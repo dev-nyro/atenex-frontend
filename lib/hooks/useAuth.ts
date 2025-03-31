@@ -14,7 +14,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Explicitly type the props for the component, including children
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
@@ -55,9 +60,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("User logged out.");
   }, [router]);
 
-  const value = { user, token, isLoading, login, logout };
+  // (-) QUITA ESTA LÍNEA (O COMENTALA):
+  // const value = { user, token, isLoading, login, logout };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    // (+) MODIFICA ESTA LÍNEA PARA PASAR EL OBJETO DIRECTAMENTE:
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = (): AuthContextType => {
