@@ -2,10 +2,10 @@
 module.exports = {
     darkMode: ["class"],
     content: [
-      './pages/**/*.{ts,tsx}',
+      './pages/**/*.{ts,tsx}', // Probablemente innecesario con App Router
       './components/**/*.{ts,tsx}',
       './app/**/*.{ts,tsx}',
-      './src/**/*.{ts,tsx}',
+      './src/**/*.{ts,tsx}', // Probablemente innecesario si no usas src/
       ],
     prefix: "",
     theme: {
@@ -145,5 +145,5 @@ module.exports = {
         }),
       },
     },
-    plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')], // Add typography plugin
+    plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')],
   }

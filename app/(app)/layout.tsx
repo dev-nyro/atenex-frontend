@@ -10,6 +10,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { cn } from '@/lib/utils';
 // (+) AÑADIR ESTA LÍNEA:
 import { removeToken } from '@/lib/auth/helpers';
+import "./globals.css"; 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, token } = useAuth();
