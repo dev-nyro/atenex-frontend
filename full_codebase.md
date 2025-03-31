@@ -77,7 +77,7 @@ atenex-frontend/
 │   │   └── helpers.ts
 │   ├── constants.ts
 │   ├── hooks
-│   │   └── useAuth.ts
+│   │   └── useAuth.tsx
 │   └── utils.ts
 ├── next.config.mjs
 ├── package.json
@@ -158,6 +158,7 @@ const nextConfig = {
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0", 
     "@tailwindcss/typography": "^0.5.16",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.13.14",
@@ -168,11 +169,10 @@ const nextConfig = {
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.4",
     "postcss": "^8.5.3",
-    "tailwindcss": "^4.0.17",
+    "tailwindcss": "^4.0.17", 
     "typescript": "^5.8.2"
   }
 }
-
 ```
 
 ## File: `tsconfig.json`
@@ -362,11 +362,11 @@ module.exports = {
 ## File: `postcss.config.js`
 ```js
 module.exports = {
-    plugins: {
-      tailwindcss: {},
-      autoprefixer: {},
-    },
-  }
+  plugins: {
+    '@tailwindcss/postcss': {},
+    autoprefixer: {},
+  },
+}
 ```
 
 ## File: `README.md`
@@ -670,8 +670,9 @@ import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
+// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA (si no existe):
+import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -688,7 +689,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
+  // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
   // Load chat history based on chatId
   useEffect(() => {
@@ -702,7 +703,6 @@ export default function ChatPage() {
       // --- TODO: Fetch actual messages ---
       // .catch(err => {
       //     // Adaptar toast si se usa aquí
-      //     // toast({ variant: "destructive", title: "Failed to load chat history", description: err.message })
       //     toast.error("Failed to load chat history", { description: err.message });
       //  })
       setMessages([
@@ -711,9 +711,6 @@ export default function ChatPage() {
     } else {
       setMessages(initialMessages);
     }
-  // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-  // }, [chatId, toast]);
-  // (+) Mantener solo [chatId] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
   }, [chatId]);
 
   // Scroll to bottom when messages change
@@ -760,13 +757,13 @@ export default function ChatPage() {
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      // (-) QUITAR ESTO:
+      // (-) QUITAR ESTO (si existía):
       // toast({
       //   variant: "destructive",
       //   title: "Query Failed",
       //   description: errorMessage,
       // });
-      // (+) AÑADIR ESTO:
+      // (+) AÑADIR/USAR ESTO:
       toast.error("Query Failed", {
         description: errorMessage,
       });
@@ -774,9 +771,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-  // }, [isLoading, toast, isPanelOpen]);
-  // (+) Mantener solo [isLoading, isPanelOpen] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+  // Dependencias de useCallback: no se necesita 'toast' para sonner
   }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {
@@ -2246,8 +2241,9 @@ import { listDocumentStatuses, DocumentStatusResponse } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
+// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA (si no existe):
+import { toast } from "sonner";
 
 type DocumentStatus = DocumentStatusResponse;
 
@@ -2255,7 +2251,7 @@ export function DocumentStatusList() {
     const [statuses, setStatuses] = useState<DocumentStatus[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
+    // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
     const fetchStatuses = useCallback(async (showToast = false) => {
         setIsLoading(true);
@@ -2264,8 +2260,8 @@ export function DocumentStatusList() {
             const data = await listDocumentStatuses();
             setStatuses(data);
             if (showToast) {
-                 // (-) QUITAR ESTO: toast({ title: "Statuses Refreshed", description: `Loaded ${data.length} document statuses.`});
-                 // (+) AÑADIR ESTO:
+                 // (-) QUITAR ESTO (si existía): toast({ title: "Statuses Refreshed", description: `Loaded ${data.length} document statuses.`});
+                 // (+) AÑADIR/USAR ESTO:
                  toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
             } else if (data.length === 0) {
                  console.log("No document statuses found.");
@@ -2274,19 +2270,15 @@ export function DocumentStatusList() {
             console.error("Failed to fetch document statuses:", err);
             const message = err instanceof Error ? err.message : "Could not load document statuses.";
             setError(message);
-            // (-) QUITAR ESTO: toast({ variant: "destructive", title: "Error Loading Statuses", description: message });
-            // (+) AÑADIR ESTO:
+            // (-) QUITAR ESTO (si existía): toast({ variant: "destructive", title: "Error Loading Statuses", description: message });
+            // (+) AÑADIR/USAR ESTO:
             toast.error("Error Loading Statuses", { description: message });
             setStatuses([]);
         } finally {
             setIsLoading(false);
         }
-    // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-    // }, [toast]);
-    // (+) Mantener solo [] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+    // Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
-
-    // ... (resto del componente igual, incluyendo useEffect, handleRefresh, getStatusBadge, formatDateTime, renderContent)
 
     useEffect(() => {
         fetchStatuses(false);
@@ -2297,7 +2289,6 @@ export function DocumentStatusList() {
     };
 
     const getStatusBadge = (status: DocumentStatus['status']) => {
-      // ... (sin cambios)
        switch (status) {
             case 'uploaded':
                 return <Badge variant="outline"><Clock className="mr-1 h-3 w-3" />Uploaded</Badge>;
@@ -2316,7 +2307,6 @@ export function DocumentStatusList() {
     };
 
     const formatDateTime = (dateString?: string) => {
-      // ... (sin cambios)
       if (!dateString) return 'N/A';
         try {
             // Format for better readability, adjust locale/options as needed
@@ -2330,7 +2320,6 @@ export function DocumentStatusList() {
     };
 
      const renderContent = () => {
-      // ... (sin cambios)
       if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
             return Array.from({ length: 5 }).map((_, index) => ( // Render more skeleton rows
                 <TableRow key={`skel-${index}`}>
@@ -2416,18 +2405,21 @@ export function DocumentStatusList() {
 
 ## File: `components/knowledge/file-uploader.tsx`
 ```tsx
+// File: components/knowledge/file-uploader.tsx
 "use client";
 
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/input'; // Input no se usa aquí, pero lo dejo por si acaso
 import { Progress } from '@/components/ui/progress';
+// Alert no se usa directamente aquí, pero lo dejo por si acaso
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UploadCloud, FileCheck2, AlertCircle, Loader2, X } from 'lucide-react';
 import { uploadDocument, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
+// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA (si no existe):
+import { toast } from "sonner";
 import { Badge } from '@/components/ui/badge';
 
 interface UploadedFileStatus {
@@ -2441,7 +2433,7 @@ interface UploadedFileStatus {
 
 export function FileUploader() {
     const [filesStatus, setFilesStatus] = useState<UploadedFileStatus[]>([]);
-    // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
+    // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
     const updateFileStatus = (fileName: string, updates: Partial<Omit<UploadedFileStatus, 'file'>>) => {
         setFilesStatus(prev =>
@@ -2475,14 +2467,14 @@ export function FileUploader() {
                     documentId: response.document_id,
                     taskId: response.task_id
                 });
-                // (-) QUITAR ESTO:
+                // (-) QUITAR ESTO (si existía):
                 // toast({
                 //     title: "Upload Queued",
                 //     description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
                 // });
-                // (+) AÑADIR ESTO:
+                // (+) AÑADIR/USAR ESTO:
                  toast.success("Upload Queued", {
-                    description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
+                    description: `${fileStatus.file.name} uploaded successfully and queued for processing. Task ID: ${response.task_id}`, // Puedes añadir más info si quieres
                  });
 
             } catch (error) {
@@ -2494,21 +2486,19 @@ export function FileUploader() {
                    errorMessage = error.message;
                 }
                 updateFileStatus(fileStatus.file.name, { status: 'error', progress: 0, error: errorMessage });
-                 // (-) QUITAR ESTO:
+                 // (-) QUITAR ESTO (si existía):
                  // toast({
                  //    variant: "destructive",
                  //    title: `Upload Failed: ${fileStatus.file.name}`,
                  //    description: errorMessage,
                  // });
-                 // (+) AÑADIR ESTO:
+                 // (+) AÑADIR/USAR ESTO:
                  toast.error(`Upload Failed: ${fileStatus.file.name}`, {
                     description: errorMessage,
                  });
             }
         });
-    // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-    // }, [toast]);
-    // (+) Mantener solo [] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+    // Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -2519,6 +2509,7 @@ export function FileUploader() {
             'text/plain': ['.txt'],
             'text/markdown': ['.md'],
             'text/html': ['.html', '.htm'],
+            // Añade más tipos si son soportados por tu backend
         },
         multiple: true,
     });
@@ -2527,7 +2518,6 @@ export function FileUploader() {
         setFilesStatus(prev => prev.filter(fs => fs.file.name !== fileName));
     };
 
-    // ... (resto del componente igual, incluyendo el return JSX)
     return (
         <div className="space-y-4">
             <div
@@ -2543,7 +2533,7 @@ export function FileUploader() {
                     <>
                         <p className="text-lg font-semibold mb-2">Drag & drop files here, or click to select</p>
                         <p className="text-sm text-muted-foreground">Supported types: PDF, DOCX, TXT, MD, HTML</p>
-                         {/* Add size limits if known */}
+                         {/* Add size limits if known from backend */}
                         {/* <p className="text-xs text-muted-foreground mt-1">Max file size: 50MB</p> */}
                     </>
                 )}
@@ -2565,15 +2555,21 @@ export function FileUploader() {
                                 {fs.status === 'uploading' && <Progress value={fs.progress} className="w-20 h-2" />}
                                 {fs.status === 'success' && <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 dark:bg-green-900 dark:text-green-300 dark:border-green-700">Queued</Badge>}
                                 {fs.status === 'error' && <Badge variant="destructive" title={fs.error}>Error</Badge>}
+                                {/* Permitir eliminar incluso si está subiendo o tuvo éxito/error */}
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFile(fs.file.name)} title="Remove from queue">
                                     <X className="h-4 w-4" />
                                 </Button>
                              </div>
-
+                            {/* Mostrar mensaje de error debajo si existe */}
+                             {fs.status === 'error' && fs.error && (
+                                <p className="text-xs text-destructive col-span-full mt-1 pl-7" title={fs.error}>
+                                   {fs.error}
+                                </p>
+                             )}
                         </div>
                     ))}
                      {filesStatus.some(fs => fs.status === 'error') && (
-                        <p className="text-xs text-destructive">Some uploads failed. Please check the errors and try again.</p>
+                        <p className="text-xs text-destructive mt-2">Some uploads failed. Check individual errors above.</p>
                      )}
                 </div>
             )}
@@ -4357,8 +4353,8 @@ export const APP_NAME = "Atenex";
 export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ```
 
-## File: `lib/hooks/useAuth.ts`
-```ts
+## File: `lib/hooks/useAuth.tsx`
+```tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -4472,6 +4468,7 @@ export const useAuth = (): AuthContextType => {
 
 ## File: `lib/utils.ts`
 ```ts
+// File: lib/utils.ts
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -4479,4 +4476,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// (+) AÑADIR ESTA FUNCIÓN COMPLETA
+/**
+ * Retrieves the API Gateway URL from environment variables.
+ * Throws an error if the environment variable is not set during runtime.
+ * @returns {string} The API Gateway URL.
+ */
+export function getApiGatewayUrl(): string {
+    const apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL;
+
+    if (!apiUrl) {
+        // En el lado del cliente o si la variable simplemente no está definida,
+        // podríamos querer lanzar un error o retornar un valor por defecto/vacío
+        // dependiendo de cómo queremos manejar este caso. Lanzar un error es más seguro
+        // para detectar problemas de configuración temprano.
+        console.error("Error: NEXT_PUBLIC_API_GATEWAY_URL environment variable is not set.");
+        // Puedes decidir lanzar un error en producción/staging
+        if (process.env.NODE_ENV !== 'development') {
+             throw new Error("API Gateway URL is not configured. Please set NEXT_PUBLIC_API_GATEWAY_URL.");
+        } else {
+            // En desarrollo, podrías retornar una URL por defecto o un string vacío
+            // para evitar bloquear el desarrollo, pero con una advertencia clara.
+            console.warn("Returning default/empty URL for API Gateway in development.");
+            return "http://localhost:8080"; // O un string vacío "" si prefieres
+        }
+    }
+     // Eliminar la barra diagonal final si existe para evitar dobles barras
+    return apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+}
+// FIN DE LA FUNCIÓN AÑADIDA
 ```
