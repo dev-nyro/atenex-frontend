@@ -1,67 +1,67 @@
 // File: components/knowledge/document-status-list.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react'; // useCallback added
+import React, { useState, useEffect, useCallback } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Clock, Loader2, RefreshCw } from 'lucide-react';
-// Import the specific LIST function and the response type
 import { listDocumentStatuses, DocumentStatusResponse } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from "@/components/ui/use-toast";
+// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
 
-// Type alias for clarity in the component
 type DocumentStatus = DocumentStatusResponse;
 
 export function DocumentStatusList() {
-    // Initialize with empty array
     const [statuses, setStatuses] = useState<DocumentStatus[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { toast } = useToast();
+    // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
 
-    const fetchStatuses = useCallback(async (showToast = false) => { // Added showToast flag
+    const fetchStatuses = useCallback(async (showToast = false) => {
         setIsLoading(true);
         setError(null);
         try {
-            // Use the actual API call function from lib/api.ts
             const data = await listDocumentStatuses();
             setStatuses(data);
-            if (showToast) { // Show toast only on manual refresh or if needed logic
-                 toast({ title: "Statuses Refreshed", description: `Loaded ${data.length} document statuses.`});
+            if (showToast) {
+                 // (-) QUITAR ESTO: toast({ title: "Statuses Refreshed", description: `Loaded ${data.length} document statuses.`});
+                 // (+) AÑADIR ESTO:
+                 toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
             } else if (data.length === 0) {
-                // Optionally show a message if the list is empty after initial load
                  console.log("No document statuses found.");
-                 // toast({ title: "No Documents", description: "No documents found. Upload documents to see their status here.", duration: 5000});
             }
         } catch (err) {
             console.error("Failed to fetch document statuses:", err);
             const message = err instanceof Error ? err.message : "Could not load document statuses.";
             setError(message);
-            toast({ variant: "destructive", title: "Error Loading Statuses", description: message });
-            setStatuses([]); // Clear statuses on error
+            // (-) QUITAR ESTO: toast({ variant: "destructive", title: "Error Loading Statuses", description: message });
+            // (+) AÑADIR ESTO:
+            toast.error("Error Loading Statuses", { description: message });
+            setStatuses([]);
         } finally {
             setIsLoading(false);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [toast]); // Toast is the only dependency needed here for useCallback
+    // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
+    // }, [toast]);
+    // (+) Mantener solo [] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+    }, []);
 
-    // Fetch statuses on component mount
+    // ... (resto del componente igual, incluyendo useEffect, handleRefresh, getStatusBadge, formatDateTime, renderContent)
+
     useEffect(() => {
-        fetchStatuses(false); // Fetch initially without showing toast
-        // Optional: Set up polling or websockets for real-time updates
-        // const intervalId = setInterval(() => fetchStatuses(false), 30000); // Fetch silently
-        // return () => clearInterval(intervalId);
-    }, [fetchStatuses]); // Add fetchStatuses to dependency array
+        fetchStatuses(false);
+    }, [fetchStatuses]);
 
     const handleRefresh = () => {
-        fetchStatuses(true); // Fetch and show toast on manual refresh
+        fetchStatuses(true);
     };
 
     const getStatusBadge = (status: DocumentStatus['status']) => {
-        switch (status) {
+      // ... (sin cambios)
+       switch (status) {
             case 'uploaded':
                 return <Badge variant="outline"><Clock className="mr-1 h-3 w-3" />Uploaded</Badge>;
             case 'processing':
@@ -79,7 +79,8 @@ export function DocumentStatusList() {
     };
 
     const formatDateTime = (dateString?: string) => {
-        if (!dateString) return 'N/A';
+      // ... (sin cambios)
+      if (!dateString) return 'N/A';
         try {
             // Format for better readability, adjust locale/options as needed
             return new Date(dateString).toLocaleString(undefined, {
@@ -91,10 +92,9 @@ export function DocumentStatusList() {
         }
     };
 
-
-    const renderContent = () => {
-        // Show skeleton rows during initial load or refresh
-        if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
+     const renderContent = () => {
+      // ... (sin cambios)
+      if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
             return Array.from({ length: 5 }).map((_, index) => ( // Render more skeleton rows
                 <TableRow key={`skel-${index}`}>
                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
@@ -148,18 +148,16 @@ export function DocumentStatusList() {
         ));
     };
 
-
     return (
        <div className="space-y-2">
            <div className="flex justify-end">
-                {/* Show error inline with refresh button if an error occurred but list might still have old data */}
                 {error && statuses.length > 0 && <span className="text-xs text-destructive mr-2 self-center">Refresh failed: {error}</span>}
                 <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
                     <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                     Refresh
                 </Button>
            </div>
-            <ScrollArea className="h-[400px] border rounded-md"> {/* Adjust height */}
+            <ScrollArea className="h-[400px] border rounded-md">
                 <Table>
                     <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
                         <TableRow>
@@ -169,7 +167,6 @@ export function DocumentStatusList() {
                             <TableHead>Last Updated</TableHead>
                         </TableRow>
                     </TableHeader>
-                    {/* Render skeleton inside TableBody if loading */}
                     <TableBody>
                        {renderContent()}
                     </TableBody>

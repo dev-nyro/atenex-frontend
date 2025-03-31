@@ -3,12 +3,13 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Although hidden, good practice
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UploadCloud, FileCheck2, AlertCircle, Loader2, X } from 'lucide-react';
 import { uploadDocument, ApiError } from '@/lib/api';
-import { useToast } from "@/components/ui/use-toast";
+// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
 import { Badge } from '@/components/ui/badge';
 
 interface UploadedFileStatus {
@@ -16,13 +17,13 @@ interface UploadedFileStatus {
     status: 'pending' | 'uploading' | 'success' | 'error';
     progress: number;
     error?: string;
-    documentId?: string; // Store ID upon success
+    documentId?: string;
     taskId?: string;
 }
 
 export function FileUploader() {
     const [filesStatus, setFilesStatus] = useState<UploadedFileStatus[]>([]);
-    const { toast } = useToast();
+    // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
 
     const updateFileStatus = (fileName: string, updates: Partial<Omit<UploadedFileStatus, 'file'>>) => {
         setFilesStatus(prev =>
@@ -31,7 +32,6 @@ export function FileUploader() {
     };
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
-        // Add new files with 'pending' status
         const newFiles: UploadedFileStatus[] = acceptedFiles.map(file => ({
             file,
             status: 'pending',
@@ -39,22 +39,17 @@ export function FileUploader() {
         }));
         setFilesStatus(prev => [...prev, ...newFiles]);
 
-        // Start uploading pending files
         newFiles.forEach(async (fileStatus) => {
             const formData = new FormData();
             formData.append('file', fileStatus.file);
-            // TODO: Add metadata if needed, e.g., from a form
             const metadata = { source: 'web-uploader' };
-            // formData.append('metadata_json', JSON.stringify(metadata)); // API client handles this now
 
-            updateFileStatus(fileStatus.file.name, { status: 'uploading', progress: 10 }); // Show indeterminate progress initially
+            updateFileStatus(fileStatus.file.name, { status: 'uploading', progress: 10 });
 
             try {
-                // Simulate progress (replace with actual progress if API supports it)
-                // For now, just set to 50% during the call
                  updateFileStatus(fileStatus.file.name, { progress: 50 });
 
-                const response = await uploadDocument(formData, metadata); // Pass metadata separately
+                const response = await uploadDocument(formData, metadata);
 
                 updateFileStatus(fileStatus.file.name, {
                     status: 'success',
@@ -62,10 +57,16 @@ export function FileUploader() {
                     documentId: response.document_id,
                     taskId: response.task_id
                 });
-                toast({
-                    title: "Upload Queued",
+                // (-) QUITAR ESTO:
+                // toast({
+                //     title: "Upload Queued",
+                //     description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
+                // });
+                // (+) AÑADIR ESTO:
+                 toast.success("Upload Queued", {
                     description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
-                });
+                 });
+
             } catch (error) {
                 console.error(`Upload failed for ${fileStatus.file.name}:`, error);
                 let errorMessage = 'Upload failed.';
@@ -75,27 +76,31 @@ export function FileUploader() {
                    errorMessage = error.message;
                 }
                 updateFileStatus(fileStatus.file.name, { status: 'error', progress: 0, error: errorMessage });
-                 toast({
-                    variant: "destructive",
-                    title: `Upload Failed: ${fileStatus.file.name}`,
+                 // (-) QUITAR ESTO:
+                 // toast({
+                 //    variant: "destructive",
+                 //    title: `Upload Failed: ${fileStatus.file.name}`,
+                 //    description: errorMessage,
+                 // });
+                 // (+) AÑADIR ESTO:
+                 toast.error(`Upload Failed: ${fileStatus.file.name}`, {
                     description: errorMessage,
                  });
             }
         });
-    }, [toast]);
+    // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
+    // }, [toast]);
+    // (+) Mantener solo [] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+    }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        // TODO: Add file type restrictions based on backend capabilities
         accept: {
             'application/pdf': ['.pdf'],
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
             'text/plain': ['.txt'],
             'text/markdown': ['.md'],
             'text/html': ['.html', '.htm'],
-            // Add image types if OCR is supported later
-            // 'image/jpeg': ['.jpg', '.jpeg'],
-            // 'image/png': ['.png'],
         },
         multiple: true,
     });
@@ -104,6 +109,7 @@ export function FileUploader() {
         setFilesStatus(prev => prev.filter(fs => fs.file.name !== fileName));
     };
 
+    // ... (resto del componente igual, incluyendo el return JSX)
     return (
         <div className="space-y-4">
             <div

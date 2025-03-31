@@ -1,10 +1,12 @@
+// File: app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth"; // Import AuthProvider
-import { Toaster } from "@/components/ui/toaster"; // For displaying notifications
+// (-) QUITAR ESTA LÍNEA: import { Toaster } from "@/components/ui/toaster";
+// (+) AÑADIR ESTA LÍNEA: import { Toaster } from "@/components/ui/sonner"; // Importa el Toaster de Sonner
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -35,7 +37,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <Toaster /> {/* Add Toaster component */}
+            <Toaster /> {/* Esta línea se mantiene, pero ahora usa el Toaster de Sonner importado arriba */}
           </ThemeProvider>
         </AuthProvider>
       </body>

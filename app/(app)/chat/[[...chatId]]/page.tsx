@@ -2,16 +2,16 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams } from 'next/navigation'; // Use useParams to get dynamic route segments
+import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-// Corrected relative paths assuming components are siblings or in subdirs
 import { ChatInput } from '@/components/chat/chat-input';
 import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-import { useToast } from "@/components/ui/use-toast";
+// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -19,9 +19,7 @@ const initialMessages: Message[] = [
     { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
 ];
 
-// Renamed to ChatPage and made the default export
 export default function ChatPage() {
-  // Use useParams hook to get the chatId from the URL
   const params = useParams();
   const chatId = params.chatId ? (Array.isArray(params.chatId) ? params.chatId.join('/') : params.chatId) : undefined;
 
@@ -30,7 +28,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
+  // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
 
   // Load chat history based on chatId
   useEffect(() => {
@@ -41,33 +39,31 @@ export default function ChatPage() {
 
     if (chatId) {
       console.log(`Loading history for chat: ${chatId}`);
-      // --- TODO: Fetch actual messages for the specific chatId ---
-      // Example:
-      // setIsLoading(true);
-      // fetchChatHistory(chatId)
-      //   .then(historyMessages => setMessages(historyMessages))
-      //   .catch(err => toast({ variant: "destructive", title: "Failed to load chat history" }))
-      //   .finally(() => setIsLoading(false));
-
-      // Placeholder for now:
+      // --- TODO: Fetch actual messages ---
+      // .catch(err => {
+      //     // Adaptar toast si se usa aquí
+      //     // toast({ variant: "destructive", title: "Failed to load chat history", description: err.message })
+      //     toast.error("Failed to load chat history", { description: err.message });
+      //  })
       setMessages([
            { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
       ]);
     } else {
-      // No specific chat ID, start fresh
       setMessages(initialMessages);
     }
-  }, [chatId, toast]); // Add toast to dependencies
+  // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
+  // }, [chatId, toast]);
+  // (+) Mantener solo [chatId] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+  }, [chatId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollAreaRef.current) {
-        // Use setTimeout to ensure scrolling happens after DOM update and potential reflow
         setTimeout(() => {
              if (scrollAreaRef.current) {
                  scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
              }
-        }, 100); // Small delay might help
+        }, 100);
     }
   }, [messages]);
 
@@ -77,7 +73,7 @@ export default function ChatPage() {
     const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-    setRetrievedDocs([]); // Clear previous docs
+    setRetrievedDocs([]);
 
     try {
       const response = await postQuery({ query });
@@ -85,12 +81,12 @@ export default function ChatPage() {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: response.answer,
-        sources: response.retrieved_documents // Attach sources to the message
+        sources: response.retrieved_documents
       };
       setMessages(prev => [...prev, assistantMessage]);
       setRetrievedDocs(response.retrieved_documents || []);
       if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isPanelOpen) {
-         setIsPanelOpen(true); // Auto-open panel if closed and docs were retrieved
+         setIsPanelOpen(true);
       }
     } catch (error) {
       console.error("Query failed:", error);
@@ -104,25 +100,33 @@ export default function ChatPage() {
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      toast({
-        variant: "destructive",
-        title: "Query Failed",
+      // (-) QUITAR ESTO:
+      // toast({
+      //   variant: "destructive",
+      //   title: "Query Failed",
+      //   description: errorMessage,
+      // });
+      // (+) AÑADIR ESTO:
+      toast.error("Query Failed", {
         description: errorMessage,
       });
+
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, toast, isPanelOpen]);
+  // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
+  // }, [isLoading, toast, isPanelOpen]);
+  // (+) Mantener solo [isLoading, isPanelOpen] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+  }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
     };
 
   return (
-     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Adjust height based on header */}
+     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]">
             <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
                 <div className="flex h-full flex-col">
-                    {/* Button to toggle panel */}
                     <div className="absolute top-2 right-2 z-10">
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon">
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
@@ -131,11 +135,11 @@ export default function ChatPage() {
                     </div>
 
                     <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-                        <div className="space-y-4 pr-4"> {/* Add padding right */}
+                        <div className="space-y-4 pr-4">
                             {messages.map((message) => (
                                 <ChatMessage key={message.id} message={message} />
                             ))}
-                            {isLoading && messages[messages.length - 1]?.role === 'user' && ( // Show skeleton only when waiting for assistant
+                            {isLoading && messages[messages.length - 1]?.role === 'user' && (
                                 <div className="flex items-start space-x-3">
                                      <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
                                           <BrainCircuit className="h-5 w-5 text-primary"/>
