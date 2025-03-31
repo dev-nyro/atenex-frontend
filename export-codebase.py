@@ -2,7 +2,7 @@ from pathlib import Path
 
 # Directories to exclude from the export
 EXCLUDED_DIRS = {'.git', '__pycache__', '.venv', '.idea', '.mypy_cache', '.vscode', '.github', 'node_modules', 
-                '.next', 'out', 'dist', 'coverage'}
+                '.next', 'out', 'dist', 'coverage', 'package-lock.json'}
 
 # Important files to include even at the root level
 IMPORTANT_CONFIG_FILES = [
