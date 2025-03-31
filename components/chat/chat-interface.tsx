@@ -1,3 +1,4 @@
+// File: components/chat/chat-interface.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -8,8 +9,10 @@ import { ChatMessage, Message } from './chat-message';
 import { RetrievedDocumentsPanel } from './retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-import { useToast } from "@/components/ui/use-toast";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react';
+// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA:
+import { toast } from "sonner";
+import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react'; // Mantuve FileText aunque no se use directamente, por si acaso.
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChatInterfaceProps {
@@ -26,10 +29,15 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true); // State for the right panel
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
+  // (-) QUITAR ESTA LÍNEA: const { toast } = useToast(); // Ya no se usa el hook, se importa 'toast' directamente.
 
   // Load chat history based on chatId (placeholder)
   useEffect(() => {
+    // Reset state for new/different chat
+    setMessages(initialMessages);
+    setRetrievedDocs([]);
+    setIsLoading(false);
+
     if (chatId) {
       console.log(`Loading history for chat: ${chatId}`);
       // TODO: Fetch messages for the specific chatId from backend/localStorage
@@ -37,18 +45,21 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       setMessages([ // Dummy loading
            { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
       ]);
-      setRetrievedDocs([]); // Clear docs when changing chat
     } else {
       // New chat
       setMessages(initialMessages);
-      setRetrievedDocs([]);
     }
   }, [chatId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+        // Added timeout to ensure DOM updates are flushed before scrolling
+        setTimeout(() => {
+            if (scrollAreaRef.current) {
+                scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+            }
+        }, 100);
     }
   }, [messages]);
 
@@ -85,15 +96,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      toast({
-        variant: "destructive",
-        title: "Query Failed",
+      // (*) MODIFICAR ESTA LLAMADA PARA USAR 'sonner'
+      toast.error("Query Failed", {
         description: errorMessage,
       });
+
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, toast, isPanelOpen]); // Add isPanelOpen dependency
+  // (*) QUITAR 'toast' de las dependencias si estaba, ya que 'toast' de sonner es una función estable importada.
+  }, [isLoading, isPanelOpen]); // Add isPanelOpen dependency
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
@@ -116,7 +128,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                             {messages.map((message) => (
                                 <ChatMessage key={message.id} message={message} />
                             ))}
-                            {isLoading && (
+                            {/* (*) Modificado para mostrar Skeleton solo cuando el último mensaje es del usuario */}
+                            {isLoading && messages[messages.length - 1]?.role === 'user' && (
                                 <div className="flex items-start space-x-3">
                                      <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
                                           <BrainCircuit className="h-5 w-5 text-primary"/>
@@ -141,7 +154,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 <>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading} />
+                        {/* (*) Modificado para pasar el estado de carga correcto al panel de documentos */}
+                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
                     </ResizablePanel>
                 </>
             )}

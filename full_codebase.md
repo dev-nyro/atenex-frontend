@@ -879,10 +879,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { useAuth } from '@/lib/hooks/useAuth'; // <-- Asegúrate que es .tsx si renombraste
+import { useAuth } from '@/lib/hooks/useAuth';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
-// --- ¡¡NO DEBE HABER NINGÚN 'import ...globals.css' AQUÍ!! ---
+// (+) AÑADIR ESTA LÍNEA:
+import { removeToken } from '@/lib/auth/helpers';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, token } = useAuth();
@@ -894,18 +895,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       console.log("AppLayout: No token found, redirecting to login.");
       router.push('/login');
     } else if (!isLoading && token && !user) {
-        console.log("AppLayout: Invalid token found, redirecting to login.");
-        router.push('/login');
+      console.log("AppLayout: Invalid token found, redirecting to login.");
+      // Ahora TypeScript sabe qué es removeToken gracias a la importación
+      removeToken();
+      router.push('/login');
     }
+    // La función removeToken importada es estable, no necesita estar en las dependencias.
   }, [user, isLoading, token, router]);
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+  // Muestra un spinner mientras se verifica la autenticación
+   if (isLoading || (!token && !isLoading)) {
+     return (
+       <div className="flex h-screen items-center justify-center">
+         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+       </div>
+     );
+   }
+
+  // Si no está cargando y no hay usuario/token
+  if (!user || !token) {
+     console.log("AppLayout: Renderizando null porque no hay usuario/token después de la carga.");
+     // Considera redirigir de nuevo aquí como medida extra de seguridad si llega a este punto
+     // router.push('/login');
+     return null;
   }
+
 
   return (
     <div className="flex h-screen bg-secondary/30 dark:bg-muted/30">
@@ -1415,19 +1429,18 @@ export async function POST(request: Request) {
 // File: app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css";
+import "./globals.css"; // Esta importación SÍ debe estar aquí
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/lib/hooks/useAuth"; // Import AuthProvider
-// (-) QUITAR ESTA LÍNEA: import { Toaster } from "@/components/ui/toaster";
-// (+) AÑADIR ESTA LÍNEA: import { Toaster } from "@/components/ui/sonner"; // Importa el Toaster de Sonner
+import { AuthProvider } from "@/lib/hooks/useAuth";
+// ¡¡ASEGÚRATE DE ELIMINAR LOS '//' DEL PRINCIPIO DE ESTA LÍNEA!!
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Atenex - Enterprise Knowledge Query",
   description: "Query your enterprise knowledge base using natural language.",
-  // Add icons later if needed
 };
 
 export default function RootLayout({
@@ -1443,7 +1456,7 @@ export default function RootLayout({
           inter.variable
         )}
       >
-        <AuthProvider> {/* Wrap with AuthProvider */}
+        <AuthProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -1451,7 +1464,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <Toaster /> {/* Esta línea se mantiene, pero ahora usa el Toaster de Sonner importado arriba */}
+            {/* Esta línea requiere la importación activa de arriba */}
+            <Toaster />
           </ThemeProvider>
         </AuthProvider>
       </body>
