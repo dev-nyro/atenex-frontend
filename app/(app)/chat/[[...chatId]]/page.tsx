@@ -10,8 +10,9 @@ import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
+// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA (si no existe):
+import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,7 +29,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
+  // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
   // Load chat history based on chatId
   useEffect(() => {
@@ -42,7 +43,6 @@ export default function ChatPage() {
       // --- TODO: Fetch actual messages ---
       // .catch(err => {
       //     // Adaptar toast si se usa aquí
-      //     // toast({ variant: "destructive", title: "Failed to load chat history", description: err.message })
       //     toast.error("Failed to load chat history", { description: err.message });
       //  })
       setMessages([
@@ -51,9 +51,6 @@ export default function ChatPage() {
     } else {
       setMessages(initialMessages);
     }
-  // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-  // }, [chatId, toast]);
-  // (+) Mantener solo [chatId] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
   }, [chatId]);
 
   // Scroll to bottom when messages change
@@ -100,13 +97,13 @@ export default function ChatPage() {
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      // (-) QUITAR ESTO:
+      // (-) QUITAR ESTO (si existía):
       // toast({
       //   variant: "destructive",
       //   title: "Query Failed",
       //   description: errorMessage,
       // });
-      // (+) AÑADIR ESTO:
+      // (+) AÑADIR/USAR ESTO:
       toast.error("Query Failed", {
         description: errorMessage,
       });
@@ -114,9 +111,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-  // }, [isLoading, toast, isPanelOpen]);
-  // (+) Mantener solo [isLoading, isPanelOpen] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+  // Dependencias de useCallback: no se necesita 'toast' para sonner
   }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {

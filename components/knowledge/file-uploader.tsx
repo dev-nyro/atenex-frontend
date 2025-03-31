@@ -1,15 +1,18 @@
+// File: components/knowledge/file-uploader.tsx
 "use client";
 
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/input'; // Input no se usa aquí, pero lo dejo por si acaso
 import { Progress } from '@/components/ui/progress';
+// Alert no se usa directamente aquí, pero lo dejo por si acaso
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UploadCloud, FileCheck2, AlertCircle, Loader2, X } from 'lucide-react';
 import { uploadDocument, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA: import { toast } from "sonner";
+// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
+// (+) AÑADIR ESTA LÍNEA (si no existe):
+import { toast } from "sonner";
 import { Badge } from '@/components/ui/badge';
 
 interface UploadedFileStatus {
@@ -23,7 +26,7 @@ interface UploadedFileStatus {
 
 export function FileUploader() {
     const [filesStatus, setFilesStatus] = useState<UploadedFileStatus[]>([]);
-    // (-) QUITAR ESTA LÍNEA: const { toast } = useToast();
+    // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
     const updateFileStatus = (fileName: string, updates: Partial<Omit<UploadedFileStatus, 'file'>>) => {
         setFilesStatus(prev =>
@@ -57,14 +60,14 @@ export function FileUploader() {
                     documentId: response.document_id,
                     taskId: response.task_id
                 });
-                // (-) QUITAR ESTO:
+                // (-) QUITAR ESTO (si existía):
                 // toast({
                 //     title: "Upload Queued",
                 //     description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
                 // });
-                // (+) AÑADIR ESTO:
+                // (+) AÑADIR/USAR ESTO:
                  toast.success("Upload Queued", {
-                    description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
+                    description: `${fileStatus.file.name} uploaded successfully and queued for processing. Task ID: ${response.task_id}`, // Puedes añadir más info si quieres
                  });
 
             } catch (error) {
@@ -76,21 +79,19 @@ export function FileUploader() {
                    errorMessage = error.message;
                 }
                 updateFileStatus(fileStatus.file.name, { status: 'error', progress: 0, error: errorMessage });
-                 // (-) QUITAR ESTO:
+                 // (-) QUITAR ESTO (si existía):
                  // toast({
                  //    variant: "destructive",
                  //    title: `Upload Failed: ${fileStatus.file.name}`,
                  //    description: errorMessage,
                  // });
-                 // (+) AÑADIR ESTO:
+                 // (+) AÑADIR/USAR ESTO:
                  toast.error(`Upload Failed: ${fileStatus.file.name}`, {
                     description: errorMessage,
                  });
             }
         });
-    // (-) QUITAR 'toast' de las dependencias si solo estaba por el hook useToast
-    // }, [toast]);
-    // (+) Mantener solo [] o añadir 'toast' de sonner si es necesario (normalmente no lo es)
+    // Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -101,6 +102,7 @@ export function FileUploader() {
             'text/plain': ['.txt'],
             'text/markdown': ['.md'],
             'text/html': ['.html', '.htm'],
+            // Añade más tipos si son soportados por tu backend
         },
         multiple: true,
     });
@@ -109,7 +111,6 @@ export function FileUploader() {
         setFilesStatus(prev => prev.filter(fs => fs.file.name !== fileName));
     };
 
-    // ... (resto del componente igual, incluyendo el return JSX)
     return (
         <div className="space-y-4">
             <div
@@ -125,7 +126,7 @@ export function FileUploader() {
                     <>
                         <p className="text-lg font-semibold mb-2">Drag & drop files here, or click to select</p>
                         <p className="text-sm text-muted-foreground">Supported types: PDF, DOCX, TXT, MD, HTML</p>
-                         {/* Add size limits if known */}
+                         {/* Add size limits if known from backend */}
                         {/* <p className="text-xs text-muted-foreground mt-1">Max file size: 50MB</p> */}
                     </>
                 )}
@@ -147,15 +148,21 @@ export function FileUploader() {
                                 {fs.status === 'uploading' && <Progress value={fs.progress} className="w-20 h-2" />}
                                 {fs.status === 'success' && <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 dark:bg-green-900 dark:text-green-300 dark:border-green-700">Queued</Badge>}
                                 {fs.status === 'error' && <Badge variant="destructive" title={fs.error}>Error</Badge>}
+                                {/* Permitir eliminar incluso si está subiendo o tuvo éxito/error */}
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFile(fs.file.name)} title="Remove from queue">
                                     <X className="h-4 w-4" />
                                 </Button>
                              </div>
-
+                            {/* Mostrar mensaje de error debajo si existe */}
+                             {fs.status === 'error' && fs.error && (
+                                <p className="text-xs text-destructive col-span-full mt-1 pl-7" title={fs.error}>
+                                   {fs.error}
+                                </p>
+                             )}
                         </div>
                     ))}
                      {filesStatus.some(fs => fs.status === 'error') && (
-                        <p className="text-xs text-destructive">Some uploads failed. Please check the errors and try again.</p>
+                        <p className="text-xs text-destructive mt-2">Some uploads failed. Check individual errors above.</p>
                      )}
                 </div>
             )}

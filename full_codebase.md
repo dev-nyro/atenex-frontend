@@ -146,6 +146,7 @@ const nextConfig = {
     "next-themes": "^0.4.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.55.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",
@@ -162,6 +163,7 @@ const nextConfig = {
     "@types/node": "^22.13.14",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
+    "@types/react-dropzone": "^4.2.2",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.4",
@@ -4371,9 +4373,32 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// (+) Define un valor por defecto que coincide con la estructura de AuthContextType
+const defaultAuthContextValue: AuthContextType = {
+    user: null,
+    token: null,
+    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
+    login: (token: string) => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("Login function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
+    },
+    logout: () => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("Logout function called outside of AuthProvider context");
+        // throw new Error("Logout function called outside AuthProvider");
+    },
+};
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// (+) Modifica createContext para usar el valor por defecto y el tipo AuthContextType (sin | undefined)
+const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
+
+// Explicitly type the props for the component, including children
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
@@ -4393,36 +4418,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     setIsLoading(false);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
 
   const login = useCallback((newToken: string) => {
     setToken(newToken);
-    const userData = getUserFromToken(newToken);
+    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
     setUser(userData);
     setAuthStateToken(newToken);
-    // Redirect to app page after login
     router.push('/'); // Redirect to the main app page
     console.log("User logged in, token set.");
-  }, [router]);
+  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
   const logout = useCallback(() => {
     removeToken();
     setUser(null);
     setAuthStateToken(null);
-    // Redirect to login page after logout
     router.push('/login');
     console.log("User logged out.");
   }, [router]);
 
-  const value = { user, token, isLoading, login, logout };
+  // El valor proporcionado por el Provider ahora siempre coincide con AuthContextType
+  const providerValue = {
+      user,
+      token,
+      isLoading,
+      login,
+      logout
+  };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    // Pasa el objeto calculado
+    <AuthContext.Provider value={providerValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
+  // La comprobación de undefined ya no es estrictamente necesaria porque
+  // createContext ahora tiene un valor por defecto válido, pero
+  // mantenerla puede ser útil para detectar errores de configuración inesperados.
   if (context === undefined) {
+    console.error("AuthContext reached undefined state unexpectedly.");
     throw new Error('useAuth must be used within an AuthProvider');
+    // O podrías retornar defaultAuthContextValue aquí si prefieres no lanzar error,
+    // aunque lanzar error suele ser mejor para detectar problemas.
   }
   return context;
 };
