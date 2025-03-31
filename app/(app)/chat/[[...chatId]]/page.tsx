@@ -1,54 +1,73 @@
+// File: app/(app)/chat/[[...chatId]]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams } from 'next/navigation'; // Use useParams to get dynamic route segments
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChatInput } from './chat-input';
-import { ChatMessage, Message } from './chat-message';
-import { RetrievedDocumentsPanel } from './retrieved-documents-panel';
+// Corrected relative paths assuming components are siblings or in subdirs
+import { ChatInput } from '@/components/chat/chat-input';
+import { ChatMessage, Message } from '@/components/chat/chat-message';
+import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
 import { useToast } from "@/components/ui/use-toast";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface ChatInterfaceProps {
-  chatId?: string; // Receive chatId from the page
-}
 
 const initialMessages: Message[] = [
     { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
 ];
 
-export function ChatInterface({ chatId }: ChatInterfaceProps) {
+// Renamed to ChatPage and made the default export
+export default function ChatPage() {
+  // Use useParams hook to get the chatId from the URL
+  const params = useParams();
+  const chatId = params.chatId ? (Array.isArray(params.chatId) ? params.chatId.join('/') : params.chatId) : undefined;
+
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(true); // State for the right panel
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Load chat history based on chatId (placeholder)
+  // Load chat history based on chatId
   useEffect(() => {
+    // Reset state for new/different chat
+    setMessages(initialMessages);
+    setRetrievedDocs([]);
+    setIsLoading(false); // Ensure loading is reset
+
     if (chatId) {
       console.log(`Loading history for chat: ${chatId}`);
-      // TODO: Fetch messages for the specific chatId from backend/localStorage
-      // setMessages(fetchedMessages);
-      setMessages([ // Dummy loading
+      // --- TODO: Fetch actual messages for the specific chatId ---
+      // Example:
+      // setIsLoading(true);
+      // fetchChatHistory(chatId)
+      //   .then(historyMessages => setMessages(historyMessages))
+      //   .catch(err => toast({ variant: "destructive", title: "Failed to load chat history" }))
+      //   .finally(() => setIsLoading(false));
+
+      // Placeholder for now:
+      setMessages([
            { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
       ]);
-      setRetrievedDocs([]); // Clear docs when changing chat
     } else {
-      // New chat
+      // No specific chat ID, start fresh
       setMessages(initialMessages);
-      setRetrievedDocs([]);
     }
-  }, [chatId]);
+  }, [chatId, toast]); // Add toast to dependencies
 
   // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+        // Use setTimeout to ensure scrolling happens after DOM update and potential reflow
+        setTimeout(() => {
+             if (scrollAreaRef.current) {
+                 scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+             }
+        }, 100); // Small delay might help
     }
   }, [messages]);
 
@@ -93,7 +112,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, toast, isPanelOpen]); // Add isPanelOpen dependency
+  }, [isLoading, toast, isPanelOpen]);
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
@@ -116,7 +135,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                             {messages.map((message) => (
                                 <ChatMessage key={message.id} message={message} />
                             ))}
-                            {isLoading && (
+                            {isLoading && messages[messages.length - 1]?.role === 'user' && ( // Show skeleton only when waiting for assistant
                                 <div className="flex items-start space-x-3">
                                      <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
                                           <BrainCircuit className="h-5 w-5 text-primary"/>
@@ -136,12 +155,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 </div>
             </ResizablePanel>
 
-            {/* Conditionally render the panel based on isPanelOpen */}
             {isPanelOpen && (
                 <>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading} />
+                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
                     </ResizablePanel>
                 </>
             )}
