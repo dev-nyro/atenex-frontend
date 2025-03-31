@@ -1,5 +1,6 @@
 import { getToken } from './auth/helpers';
 import { getApiGatewayUrl } from './utils';
+import type { User } from './auth/helpers'; // Import User type
 
 interface ApiErrorData {
     detail?: string | { msg: string; type: string }[] | any; // FastAPI often uses 'detail'
@@ -38,23 +39,15 @@ async function request<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // Add X-Company-ID if needed DIRECTLY by a service (Gateway should handle it based on JWT)
-  // const { user } = useAuth(); // Cannot use hooks here
-  // const companyId = getCompanyIdFromSomewhere(); // Get company ID if needed
-  // if (companyId) {
-  //   headers.set('X-Company-ID', companyId);
-  // }
+  // The API Gateway is responsible for adding X-Company-ID based on the JWT.
+  // Frontend usually doesn't need to send it directly when talking to the Gateway.
 
   const config: RequestInit = {
     ...options,
     headers,
   };
 
-  // Log the request details (optional)
   console.log(`API Request: ${config.method || 'GET'} ${url}`);
-  // if (config.body && !(config.body instanceof FormData)) {
-  //    console.log('Request Body:', config.body);
-  // }
 
   try {
     const response = await fetch(url, config);
@@ -62,10 +55,8 @@ async function request<T>(
     if (!response.ok) {
       let errorData: ApiErrorData | null = null;
       try {
-        // Try to parse error response body
         errorData = await response.json();
       } catch (e) {
-        // Ignore if response is not JSON
         console.warn("API error response was not valid JSON:", await response.text());
       }
       const errorMessage = errorData?.detail
@@ -76,35 +67,29 @@ async function request<T>(
       throw new ApiError(errorMessage, response.status, errorData || undefined);
     }
 
-    // Handle successful response with no content
     if (response.status === 204 || response.headers.get('content-length') === '0') {
         console.log(`API Success: ${response.status} No Content`);
-        return {} as T; // Or return null/undefined based on expected type
+        // Ensure the return type matches T, even if empty. Use 'any' or specific empty object type.
+        // If T can be void or undefined, handle accordingly.
+        return {} as T;
     }
 
     const data: T = await response.json();
-    console.log(`API Success: ${response.status}`, data);
+    console.log(`API Success: ${response.status}`); // Avoid logging potentially large data object
     return data;
   } catch (error) {
     if (error instanceof ApiError) {
-      // Re-throw known API errors
       throw error;
     } else {
-      // Handle network errors or other exceptions
       console.error('Network or unexpected error:', error);
-      throw new ApiError(error instanceof Error ? error.message : 'Network error or unexpected issue', 0, undefined); // status 0 for network errors
+      throw new ApiError(error instanceof Error ? error.message : 'Network error or unexpected issue', 0, undefined);
     }
   }
 }
 
-// --- Auth Service (Example Proxied through API Gateway or Direct) ---
-// Note: Adjust endpoint if auth is handled by a separate service proxied via gateway
-
+// --- Auth Service ---
 export const loginUser = async (credentials: { email: string; password: string }) => {
-  // Assuming backend provides { access_token: string } on successful login
-  // The Gateway might proxy this to an /auth service endpoint
-  // Adjust the endpoint based on your Gateway/Auth service routing
-  const response = await request<{ access_token: string }>('/api/auth/login', { // Example endpoint
+  const response = await request<{ access_token: string }>('/api/auth/login', { // Using internal BFF route
     method: 'POST',
     body: JSON.stringify(credentials),
   });
@@ -112,9 +97,7 @@ export const loginUser = async (credentials: { email: string; password: string }
 };
 
 export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-  // Assuming backend provides user details or just success/token
-  // Adjust endpoint and response type as needed
-  const response = await request<{ access_token: string; user: User }>('/api/auth/register', { // Example endpoint
+  const response = await request<{ access_token: string; user: User }>('/api/auth/register', { // Using internal BFF route
     method: 'POST',
     body: JSON.stringify(details),
   });
@@ -122,41 +105,68 @@ export const registerUser = async (details: { email: string; password: string; n
 };
 
 // --- Ingest Service Endpoints (via API Gateway) ---
-
+export interface IngestResponse {
+    document_id: string;
+    task_id: string;
+    status: string; // Consider using the DocumentStatus enum type here
+    message: string;
+}
 export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => {
-    // Append metadata as a JSON string field if needed by backend
     formData.append('metadata_json', JSON.stringify(metadata));
-
-    // NOTE: Let the browser set the Content-Type header for FormData
-    const headers = new Headers();
+    const headers = new Headers(); // Create headers specifically for this request
     const token = getToken();
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
     }
-    // Remove manual Content-Type setting for FormData
-    // headers.delete('Content-Type');
+    // Don't set Content-Type for FormData manually
 
-    return request<{ document_id: string; task_id: string; status: string; message: string }>('/api/v1/ingest', {
+    return request<IngestResponse>('/api/v1/ingest', { // Endpoint proxied by Gateway
         method: 'POST',
         body: formData,
-        headers: headers, // Pass only necessary headers (Auth)
+        headers: headers,
     });
 };
 
-export const getDocumentStatus = async (documentId: string) => {
-  return request<any>(`/api/v1/ingest/status/${documentId}`, { // Replace 'any' with specific StatusResponse type
+// Define the expected status response structure based on backend/schemas
+export interface DocumentStatusResponse {
+    document_id: string;
+    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error';
+    file_name?: string;
+    file_type?: string;
+    chunk_count?: number | null;
+    error_message?: string | null;
+    last_updated?: string; // ISO 8601 string
+    message?: string;
+}
+
+export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
+  // Fetches status for a SINGLE document
+  return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, { // Endpoint proxied by Gateway
     method: 'GET',
   });
 };
 
-// --- Query Service Endpoints (via API Gateway) ---
+// Placeholder function to list statuses (Needs corresponding Backend Endpoint)
+export const listDocumentStatuses = async (/* Add filters like page, limit if needed */): Promise<DocumentStatusResponse[]> => {
+    console.warn("listDocumentStatuses API call is not implemented yet.");
+    // Replace with actual API call when backend endpoint exists
+    // Example: return request<DocumentStatusResponse[]>('/api/v1/ingest/status', { method: 'GET' });
 
+    // Returning dummy data for now
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
+    return [
+        // Add some dummy data matching DocumentStatusResponse structure if needed for testing
+        // { document_id: 'uuid-doc-1', status: 'processed', file_name: 'Q3_Report.pdf', last_updated: new Date(Date.now() - 3600000).toISOString(), chunk_count: 153, message: 'Processed successfully' },
+        // { document_id: 'uuid-doc-2', status: 'processing', file_name: 'Competitor_Analysis.docx', last_updated: new Date(Date.now() - 60000).toISOString(), message: 'Processing document...' },
+    ];
+};
+
+
+// --- Query Service Endpoints (via API Gateway) ---
 interface QueryPayload {
     query: string;
     retriever_top_k?: number;
-    // chat_history?: Array<{ role: string; content: string }>; // Add if using history
 }
-
 export interface RetrievedDoc {
     id: string;
     score?: number | null;
@@ -168,11 +178,10 @@ export interface RetrievedDoc {
 interface QueryApiResponse {
     answer: string;
     retrieved_documents: RetrievedDoc[];
-    query_log_id?: string | null;
+    query_log_id?: string | null; // Assuming UUID is stringified
 }
-
-export const postQuery = async (payload: QueryPayload) => {
-  return request<QueryApiResponse>('/api/v1/query', {
+export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
+  return request<QueryApiResponse>('/api/v1/query', { // Endpoint proxied by Gateway
     method: 'POST',
     body: JSON.stringify(payload),
   });

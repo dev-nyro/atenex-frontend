@@ -1,15 +1,8 @@
 import { redirect } from 'next/navigation';
 
-// This page will likely just redirect to the main chat interface
+// This page handles the root '/' ONLY WITHIN the (app) route group context.
+// The main app/page.tsx handles the absolute root '/'.
 export default function AppPage() {
-    // Redirect to the default chat page or the first chat in history
+    // Redirect to the default chat page when accessing '/' after login.
     redirect('/chat');
-
-    // Or render a welcome message/dashboard overview
-    // return (
-    //    <div>
-    //      <h1>Welcome to Atenex</h1>
-    //      <p>Select a chat or start a new one.</p>
-    //    </div>
-    // );
 }
