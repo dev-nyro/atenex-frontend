@@ -211,10 +211,10 @@ const nextConfig = {
 module.exports = {
     darkMode: ["class"],
     content: [
-      './pages/**/*.{ts,tsx}',
+      './pages/**/*.{ts,tsx}', // Probablemente innecesario con App Router
       './components/**/*.{ts,tsx}',
       './app/**/*.{ts,tsx}',
-      './src/**/*.{ts,tsx}',
+      './src/**/*.{ts,tsx}', // Probablemente innecesario si no usas src/
       ],
     prefix: "",
     theme: {
@@ -354,7 +354,7 @@ module.exports = {
         }),
       },
     },
-    plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')], // Add typography plugin
+    plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')],
   }
 ```
 
@@ -1212,13 +1212,15 @@ export async function POST(request: Request) {
 
 ## File: `app/globals.css`
 ```css
+/* File: app/globals.css */
 @tailwind base;
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *)); /* Esto podría ser específico de Tailwind v4, lo dejamos */
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
+/* (-) ELIMINAR TODO ESTE BLOQUE @layer base {...} HSL */
+/* @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -1227,19 +1229,19 @@ export async function POST(request: Request) {
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
     --primary: 173 90% 36%; /* Teal */
-    --primary-foreground: 180 100% 10%; /* Dark Teal */
-    --secondary: 240 4.8% 95.9%;
+    /* --primary-foreground: 180 100% 10%; /* Dark Teal */
+    /* --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
     --accent: 38 92% 50%; /* Amber/Orange Accent */
-    --accent-foreground: 40 10% 10%;
+    /* --accent-foreground: 40 10% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 173 80% 40%; /* Lighter Teal for ring */
-    --radius: 0.5rem;
+    /* --radius: 0.5rem;
   }
 
   .dark {
@@ -1250,21 +1252,24 @@ export async function POST(request: Request) {
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
     --primary: 173 80% 40%; /* Lighter Teal for dark */
-    --primary-foreground: 180 100% 15%;
+    /* --primary-foreground: 180 100% 15%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     --accent: 38 92% 55%; /* Slightly brighter Amber */
-    --accent-foreground: 40 10% 10%;
+    /* --accent-foreground: 40 10% 10%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 173 70% 45%; /* Adjusted Teal ring for dark */
-  }
-}
+ /* }
+} */
+/* (-) FIN DEL BLOQUE ELIMINADO */
 
+
+/* (+) DEJAR ESTE BLOQUE @layer base (con apply y font-feature-settings) */
 @layer base {
   * {
     @apply border-border;
@@ -1276,33 +1281,36 @@ export async function POST(request: Request) {
 }
 
 /* Custom scrollbar styles (optional) */
+/* (+) DEJAR ESTILOS DE SCROLLBAR */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(var(--secondary) / 0.5);
+  background: hsl(var(--secondary) / 0.5); /* Nota: Usa HSL aquí, podría ser inconsistente */
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.6);
+  background: hsl(var(--primary) / 0.6); /* Nota: Usa HSL aquí */
   border-radius: 10px;
-  border: 1px solid hsl(var(--secondary) / 0.5);
+  border: 1px solid hsl(var(--secondary) / 0.5); /* Nota: Usa HSL aquí */
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.8);
+  background: hsl(var(--primary) / 0.8); /* Nota: Usa HSL aquí */
 }
 
+/* (+) DEJAR ESTE BLOQUE :root (OKLCH) */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.625rem; /* Este puede ser el radio de shadcn/ui */
+  /* Variables OKLCH (Probablemente de shadcn/ui init) */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.205 0 0); /* Negro por defecto */
+  --primary-foreground: oklch(0.985 0 0); /* Blanco */
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -1312,12 +1320,14 @@ export async function POST(request: Request) {
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.708 0 0); /* Color de anillo por defecto */
+  /* Variables de Chart */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  /* Variables de Sidebar (Parecen ser específicas de shadcn-blocks o similar) */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -1328,6 +1338,7 @@ export async function POST(request: Request) {
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* (+) DEJAR ESTE BLOQUE .dark (OKLCH) */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -1335,8 +1346,8 @@ export async function POST(request: Request) {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.922 0 0); /* Blanco/Gris claro en modo oscuro */
+  --primary-foreground: oklch(0.205 0 0); /* Negro */
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -1346,12 +1357,14 @@ export async function POST(request: Request) {
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.556 0 0); /* Color de anillo por defecto */
+  /* Variables de Chart */
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+  /* Variables de Sidebar */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -1362,11 +1375,13 @@ export async function POST(request: Request) {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* (+) DEJAR ESTE BLOQUE @theme inline */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Mapeo de colores semánticos a las variables CSS */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -1385,11 +1400,13 @@ export async function POST(request: Request) {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /* Mapeo de colores de chart */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  /* Mapeo de colores de sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -1400,6 +1417,7 @@ export async function POST(request: Request) {
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* (+) DEJAR ESTE ÚLTIMO @layer base */
 @layer base {
   * {
     @apply border-border outline-ring/50;

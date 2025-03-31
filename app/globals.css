@@ -1,94 +1,26 @@
 /* File: app/globals.css */
 @tailwind base;
-
-@custom-variant dark (&:is(.dark *)); /* Esto podría ser específico de Tailwind v4, lo dejamos */
+@custom-variant dark (&:is(.dark *)); /* Directiva Tailwind v4 */
 @tailwind components;
 @tailwind utilities;
 
-/* (-) ELIMINAR TODO ESTE BLOQUE @layer base {...} HSL */
-/* @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 173 90% 36%; /* Teal */
-    /* --primary-foreground: 180 100% 10%; /* Dark Teal */
-    /* --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 38 92% 50%; /* Amber/Orange Accent */
-    /* --accent-foreground: 40 10% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 173 80% 40%; /* Lighter Teal for ring */
-    /* --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 173 80% 40%; /* Lighter Teal for dark */
-    /* --primary-foreground: 180 100% 15%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 38 92% 55%; /* Slightly brighter Amber */
-    /* --accent-foreground: 40 10% 10%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 173 70% 45%; /* Adjusted Teal ring for dark */
- /* }
-} */
-/* (-) FIN DEL BLOQUE ELIMINADO */
-
-
-/* (+) DEJAR ESTE BLOQUE @layer base (con apply y font-feature-settings) */
+/* @layer base Simplificado: Solo lo esencial para el body */
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    /* Asegúrate que la fuente (inter.variable) se aplique en layout.tsx */
+    /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
   }
+  /* Eliminamos el selector * { @apply border-border } para evitar conflictos */
 }
 
-/* Custom scrollbar styles (optional) */
-/* (+) DEJAR ESTILOS DE SCROLLBAR */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: hsl(var(--secondary) / 0.5); /* Nota: Usa HSL aquí, podría ser inconsistente */
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.6); /* Nota: Usa HSL aquí */
-  border-radius: 10px;
-  border: 1px solid hsl(var(--secondary) / 0.5); /* Nota: Usa HSL aquí */
-}
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.8); /* Nota: Usa HSL aquí */
-}
+/* (-) ELIMINAMOS COMPLETAMENTE los estilos del scrollbar */
 
-/* (+) DEJAR ESTE BLOQUE :root (OKLCH) */
+
+/* Variables OKLCH (Probablemente de shadcn/ui init) - MANTENER */
 :root {
-  --radius: 0.625rem; /* Este puede ser el radio de shadcn/ui */
-  /* Variables OKLCH (Probablemente de shadcn/ui init) */
+  --radius: 0.625rem;
+  /* Variables OKLCH */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -113,7 +45,7 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  /* Variables de Sidebar (Parecen ser específicas de shadcn-blocks o similar) */
+  /* Variables de Sidebar */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -124,7 +56,7 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* (+) DEJAR ESTE BLOQUE .dark (OKLCH) */
+/* Dark theme variables (OKLCH) - MANTENER */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -161,7 +93,7 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* (+) DEJAR ESTE BLOQUE @theme inline */
+/* @theme inline - MANTENER */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -203,12 +135,4 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* (+) DEJAR ESTE ÚLTIMO @layer base */
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
+/* (-) YA NO HAY SEGUNDO @layer base */
