@@ -2,10 +2,10 @@
 module.exports = {
     darkMode: ["class"],
     content: [
-      './pages/**/*.{ts,tsx}', // Probablemente innecesario con App Router
+      './pages/**/*.{ts,tsx}',
       './components/**/*.{ts,tsx}',
       './app/**/*.{ts,tsx}',
-      './src/**/*.{ts,tsx}', // Probablemente innecesario si no usas src/
+      './src/**/*.{ts,tsx}', // Si usas src/
       ],
     prefix: "",
     theme: {

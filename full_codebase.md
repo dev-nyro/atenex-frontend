@@ -176,32 +176,33 @@ const nextConfig = {
 ## File: `tsconfig.json`
 ```json
 {
-    "compilerOptions": {
-      "target": "es5",
-      "lib": ["dom", "dom.iterable", "esnext"],
-      "allowJs": true,
-      "skipLibCheck": true,
-      "strict": true,
-      "noEmit": true,
-      "esModuleInterop": true,
-      "module": "esnext",
-      "moduleResolution": "bundler",
-      "resolveJsonModule": true,
-      "isolatedModules": true,
-      "jsx": "preserve",
-      "incremental": true,
-      "plugins": [
-        {
-          "name": "next"
-        }
-      ],
-      "paths": {
-        "@/*": ["./*"]
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true, 
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
       }
-    },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-    "exclude": ["node_modules"]
-  }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
 ```
 
 ## File: `tailwind.config.js`
@@ -702,12 +703,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoading && !token) {
       console.log("AppLayout: No token found, redirecting to login.");
-      router.push('/');
+      router.push('/'); // Cambiado a '/'
     } else if (!isLoading && token && !user) {
       console.log("AppLayout: Invalid token found, redirecting to login.");
       // Ahora TypeScript sabe qué es removeToken gracias a la importación
       removeToken();
-      router.push('/');
+      router.push('/'); // Cambiado a '/'
     }
     // La función removeToken importada es estable, no necesita estar en las dependencias.
   }, [user, isLoading, token, router]);
@@ -736,31 +737,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             direction="horizontal"
             className="h-full items-stretch"
         >
-            <ResizablePanel
-                collapsible
-                collapsedSize={4}
-                minSize={15}
-                maxSize={25}
-                defaultSize={20}
-                onCollapse={() => setIsSidebarCollapsed(true)}
-                onExpand={() => setIsSidebarCollapsed(false)}
-                className={cn(
-                    "transition-all duration-300 ease-in-out",
-                    isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]"
-                )}
-            >
-                <Sidebar isCollapsed={isSidebarCollapsed} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={80} minSize={30}>
-                <div className="flex h-full flex-col">
-                    <Header />
-                    <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
-                        {children}
-                    </main>
-                </div>
-            </ResizablePanel>
-        </ResizablePanelGroup>
+          <ResizablePanel
+              collapsible
+              collapsedSize={4}
+              minSize={15}
+              maxSize={25}
+              defaultSize={20}
+              onCollapse={() => setIsSidebarCollapsed(true)}
+              onExpand={() => setIsSidebarCollapsed(false)}
+              className={cn(
+                  "transition-all duration-300 ease-in-out",
+                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]"
+              )}
+          >
+              <Sidebar isCollapsed={isSidebarCollapsed} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={80} minSize={30}>
+              <div className="flex h-full flex-col">
+                  <Header />
+                  <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
+                      {children}
+                  </main>
+              </div>
+          </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
@@ -1214,33 +1215,91 @@ export default function RootLayout({
 
 ## File: `app/page.tsx`
 ```tsx
-"use client"; // Needed for hooks like useEffect and useRouter
+// app/page.tsx
+"use client";
 
-import { useEffect } from 'react';
+import React from 'react';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth'; // Assuming useAuth handles loading state and token check
+import { APP_NAME } from '@/lib/constants';
+import { useAuth } from '@/lib/hooks/useAuth';
 
-export default function RootPage() {
-  const { token, isLoading } = useAuth();
+export default function HomePage() {
   const router = useRouter();
+  const { token } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading) {
-      if (token) {
-        // User is likely logged in, redirect to the main app page (e.g., chat)
-        router.replace('/chat'); // Or router.replace('/app'); if you have a dedicated dashboard landing
-      } else {
-        // User is not logged in, redirect to login page
-        router.replace('/');
-      }
-    }
-  }, [token, isLoading, router]);
-
-  // Render a loading indicator while checking auth status
   return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      <p className="ml-4 text-muted-foreground">Loading Atenex...</p>
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header/Navigation */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
+        <div className="container flex items-center justify-between h-16 py-4">
+          <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
+          <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
+            <LinkButton href="/chat">Chat</LinkButton>
+            <LinkButton href="/knowledge">Knowledge Base</LinkButton>
+            <LinkButton href="/settings">Settings</LinkButton>
+            {token ?
+              <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
+                Go to App
+              </Button>
+              :
+              <Button onClick={() => router.push('/login')}>
+                Login
+              </Button>
+            }
+
+          </nav>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
+        <section className="text-center">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
+            Unlock Your Enterprise Knowledge with <span className="text-primary">{APP_NAME}</span>
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8">
+            Ask questions in natural language and get instant answers based on your organization's collective knowledge.
+          </p>
+          <Button size="lg" onClick={() => token ? router.push('/chat') : router.push('/register')}>
+            {token ? 'Go to Chat' : 'Get Started'}
+          </Button>
+        </section>
+
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Feature Cards - replace with actual feature descriptions */}
+          <FeatureCard title="Intelligent Search" description="Find the information you need quickly and easily using natural language queries." />
+          <FeatureCard title="Centralized Knowledge" description="Access all your organization's knowledge in one place, eliminating information silos." />
+          <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
+        </section>
+      </main>
+
+      {/* Footer (optional) */}
+      <footer className="bg-secondary/10 border-t py-8">
+        <div className="container text-center text-muted-foreground">
+          © {new Date().getFullYear()} Atenex. All rights reserved.
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Reusable Button Component
+function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+  const router = useRouter();
+  return (
+    <Button variant="link" onClick={() => router.push(href)}>
+      {children}
+    </Button>
+  );
+}
+
+// Reusable Feature Card Component
+function FeatureCard({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-xl transition-shadow duration-200">
+      <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -2432,7 +2491,7 @@ export function Header() {
             </DropdownMenu>
           )}
           </>
-          }
+      }
         </div>
       </header>
     );
