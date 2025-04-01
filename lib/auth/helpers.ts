@@ -24,22 +24,25 @@ export const removeToken = (): void => {
 };
 
 export interface User {
-    userId: string; // Renamed from id for clarity if needed, or keep as id
+    // Align with JWT claims expected/needed by frontend
+    userId: string; // Matches 'user_id' claim from backend JWT
     email: string;
-    name?: string;
-    companyId: string; // Ensure this is present
-    // Add other relevant claims like roles if available
-    // exp?: number; // Expiry time
+    name?: string; // Optional name claim
+    companyId: string; // Matches 'company_id' claim from backend JWT
+    // Add other relevant claims like roles if available in token
+    // exp?: number; // Expiry time (managed internally by getUserFromToken)
 }
 
-// Interface for the expected JWT payload structure
+// Interface for the expected JWT payload structure from your Auth Service
 interface JwtPayload {
-    user_id: string; // Match the claim name from your backend JWT
-    company_id: string; // Match the claim name
+    user_id: string; // Claim name for User ID (as defined in your Auth Service)
+    company_id: string; // Claim name for Company ID (as defined in your Auth Service)
     email: string;
-    name?: string;
-    exp: number; // Standard expiry claim
-    // Add other claims as needed
+    name?: string; // Optional name claim
+    role?: string; // Example: Optional role claim
+    exp: number; // Standard expiry timestamp (seconds since epoch)
+    iat?: number; // Standard issued at timestamp
+    // Add any other claims your backend includes
 }
 
 // Function to get user details from the JWT token
@@ -49,32 +52,35 @@ export const getUserFromToken = (token: string | null): User | null => {
     // Decode the JWT
     const decoded = jwtDecode<JwtPayload>(token);
 
-    // Check expiry (optional but recommended)
-    const now = Date.now() / 1000;
+    // --- Validation ---
+    // 1. Check expiry
+    const now = Date.now() / 1000; // Current time in seconds
     if (decoded.exp < now) {
-      console.warn("Token has expired.");
+      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Current time: ${new Date()}.`);
       removeToken(); // Clear expired token
       return null;
     }
 
-    // Map decoded payload to User interface
-    const user: User = {
-      userId: decoded.user_id, // Map from payload claim
-      email: decoded.email,
-      companyId: decoded.company_id, // Map from payload claim
-      name: decoded.name, // Optional name claim
-    };
-
-    // Basic validation
-    if (!user.userId || !user.companyId || !user.email) {
-        console.error("Decoded token is missing essential claims (userId, companyId, email).", decoded);
-        removeToken();
+    // 2. Check for essential claims required by the frontend
+    if (!decoded.user_id || !decoded.company_id || !decoded.email) {
+        console.error("Decoded token is missing essential claims (user_id, company_id, email). Payload:", decoded);
+        removeToken(); // Clear invalid token
         return null;
     }
+
+    // --- Map decoded payload to User interface ---
+    const user: User = {
+      userId: decoded.user_id, // Map from 'user_id' claim
+      email: decoded.email,
+      companyId: decoded.company_id, // Map from 'company_id' claim
+      name: decoded.name, // Map optional 'name' claim
+      // Add other mappings if needed, e.g., role: decoded.role
+    };
 
     return user;
 
   } catch (error) {
+    // Handle various decoding errors (invalid token format, etc.)
     console.error("Failed to decode or validate token:", error);
     removeToken(); // Clear invalid token
     return null;

@@ -26,6 +26,7 @@ const welcomeMessage: Message = {
     id: 'initial-welcome',
     role: 'assistant',
     content: 'Hello! How can I help you query your knowledge base today?',
+    created_at: new Date().toISOString(), // Add a timestamp
 };
 
 export default function ChatPage() {
@@ -34,7 +35,9 @@ export default function ChatPage() {
   const { token } = useAuth(); // Check if user is logged in
 
   // Extract chatId, ensuring it's a string or undefined
-  const chatId = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
+  // Take only the first element if it's an array (robustness for [[...chatId]])
+  const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
+  const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
 
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
@@ -43,29 +46,40 @@ export default function ChatPage() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const hasFetchedHistory = useRef(false); // Prevent refetching on navigation replacement
+  // Ref to track if the current URL's chatId has already been fetched
+  const fetchedChatIdRef = useRef<string | undefined>(undefined);
+
+  // Update chatId state if the param changes (e.g., navigation)
+  useEffect(() => {
+    setChatId(chatIdParam);
+  }, [chatIdParam]);
 
   // Load chat history from API based on chatId
   useEffect(() => {
-    // Only fetch if chatId exists and we haven't fetched for this ID yet
-    if (chatId && !hasFetchedHistory.current && token) {
+    // Only fetch if:
+    // 1. User is logged in (token exists)
+    // 2. A chatId is present in the state
+    // 3. We haven't already fetched for this specific chatId
+    if (token && chatId && fetchedChatIdRef.current !== chatId) {
       console.log(`ChatPage: Fetching history for chat ID: ${chatId}`);
       setIsLoadingHistory(true);
       setHistoryError(null);
-      hasFetchedHistory.current = true; // Mark as attempting fetch
+      fetchedChatIdRef.current = chatId; // Mark this ID as being fetched
 
       getChatMessages(chatId)
         .then(apiMessages => {
-          if (apiMessages.length > 0) {
-             // Map API messages to frontend message type
-             const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
-             setMessages(mappedMessages);
-             console.log(`ChatPage: Loaded ${mappedMessages.length} messages for chat ${chatId}.`);
-          } else {
-              // Chat exists but has no messages (shouldn't happen if created via query)
-              setMessages([welcomeMessage]); // Start with welcome message
-              console.log(`ChatPage: Chat ${chatId} found but has no messages. Displaying welcome message.`);
-          }
+            // Sort messages by creation time ascending (oldest first)
+           apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+           const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
+
+           if (mappedMessages.length > 0) {
+                setMessages(mappedMessages);
+                console.log(`ChatPage: Loaded ${mappedMessages.length} messages for chat ${chatId}.`);
+           } else {
+                // Chat exists but has no messages (or API returned empty)
+                setMessages([welcomeMessage]); // Start with welcome message
+                console.log(`ChatPage: Chat ${chatId} has no messages. Displaying welcome message.`);
+           }
         })
         .catch(error => {
           console.error(`ChatPage: Failed to load chat history for ${chatId}:`, error);
@@ -73,9 +87,15 @@ export default function ChatPage() {
           if (error instanceof ApiError) {
               message = error.message || message;
               if (error.status === 404) {
-                  message = "Chat not found. It might have been deleted.";
-                  // Optionally redirect if chat not found
-                  // router.replace('/chat');
+                  message = "Chat not found or you don't have access.";
+                  // Redirect to base chat page if not found
+                  toast.error("Chat Not Found", { description: message });
+                  router.replace('/chat');
+                  return; // Stop further processing in this effect
+              } else if (error.status === 401) {
+                   message = "Authentication error. Please log in again.";
+                   // Optionally trigger logout or redirect to login
+                   router.push('/login'); // Example redirect
               }
           } else if (error instanceof Error) {
               message = error.message;
@@ -95,36 +115,29 @@ export default function ChatPage() {
       setRetrievedDocs([]);
       setIsLoadingHistory(false);
       setHistoryError(null);
-      hasFetchedHistory.current = false; // Reset fetch flag for when a new chat ID is created
+      fetchedChatIdRef.current = undefined; // Reset fetch flag
     } else if (!token) {
          console.log("ChatPage: User not authenticated, cannot load history.");
          setIsLoadingHistory(false);
          setHistoryError("Please log in to view chat history.");
-         hasFetchedHistory.current = false;
+         setMessages([welcomeMessage]); // Show welcome message
+         fetchedChatIdRef.current = undefined;
     }
 
-  // Reset fetch flag if chatId changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId, token]); // Depend on chatId and token
-
-  // Effect to reset fetch flag when navigating away or chatId changes significantly
-  useEffect(() => {
-      hasFetchedHistory.current = false;
-  }, [chatId]);
-
+  // Depend on chatId (state) and token
+  }, [chatId, token, router]); // Add router to dependencies
 
   // Scroll to bottom when messages change or loading starts/stops
   useEffect(() => {
     if (scrollAreaRef.current) {
-        // Delay slightly to allow DOM updates
         const timer = setTimeout(() => {
              if (scrollAreaRef.current) {
                  scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
              }
         }, 100);
-        return () => clearTimeout(timer); // Cleanup timer on unmount or change
+        return () => clearTimeout(timer);
     }
-  }, [messages, isSending, isLoadingHistory]); // Scroll on message changes and loading state changes
+  }, [messages, isSending, isLoadingHistory]); // Scroll on changes
 
   const handleSendMessage = useCallback(async (query: string) => {
     if (!query.trim() || isSending || !token) {
@@ -132,40 +145,52 @@ export default function ChatPage() {
         return;
     }
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
-    // Add user message immediately for better UX
+    const userMessage: Message = {
+        id: `client-user-${Date.now()}`, // Temporary client-side ID
+        role: 'user',
+        content: query,
+        created_at: new Date().toISOString() // Add timestamp
+    };
     setMessages(prev => [...prev, userMessage]);
     setIsSending(true);
-    setRetrievedDocs([]); // Clear previous docs
+    setRetrievedDocs([]);
 
-    const currentChatId = chatId || null; // Send null if chatId is undefined
+    const currentChatIdForApi = chatId || null; // Send null to API if chatId is undefined
 
     try {
-      console.log(`ChatPage: Sending query to chat ID: ${currentChatId}`);
-      const response = await postQuery({ query, chat_id: currentChatId });
+      console.log(`ChatPage: Sending query to chat ID: ${currentChatIdForApi}`);
+      const response = await postQuery({ query, chat_id: currentChatIdForApi });
       console.log("ChatPage: Received response:", response);
 
+      // --- IMPORTANT: Use the chat_id returned by the API ---
+      const returnedChatId = response.chat_id;
+
+      // Create assistant message using a temporary ID or potentially one from backend if available
       const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`, // Use a temporary client-side ID or wait for backend ID if needed
+        id: `client-assistant-${Date.now()}`, // Temporary ID
         role: 'assistant',
         content: response.answer,
-        // Map sources from API response to frontend type
-        sources: mapApiMessageToFrontend({ // Use mapping helper structure
-             id: '', role: 'assistant', content: '', // Dummy values not used
-             sources: response.retrieved_documents,
-             created_at: ''
-         }).sources
+        sources: mapApiSourcesToFrontend(response.retrieved_documents),
+        created_at: new Date().toISOString() // Approximate timestamp
       };
 
       // Update state with assistant message
       setMessages(prev => [...prev, assistantMessage]);
-      setRetrievedDocs(mapApiMessageToFrontend({ id: '', role: 'assistant', content: '', sources: response.retrieved_documents, created_at: '' }).sources || []);
+      setRetrievedDocs(mapApiSourcesToFrontend(response.retrieved_documents) || []);
 
-      // If it was a new chat, update the URL
-      if (!chatId && response.chat_id) {
-        console.log(`ChatPage: New chat created with ID: ${response.chat_id}. Updating URL.`);
-        router.replace(`/chat/${response.chat_id}`, { scroll: false });
-        // No need to set hasFetchedHistory.current = true here, useEffect will handle it on next render
+      // If it was a new chat, update the URL *without* triggering a full history reload
+      if (!currentChatIdForApi && returnedChatId) {
+        console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL.`);
+        // Update the internal state *before* replacing URL to prevent refetch
+        setChatId(returnedChatId);
+        fetchedChatIdRef.current = returnedChatId; // Mark the new ID as "fetched" (since we just created it)
+        router.replace(`/chat/${returnedChatId}`, { scroll: false });
+      } else if (currentChatIdForApi && returnedChatId !== currentChatIdForApi) {
+           // This case shouldn't normally happen with the current backend logic
+           console.warn(`Backend returned a different chat ID (${returnedChatId}) than expected (${currentChatIdForApi}). Updating state.`);
+           setChatId(returnedChatId);
+           fetchedChatIdRef.current = returnedChatId;
+           router.replace(`/chat/${returnedChatId}`, { scroll: false });
       }
 
       // Auto-open panel if closed and docs were retrieved
@@ -177,12 +202,25 @@ export default function ChatPage() {
       console.error("ChatPage: Query failed:", error);
       let errorMessage = "Sorry, I encountered an error trying to answer your question.";
        if (error instanceof ApiError) {
-           errorMessage = `Error: ${error.message}`;
+           errorMessage = error.message || `API Error (${error.status})`;
+           if (error.status === 401) {
+                errorMessage = "Authentication error. Please log in again.";
+                // Optional: Trigger logout or redirect
+                router.push('/login');
+           }
        } else if (error instanceof Error) {
            errorMessage = `Error: ${error.message}`;
        }
 
-      const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
+      const errorTimestamp = new Date().toISOString();
+      const errorMessageObj: Message = {
+          id: `error-${errorTimestamp}`,
+          role: 'assistant',
+          content: errorMessage,
+          isError: true,
+          created_at: errorTimestamp
+      };
+      // Add error message to the chat
       setMessages(prev => [...prev, errorMessageObj]);
 
       toast.error("Query Failed", { description: errorMessage });
@@ -190,13 +228,13 @@ export default function ChatPage() {
     } finally {
       setIsSending(false);
     }
-  }, [isSending, chatId, router, token, isPanelOpen]); // Add token and isPanelOpen
+  }, [isSending, chatId, router, token, isPanelOpen]); // Include dependencies
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
     };
 
-  // Render loading state for history
+  // --- Render Functions for Loading/Error ---
   const renderHistoryLoading = () => (
        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
@@ -204,15 +242,26 @@ export default function ChatPage() {
         </div>
   );
 
-  // Render error state for history
   const renderHistoryError = () => (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
           <AlertCircle className="h-8 w-8 text-destructive mb-4" />
           <p className="text-destructive font-medium mb-2">Error Loading History</p>
           <p className="text-sm text-muted-foreground mb-4">{historyError}</p>
-          {/* Optionally add a retry button */}
+          {/* Optionally add a retry button - requires refetch logic */}
+          {/* <Button variant="outline" size="sm" onClick={retryFetchHistory}>Retry</Button> */}
       </div>
   );
+
+  const renderWelcomeOrMessages = () => {
+      if (messages.length === 0 || (messages.length === 1 && messages[0].id === 'initial-welcome' && !chatId)) {
+          // Show welcome message only for truly new chats or if history is empty
+          return <ChatMessage message={welcomeMessage} />;
+      }
+      // Otherwise, render the loaded/updated messages
+      return messages.map((message) => (
+          <ChatMessage key={message.id} message={message} />
+      ));
+  };
 
   return (
      <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]">
@@ -220,9 +269,8 @@ export default function ChatPage() {
                 <div className="flex h-full flex-col relative"> {/* Added relative */}
                     {/* Panel Toggle Button */}
                     <div className="absolute top-2 right-2 z-10">
-                        <Button onClick={handlePanelToggle} variant="ghost" size="icon">
+                        <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                            <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
                         </Button>
                     </div>
 
@@ -234,17 +282,15 @@ export default function ChatPage() {
                              renderHistoryError()
                          ) : (
                             <div className="space-y-4 pr-4">
-                                {messages.map((message) => (
-                                    <ChatMessage key={message.id} message={message} />
-                                ))}
+                                {renderWelcomeOrMessages()}
                                 {/* Show assistant thinking skeleton only when sending */}
                                 {isSending && (
                                     <div className="flex items-start space-x-3">
                                         <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
                                             <BrainCircuit className="h-5 w-5 text-primary"/>
                                         </Skeleton>
-                                        <div className="space-y-2 flex-1">
-                                            <Skeleton className="h-4 w-16" /> {/* Short thinking text */}
+                                        <div className="space-y-2 flex-1 pt-1">
+                                            <Skeleton className="h-4 w-16" />
                                         </div>
                                     </div>
                                 )}
