@@ -47,6 +47,7 @@ atenex-frontend/
 │   ├── layout
 │   │   ├── header.tsx
 │   │   └── sidebar.tsx
+│   ├── theme-palette-button.tsx
 │   ├── theme-provider.tsx
 │   ├── theme-toggle.tsx
 │   └── ui
@@ -213,8 +214,8 @@ module.exports = {
     content: [
       './pages/**/*.{ts,tsx}',
       './components/**/*.{ts,tsx}',
-      './app/**/*.{ts,tsx}',
-      './src/**/*.{ts,tsx}', // Si usas src/
+      './app/**/*.{ts,tsx,mdx}',
+      './src/**/*.{ts,tsx,mdx}', // Si usas src/
       ],
     prefix: "",
     theme: {
@@ -1030,6 +1031,8 @@ export async function POST(request: Request) {
 
 /* 2. Define la variante custom FUERA de @theme */
 @custom-variant dark (&:is(.dark *));
+@custom-variant blue (&:is(.blue *));
+@custom-variant green (&:is(.green *));
 
 /* 3. Define variables base FUERA del @theme */
 /* Variables para el tema claro (:root) */
@@ -1108,6 +1111,50 @@ export async function POST(request: Request) {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Variables para el tema blue (.blue) */
+.blue {
+    --background: oklch(0.2 0.05 220); /* Dark Blue */
+    --foreground: oklch(0.95 0.02 30);  /* Light Gray */
+    --card: oklch(0.25 0.06 220);
+    --card-foreground: oklch(0.95 0.02 30);
+    --popover: oklch(0.3 0.07 220);
+    --popover-foreground: oklch(0.95 0.02 30);
+    --primary: oklch(0.8 0.1 240); /* Light Blue */
+    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
+    --secondary: oklch(0.35 0.08 220);
+    --secondary-foreground: oklch(0.9 0.01 30);
+    --muted: oklch(0.4 0.09 220);
+    --muted-foreground: oklch(0.75 0.03 30);
+    --accent: oklch(0.45 0.1 220);
+    --accent-foreground: oklch(0.9 0.01 30);
+    --destructive: oklch(0.6 0.2 10); /* Dark Red */
+    --border: oklch(0.3 0.05 220);
+    --input: oklch(0.35 0.06 220);
+    --ring: oklch(0.7 0.1 240); /* Light Blue Ring */
+  }
+
+  /* Variables para el tema green (.green) */
+.green {
+    --background: oklch(0.2 0.1 150); /* Dark Green */
+    --foreground: oklch(0.95 0.02 30); /* Light Gray */
+    --card: oklch(0.25 0.12 150);
+    --card-foreground: oklch(0.95 0.02 30);
+    --popover: oklch(0.3 0.14 150);
+    --popover-foreground: oklch(0.95 0.02 30);
+    --primary: oklch(0.8 0.2 120); /* Light Green */
+    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
+    --secondary: oklch(0.35 0.16 150);
+    --secondary-foreground: oklch(0.9 0.01 30);
+    --muted: oklch(0.4 0.18 150);
+    --muted-foreground: oklch(0.75 0.03 30);
+    --accent: oklch(0.45 0.2 150);
+    --accent-foreground: oklch(0.9 0.01 30);
+    --destructive: oklch(0.6 0.2 10); /* Dark Red */
+    --border: oklch(0.3 0.1 150);
+    --input: oklch(0.35 0.12 150);
+    --ring: oklch(0.7 0.2 120); /* Light Green Ring */
+  }
+
 /* 4. Define el mapeo semántico DENTRO de @theme */
 /*    (SOLO --variable: valor;) */
 @theme {
@@ -1152,6 +1199,50 @@ export async function POST(request: Request) {
 
   /* La directiva @custom-variant se movió fuera */
 }
+
+/* Variables para el tema blue (.blue) */
+.blue {
+    --background: oklch(0.2 0.05 220); /* Dark Blue */
+    --foreground: oklch(0.95 0.02 30);  /* Light Gray */
+    --card: oklch(0.25 0.06 220);
+    --card-foreground: oklch(0.95 0.02 30);
+    --popover: oklch(0.3 0.07 220);
+    --popover-foreground: oklch(0.95 0.02 30);
+    --primary: oklch(0.8 0.1 240); /* Light Blue */
+    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
+    --secondary: oklch(0.35 0.08 220);
+    --secondary-foreground: oklch(0.9 0.01 30);
+    --muted: oklch(0.4 0.09 220);
+    --muted-foreground: oklch(0.75 0.03 30);
+    --accent: oklch(0.45 0.1 220);
+    --accent-foreground: oklch(0.9 0.01 30);
+    --destructive: oklch(0.6 0.2 10); /* Dark Red */
+    --border: oklch(0.3 0.05 220);
+    --input: oklch(0.35 0.06 220);
+    --ring: oklch(0.7 0.1 240); /* Light Blue Ring */
+  }
+
+  /* Variables para el tema green (.green) */
+.green {
+    --background: oklch(0.2 0.1 150); /* Dark Green */
+    --foreground: oklch(0.95 0.02 30); /* Light Gray */
+    --card: oklch(0.25 0.12 150);
+    --card-foreground: oklch(0.95 0.02 30);
+    --popover: oklch(0.3 0.14 150);
+    --popover-foreground: oklch(0.95 0.02 30);
+    --primary: oklch(0.8 0.2 120); /* Light Green */
+    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
+    --secondary: oklch(0.35 0.16 150);
+    --secondary-foreground: oklch(0.9 0.01 30);
+    --muted: oklch(0.4 0.18 150);
+    --muted-foreground: oklch(0.75 0.03 30);
+    --accent: oklch(0.45 0.2 150);
+    --accent-foreground: oklch(0.9 0.01 30);
+    --destructive: oklch(0.6 0.2 10); /* Dark Red */
+    --border: oklch(0.3 0.1 150);
+    --input: oklch(0.35 0.12 150);
+    --ring: oklch(0.7 0.2 120); /* Light Green Ring */
+  }
 
 /* 5. Aplica overrides mínimos en la capa base */
 @layer base {
@@ -1970,27 +2061,39 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
 ## File: `components/chat/retrieved-documents-panel.tsx`
 ```tsx
-import React from 'react';
+// File: components/chat/retrieved-documents-panel.tsx
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
 import { RetrievedDoc } from '@/lib/api'; // Import type
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-
+import { Button } from '@/components/ui/button'; // Import Button component
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog" 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean; // Indicate when the main query is loading
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
+    const [open, setOpen] = React.useState(false)
+    const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
 
-  const handleViewDocument = (doc: RetrievedDoc) => {
-      // TODO: Implement document viewing logic
-      // This could open a modal, navigate to a viewer page, or fetch content
-      console.log("Viewing document:", doc.document_id || doc.id);
-      alert(`Viewing document: ${doc.file_name || doc.id}\n(Implementation needed)`);
-  };
+    const handleViewDocument = (doc: RetrievedDoc) => {
+        // TODO: Implement document viewing logic
+        // This could open a modal, navigate to a viewer page, or fetch content
+        console.log("Viewing document:", doc.document_id || doc.id);
+        // alert(`Viewing document: ${doc.file_name || doc.id}\n(Implementation needed)`);
+        setSelectedDoc(doc);
+        setOpen(true); // Open the Dialog
+    };
+
+    const handleDownloadDocument = (doc: RetrievedDoc) => {
+        // TODO: Implement document download logic
+        console.log("Downloading document:", doc.document_id || doc.id);
+        alert(`Downloading document: ${doc.file_name || doc.id}\n(Implementation needed)`);
+    };
 
   return (
     <div className="flex h-full flex-col border-l bg-muted/30">
@@ -2048,6 +2151,36 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
           ))}
         </div>
       </ScrollArea>
+
+      {/* Document Dialog (Modal) */}
+      <Dialog open={open} onOpenChange={setOpen}>
+            {selectedDoc && (
+                <>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
+                            <DialogDescription>
+                                {/* Implement document viewer or preview here. For MVP, show details. */}
+                                <p>ID: {selectedDoc.id}</p>
+                                <p>Score: {selectedDoc.score?.toFixed(4) || 'N/A'}</p>
+                                {/* Add scrollable content area */}
+                                <ScrollArea className="max-h-[300px]">
+                                    <p>{selectedDoc.content_preview || 'No preview available.'}</p>
+                                </ScrollArea>
+                            </DialogDescription>
+                        </DialogHeader>
+                         {/* Action buttons in footer - View/Download */}
+                        <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Download
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </>
+            )}
+        </Dialog>
+
     </div>
   );
 }
@@ -2405,6 +2538,7 @@ export function FileUploader() {
 
 ## File: `components/layout/header.tsx`
 ```tsx
+// File: components/layout/header.tsx
 "use client";
 
 import React from 'react';
@@ -2416,6 +2550,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
 import { useRouter } from 'next/navigation';
+import { ThemePaletteButton } from '@/components/theme-palette-button';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -2441,6 +2576,7 @@ export function Header() {
         {/* Right side - Theme toggle and User menu */}
         <div className="flex items-center space-x-4">
           <ThemeToggle /> {/* Add ThemeToggle button */}
+          <ThemePaletteButton />
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -2576,6 +2712,61 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 }
 ```
 
+## File: `components/theme-palette-button.tsx`
+```tsx
+// File: components/theme-palette-button.tsx
+"use client";
+
+import * as React from "react";
+import { Palette } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const colorPalettes = [
+    'system',
+    'light',
+    'dark',
+    'blue',
+    'green',
+];
+
+const themeToPalette: { [key: string]: string } = {
+   'system': 'Default',
+   'light': 'Light',
+   'dark': 'Dark',
+   'blue': 'Blue Oasis',
+   'green': 'Emerald Depths'
+}
+
+export function ThemePaletteButton() {
+  const { setTheme, theme } = useTheme();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+           <Button variant="outline" size="icon">
+               <Palette className="h-[1.2rem] w-[1.2rem]"/>
+                <span className="sr-only">Toggle theme</span>
+            </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+           {colorPalettes.map((palette) => (
+               <DropdownMenuItem key={palette} onClick={() => setTheme(palette)}>
+                   {themeToPalette[palette] || palette}
+               </DropdownMenuItem>
+           ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
 ## File: `components/theme-provider.tsx`
 ```tsx
 // File: components/theme-provider.tsx
@@ -2591,12 +2782,13 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
 ## File: `components/theme-toggle.tsx`
 ```tsx
+// File: components/theme-toggle.tsx
 "use client";
 
 import * as React from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Palette } from "lucide-react";
 import { useTheme } from "next-themes";
-
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -2605,28 +2797,51 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const colorPalettes = [
+    'system',
+    'light',
+    'dark',
+    'blue',
+    'green',
+];
+
+const themeToPalette: { [key: string]: string } = {
+   'system': 'Default',
+   'light': 'Light',
+   'dark': 'Dark',
+   'blue': 'Blue Oasis',
+   'green': 'Emerald Depths'
+}
+
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { setTheme, theme } = useTheme();
+  const [currentPaletteIndex, setCurrentPaletteIndex] = React.useState(0);
+
+  const handlePaletteChange = () => {
+    setCurrentPaletteIndex((prevIndex) => {
+      const newIndex = (prevIndex + 1) % colorPalettes.length;
+      setTheme(colorPalettes[newIndex]);
+      return newIndex;
+    });
+  };
+
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon">
-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <Sun className={cn("h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0", theme === "dark" || theme === "blue" || theme === "green" ? "hidden" : "" )} />
+          <Moon className={cn("absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100", theme !== "dark" && theme !== "blue" && theme !== "green" ? "hidden" : "")} />
+          <Palette className={cn("absolute h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:rotate-0 dark:scale-100", theme === "blue" || theme === "green" ? "" : "hidden")} />
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          System
-        </DropdownMenuItem>
+           {colorPalettes.map((palette) => (
+               <DropdownMenuItem key={palette} onClick={() => setTheme(palette)}>
+                   {themeToPalette[palette] || palette}
+               </DropdownMenuItem>
+           ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -2815,6 +3030,7 @@ export { Badge, badgeVariants }
 
 ## File: `components/ui/button.tsx`
 ```tsx
+// File: components/ui/button.tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -2837,6 +3053,8 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
+        "icon-palette": // New variant
+          "border bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -2874,7 +3092,6 @@ function Button({
 }
 
 export { Button, buttonVariants }
-
 ```
 
 ## File: `components/ui/card.tsx`
@@ -3971,11 +4188,19 @@ async function request<T>(
              console.warn("Could not read API error response body.");
         }
       }
-      const detailMessage = errorData?.detail
-        ? (typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail))
-        : null;
-      const fallbackMessage = errorData?.message || errorText || `HTTP error ${response.status}`;
-      const errorMessage = detailMessage || fallbackMessage;
+    
+      let errorMessage = `HTTP error ${response.status}`; // Provide a default
+      if (errorData && typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+      } else if (errorData && Array.isArray(errorData.detail)) {
+          // Handle array of errors (e.g., from Zod validation)
+          errorMessage = errorData.detail.map(e => (typeof e === 'object' && e !== null && 'msg' in e) ? e.msg : String(e)).join(', ');
+      } else if (errorData && errorData.message) {
+          errorMessage = errorData.message;
+      } else if (errorText) {
+          errorMessage = errorText;
+      }
+    
       console.error(`API Error: ${response.status} ${errorMessage}`, errorData || errorText);
       throw new ApiError(errorMessage, response.status, errorData || undefined);
     }

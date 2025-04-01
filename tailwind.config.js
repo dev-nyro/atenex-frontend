@@ -6,6 +6,7 @@ module.exports = {
       './components/**/*.{ts,tsx}',
       './app/**/*.{ts,tsx,mdx}',
       './src/**/*.{ts,tsx,mdx}', // Si usas src/
+      './components/theme-palette-button.tsx',
       ],
     prefix: "",
     theme: {
