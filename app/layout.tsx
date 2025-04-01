@@ -1,11 +1,11 @@
 // File: app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css"; // Esta importación SÍ debe estar aquí
+import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// (+) DESCOMENTAR ESTA LÍNEA:
+// (*) Ensure this import points to sonner's Toaster
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -31,13 +31,13 @@ export default function RootLayout({
         <AuthProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
+            defaultTheme="system" // Or your preferred default
             enableSystem
             disableTransitionOnChange
           >
             {children}
-            {/* (+) Asegúrate de que esta línea esté activa y use el Toaster importado */}
-            <Toaster />
+            {/* (*) Ensure this Toaster component is rendered */}
+            <Toaster richColors position="top-right" /> {/* Added richColors and position */}
           </ThemeProvider>
         </AuthProvider>
       </body>
