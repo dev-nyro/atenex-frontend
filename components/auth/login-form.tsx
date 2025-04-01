@@ -11,8 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { ApiError } from '@/lib/api'; // Import ApiError
-import { createClientComponentClient } from '@supabase/supabase-js';
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -22,7 +22,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login } = useAuth(); // Use the context login function
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,33 +39,42 @@ export function LoginForm() {
     setError(null);
     try {
       console.log("Attempting login with:", data.email);
-        const supabase = createClientComponentClient();
-        const { data: authResponse, error: authError } = await supabase.auth.signInWithPassword(data);
 
-        if (authError) {
-            console.error("Supabase login failed:", authError);
-            setError(authError.message || 'Login failed. Please check your credentials.');
-        } else if (authResponse.session) {
-            console.log("Supabase login successful:", authResponse);
-            login(authResponse.session); // Call the auth context to update session
-        } else {
-            console.error("Supabase login: No session returned");
-            setError('Login failed. Please check your credentials.');
-        }
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword(data);
+
+      if (authError) {
+        console.error("Supabase login failed:", authError);
+        setError(authError.message || 'Login failed. Please check your credentials.');
+      } else if (authResponse.session) {
+        console.log("Supabase login successful:", authResponse);
+        login(authResponse.session);
+      } else {
+        console.error("Supabase login: No session returned");
+        setError('Login failed. Please check your credentials.');
+      }
     } catch (err) {
       console.error("Login failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
       if (err instanceof ApiError) {
-         // Use specific error message from API if available
-         errorMessage = err.message || errorMessage;
+        errorMessage = err.message || errorMessage;
       } else if (err instanceof Error) {
-           errorMessage = err.message || errorMessage;
+        errorMessage = err.message || errorMessage;
       }
       setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-    // No need to set isLoading false here if redirect happens on success
   };
 
   return (
@@ -107,12 +116,12 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
       </Button>
-       <div className="mt-4 text-center text-sm">
-         Don't have an account?{" "}
-         <Link href="/register" className="underline text-primary hover:text-primary/80">
-           Register
-         </Link>
-       </div>
+      <div className="mt-4 text-center text-sm">
+        Don't have an account?{" "}
+        <Link href="/register" className="underline text-primary hover:text-primary/80">
+          Register
+        </Link>
+      </div>
     </form>
   );
 }

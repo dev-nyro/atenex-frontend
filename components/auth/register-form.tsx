@@ -1,3 +1,4 @@
+// File: components/auth/register-form.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -12,22 +13,19 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ApiError } from '@/lib/api';
-import { createClientComponentClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import { AuthApiError } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  // confirmPassword: z.string(), // Add if needed
-// }).refine(data => data.password === data.confirmPassword, {
-//   message: "Passwords don't match",
-//   path: ["confirmPassword"], // path of error
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const { login } = useAuth(); // Use login from auth context to set token after registration
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -46,47 +44,75 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
     try {
-       console.log("Attempting registration with:", data.email);
-        const supabase = createClientComponentClient();
-        const { data: authResponse, error: authError } = await supabase.auth.signUp({
-            email: data.email,
-            password: data.password,
-            options: {
-                data: {
-                    name: data.name || null, // Store the name as user metadata
-                    // Add any other custom claims you want to store
-                }
-            }
-        });
+      console.log("Attempting registration with:", data.email);
 
-        if (authError) {
-            console.error("Supabase registration failed:", authError);
-            setError(authError.message || 'Registration failed. Please try again.');
-            setIsLoading(false);
-        } else if (authResponse.session) {
-            console.log("Supabase registration successful:", authResponse);
-            setSuccess(true);
-            login(authResponse.session); // Automatically log in the user
-        }
-        else {
-            console.warn("Supabase registration: No session returned, user needs to verify email.");
-            setSuccess(true);
-            // You might want to show a message to the user that they need to check their email
-            // setError("Registration successful, but please check your email to verify your account.");
-            // Consider redirecting to a "check your email" page
-        }
-
-
-    } catch (err) {
-        console.error("Registration failed:", err);
-        let errorMessage = 'Registration failed. Please try again.';
-        if (err instanceof ApiError) {
-          errorMessage = err.message || errorMessage;
-        } else if (err instanceof Error) {
-           errorMessage = err.message || errorMessage;
-        }
-        setError(errorMessage);
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
         setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+     console.log("Supabase client created."); // Add this
+
+     // Try signing up the user
+     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+           data: {
+              name: data.name || null,
+           },
+        },
+     });
+     console.log("signUp response:", authResponse, authError); // Add this
+
+     if (authError) {
+        console.error("Supabase registration failed:", authError);
+        setError(authError.message || 'Registration failed. Please try again.');
+        setIsLoading(false);
+     } else {
+        setSuccess(true); // Registration successful, set success state
+
+        // (+) Auto sign-in after successful registration:
+        // Check that email confirmation is not enabled
+        if (authResponse?.user) {
+           const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+              email: data.email,
+              password: data.password,
+           });
+
+           if (signInError) {
+              console.error("Auto sign-in failed:", signInError);
+              setError(`Registration successful, but auto sign-in failed: ${signInError.message}`);
+           } else if (signInData?.session) {
+              console.log("Auto sign-in successful:", signInData);
+              login(signInData.session); // Calls your login function
+           } else {
+              setError("Registration successful, but auto sign-in failed: No session returned.");
+           }
+        } else {
+           console.warn("Supabase registration: No user object returned.");
+           setError("Registration successful, but could not automatically sign you in.  Please login.");
+        }
+     }
+      
+    } catch (err) {
+      console.error("Registration failed:", err);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -99,12 +125,11 @@ export function RegisterForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && !error && ( // Show success only if no subsequent error occurred
+      {success && !error && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          {/* <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" /> */}
           <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! {authResponse?.user?.email_confirmed_at ? "Redirecting..." : "Please check your email to verify your account."}
+            Account created successfully! Please check your email to verify your account.
           </AlertDescription>
         </Alert>
       )}
@@ -117,7 +142,7 @@ export function RegisterForm() {
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
-         {form.formState.errors.name && (
+        {form.formState.errors.name && (
           <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
         )}
       </div>
@@ -148,8 +173,7 @@ export function RegisterForm() {
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
       </div>
-      {/* Add Confirm Password if needed */}
-      <Button type="submit" className="w-full" disabled={isLoading || success}>
+      <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
       <div className="mt-4 text-center text-sm">

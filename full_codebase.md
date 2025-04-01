@@ -94,18 +94,10 @@ const nextConfig = {
     transpilePackages: ['@radix-ui/react-dialog'],
     reactStrictMode: true,
   
-    // You can add other Next.js configurations here as needed:
-    // images: {
-    //   remotePatterns: [
-    //     {
-    //       protocol: 'https',
-    //       hostname: 'example.com', // Add hostnames for external images
-    //     },
-    //   ],
-    // },
-    // experimental: {
-    //   // Add experimental features if you use any
-    // },
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    },
   };
   
   export default nextConfig;
@@ -345,8 +337,7 @@ module.exports = {
 # Base URL of your deployed API Gateway (REQUIRED for API calls to work)
 # Example: http://localhost:8080 if running gateway locally
 # Example: https://your-gateway-dev.example.com if deployed
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
-
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:9999  # Una URL falsa
 NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
 # Add other environment variables needed by your app here
@@ -1291,10 +1282,9 @@ export default function RootLayout({
 
 ## File: `app/page.tsx`
 ```tsx
-// app/page.tsx
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
@@ -1302,7 +1292,33 @@ import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, login } = useAuth(); // Get login function
+
+  useEffect(() => {
+    const handleEmailConfirmation = async () => {
+      if (window.location.hash) {
+        const params = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        const expiresIn = params.get('expires_in');
+
+        if (accessToken && refreshToken && expiresIn) {
+          console.log("Found access token in URL hash:", accessToken);
+          console.log("Attempting to set session and log in.");
+           const session = {
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                expires_in: parseInt(expiresIn),
+                token_type: 'bearer',
+            };
+          await login(session);
+          router.replace('/'); // Replace current route to remove hash
+        }
+      }
+    };
+
+    handleEmailConfirmation();
+  }, [login, router]); // Dependencies: login function and router
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -1396,8 +1412,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { ApiError } from '@/lib/api'; // Import ApiError
-import { createClientComponentClient } from '@supabase/supabase-js';
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -1407,7 +1423,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login } = useAuth(); // Use the context login function
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1424,33 +1440,42 @@ export function LoginForm() {
     setError(null);
     try {
       console.log("Attempting login with:", data.email);
-        const supabase = createClientComponentClient();
-        const { data: authResponse, error: authError } = await supabase.auth.signInWithPassword(data);
 
-        if (authError) {
-            console.error("Supabase login failed:", authError);
-            setError(authError.message || 'Login failed. Please check your credentials.');
-        } else if (authResponse.session) {
-            console.log("Supabase login successful:", authResponse);
-            login(authResponse.session); // Call the auth context to update session
-        } else {
-            console.error("Supabase login: No session returned");
-            setError('Login failed. Please check your credentials.');
-        }
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword(data);
+
+      if (authError) {
+        console.error("Supabase login failed:", authError);
+        setError(authError.message || 'Login failed. Please check your credentials.');
+      } else if (authResponse.session) {
+        console.log("Supabase login successful:", authResponse);
+        login(authResponse.session);
+      } else {
+        console.error("Supabase login: No session returned");
+        setError('Login failed. Please check your credentials.');
+      }
     } catch (err) {
       console.error("Login failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
       if (err instanceof ApiError) {
-         // Use specific error message from API if available
-         errorMessage = err.message || errorMessage;
+        errorMessage = err.message || errorMessage;
       } else if (err instanceof Error) {
-           errorMessage = err.message || errorMessage;
+        errorMessage = err.message || errorMessage;
       }
       setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-    // No need to set isLoading false here if redirect happens on success
   };
 
   return (
@@ -1492,12 +1517,12 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
       </Button>
-       <div className="mt-4 text-center text-sm">
-         Don't have an account?{" "}
-         <Link href="/register" className="underline text-primary hover:text-primary/80">
-           Register
-         </Link>
-       </div>
+      <div className="mt-4 text-center text-sm">
+        Don't have an account?{" "}
+        <Link href="/register" className="underline text-primary hover:text-primary/80">
+          Register
+        </Link>
+      </div>
     </form>
   );
 }
@@ -1505,9 +1530,10 @@ export function LoginForm() {
 
 ## File: `components/auth/register-form.tsx`
 ```tsx
+// components/auth/register-form.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -1519,25 +1545,24 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ApiError } from '@/lib/api';
-import { createClientComponentClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import { AuthApiError } from '@supabase/supabase-js';
+
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  // confirmPassword: z.string(), // Add if needed
-// }).refine(data => data.password === data.confirmPassword, {
-//   message: "Passwords don't match",
-//   path: ["confirmPassword"], // path of error
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const { login } = useAuth(); // Use login from auth context to set token after registration
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [authResponseState, setAuthResponseState] = useState<any>(null);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -1553,47 +1578,81 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
     try {
-       console.log("Attempting registration with:", data.email);
-        const supabase = createClientComponentClient();
-        const { data: authResponse, error: authError } = await supabase.auth.signUp({
+      console.log("Attempting registration with:", data.email);
+
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+     console.log("Supabase client created."); // Add this
+
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name || null,
+          },
+        },
+      });
+
+        console.log("signUp response:", authResponse, authError); // Add this
+
+      if (authError) {
+        console.error("Supabase registration failed:", authError);
+        if (authError instanceof AuthApiError) {
+          setError(`Supabase registration failed: ${authError.message}`);
+          //setAuthResponseState(authError); // authError state variable is already set by try/catch block
+        } else {
+            setError(authError.message || 'Registration failed. Please try again.');
+        }
+        setIsLoading(false);
+      } else {
+        // (+) Auto sign-in after successful registration:
+        if (authResponse?.user) {
+          const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
             email: data.email,
             password: data.password,
-            options: {
-                data: {
-                    name: data.name || null, // Store the name as user metadata
-                    // Add any other custom claims you want to store
-                }
-            }
-        });
+          });
 
-        if (authError) {
-            console.error("Supabase registration failed:", authError);
-            setError(authError.message || 'Registration failed. Please try again.');
-            setIsLoading(false);
-        } else if (authResponse.session) {
-            console.log("Supabase registration successful:", authResponse);
-            setSuccess(true);
-            login(authResponse.session); // Automatically log in the user
+          if (signInError) {
+            console.error("Auto sign-in failed:", signInError);
+            setError(`Registration successful, but auto sign-in failed: ${signInError.message}`);
+          } else if (signInData?.session) {
+            console.log("Auto sign-in successful:", signInData);
+            login(signInData.session); // Calls your login function
+            setSuccess(true); // set success to true so that account created message is not displayed
+          } else {
+            setError("Registration successful, but auto sign-in failed: No session returned.");
+          }
+        } else {
+            console.warn("Supabase registration: No user object returned.");
+            setError("Registration successful, but could not automatically sign you in.  Please login.");
         }
-        else {
-            console.warn("Supabase registration: No session returned, user needs to verify email.");
-            setSuccess(true);
-            // You might want to show a message to the user that they need to check their email
-            // setError("Registration successful, but please check your email to verify your account.");
-            // Consider redirecting to a "check your email" page
-        }
+      }
 
+      if (!authError) {
+        setAuthResponseState(authResponse);
+      }
 
     } catch (err) {
-        console.error("Registration failed:", err);
-        let errorMessage = 'Registration failed. Please try again.';
-        if (err instanceof ApiError) {
-          errorMessage = err.message || errorMessage;
-        } else if (err instanceof Error) {
-           errorMessage = err.message || errorMessage;
-        }
-        setError(errorMessage);
-        setIsLoading(false);
+      console.error("Registration failed:", err);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+      setIsLoading(false);
     }
   };
 
@@ -1606,15 +1665,15 @@ export function RegisterForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && !error && ( // Show success only if no subsequent error occurred
-        <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          {/* <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" /> */}
-          <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
-          <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! {authResponse?.user?.email_confirmed_at ? "Redirecting..." : "Please check your email to verify your account."}
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Remove this success block */}
+      {/*{success && !error && (*/}
+      {/*  <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">*/}
+      {/*    <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>*/}
+      {/*    <AlertDescription className="text-green-700 dark:text-green-300">*/}
+      {/*      Account created successfully! Please check your email to verify your account.*/}
+      {/*    </AlertDescription>*/}
+      {/*  </Alert>*/}
+      {/*)}*/}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
         <Input
@@ -1624,7 +1683,7 @@ export function RegisterForm() {
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
-         {form.formState.errors.name && (
+        {form.formState.errors.name && (
           <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
         )}
       </div>
@@ -1655,8 +1714,7 @@ export function RegisterForm() {
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
       </div>
-      {/* Add Confirm Password if needed */}
-      <Button type="submit" className="w-full" disabled={isLoading || success}>
+      <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
       <div className="mt-4 text-center text-sm">
@@ -1821,170 +1879,192 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 
 ## File: `components/chat/chat-interface.tsx`
 ```tsx
-// File: components/chat/chat-interface.tsx
-"use client";
+    // File: components/chat/chat-interface.tsx
+    "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChatInput } from './chat-input';
-import { ChatMessage, Message } from './chat-message';
-import { RetrievedDocumentsPanel } from './retrieved-documents-panel';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA:
-import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react'; // Mantuve FileText aunque no se use directamente, por si acaso.
-import { Skeleton } from '@/components/ui/skeleton';
+    import React, { useState, useEffect, useRef, useCallback } from 'react';
+    import { Button } from '@/components/ui/button';
+    import { ScrollArea } from '@/components/ui/scroll-area';
+    import { ChatInput } from './chat-input';
+    import { ChatMessage, Message } from './chat-message';
+    import { RetrievedDocumentsPanel } from './retrieved-documents-panel';
+    import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+    import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
+    // (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
+    // (+) AÑADIR ESTA LÍNEA:
+    import { toast } from "sonner";
+    import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react'; // Mantuve FileText aunque no se use directamente, por si acaso.
+    import { Skeleton } from '@/components/ui/skeleton';
 
-interface ChatInterfaceProps {
-  chatId?: string; // Receive chatId from the page
-}
-
-const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
-];
-
-export function ChatInterface({ chatId }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(true); // State for the right panel
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  // (-) QUITAR ESTA LÍNEA: const { toast } = useToast(); // Ya no se usa el hook, se importa 'toast' directamente.
-
-  // Load chat history based on chatId (placeholder)
-  useEffect(() => {
-    // Reset state for new/different chat
-    setMessages(initialMessages);
-    setRetrievedDocs([]);
-    setIsLoading(false);
-
-    if (chatId) {
-      console.log(`Loading history for chat: ${chatId}`);
-      // TODO: Fetch messages for the specific chatId from backend/localStorage
-      // setMessages(fetchedMessages);
-      setMessages([ // Dummy loading
-           { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
-      ]);
-    } else {
-      // New chat
-      setMessages(initialMessages);
+    interface ChatInterfaceProps {
+      chatId?: string; // Receive chatId from the page
     }
-  }, [chatId]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-        // Added timeout to ensure DOM updates are flushed before scrolling
-        setTimeout(() => {
-            if (scrollAreaRef.current) {
-                scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    const initialMessages: Message[] = [
+        { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
+    ];
+
+    export function ChatInterface({ chatId }: ChatInterfaceProps) {
+      const [messages, setMessages] = useState<Message[]>(initialMessages);
+      const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
+      const [isLoading, setIsLoading] = useState(false);
+      const [isPanelOpen, setIsPanelOpen] = useState(true); // State for the right panel
+      const scrollAreaRef = useRef<HTMLDivElement>(null);
+      // (-) QUITAR ESTA LÍNEA: const { toast } = useToast(); // Ya no se usa el hook, se importa 'toast' directamente.
+
+      // Load chat history based on chatId (placeholder)
+      useEffect(() => {
+        // Reset state for new/different chat
+        setMessages(initialMessages);
+        setRetrievedDocs([]);
+        setIsLoading(false);
+
+        if (chatId) {
+          console.log(`Loading history for chat: ${chatId}`);
+          // Load messages from local storage
+          const storedMessages = localStorage.getItem(`chat-${chatId}`);
+          if (storedMessages) {
+            try {
+              const parsedMessages: Message[] = JSON.parse(storedMessages);
+              setMessages(parsedMessages);
+            } catch (error) {
+              console.error("Error parsing chat history from local storage:", error);
+              // Handle error (e.g., clear local storage or show an error message)
             }
-        }, 100);
-    }
-  }, [messages]);
+          } else {
+              setMessages([ // Dummy loading
+                { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
+              ]);
+          }
+        } else {
+          // New chat
+          setMessages(initialMessages);
+        }
+      }, [chatId]);
 
-  const handleSendMessage = useCallback(async (query: string) => {
-    if (!query.trim() || isLoading) return;
+      // Save chat history to localStorage
+      useEffect(() => {
+        if (chatId) {
+          try {
+            localStorage.setItem(`chat-${chatId}`, JSON.stringify(messages));
+          } catch (error) {
+            console.error("Error saving chat history to local storage:", error);
+            // Handle error (e.g., show an error message)
+          }
+        }
+      }, [chatId, messages]);
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    setRetrievedDocs([]); // Clear previous docs
+      // Scroll to bottom when messages change
+      useEffect(() => {
+        if (scrollAreaRef.current) {
+            // Added timeout to ensure DOM updates are flushed before scrolling
+            setTimeout(() => {
+                if (scrollAreaRef.current) {
+                    scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+                }
+            }, 100);
+        }
+      }, [messages]);
 
-    try {
-      const response = await postQuery({ query });
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: response.answer,
-        sources: response.retrieved_documents // Attach sources to the message
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      setRetrievedDocs(response.retrieved_documents || []);
-      if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isPanelOpen) {
-         setIsPanelOpen(true); // Auto-open panel if closed and docs were retrieved
-      }
-    } catch (error) {
-      console.error("Query failed:", error);
-      let errorMessage = "Sorry, I encountered an error trying to answer your question.";
-       if (error instanceof ApiError && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       } else if (error instanceof Error && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       }
+      const handleSendMessage = useCallback(async (query: string) => {
+        if (!query.trim() || isLoading) return;
 
-      const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
-      setMessages(prev => [...prev, errorMessageObj]);
+        const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
+        setMessages(prev => [...prev, userMessage]);
+        setIsLoading(true);
+        setRetrievedDocs([]); // Clear previous docs
 
-      // (*) MODIFICAR ESTA LLAMADA PARA USAR 'sonner'
-      toast.error("Query Failed", {
-        description: errorMessage,
-      });
+        try {
+          const response = await postQuery({ query });
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: response.answer,
+            sources: response.retrieved_documents // Attach sources to the message
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+          setRetrievedDocs(response.retrieved_documents || []);
+          if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isPanelOpen) {
+             setIsPanelOpen(true); // Auto-open panel if closed and docs were retrieved
+          }
+        } catch (error) {
+          console.error("Query failed:", error);
+          let errorMessage = "Sorry, I encountered an error trying to answer your question.";
+           if (error instanceof ApiError && error.message) {
+               errorMessage = `Error: ${error.message}`;
+           } else if (error instanceof Error && error.message) {
+               errorMessage = `Error: ${error.message}`;
+           }
 
-    } finally {
-      setIsLoading(false);
-    }
-  // (*) QUITAR 'toast' de las dependencias si estaba, ya que 'toast' de sonner es una función estable importada.
-  }, [isLoading, isPanelOpen]); // Add isPanelOpen dependency
+          const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
+          setMessages(prev => [...prev, errorMessageObj]);
 
-  const handlePanelToggle = () => {
-        setIsPanelOpen(!isPanelOpen);
-    };
+          // (*) MODIFICAR ESTA LLAMADA PARA USAR 'sonner'
+          toast.error("Query Failed", {
+            description: errorMessage,
+          });
 
-  return (
-     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Adjust height based on header */}
-            <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
-                <div className="flex h-full flex-col">
-                    {/* Button to toggle panel */}
-                    <div className="absolute top-2 right-2 z-10">
-                        <Button onClick={handlePanelToggle} variant="ghost" size="icon">
-                            {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                            <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
-                        </Button>
-                    </div>
+        } finally {
+          setIsLoading(false);
+        }
+      // (*) QUITAR 'toast' de las dependencias si estaba, ya que 'toast' de sonner es una función estable importada.
+      }, [isLoading, isPanelOpen]); // Add isPanelOpen dependency
 
-                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-                        <div className="space-y-4 pr-4"> {/* Add padding right */}
-                            {messages.map((message) => (
-                                <ChatMessage key={message.id} message={message} />
-                            ))}
-                            {/* (*) Modificado para mostrar Skeleton solo cuando el último mensaje es del usuario */}
-                            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                                <div className="flex items-start space-x-3">
-                                     <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                          <BrainCircuit className="h-5 w-5 text-primary"/>
-                                     </Skeleton>
-                                    <div className="space-y-2 flex-1">
-                                        <Skeleton className="h-4 w-3/4" />
-                                        <Skeleton className="h-4 w-1/2" />
-                                    </div>
-                                </div>
-                            )}
+      const handlePanelToggle = () => {
+            setIsPanelOpen(!isPanelOpen);
+        };
+
+      return (
+         <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Adjust height based on header */}
+                <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
+                    <div className="flex h-full flex-col">
+                        {/* Button to toggle panel */}
+                        <div className="absolute top-2 right-2 z-10">
+                            <Button onClick={handlePanelToggle} variant="ghost" size="icon">
+                                {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+                                <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
+                            </Button>
                         </div>
-                    </ScrollArea>
 
-                    <div className="border-t p-4 bg-muted/30">
-                        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+                            <div className="space-y-4 pr-4"> {/* Add padding right */}
+                                {messages.map((message) => (
+                                    <ChatMessage key={message.id} message={message} />
+                                ))}
+                                {/* (*) Modificado para mostrar Skeleton solo cuando el último mensaje es del usuario */}
+                                {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                                    <div className="flex items-start space-x-3">
+                                         <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                              <BrainCircuit className="h-5 w-5 text-primary"/>
+                                         </Skeleton>
+                                        <div className="space-y-2 flex-1">
+                                            <Skeleton className="h-4 w-3/4" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
+
+                        <div className="border-t p-4 bg-muted/30">
+                            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                        </div>
                     </div>
-                </div>
-            </ResizablePanel>
+                </ResizablePanel>
 
-            {/* Conditionally render the panel based on isPanelOpen */}
-            {isPanelOpen && (
-                <>
-                    <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        {/* (*) Modificado para pasar el estado de carga correcto al panel de documentos */}
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
-                    </ResizablePanel>
-                </>
-            )}
-        </ResizablePanelGroup>
-  );
-}
+                {/* Conditionally render the panel based on isPanelOpen */}
+                {isPanelOpen && (
+                    <>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+                            {/* (*) Modificado para pasar el estado de carga correcto al panel de documentos */}
+                            <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
+                        </ResizablePanel>
+                    </>
+                )}
+            </ResizablePanelGroup>
+      );
+    }
 ```
 
 ## File: `components/chat/chat-message.tsx`
@@ -2086,6 +2166,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Import Button component
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
+import { ApiError, request } from "@/lib/api"; // Import request function
+
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -2095,15 +2177,53 @@ interface RetrievedDocumentsPanelProps {
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
     const [open, setOpen] = React.useState(false)
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
+    const [docContent, setDocContent] = useState<string | null>(null); // State to store document content
+    const [viewingError, setViewingError] = useState<string | null>(null); // Error when viewing doc
 
-    const handleViewDocument = (doc: RetrievedDoc) => {
-        // TODO: Implement document viewing logic
-        // This could open a modal, navigate to a viewer page, or fetch content
+
+    const handleViewDocument = async (doc: RetrievedDoc) => {
         console.log("Viewing document:", doc.document_id || doc.id);
-        // alert(`Viewing document: ${doc.file_name || doc.id}\n(Implementation needed)`);
         setSelectedDoc(doc);
-        setOpen(true); // Open the Dialog
+        setViewingError(null); // Clear any previous errors
+        setDocContent(null); // Clear previous content
+
+        try {
+             if (!doc.document_id) {
+                 throw new Error("Missing document_id for viewing");
+             }
+             const content = await fetchDocumentContent(doc.document_id);
+             setDocContent(content); // Set the content if fetch is successful
+             setOpen(true); // Open the Dialog after fetching content
+        } catch (error) {
+            console.error("Error fetching document content:", error);
+            let errorMessage = "Failed to load document content.";
+            if (error instanceof ApiError && error.message) {
+                errorMessage = error.message;
+            } else if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            setViewingError(errorMessage); // Set the error message
+            setDocContent(null); // Ensure content is cleared on error
+            setOpen(true); // Still open the dialog to display the error
+
+        }
     };
+
+
+     const fetchDocumentContent = async (documentId: string): Promise<string> => {
+        try {
+            const response = await request<string>(`/api/v1/ingest/document/${documentId}/content`, {
+                method: 'GET',
+            });
+            return response;
+
+        } catch (error) {
+            console.error("Error fetching document content:", error);
+            throw error;
+        }
+    };
+
+
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
         // TODO: Implement document download logic
@@ -2175,13 +2295,24 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         <div className="px-6 pb-4 text-center sm:text-left">
                             <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
                             <DialogDescription>
-                                {/* Implement document viewer or preview here. For MVP, show details. */}
-                                <p>ID: {selectedDoc.id}</p>
-                                <p>Score: {selectedDoc.score?.toFixed(4) || 'N/A'}</p>
-                                {/* Add scrollable content area */}
-                                <ScrollArea className="max-h-[300px]">
-                                    <p>{selectedDoc.content_preview || 'No preview available.'}</p>
-                                </ScrollArea>
+                                {viewingError && (
+                                    <div className="text-red-500">
+                                        Error loading document: {viewingError}
+                                    </div>
+                                )}
+                                {/* Display loading state while fetching */}
+                                 {!docContent && !viewingError && (
+                                    <div className="flex justify-center items-center h-32">
+                                        <Loader2 className="animate-spin h-6 w-6" />
+                                    </div>
+                                 )}
+
+                                {/* Display loaded content */}
+                                {docContent && (
+                                    <ScrollArea className="max-h-[300px]">
+                                        <p>{docContent}</p>
+                                    </ScrollArea>
+                                )}
                             </DialogDescription>
                         </div>
                          {/* Action buttons in footer - View/Download */}

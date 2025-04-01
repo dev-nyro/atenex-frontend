@@ -1,7 +1,6 @@
-// app/page.tsx
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
@@ -9,7 +8,33 @@ import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, login } = useAuth(); // Get login function
+
+  useEffect(() => {
+    const handleEmailConfirmation = async () => {
+      if (window.location.hash) {
+        const params = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        const expiresIn = params.get('expires_in');
+
+        if (accessToken && refreshToken && expiresIn) {
+          console.log("Found access token in URL hash:", accessToken);
+          console.log("Attempting to set session and log in.");
+           const session = {
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                expires_in: parseInt(expiresIn),
+                token_type: 'bearer',
+            };
+          await login(session);
+          router.replace('/'); // Replace current route to remove hash
+        }
+      }
+    };
+
+    handleEmailConfirmation();
+  }, [login, router]); // Dependencies: login function and router
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

@@ -1,117 +1,187 @@
-// File: lib/hooks/useAuth.tsx
+// File: components/auth/register-form.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getToken, setToken, removeToken, getUserFromToken, User } from '@/lib/auth/helpers';
-import { useRouter } from 'next/navigation';
-import { Session } from '@supabase/supabase-js';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
+import { AuthApiError } from '@supabase/supabase-js';
 
-interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  isLoading: boolean;
-  login: (session: Session) => void;
-  logout: () => void;
-}
+const registerSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
+  email: z.string().email({ message: 'Invalid email address' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+});
 
-const defaultAuthContextValue: AuthContextType = {
-    user: null,
-    token: null,
-    isLoading: true,
-    login: (session: Session) => {
-        console.error("Login function called outside of AuthProvider context");
+type RegisterFormValues = z.infer<typeof registerSchema>;
+
+export function RegisterForm() {
+  const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
+
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
     },
-    logout: () => {
-        console.error("Logout function called outside of AuthProvider context");
-    },
-};
+  });
 
-const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
+  const onSubmit = async (data: RegisterFormValues) => {
+    setIsLoading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      console.log("Attempting registration with:", data.email);
 
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setAuthStateToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-
-  useEffect(() => {
-    const storedToken = getToken(); // Check localStorage for token
-      if (storedToken) {
-          // console.log("useAuth: Token found in localStorage, attempting to validate.");
-          const userData = getUserFromToken(storedToken); // Validate the token
-          if (userData) {
-              // Token is valid and user data is available
-              // console.log("useAuth: Token is valid, setting user and token from localStorage.");
-              setUser(userData);
-              setAuthStateToken(storedToken);
-          } else {
-              // Token is invalid or expired
-              console.warn("useAuth: Invalid token found in localStorage, clearing.");
-              removeToken();
-          }
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
       }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+     console.log("Supabase client created."); // Add this
+
+     // Try signing up the user
+     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+           data: {
+              name: data.name || null,
+           },
+        },
+     });
+     console.log("signUp response:", authResponse, authError); // Add this
+
+     if (authError) {
+        console.error("Supabase registration failed:", authError);
+        setError(authError.message || 'Registration failed. Please try again.');
+        setIsLoading(false);
+     } else {
+        setSuccess(true); // Registration successful, set success state
+
+        // (+) Auto sign-in after successful registration:
+        // Check that email confirmation is not enabled
+        if (authResponse?.user) {
+           const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
+              email: data.email,
+              password: data.password,
+           });
+
+           if (signInError) {
+              console.error("Auto sign-in failed:", signInError);
+              setError(`Registration successful, but auto sign-in failed: ${signInError.message}`);
+           } else if (signInData?.session) {
+              console.log("Auto sign-in successful:", signInData);
+              login(signInData.session); // Calls your login function
+           } else {
+              setError("Registration successful, but auto sign-in failed: No session returned.");
+           }
+        } else {
+           console.warn("Supabase registration: No user object returned.");
+           setError("Registration successful, but could not automatically sign you in.  Please login.");
+        }
+     }
+      
+    } catch (err) {
+      console.error("Registration failed:", err);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+    } finally {
       setIsLoading(false);
-      // console.log("useAuth: Initial token check complete.");
-      // Intentionally empty dependency array: This effect runs only once on mount
-  }, []);
-
-
-  const login = useCallback((session: Session) => {
-      console.log("useAuth: Login called with session:", session);
-        if (!session?.access_token) {
-            console.error("useAuth: No access token found in session.");
-            return;
-        }
-
-        const newToken = session.access_token;
-        setToken(newToken);
-
-        const userData = getUserFromToken(newToken);
-        if (!userData) {
-            console.error("useAuth: Failed to get user from token.");
-            return;
-        }
-        setUser(userData);
-        setAuthStateToken(newToken);
-        router.push('/');
-        console.log("useAuth: User logged in, token set, redirecting home.");
-  }, [router]);
-
-  const logout = useCallback(() => {
-    removeToken();
-    setUser(null);
-    setAuthStateToken(null);
-    router.push('/login');
-    console.log("User logged out.");
-  }, [router]);
-
-  const providerValue = {
-      user,
-      token,
-      isLoading,
-      login,
-      logout
+    }
   };
 
   return (
-    <AuthContext.Provider value={providerValue}>
-      {children}
-    </AuthContext.Provider>
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {success && !error && (
+        <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
+          <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
+          <AlertDescription className="text-green-700 dark:text-green-300">
+            Account created successfully! Please check your email to verify your account.
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="space-y-1">
+        <Label htmlFor="name">Name (Optional)</Label>
+        <Input
+          id="name"
+          type="text"
+          placeholder="Your Name"
+          {...form.register('name')}
+          aria-invalid={form.formState.errors.name ? 'true' : 'false'}
+        />
+        {form.formState.errors.name && (
+          <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+        )}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="name@example.com"
+          required
+          {...form.register('email')}
+          aria-invalid={form.formState.errors.email ? 'true' : 'false'}
+        />
+        {form.formState.errors.email && (
+          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+        )}
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
+          type="password"
+          required
+          {...form.register('password')}
+          aria-invalid={form.formState.errors.password ? 'true' : 'false'}
+        />
+        {form.formState.errors.password && (
+          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+        )}
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
+      </Button>
+      <div className="mt-4 text-center text-sm">
+        Already have an account?{" "}
+        <Link href="/login" className="underline text-primary hover:text-primary/80">
+          Login
+        </Link>
+      </div>
+    </form>
   );
-};
-
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined || context === defaultAuthContextValue) {
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
-       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
-    } else if (context === undefined) {
-       throw new Error('useAuth must be used within an AuthProvider');
-    }
-  }
-  return context;
-};
+}
