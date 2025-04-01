@@ -1,26 +1,26 @@
 // File: components/chat/retrieved-documents-panel.tsx
-"use client"; // (+) ADDED "use client" directive
+"use client";
 
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Eye } from 'lucide-react'; // (+) ADDED Download, Eye icons
+import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
 import { RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button'; // (+) ADDED Button import
-// (+) ADDED Dialog imports from shadcn/ui (assuming it re-exports Radix)
+import { Button } from '@/components/ui/button';
+// (*) CORRECT IMPORT PATH (Ensure components/ui/dialog.tsx exists after running `npx shadcn-ui@latest add dialog`)
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogHeader, // (+) Use DialogHeader
+    DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogFooter, // (+) Use DialogFooter
-    DialogClose   // (+) Use DialogClose for explicit closing
-} from "@/components/ui/dialog"; // (*) ADJUST path if needed
-import { toast } from "sonner"; // (+) ADDED for download feedback
+    DialogFooter,
+    DialogClose
+} from "@/components/ui/dialog"; // <--- This path causes the error if the file is missing
+import { toast } from "sonner";
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -28,33 +28,29 @@ interface RetrievedDocumentsPanelProps {
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
-    // (+) ADDED state for dialog
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleViewDocument = (doc: RetrievedDoc) => {
         console.log("Viewing document details:", doc.document_id || doc.id);
         setSelectedDoc(doc);
-        setIsDialogOpen(true); // Open the Dialog
+        setIsDialogOpen(true);
     };
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
-        // TODO: Implement actual document download logic when backend endpoint exists
         const message = `Download requested for: ${doc.file_name || doc.id}`;
         console.log(message);
-        // Use toast for user feedback
         toast.info("Download Not Implemented", {
              description: `Backend endpoint for downloading '${doc.file_name || doc.id}' is not yet available.`,
              action: {
                 label: "Close",
-                onClick: () => {}, // No-op, just closes the toast
+                onClick: () => {},
              },
         });
-        // Close the dialog after attempting download
-        // setIsDialogOpen(false); // Optional: keep dialog open if preferred
     };
 
   return (
+    // Wrap the entire panel content potentially triggering the dialog
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
@@ -81,7 +77,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     </div>
                 )}
                 {documents.map((doc, index) => (
-                    // (+) Use DialogTrigger to open the modal on click
+                    // Use DialogTrigger around the Card to make it clickable
                     <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                          <Card
                             className="cursor-pointer hover:shadow-md transition-shadow duration-150"
@@ -102,7 +98,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                 <p className="text-xs text-muted-foreground line-clamp-2">
                                 {doc.content_preview || 'No preview available.'}
                                 </p>
-                                {/* Optional Metadata */}
                                 <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
                                     <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                     <Eye className="h-3 w-3 text-muted-foreground/50" />
@@ -114,7 +109,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* (+) Document Dialog Content */}
+            {/* Dialog Content - Rendered conditionally when selectedDoc is not null */}
             {selectedDoc && (
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
@@ -126,6 +121,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3 text-sm">
+                        {/* Details content */}
                         <div className="flex justify-between">
                             <span className="font-medium text-muted-foreground">Document ID:</span>
                             <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
@@ -144,7 +140,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                 <pre className="whitespace-pre-wrap break-words">{selectedDoc.content_preview || 'No content preview available.'}</pre>
                             </ScrollArea>
                         </div>
-                        {/* Display other metadata if needed */}
                         {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                              <div>
                                 <span className="font-medium text-muted-foreground block mb-1">Metadata:</span>
@@ -157,7 +152,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         )}
                     </div>
                     <DialogFooter>
-                        {/* Action buttons */}
                         <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
                             <Download className="mr-2 h-4 w-4" />
                             Download Original (N/A)
@@ -169,6 +163,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </DialogContent>
             )}
         </div>
-    </Dialog>
+    </Dialog> // Close the main Dialog wrapper
   );
 }
