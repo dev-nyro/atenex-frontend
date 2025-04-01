@@ -9,155 +9,216 @@ import { ChatInput } from '@/components/chat/chat-input';
 import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
+import {
+    postQuery,
+    getChatMessages,
+    RetrievedDoc, // Use the frontend type defined/exported in api.ts
+    ApiError,
+    mapApiMessageToFrontend // Import the mapping function
+} from '@/lib/api';
 import { toast } from "sonner";
-// (*) CORRECTED IMPORT: Added Loader2 here
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2 } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/lib/hooks/useAuth'; // Import useAuth
 
-const initialMessageContent = 'Hello! How can I help you query your knowledge base today?';
-const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: initialMessageContent }
-];
-
-const getChatHistoryKey = (id: string | undefined): string | null => {
-    return id ? `chatHistory_${id}` : null;
-}
+// Initial message for new chats or when history is empty
+const welcomeMessage: Message = {
+    id: 'initial-welcome',
+    role: 'assistant',
+    content: 'Hello! How can I help you query your knowledge base today?',
+};
 
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
-  const chatId = params.chatId ? (Array.isArray(params.chatId) ? params.chatId.join('/') : params.chatId) : undefined;
+  const { token } = useAuth(); // Check if user is logged in
 
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  // Extract chatId, ensuring it's a string or undefined
+  const chatId = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
+
+  const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false); // Renamed from isLoading for clarity
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
+  const hasFetchedHistory = useRef(false); // Prevent refetching on navigation replacement
 
-  // Load chat history from localStorage based on chatId
+  // Load chat history from API based on chatId
   useEffect(() => {
-    setIsHistoryLoaded(false);
-    const storageKey = getChatHistoryKey(chatId);
-    let loadedMessages = initialMessages;
+    // Only fetch if chatId exists and we haven't fetched for this ID yet
+    if (chatId && !hasFetchedHistory.current && token) {
+      console.log(`ChatPage: Fetching history for chat ID: ${chatId}`);
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      hasFetchedHistory.current = true; // Mark as attempting fetch
 
-    if (storageKey && typeof window !== 'undefined') {
-        console.log(`Attempting to load history for chat: ${chatId} from key: ${storageKey}`);
-        try {
-            const storedHistory = localStorage.getItem(storageKey);
-            if (storedHistory) {
-                const parsedMessages = JSON.parse(storedHistory) as Message[];
-                if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
-                    loadedMessages = parsedMessages;
-                    console.log(`Successfully loaded ${parsedMessages.length} messages for chat ${chatId}.`);
-                } else {
-                     console.log(`Stored history for ${chatId} was empty or invalid format. Using initial message.`);
-                     localStorage.setItem(storageKey, JSON.stringify(initialMessages));
-                }
-            } else {
-                console.log(`No history found for chat ${chatId}. Initializing with default message.`);
-                localStorage.setItem(storageKey, JSON.stringify(initialMessages));
-            }
-        } catch (error) {
-            console.error(`Failed to load or parse chat history for ${chatId}:`, error);
-            toast.error("Error loading chat history", { description: "Could not retrieve previous messages. Resetting chat." });
-        }
+      getChatMessages(chatId)
+        .then(apiMessages => {
+          if (apiMessages.length > 0) {
+             // Map API messages to frontend message type
+             const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
+             setMessages(mappedMessages);
+             console.log(`ChatPage: Loaded ${mappedMessages.length} messages for chat ${chatId}.`);
+          } else {
+              // Chat exists but has no messages (shouldn't happen if created via query)
+              setMessages([welcomeMessage]); // Start with welcome message
+              console.log(`ChatPage: Chat ${chatId} found but has no messages. Displaying welcome message.`);
+          }
+        })
+        .catch(error => {
+          console.error(`ChatPage: Failed to load chat history for ${chatId}:`, error);
+          let message = "Error loading chat history.";
+          if (error instanceof ApiError) {
+              message = error.message || message;
+              if (error.status === 404) {
+                  message = "Chat not found. It might have been deleted.";
+                  // Optionally redirect if chat not found
+                  // router.replace('/chat');
+              }
+          } else if (error instanceof Error) {
+              message = error.message;
+          }
+          setHistoryError(message);
+          setMessages([welcomeMessage]); // Show welcome message on error
+          toast.error("Failed to Load Chat", { description: message });
+        })
+        .finally(() => {
+          setIsLoadingHistory(false);
+        });
+
     } else if (!chatId) {
-        console.log("No chatId provided, using ephemeral chat state.");
+      // Reset for the '/chat' page (new chat state)
+      console.log("ChatPage: No chatId, preparing for new chat.");
+      setMessages([welcomeMessage]);
+      setRetrievedDocs([]);
+      setIsLoadingHistory(false);
+      setHistoryError(null);
+      hasFetchedHistory.current = false; // Reset fetch flag for when a new chat ID is created
+    } else if (!token) {
+         console.log("ChatPage: User not authenticated, cannot load history.");
+         setIsLoadingHistory(false);
+         setHistoryError("Please log in to view chat history.");
+         hasFetchedHistory.current = false;
     }
 
-    setMessages(loadedMessages);
-    setRetrievedDocs([]);
-    setIsLoading(false);
-    setIsHistoryLoaded(true);
+  // Reset fetch flag if chatId changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, token]); // Depend on chatId and token
 
+  // Effect to reset fetch flag when navigating away or chatId changes significantly
+  useEffect(() => {
+      hasFetchedHistory.current = false;
   }, [chatId]);
 
-  // Save chat history to localStorage when messages change
-  useEffect(() => {
-    if (isHistoryLoaded && chatId && typeof window !== 'undefined') {
-        const storageKey = getChatHistoryKey(chatId);
-        if (storageKey && messages.length > 0) {
-            try {
-                console.log(`Saving ${messages.length} messages for chat ${chatId} to key ${storageKey}`);
-                localStorage.setItem(storageKey, JSON.stringify(messages));
-            } catch (error) {
-                 console.error(`Failed to save chat history for ${chatId}:`, error);
-                 toast.error("Error saving chat history", { description: "Could not save the latest messages." });
-            }
-        }
-    }
-  }, [messages, chatId, isHistoryLoaded]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change or loading starts/stops
   useEffect(() => {
     if (scrollAreaRef.current) {
-        setTimeout(() => {
+        // Delay slightly to allow DOM updates
+        const timer = setTimeout(() => {
              if (scrollAreaRef.current) {
                  scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
              }
         }, 100);
+        return () => clearTimeout(timer); // Cleanup timer on unmount or change
     }
-  }, [messages]);
+  }, [messages, isSending, isLoadingHistory]); // Scroll on message changes and loading state changes
 
   const handleSendMessage = useCallback(async (query: string) => {
-    if (!query.trim() || isLoading) return;
-
-    let currentChatId = chatId;
-    if (!currentChatId) {
-        currentChatId = `chat-${Date.now()}`;
-        console.log(`Starting new chat with ID: ${currentChatId}`);
-        router.replace(`/chat/${currentChatId}`, { scroll: false });
+    if (!query.trim() || isSending || !token) {
+        if (!token) toast.error("Authentication Error", { description: "Please log in to send messages." });
+        return;
     }
 
     const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
+    // Add user message immediately for better UX
     setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    setRetrievedDocs([]);
+    setIsSending(true);
+    setRetrievedDocs([]); // Clear previous docs
+
+    const currentChatId = chatId || null; // Send null if chatId is undefined
 
     try {
-      const response = await postQuery({ query });
+      console.log(`ChatPage: Sending query to chat ID: ${currentChatId}`);
+      const response = await postQuery({ query, chat_id: currentChatId });
+      console.log("ChatPage: Received response:", response);
+
       const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
+        id: `assistant-${Date.now()}`, // Use a temporary client-side ID or wait for backend ID if needed
         role: 'assistant',
         content: response.answer,
-        sources: response.retrieved_documents
+        // Map sources from API response to frontend type
+        sources: mapApiMessageToFrontend({ // Use mapping helper structure
+             id: '', role: 'assistant', content: '', // Dummy values not used
+             sources: response.retrieved_documents,
+             created_at: ''
+         }).sources
       };
+
+      // Update state with assistant message
       setMessages(prev => [...prev, assistantMessage]);
-      setRetrievedDocs(response.retrieved_documents || []);
+      setRetrievedDocs(mapApiMessageToFrontend({ id: '', role: 'assistant', content: '', sources: response.retrieved_documents, created_at: '' }).sources || []);
+
+      // If it was a new chat, update the URL
+      if (!chatId && response.chat_id) {
+        console.log(`ChatPage: New chat created with ID: ${response.chat_id}. Updating URL.`);
+        router.replace(`/chat/${response.chat_id}`, { scroll: false });
+        // No need to set hasFetchedHistory.current = true here, useEffect will handle it on next render
+      }
+
+      // Auto-open panel if closed and docs were retrieved
       if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isPanelOpen) {
          setIsPanelOpen(true);
       }
+
     } catch (error) {
-      console.error("Query failed:", error);
+      console.error("ChatPage: Query failed:", error);
       let errorMessage = "Sorry, I encountered an error trying to answer your question.";
-       if (error instanceof ApiError && error.message) {
+       if (error instanceof ApiError) {
            errorMessage = `Error: ${error.message}`;
-       } else if (error instanceof Error && error.message) {
+       } else if (error instanceof Error) {
            errorMessage = `Error: ${error.message}`;
        }
 
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      toast.error("Query Failed", {
-        description: errorMessage,
-      });
+      toast.error("Query Failed", { description: errorMessage });
 
     } finally {
-      setIsLoading(false);
+      setIsSending(false);
     }
-  }, [isLoading, isPanelOpen, chatId, router]);
+  }, [isSending, chatId, router, token, isPanelOpen]); // Add token and isPanelOpen
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
     };
 
+  // Render loading state for history
+  const renderHistoryLoading = () => (
+       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Loading chat history...</p>
+        </div>
+  );
+
+  // Render error state for history
+  const renderHistoryError = () => (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive mb-4" />
+          <p className="text-destructive font-medium mb-2">Error Loading History</p>
+          <p className="text-sm text-muted-foreground mb-4">{historyError}</p>
+          {/* Optionally add a retry button */}
+      </div>
+  );
+
   return (
      <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]">
             <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
-                <div className="flex h-full flex-col">
+                <div className="flex h-full flex-col relative"> {/* Added relative */}
+                    {/* Panel Toggle Button */}
                     <div className="absolute top-2 right-2 z-10">
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon">
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
@@ -165,45 +226,46 @@ export default function ChatPage() {
                         </Button>
                     </div>
 
+                    {/* Main Content Area */}
                     <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-                        <div className="space-y-4 pr-4">
-                            {/* Conditional rendering while history loads */}
-                            {!isHistoryLoaded && chatId && (
-                                <div className="flex justify-center items-center h-full">
-                                     {/* Error was here: Loader2 was used without being imported */}
-                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                    <span className="ml-2 text-muted-foreground">Loading chat history...</span>
-                                </div>
-                            )}
-                            {/* Render messages once loaded */}
-                            {isHistoryLoaded && messages.map((message) => (
-                                <ChatMessage key={message.id} message={message} />
-                            ))}
-                            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                                <div className="flex items-start space-x-3">
-                                     <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                          <BrainCircuit className="h-5 w-5 text-primary"/>
-                                     </Skeleton>
-                                    <div className="space-y-2 flex-1">
-                                        <Skeleton className="h-4 w-3/4" />
-                                        <Skeleton className="h-4 w-1/2" />
+                         {isLoadingHistory ? (
+                            renderHistoryLoading()
+                         ) : historyError ? (
+                             renderHistoryError()
+                         ) : (
+                            <div className="space-y-4 pr-4">
+                                {messages.map((message) => (
+                                    <ChatMessage key={message.id} message={message} />
+                                ))}
+                                {/* Show assistant thinking skeleton only when sending */}
+                                {isSending && (
+                                    <div className="flex items-start space-x-3">
+                                        <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                            <BrainCircuit className="h-5 w-5 text-primary"/>
+                                        </Skeleton>
+                                        <div className="space-y-2 flex-1">
+                                            <Skeleton className="h-4 w-16" /> {/* Short thinking text */}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                         )}
                     </ScrollArea>
 
+                    {/* Input Area */}
                     <div className="border-t p-4 bg-muted/30">
-                        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                        <ChatInput onSendMessage={handleSendMessage} isLoading={isSending} />
                     </div>
                 </div>
             </ResizablePanel>
 
+            {/* Retrieved Documents Panel */}
             {isPanelOpen && (
                 <>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
+                        {/* Show loading state in panel only when actively sending/waiting for response */}
+                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
                     </ResizablePanel>
                 </>
             )}

@@ -1,67 +1,194 @@
+// File: components/chat/chat-history.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Trash2 } from 'lucide-react'; // Import icons
+import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/hooks/useAuth'; // To ensure user is logged in
+import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
-// Dummy data - replace with actual chat history fetching
-const dummyHistory = [
-  { id: 'chat-1', title: 'Q3 Marketing Strategy' },
-  { id: 'chat-2', title: 'Competitor Analysis - Project X' },
-  { id: 'chat-3', title: 'Onboarding Process Review' },
-  { id: 'chat-4', title: 'API Documentation Query' },
-  { id: 'chat-5', title: 'Financial Report Summary' },
-  { id: 'chat-6', title: 'Long Chat Title That Might Need Truncation Example' },
-];
 
 export function ChatHistory() {
   const pathname = usePathname();
-  // TODO: Fetch actual chat history, maybe store in state or use a hook
-  const [history, setHistory] = useState(dummyHistory);
+  const { token } = useAuth(); // Get token to know if user is authenticated
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteChat = (id: string, event: React.MouseEvent) => {
-     event.stopPropagation(); // Prevent link navigation when clicking delete
+  const fetchChatHistory = useCallback(async (showToast = false) => {
+    if (!token) {
+        console.log("ChatHistory: No token, skipping fetch.");
+        setChats([]);
+        setIsLoading(false);
+        return;
+    }
+    console.log("ChatHistory: Fetching chat list...");
+    setIsLoading(true);
+    setError(null);
+    try {
+      const fetchedChats = await getChats();
+      // Sort chats by updated_at descending (newest first)
+      fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      setChats(fetchedChats);
+       if (showToast) {
+           toast.success("Chat History Refreshed");
+       }
+    } catch (err) {
+      console.error("Failed to fetch chat history:", err);
+      let message = "Could not load chat history.";
+       if (err instanceof ApiError) {
+         message = err.message || message;
+       } else if (err instanceof Error) {
+         message = err.message;
+       }
+      setError(message);
+      toast.error("Error Loading Chats", { description: message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchChatHistory(false);
+  }, [fetchChatHistory]); // Depend on the memoized fetch function
+
+  const confirmDeleteChat = (chat: ChatSummary, event: React.MouseEvent) => {
+     event.stopPropagation();
      event.preventDefault();
-     console.log("Deleting chat:", id);
-     // TODO: Implement actual deletion logic (API call, update state)
-     setHistory(prev => prev.filter(chat => chat.id !== id));
-  }
+     setChatToDelete(chat);
+  };
+
+  const handleDeleteChat = async () => {
+    if (!chatToDelete) return;
+
+    console.log("Deleting chat:", chatToDelete.id);
+    setIsDeleting(true);
+    try {
+        await deleteChat(chatToDelete.id);
+        setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
+        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+        // If the currently active chat is deleted, navigate away (e.g., to /chat)
+        const currentChatId = pathname.split('/').pop();
+        if (currentChatId === chatToDelete.id) {
+             // Use next/navigation's router if available, or window.location
+             // Assuming this component doesn't have direct router access easily,
+             // a simple redirect might suffice, or lift state up.
+             // For now, just log it. Consider using router from page if needed.
+             console.log("Active chat deleted, consider navigating to /chat");
+             window.location.href = '/chat'; // Simple redirect
+        }
+    } catch (err) {
+        console.error("Failed to delete chat:", err);
+        let message = "Could not delete chat.";
+        if (err instanceof ApiError) {
+            message = err.message || message;
+        } else if (err instanceof Error) {
+            message = err.message;
+        }
+        toast.error("Deletion Failed", { description: message });
+    } finally {
+        setIsDeleting(false);
+        setChatToDelete(null); // Close the dialog
+    }
+  };
+
+  const renderContent = () => {
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    }
+    if (error) {
+        return (
+            <div className="px-2 py-4 text-center text-destructive">
+                <AlertCircle className="mx-auto h-6 w-6 mb-1" />
+                <p className="text-sm mb-2">{error}</p>
+                <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
+                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                </Button>
+            </div>
+        );
+    }
+    if (chats.length === 0) {
+        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
+    }
+
+    return chats.map((chat) => {
+        const isActive = pathname === `/chat/${chat.id}`;
+        const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+        return (
+            <AlertDialog key={chat.id}>
+                <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
+                    <Button
+                        variant={isActive ? "secondary" : "ghost"}
+                        className={cn(
+                            "w-full justify-between h-10 group relative", // Added relative for positioning trigger
+                            isActive ? "bg-muted hover:bg-muted" : ""
+                        )}
+                        title={displayTitle}
+                    >
+                        <div className="flex items-center overflow-hidden flex-1 mr-2">
+                            <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate flex-1 text-sm">{displayTitle}</span>
+                        </div>
+                        {/* Use AlertDialogTrigger for the delete icon */}
+                        <AlertDialogTrigger asChild>
+                            <button
+                                className="p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 hover:text-destructive focus:outline-none z-10"
+                                onClick={(e) => confirmDeleteChat(chat, e)}
+                                aria-label={`Delete chat: ${displayTitle}`}
+                            >
+                                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                            </button>
+                        </AlertDialogTrigger>
+                    </Button>
+                </Link>
+                {/* Dialog Content - Rendered outside the Link/Button */}
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the chat
+                            <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id.substring(0,8)}"</span> and all its messages.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setChatToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteChat}
+                            disabled={isDeleting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        );
+    });
+  };
+
 
   return (
-    <ScrollArea className="h-[300px] flex-1"> {/* Adjust height as needed */}
+    <ScrollArea className="h-full flex-1"> {/* Let parent control height */}
       <div className="flex flex-col gap-1 p-2">
-        {history.length === 0 && (
-          <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>
-        )}
-        {history.map((chat) => {
-           const isActive = pathname === `/chat/${chat.id}`;
-           return (
-            <Link key={chat.id} href={`/chat/${chat.id}`} passHref legacyBehavior>
-                <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                        "w-full justify-between h-10 group",
-                        isActive ? "bg-muted hover:bg-muted" : ""
-                    )}
-                    title={chat.title}
-                >
-                    <div className="flex items-center overflow-hidden">
-                        <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="truncate flex-1 text-sm">{chat.title}</span>
-                    </div>
-                    <Trash2
-                        className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 hover:text-destructive"
-                        onClick={(e) => handleDeleteChat(chat.id, e)}
-                        aria-label={`Delete chat: ${chat.title}`}
-                    />
-                </Button>
-            </Link>
-           );
-        })}
+        {renderContent()}
       </div>
     </ScrollArea>
   );
