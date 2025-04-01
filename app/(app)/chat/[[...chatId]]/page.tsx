@@ -42,7 +42,7 @@ export default function ChatPage() {
       console.log(`Loading history for chat: ${chatId}`);
       // --- TODO: Fetch actual messages ---
       // .catch(err => {
-      //     // Adaptar toast si se usa aquí
+      //     // (+) Adaptar toast si se usa aquí
       //     toast.error("Failed to load chat history", { description: err.message });
       //  })
       setMessages([
@@ -111,7 +111,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  // Dependencias de useCallback: no se necesita 'toast' para sonner
+  // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
   }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {

@@ -65,7 +65,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
     setUser(userData);
     setAuthStateToken(newToken);
-    router.push('/'); // Redirect to the main app page
+    // (+) Cambiado a '/' para ir a la página principal después del login
+    router.push('/');
     console.log("User logged in, token set.");
   }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
@@ -99,11 +100,13 @@ export const useAuth = (): AuthContextType => {
   // La comprobación de undefined ya no es estrictamente necesaria porque
   // createContext ahora tiene un valor por defecto válido, pero
   // mantenerla puede ser útil para detectar errores de configuración inesperados.
-  if (context === undefined) {
-    console.error("AuthContext reached undefined state unexpectedly.");
-    throw new Error('useAuth must be used within an AuthProvider');
-    // O podrías retornar defaultAuthContextValue aquí si prefieres no lanzar error,
-    // aunque lanzar error suele ser mejor para detectar problemas.
+  if (context === undefined || context === defaultAuthContextValue) { // (+) Check against default value too
+    // Only throw error if it's truly used outside and hasn't received the real value
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') { // Avoid throwing during SSR/build if possible
+       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
+    } else if (context === undefined) {
+       throw new Error('useAuth must be used within an AuthProvider');
+    }
   }
   return context;
 };

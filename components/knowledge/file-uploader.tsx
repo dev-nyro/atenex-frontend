@@ -91,7 +91,7 @@ export function FileUploader() {
                  });
             }
         });
-    // Dependencias de useCallback: no se necesita 'toast' para sonner
+    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({

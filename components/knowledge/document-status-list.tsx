@@ -45,7 +45,7 @@ export function DocumentStatusList() {
         } finally {
             setIsLoading(false);
         }
-    // Dependencias de useCallback: no se necesita 'toast' para sonner
+    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     useEffect(() => {

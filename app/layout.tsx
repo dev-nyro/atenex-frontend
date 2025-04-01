@@ -5,7 +5,7 @@ import "./globals.css"; // Esta importación SÍ debe estar aquí
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// ¡¡ASEGÚRATE DE ELIMINAR LOS '//' DEL PRINCIPIO DE ESTA LÍNEA!!
+// (+) DESCOMENTAR ESTA LÍNEA:
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -36,7 +36,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            {/* Esta línea requiere la importación activa de arriba */}
+            {/* (+) Asegúrate de que esta línea esté activa y use el Toaster importado */}
             <Toaster />
           </ThemeProvider>
         </AuthProvider>

@@ -85,6 +85,8 @@ atenex-frontend/
 ├── next.config.mjs
 ├── package.json
 ├── postcss.config.js
+├── public
+│   └── icons
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -215,112 +217,120 @@ const nextConfig = {
 ```js
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-    darkMode: ["class"],
-    content: [
-      './pages/**/*.{ts,tsx}',
-      './components/**/*.{ts,tsx}',
-      './app/**/*.{ts,tsx,mdx}',
-      './src/**/*.{ts,tsx,mdx}', // Si usas src/
-      './components/theme-palette-button.tsx',
-      ],
-    prefix: "",
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        },
-        borderRadius: {
-          lg: "var(--radius)",
-          md: "calc(var(--radius) - 2px)",
-          sm: "calc(var(--radius) - 4px)",
-        },
-        keyframes: {
-          "accordion-down": {
-            from: { height: "0" },
-            to: { height: "var(--radix-accordion-content-height)" },
-          },
-          "accordion-up": {
-            from: { height: "var(--radix-accordion-content-height)" },
-            to: { height: "0" },
-          },
-        },
-        animation: {
-          "accordion-down": "accordion-down 0.2s ease-out",
-          "accordion-up": "accordion-up 0.2s ease-out",
-        },
-         // Add prose styles for markdown rendering
-         typography: (theme) => ({
-          DEFAULT: {
-            css: {
-              '--tw-prose-body': theme('colors.foreground'),
-              '--tw-prose-headings': theme('colors.foreground'),
-              '--tw-prose-lead': theme('colors.muted.foreground'),
-              '--tw-prose-links': theme('colors.primary.DEFAULT'),
-              '--tw-prose-bold': theme('colors.foreground'),
-              '--tw-prose-counters': theme('colors.muted.foreground'),
-              '--tw-prose-bullets': theme('colors.muted.foreground'),
-              '--tw-prose-hr': theme('colors.border'),
-              '--tw-prose-quotes': theme('colors.foreground'),
-              '--tw-prose-quote-borders': theme('colors.border'),
-              '--tw-prose-captions': theme('colors.muted.foreground'),
-              '--tw-prose-code': theme('colors.foreground'),
-              '--tw-prose-pre-code': theme('colors.foreground'),
-              '--tw-prose-pre-bg': theme('colors.muted.DEFAULT'),
-              '--tw-prose-th-borders': theme('colors.border'),
-              '--tw-prose-td-borders': theme('colors.border'),
-              '--tw-prose-invert-body': theme('colors.foreground'), // Assuming foreground is light in dark mode
-              '--tw-prose-invert-headings': theme('colors.foreground'),
-              '--tw-prose-invert-lead': theme('colors.muted.foreground'),
-              '--tw-prose-invert-links': theme('colors.primary.DEFAULT'),
-              '--tw-prose-invert-bold': theme('colors.foreground'),
-              '--tw-prose-invert-counters': theme('colors.muted.foreground'),
-              '--tw-prose-invert-bullets': theme('colors.muted.foreground'),
-              '--tw-prose-invert-hr': theme('colors.border'),
-              '--tw-prose-invert-quotes': theme('colors.foreground'),
-              '--tw-prose-invert-quote-borders': theme('colors.border'),
-              '--tw-prose-invert-captions': theme('colors.muted.foreground'),
-              '--tw-prose-invert-code': theme('colors.foreground'),
-              '--tw-prose-invert-pre-code': theme('colors.foreground'),
-              '--tw-prose-invert-pre-bg': theme('colors.muted.DEFAULT'),
-              '--tw-prose-invert-th-borders': theme('colors.border'),
-              '--tw-prose-invert-td-borders': theme('colors.border'),
-              // Customizations
-              code: {
-                  padding: '0.2em 0.4em',
-                  margin: '0',
-                  fontSize: '85%',
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderRadius: '0.25rem',
-                  fontWeight: '400', // Ensure code block text isn't bold by default
-                  color: 'inherit' // Inherit color
-              },
-              'code::before': { content: 'none' }, // Remove default quotes around inline code
-              'code::after': { content: 'none' },
-              pre: {
-                   fontWeight: '400', // Ensure pre block text isn't bold
-                   color: 'inherit', // Inherit color
-                   backgroundColor: 'hsl(var(--muted))', // Match inline code bg
-                   padding: theme('padding.4'),
-                   borderRadius: theme('borderRadius.sm'),
-                   overflowX: 'auto',
-              },
-              'pre code': { // Style code specifically inside pre blocks
-                   backgroundColor: 'transparent', // No background for code inside pre
-                   padding: '0',
-                   margin: '0',
-                   fontSize: 'inherit', // Inherit font size from pre
-                   color: 'inherit', // Inherit color from pre
-                   fontWeight: 'inherit', // Inherit font weight
-               },
-              'pre code::before': { content: 'none' }, // Remove quotes for code inside pre
-              'pre code::after': { content: 'none' },
-            },
-          },
-        }),
+  darkMode: ["class"],
+  content: [
+    './pages/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx,mdx}',
+    './src/**/*.{ts,tsx,mdx}', // Si usas src/
+    './components/theme-palette-button.tsx',
+    ],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
       },
     },
-    plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')],
-  }
+    extend: {
+       fontFamily: {
+         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+       },
+      
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+       // Add prose styles for markdown rendering
+       typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            '--tw-prose-body': 'var(--foreground)',
+            '--tw-prose-headings': 'var(--foreground)',
+            '--tw-prose-lead': 'var(--muted-foreground)',
+            '--tw-prose-links': 'var(--primary)',
+            '--tw-prose-bold': 'var(--foreground)',
+            '--tw-prose-counters': 'var(--muted-foreground)',
+            '--tw-prose-bullets': 'var(--muted-foreground)',
+            '--tw-prose-hr': 'var(--border)',
+            '--tw-prose-quotes': 'var(--foreground)',
+            '--tw-prose-quote-borders': 'var(--border)',
+            '--tw-prose-captions': 'var(--muted-foreground)',
+            '--tw-prose-code': 'var(--foreground)',
+            '--tw-prose-pre-code': 'var(--foreground)',
+            '--tw-prose-pre-bg': 'var(--muted)',
+            '--tw-prose-th-borders': 'var(--border)',
+            '--tw-prose-td-borders': 'var(--border)',
+            '--tw-prose-invert-body': 'var(--foreground)', // Assuming foreground is light in dark mode
+            '--tw-prose-invert-headings': 'var(--foreground)',
+            '--tw-prose-invert-lead': 'var(--muted-foreground)',
+            '--tw-prose-invert-links': 'var(--primary)',
+            '--tw-prose-invert-bold': 'var(--foreground)',
+            '--tw-prose-invert-counters': 'var(--muted-foreground)',
+            '--tw-prose-invert-bullets': 'var(--muted-foreground)',
+            '--tw-prose-invert-hr': 'var(--border)',
+            '--tw-prose-invert-quotes': 'var(--foreground)',
+            '--tw-prose-invert-quote-borders': 'var(--border)',
+            '--tw-prose-invert-captions': 'var(--muted-foreground)',
+            '--tw-prose-invert-code': 'var(--foreground)',
+            '--tw-prose-invert-pre-code': 'var(--foreground)',
+            '--tw-prose-invert-pre-bg': 'var(--muted)',
+            '--tw-prose-invert-th-borders': 'var(--border)',
+            '--tw-prose-invert-td-borders': 'var(--border)',
+            // Customizations
+            code: {
+                padding: '0.2em 0.4em',
+                margin: '0',
+                fontSize: '85%',
+                backgroundColor: 'hsl(var(--muted))',
+                borderRadius: '0.25rem',
+                fontWeight: '400', // Ensure code block text isn't bold by default
+                color: 'inherit' // Inherit color
+            },
+            'code::before': { content: 'none' }, // Remove default quotes around inline code
+            'code::after': { content: 'none' },
+            pre: {
+                 fontWeight: '400', // Ensure pre block text isn't bold
+                 color: 'inherit', // Inherit color
+                 backgroundColor: 'hsl(var(--muted))', // Match inline code bg
+                 padding: theme('padding.4'),
+                 borderRadius: theme('borderRadius.sm'),
+                 overflowX: 'auto',
+            },
+            'pre code': { // Style code specifically inside pre blocks
+                 backgroundColor: 'transparent', // No background for code inside pre
+                 padding: '0',
+                 margin: '0',
+                 fontSize: 'inherit', // Inherit font size from pre
+                 color: 'inherit', // Inherit color from pre
+                 fontWeight: 'inherit', // Inherit font weight
+             },
+            'pre code::before': { content: 'none' }, // Remove quotes for code inside pre
+            'pre code::after': { content: 'none' },
+          },
+        },
+      }),
+    },
+  },
+  plugins: [require("tailwindcss-animate"), require('@tailwindcss/typography')],
+}
 ```
 
 ## File: `postcss.config.js`
@@ -431,7 +441,7 @@ ehthumbs_vista.db
 .history/
 ```
 
-## File: `app/(app)/chat/[[...chatId]]/page.tsx`
+## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx
 "use client";
@@ -602,7 +612,7 @@ export default function ChatPage() {
 }
 ```
 
-## File: `app/(app)/knowledge/page.tsx`
+## File: `app\(app)\knowledge\page.tsx`
 ```tsx
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
@@ -645,7 +655,7 @@ export default function KnowledgePage() {
 }
 ```
 
-## File: `app/(app)/layout.tsx`
+## File: `app\(app)\layout.tsx`
 ```tsx
 // File: app/(app)/layout.tsx
 "use client";
@@ -732,7 +742,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-## File: `app/(app)/settings/page.tsx`
+## File: `app\(app)\settings\page.tsx`
 ```tsx
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -795,7 +805,7 @@ export default function SettingsPage() {
 }
 ```
 
-## File: `app/(auth)/layout.tsx`
+## File: `app\(auth)\layout.tsx`
 ```tsx
 import React from 'react';
 import Image from 'next/image';
@@ -819,7 +829,7 @@ export default function AuthLayout({
 }
 ```
 
-## File: `app/(auth)/login/page.tsx`
+## File: `app\(auth)\login\page.tsx`
 ```tsx
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -839,7 +849,7 @@ export default function LoginPage() {
 }
 ```
 
-## File: `app/(auth)/register/page.tsx`
+## File: `app\(auth)\register\page.tsx`
 ```tsx
 import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -859,7 +869,7 @@ export default function RegisterPage() {
 }
 ```
 
-## File: `app/about/page.tsx`
+## File: `app\about\page.tsx`
 ```tsx
 // app/about/page.tsx
 "use client"; // Add this line
@@ -984,7 +994,7 @@ export default function AboutPage() {
 }
 ```
 
-## File: `app/api/auth/login/route.ts`
+## File: `app\api\auth\login\route.ts`
 ```ts
 // Example Backend Route (using Next.js Route Handler - BFF pattern)
 // In a real app, this might call your actual Auth microservice or handle auth logic.
@@ -1030,7 +1040,7 @@ export async function POST(request: Request) {
 }
 ```
 
-## File: `app/api/auth/logout/route.ts`
+## File: `app\api\auth\logout\route.ts`
 ```ts
 // Example Backend Route for Logout (Optional)
 // Often, logout is handled purely client-side by clearing the token.
@@ -1059,7 +1069,7 @@ export async function POST(request: Request) {
 // e.g., /api/auth/session which verifies the token and returns user info.
 ```
 
-## File: `app/api/auth/register/route.ts`
+## File: `app\api\auth\register\route.ts`
 ```ts
 // Example Backend Route for Registration
 
@@ -1111,7 +1121,7 @@ export async function POST(request: Request) {
 }
 ```
 
-## File: `app/contact/page.tsx`
+## File: `app\contact\page.tsx`
 ```tsx
 // app/contact/page.tsx
 "use client"; // Add this line
@@ -1219,7 +1229,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app/globals.css`
+## File: `app\globals.css`
 ```css
 /* File: atenex-frontend/app/globals.css */
 
@@ -1357,7 +1367,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app/layout.tsx`
+## File: `app\layout.tsx`
 ```tsx
 // File: app/layout.tsx
 import type { Metadata } from "next";
@@ -1407,7 +1417,7 @@ export default function RootLayout({
 }
 ```
 
-## File: `app/page.tsx`
+## File: `app\page.tsx`
 ```tsx
 // app/page.tsx
 "use client";
@@ -1499,7 +1509,7 @@ function FeatureCard({ title, description }: { title: string; description: strin
 }
 ```
 
-## File: `components/auth/login-form.tsx`
+## File: `components\auth\login-form.tsx`
 ```tsx
 "use client";
 
@@ -1610,7 +1620,7 @@ export function LoginForm() {
 }
 ```
 
-## File: `components/auth/register-form.tsx`
+## File: `components\auth\register-form.tsx`
 ```tsx
 "use client";
 
@@ -1758,7 +1768,7 @@ export function RegisterForm() {
 }
 ```
 
-## File: `components/chat/chat-history.tsx`
+## File: `components\chat\chat-history.tsx`
 ```tsx
 "use client";
 
@@ -1830,7 +1840,7 @@ export function ChatHistory() {
 }
 ```
 
-## File: `components/chat/chat-input.tsx`
+## File: `components\chat\chat-input.tsx`
 ```tsx
 "use client";
 
@@ -1907,7 +1917,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 }
 ```
 
-## File: `components/chat/chat-interface.tsx`
+## File: `components\chat\chat-interface.tsx`
 ```tsx
 // File: components/chat/chat-interface.tsx
 "use client";
@@ -2075,7 +2085,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 }
 ```
 
-## File: `components/chat/chat-message.tsx`
+## File: `components\chat\chat-message.tsx`
 ```tsx
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -2162,7 +2172,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 }
 ```
 
-## File: `components/chat/retrieved-documents-panel.tsx`
+## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
 import React, { useState } from 'react';
@@ -2289,7 +2299,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 }
 ```
 
-## File: `components/knowledge/document-status-list.tsx`
+## File: `components\knowledge\document-status-list.tsx`
 ```tsx
 // File: components/knowledge/document-status-list.tsx
 "use client";
@@ -2464,7 +2474,7 @@ export function DocumentStatusList() {
 }
 ```
 
-## File: `components/knowledge/file-uploader.tsx`
+## File: `components\knowledge\file-uploader.tsx`
 ```tsx
 // File: components/knowledge/file-uploader.tsx
 "use client";
@@ -2639,7 +2649,7 @@ export function FileUploader() {
 }
 ```
 
-## File: `components/layout/header.tsx`
+## File: `components\layout\header.tsx`
 ```tsx
     // File: components/layout/header.tsx
     "use client";
@@ -2727,7 +2737,7 @@ export function FileUploader() {
       }
 ```
 
-## File: `components/layout/sidebar.tsx`
+## File: `components\layout\sidebar.tsx`
 ```tsx
 "use client";
 
@@ -2814,7 +2824,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 }
 ```
 
-## File: `components/theme-palette-button.tsx`
+## File: `components\theme-palette-button.tsx`
 ```tsx
 // File: components/theme-palette-button.tsx
 "use client";
@@ -2873,7 +2883,7 @@ export function ThemePaletteButton() {
 }
 ```
 
-## File: `components/theme-provider.tsx`
+## File: `components\theme-provider.tsx`
 ```tsx
 // File: components/theme-provider.tsx
 "use client";
@@ -2886,12 +2896,12 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 ```
 
-## File: `components/theme-toggle.tsx`
+## File: `components\theme-toggle.tsx`
 ```tsx
 
 ```
 
-## File: `components/ui/alert.tsx`
+## File: `components\ui\alert.tsx`
 ```tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -2962,7 +2972,7 @@ export { Alert, AlertTitle, AlertDescription }
 
 ```
 
-## File: `components/ui/avatar.tsx`
+## File: `components\ui\avatar.tsx`
 ```tsx
 "use client"
 
@@ -3020,7 +3030,7 @@ export { Avatar, AvatarImage, AvatarFallback }
 
 ```
 
-## File: `components/ui/badge.tsx`
+## File: `components\ui\badge.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3071,7 +3081,7 @@ export { Badge, badgeVariants }
 
 ```
 
-## File: `components/ui/button.tsx`
+## File: `components\ui\button.tsx`
 ```tsx
 // File: components/ui/button.tsx
 import * as React from "react"
@@ -3137,7 +3147,7 @@ function Button({
 export { Button, buttonVariants }
 ```
 
-## File: `components/ui/card.tsx`
+## File: `components\ui\card.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3234,7 +3244,7 @@ export {
 
 ```
 
-## File: `components/ui/dropdown-menu.tsx`
+## File: `components\ui\dropdown-menu.tsx`
 ```tsx
 "use client"
 
@@ -3496,7 +3506,7 @@ export {
 
 ```
 
-## File: `components/ui/input.tsx`
+## File: `components\ui\input.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3522,7 +3532,7 @@ export { Input }
 
 ```
 
-## File: `components/ui/label.tsx`
+## File: `components\ui\label.tsx`
 ```tsx
 "use client"
 
@@ -3551,7 +3561,7 @@ export { Label }
 
 ```
 
-## File: `components/ui/progress.tsx`
+## File: `components\ui\progress.tsx`
 ```tsx
 "use client"
 
@@ -3587,7 +3597,7 @@ export { Progress }
 
 ```
 
-## File: `components/ui/resizable.tsx`
+## File: `components\ui\resizable.tsx`
 ```tsx
 "use client"
 
@@ -3648,7 +3658,7 @@ export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
 
 ```
 
-## File: `components/ui/scroll-area.tsx`
+## File: `components\ui\scroll-area.tsx`
 ```tsx
 "use client"
 
@@ -3711,7 +3721,7 @@ export { ScrollArea, ScrollBar }
 
 ```
 
-## File: `components/ui/separator.tsx`
+## File: `components\ui\separator.tsx`
 ```tsx
 "use client"
 
@@ -3744,7 +3754,7 @@ export { Separator }
 
 ```
 
-## File: `components/ui/skeleton.tsx`
+## File: `components\ui\skeleton.tsx`
 ```tsx
 import { cn } from "@/lib/utils"
 
@@ -3762,7 +3772,7 @@ export { Skeleton }
 
 ```
 
-## File: `components/ui/sonner.tsx`
+## File: `components\ui\sonner.tsx`
 ```tsx
 "use client"
 
@@ -3792,7 +3802,7 @@ export { Toaster }
 
 ```
 
-## File: `components/ui/table.tsx`
+## File: `components\ui\table.tsx`
 ```tsx
 "use client"
 
@@ -3913,7 +3923,7 @@ export {
 
 ```
 
-## File: `components/ui/textarea.tsx`
+## File: `components\ui\textarea.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3936,7 +3946,7 @@ export { Textarea }
 
 ```
 
-## File: `components/ui/tooltip.tsx`
+## File: `components\ui\tooltip.tsx`
 ```tsx
 "use client"
 
@@ -4142,7 +4152,7 @@ if __name__ == "__main__":
     generate_codebase_markdown()
 ```
 
-## File: `lib/api.ts`
+## File: `lib\api.ts`
 ```ts
 // File: lib/api.ts
 import { getToken } from './auth/helpers';
@@ -4367,7 +4377,7 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
 };
 ```
 
-## File: `lib/auth/helpers.ts`
+## File: `lib\auth\helpers.ts`
 ```ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
 
@@ -4423,13 +4433,13 @@ export const getUserFromToken = (token: string | null): User | null => {
 };
 ```
 
-## File: `lib/constants.ts`
+## File: `lib\constants.ts`
 ```ts
 export const APP_NAME = "Atenex";
 export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ```
 
-## File: `lib/hooks/useAuth.tsx`
+## File: `lib\hooks\useAuth.tsx`
 ```tsx
 "use client";
 
@@ -4542,7 +4552,7 @@ export const useAuth = (): AuthContextType => {
 };
 ```
 
-## File: `lib/utils.ts`
+## File: `lib\utils.ts`
 ```ts
 // File: lib/utils.ts
 import { clsx, type ClassValue } from "clsx"
