@@ -44,8 +44,9 @@ export function Header() {
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {getInitials(user.name)}
                     </AvatarFallback>
-                  </Button>
-                </DropdownMenuTrigger>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
