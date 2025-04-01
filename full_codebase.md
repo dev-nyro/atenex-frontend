@@ -762,7 +762,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={80} minSize={30}>
               <div className="flex h-full flex-col">
-                  <Header />  // Added This Line
+                  <Header />  
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
                       {children}
                   </main>
@@ -905,23 +905,74 @@ export default function RegisterPage() {
 ```tsx
 // app/about/page.tsx
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { APP_NAME } from '@/lib/constants';
+import { Separator } from "@/components/ui/separator";
 
 export default function AboutPage() {
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-semibold mb-4">About Us</h1>
-      <p className="text-gray-700 dark:text-gray-300">
-        Atenex is an innovative knowledge management platform designed to help
-        organizations unlock the power of their collective knowledge.
-        We strive to provide a seamless and intuitive experience, allowing
-        users to easily access and share information.
-      </p>
-      <p className="mt-4 text-gray-700 dark:text-gray-300">
-        Our mission is to empower teams to make better decisions with faster access
-        to relevant insights.
-      </p>
-      {/* Add more content as needed */}
-    </div>
+      <div className="container mx-auto p-6 space-y-4">
+          <h1 className="text-3xl font-semibold">About {APP_NAME}</h1>
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Our Mission</CardTitle>
+                  <CardDescription>
+                      Empowering organizations with seamless access to their collective knowledge.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <p>
+                      We are committed to providing innovative solutions that streamline knowledge management,
+                      facilitate informed decision-making, and enhance team productivity.
+                  </p>
+              </CardContent>
+          </Card>
+
+          <Separator />
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Our Vision</CardTitle>
+                  <CardDescription>
+                      To be the leading knowledge query platform, transforming how businesses leverage information.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <p>
+                      We envision a future where organizations can effortlessly tap into their internal expertise,
+                      fostering a culture of continuous learning and growth.
+                  </p>
+              </CardContent>
+          </Card>
+
+          <Separator />
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Our Values</CardTitle>
+                  <CardDescription>
+                      Integrity, Innovation, Collaboration, and Customer Success.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <ul className="list-disc list-inside space-y-1">
+                      <li>
+                          <strong>Integrity:</strong> We uphold the highest ethical standards in all our operations.
+                      </li>
+                      <li>
+                          <strong>Innovation:</strong> We continuously seek new ways to improve our platform and services.
+                      </li>
+                      <li>
+                          <strong>Collaboration:</strong> We believe in working together to achieve shared goals.
+                      </li>
+                      <li>
+                          <strong>Customer Success:</strong> We are dedicated to helping our customers succeed.
+                      </li>
+                  </ul>
+              </CardContent>
+          </Card>
+      </div>
   );
 }
 ```
@@ -1057,24 +1108,71 @@ export async function POST(request: Request) {
 ```tsx
 // app/contact/page.tsx
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { APP_NAME } from '@/lib/constants';
+import { Mail, Phone, MapPin } from 'lucide-react';
+import { Separator } from "@/components/ui/separator";
 
 export default function ContactPage() {
-  return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-semibold mb-4">Contact Us</h1>
-      <p className="text-gray-700 dark:text-gray-300">
-        We'd love to hear from you! If you have any questions or feedback,
-        please don't hesitate to reach out.
-      </p>
-      <ul className="mt-4 list-none">
-        <li>
-          Email: <a href="mailto:support@example.com">support@example.com</a>
-        </li>
-        <li>Phone: (123) 456-7890</li>
-        {/* Add more contact methods as needed */}
-      </ul>
-    </div>
-  );
+    return (
+        <div className="container mx-auto p-6 space-y-4">
+            <h1 className="text-3xl font-semibold">Contact {APP_NAME}</h1>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>General Inquiries</CardTitle>
+                    <CardDescription>
+                        For questions about our platform, features, or pricing.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <a href="mailto:info@example.com">info@example.com</a>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>(123) 456-7890</span>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Separator />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Support</CardTitle>
+                    <CardDescription>
+                        Need help with using the platform? Contact our support team.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <a href="mailto:support@example.com">support@example.com</a>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Separator />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Our Office</CardTitle>
+                    <CardDescription>
+                        Visit us at our headquarters.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span>123 Main Street, Anytown, CA 12345</span>
+                    </div>
+                    {/* Google Maps Embed or similar here if desired */}
+                </CardContent>
+            </Card>
+        </div>
+    );
 }
 ```
 
@@ -1280,26 +1378,25 @@ export default function ContactPage() {
 
 /* Variables para el tema green (.green) */
 .green {
-    --background: oklch(0.2 0.1 150); /* Dark Green */
-    --foreground: oklch(0.95 0.02 30); /* Light Gray */
-    --card: oklch(0.25 0.12 150);
-    --card-foreground: oklch(0.95 0.02 30);
-    --popover: oklch(0.3 0.14 150);
-    --popover-foreground: oklch(0.95 0.02 30);
-    --primary: oklch(0.8 0.2 120); /* Light Green */
-    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
-    --secondary: oklch(0.35 0.16 150);
-    --secondary-foreground: oklch(0.9 0.01 30);
-    --muted: oklch(0.4 0.18 150);
-    --muted-foreground: oklch(0.75 0.03 30);
-    --accent: oklch(0.45 0.2 150);
-    --accent-foreground: oklch(0.9 0.01 30);
-    --destructive: oklch(0.6 0.2 10); /* Dark Red */
-    --border: oklch(0.3 0.1 150);
-    --input: oklch(0.35 0.12 150);
-    --ring: oklch(0.7 0.2 120); /* Light Green Ring */
+  --background: oklch(0.98 0.01 150); /* Very Light Green/Gray - almost white */
+  --foreground: oklch(0.15 0.1 150); /* Dark Green - Slightly brighter than pure black for readability */
+  --card: oklch(0.96 0.02 150); /* Lighter Green/Gray for cards */
+  --card-foreground: oklch(0.15 0.1 150); /* Dark Green */
+  --popover: oklch(0.94 0.03 150); /* Even Lighter - near white */
+  --popover-foreground: oklch(0.15 0.1 150); /* Dark Green */
+  --primary: oklch(0.3 0.2 120); /* Medium Green */
+  --primary-foreground: oklch(0.98 0.01 30); /* White */
+  --secondary: oklch(0.92 0.04 150); /* Light Greenish-Gray */
+  --secondary-foreground: oklch(0.15 0.1 150); /* Dark Green */
+  --muted: oklch(0.9 0.05 150); /* Subtle Light Green */
+  --muted-foreground: oklch(0.3 0.03 30); /* Slightly lighter green for text */
+  --accent: oklch(0.88 0.06 150); /* Light Green Accent */
+  --accent-foreground: oklch(0.15 0.1 150); /* Dark Green */
+  --destructive: oklch(0.6 0.2 10); /* Dark Red - for destructive actions */
+  --border: oklch(0.85 0.04 150); /* Subtle Light Green Border */
+  --input: oklch(0.8 0.03 150); /* Input background - slightly darker */
+  --ring: oklch(0.3 0.2 120); /* Medium Green Ring */
 }
-
 /* 5. Aplica overrides mínimos en la capa base */
 @layer base {
 body {
@@ -2594,90 +2691,90 @@ export function FileUploader() {
 
 ## File: `components/layout/header.tsx`
 ```tsx
-// File: components/layout/header.tsx
-"use client";
+    // File: components/layout/header.tsx
+    "use client";
 
-import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
-import { useAuth } from '@/lib/hooks/useAuth';
-import { APP_NAME } from '@/lib/constants';
-import { ThemePaletteButton } from '@/components/theme-palette-button';
-import { useRouter } from 'next/navigation';
+    import React from 'react';
+    import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+    import { Button } from "@/components/ui/button";
+    import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+    import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
+    import { useAuth } from '@/lib/hooks/useAuth';
+    import { APP_NAME } from '@/lib/constants';
+    import { ThemePaletteButton } from '@/components/theme-palette-button';
+    import { useRouter } from 'next/navigation';
 
-export function Header() {
-  const { user, logout } = useAuth();
-    const router = useRouter();
-    const getInitials = (name?: string) => {
-      if (!name) return '?';
-      return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-    };
+    export function Header() {
+      const { user, logout } = useAuth();
+        const router = useRouter();
+        const getInitials = (name?: string) => {
+          if (!name) return '?';
+          return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+        };
 
-    return (
-      <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
-        {/* Left side - Home Link */}
-        <div className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-                <Home className="h-5 w-5" />
-                <span className="sr-only">Home</span>
-            </Button>
-            <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
-            {/* Add Breadcrumbs or dynamic title here */}
-        </div>
-
-
-        {/* Right side - Theme toggle and User menu */}
-        <div className="flex items-center space-x-4">
-          <ThemePaletteButton />
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                  <Avatar className="h-9 w-9">
-                    {/* Add AvatarImage if user has profile picture URL */}
-                    {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
+        return (
+          <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
+            {/* Left side - Home Link */}
+            <div className="flex items-center">
+                <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+                    <Home className="h-5 w-5" />
+                    <span className="sr-only">Home</span>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name || 'User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {/* Add links to settings or profile page */}
-                <DropdownMenuItem onClick={() => router.push('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                  {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
-                </DropdownMenuItem>
-                {/* Remove Profile DropDown Option
-                <DropdownMenuItem>
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                  {/* <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-                </DropdownMenuItem> */}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </header>
-    );
-  }
+                <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
+                {/* Add Breadcrumbs or dynamic title here */}
+            </div>
+
+
+            {/* Right side - Theme toggle and User menu */}
+            <div className="flex items-center space-x-4">
+              <ThemePaletteButton />
+              {user && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                      <Avatar className="h-9 w-9">
+                        {/* Add AvatarImage if user has profile picture URL */}
+                        {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user.name || 'User'}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {/* Add links to settings or profile page */}
+                    <DropdownMenuItem onClick={() => router.push('/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                      {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
+                    </DropdownMenuItem>
+                    {/* Remove Profile DropDown Option
+                    <DropdownMenuItem>
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                      {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                    </DropdownMenuItem> */}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </header>
+        );
+      }
 ```
 
 ## File: `components/layout/sidebar.tsx`
@@ -2837,71 +2934,6 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
 ## File: `components/theme-toggle.tsx`
 ```tsx
-
-// File: components/theme-toggle.tsx
-"use client";
-
-import * as React from "react";
-import { Moon, Sun, Palette } from "lucide-react";
-import { useTheme } from "next-themes";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-const colorPalettes = [
-    'system',
-    'light',
-    'dark',
-    'blue',
-    'green',
-];
-
-const themeToPalette: { [key: string]: string } = {
-   'system': 'Default',
-   'light': 'Light',
-   'dark': 'Dark',
-   'blue': 'Blue Oasis',
-   'green': 'Emerald Depths'
-}
-
-export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
-  const [currentPaletteIndex, setCurrentPaletteIndex] = React.useState(0);
-
-  const handlePaletteChange = () => {
-    setCurrentPaletteIndex((prevIndex) => {
-      const newIndex = (prevIndex + 1) % colorPalettes.length;
-      setTheme(colorPalettes[newIndex]);
-      return newIndex;
-    });
-  };
-
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon">
-          <Sun className={cn("h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0", theme === "dark" || theme === "blue" || theme === "green" ? "hidden" : "" )} />
-          <Moon className={cn("absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100", theme !== "dark" && theme !== "blue" && theme !== "green" ? "hidden" : "")} />
-          <Palette className={cn("absolute h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:rotate-0 dark:scale-100", theme === "blue" || theme === "green" ? "" : "hidden")} />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-           {colorPalettes.map((palette) => (
-               <DropdownMenuItem key={palette} onClick={() => setTheme(palette)}>
-                   {themeToPalette[palette] || palette}
-               </DropdownMenuItem>
-           ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 ```
 

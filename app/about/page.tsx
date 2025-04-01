@@ -3,6 +3,17 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from '@/lib/constants';
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+const teamMembers = [
+    { name: "Demo User", role: "Founder", imageUrl: null },
+    // Add more team members as needed
+];
+
+const milestones = [
+    { year: 2023, event: "Atenex founded with a vision for accessible knowledge." },
+    // Add more milestones
+];
 
 export default function AboutPage() {
   return (
@@ -65,6 +76,33 @@ export default function AboutPage() {
                           <strong>Customer Success:</strong> We are dedicated to helping our customers succeed.
                       </li>
                   </ul>
+              </CardContent>
+          </Card>
+          <Separator />
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Meet Our Team</CardTitle>
+                  <CardDescription>
+                      The talented individuals behind {APP_NAME}.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {teamMembers.map((member) => (
+                      <div key={member.name} className="flex flex-col items-center">
+                          <Avatar className="h-16 w-16">
+                              {member.imageUrl ? (
+                                  <img src={member.imageUrl} alt={member.name} />
+                              ) : (
+                                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                              )}
+                          </Avatar>
+                          <div className="mt-2 text-center">
+                              <p className="font-medium">{member.name}</p>
+                              <p className="text-sm text-muted-foreground">{member.role}</p>
+                          </div>
+                      </div>
+                  ))}
               </CardContent>
           </Card>
       </div>

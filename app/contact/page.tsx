@@ -4,6 +4,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { APP_NAME } from '@/lib/constants';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 export default function ContactPage() {
     return (
@@ -43,6 +47,32 @@ export default function ContactPage() {
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <a href="mailto:support@example.com">support@example.com</a>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Separator />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Contact Form</CardTitle>
+                    <CardDescription>Send us a message directly.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form className="grid gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="name">Your Name</Label>
+                            <Input id="name" placeholder="John Doe" type="text" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" placeholder="johndoe@example.com" type="email" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="message">Message</Label>
+                            <Textarea id="message" placeholder="Write your message here." />
+                        </div>
+                        <Button>Send Message</Button>
+                    </form>
                 </CardContent>
             </Card>
 

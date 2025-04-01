@@ -31,6 +31,10 @@ const themeToPalette: { [key: string]: string } = {
 export function ThemePaletteButton() {
   const { setTheme, theme } = useTheme();
 
+  const handleThemeChange = (palette: string) => {
+    setTheme(palette);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -41,7 +45,7 @@ export function ThemePaletteButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
            {colorPalettes.map((palette) => (
-               <DropdownMenuItem key={palette} onClick={() => setTheme(palette)}>
+               <DropdownMenuItem key={palette} onClick={() => handleThemeChange(palette)}>
                    {themeToPalette[palette] || palette}
                </DropdownMenuItem>
            ))}
