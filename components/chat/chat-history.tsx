@@ -4,7 +4,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
-import { Button } from '@/components/ui/button';
+// *** CORREGIDO: Importar Button Y buttonVariants ***
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -156,6 +157,7 @@ export function ChatHistory() {
                 <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
                     <a
                         className={cn(
+                            // *** CORREGIDO: Ahora buttonVariants está importado y se puede usar ***
                             buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
                             "w-full justify-start h-10 flex-1 overflow-hidden mr-1", // Adjust styling
                             isActive ? "bg-muted hover:bg-muted" : ""
