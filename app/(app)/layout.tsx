@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
+// import { Header } from '@/components/layout/header'; //Remove This Line
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
@@ -71,7 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={80} minSize={30}>
               <div className="flex h-full flex-col">
-                  <Header />
+                  {/* <Header />  // Remove This Line */}
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
                       {children}
                   </main>
