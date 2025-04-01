@@ -4,6 +4,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { APP_NAME } from '@/lib/constants';
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from '@/components/ui/button'; // Import the Button component
+import { useRouter } from 'next/navigation'; // Import the useRouter hook
 
 const teamMembers = [
     { name: "Demo User 1", role: "Founder", imageUrl: null },
@@ -18,8 +20,11 @@ const milestones = [
 ];
 
 export default function AboutPage() {
+    const router = useRouter(); // Initialize the router
+
   return (
       <div className="container mx-auto p-6 space-y-4">
+          <Button variant="link" onClick={() => router.push('/')}>Back to Home</Button> {/* Button to go back */}
           <h1 className="text-3xl font-semibold">About {APP_NAME}</h1>
 
           <Card>

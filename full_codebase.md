@@ -908,6 +908,19 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from '@/lib/constants';
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+const teamMembers = [
+    { name: "Demo User 1", role: "Founder", imageUrl: null },
+    { name: "Demo User 2", role: "Co-Founder", imageUrl: null },
+    { name: "Demo User 3", role: "Lead Engineer", imageUrl: null },
+    // Add more team members as needed
+];
+
+const milestones = [
+    { year: 2023, event: "Atenex founded with a vision for accessible knowledge." },
+    // Add more milestones
+];
 
 export default function AboutPage() {
   return (
@@ -970,6 +983,35 @@ export default function AboutPage() {
                           <strong>Customer Success:</strong> We are dedicated to helping our customers succeed.
                       </li>
                   </ul>
+              </CardContent>
+          </Card>
+          <Separator />
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Meet Our Team</CardTitle>
+                  <CardDescription>
+                      The talented individuals behind {APP_NAME}.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                  <div className="grid sm:grid-cols-3 gap-4"> {/* Flex Container for centering */}
+                    {teamMembers.map((member) => (
+                        <div key={member.name} className="flex flex-col items-center">
+                            <Avatar className="h-16 w-16">
+                                {member.imageUrl ? (
+                                    <img src={member.imageUrl} alt={member.name} />
+                                ) : (
+                                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                )}
+                            </Avatar>
+                            <div className="mt-2 text-center">
+                                <p className="font-medium">{member.name}</p>
+                                <p className="text-sm text-muted-foreground">{member.role}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
               </CardContent>
           </Card>
       </div>
@@ -1112,6 +1154,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { APP_NAME } from '@/lib/constants';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 export default function ContactPage() {
     return (
@@ -1151,6 +1197,32 @@ export default function ContactPage() {
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <a href="mailto:support@example.com">support@example.com</a>
                     </div>
+                </CardContent>
+            </Card>
+
+            <Separator />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Contact Form</CardTitle>
+                    <CardDescription>Send us a message directly.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form className="grid gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="name">Your Name</Label>
+                            <Input id="name" placeholder="John Doe" type="text" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" placeholder="johndoe@example.com" type="email" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="message">Message</Label>
+                            <Textarea id="message" placeholder="Write your message here." />
+                        </div>
+                        <Button>Send Message</Button>
+                    </form>
                 </CardContent>
             </Card>
 
@@ -1379,23 +1451,23 @@ export default function ContactPage() {
 /* Variables para el tema green (.green) */
 .green {
   --background: oklch(0.98 0.01 150); /* Very Light Green/Gray - almost white */
-  --foreground: oklch(0.15 0.1 150); /* Dark Green - Slightly brighter than pure black for readability */
+  --foreground: oklch(0.10 0.1 150); /* Dark Green - Slightly brighter than pure black for readability */
   --card: oklch(0.96 0.02 150); /* Lighter Green/Gray for cards */
-  --card-foreground: oklch(0.15 0.1 150); /* Dark Green */
-  --popover: oklch(0.94 0.03 150); /* Even Lighter - near white */
-  --popover-foreground: oklch(0.15 0.1 150); /* Dark Green */
-  --primary: oklch(0.3 0.2 120); /* Medium Green */
+  --card-foreground: oklch(0.10 0.1 150); /* Dark Green */
+  --popover: oklch(0.97 0.03 150); /* Even Lighter - near white */
+  --popover-foreground: oklch(0.10 0.1 150); /* Dark Green */
+  --primary: oklch(0.10 0.2 120); /* Medium Green */
   --primary-foreground: oklch(0.98 0.01 30); /* White */
-  --secondary: oklch(0.92 0.04 150); /* Light Greenish-Gray */
-  --secondary-foreground: oklch(0.15 0.1 150); /* Dark Green */
-  --muted: oklch(0.9 0.05 150); /* Subtle Light Green */
-  --muted-foreground: oklch(0.3 0.03 30); /* Slightly lighter green for text */
-  --accent: oklch(0.88 0.06 150); /* Light Green Accent */
-  --accent-foreground: oklch(0.15 0.1 150); /* Dark Green */
+  --secondary: oklch(0.95 0.04 150); /* Light Greenish-Gray */
+  --secondary-foreground: oklch(0.10 0.1 150); /* Dark Green */
+  --muted: oklch(0.94 0.05 150); /* Subtle Light Green */
+  --muted-foreground: oklch(0.2 0.03 30); /* Slightly lighter green for text */
+  --accent: oklch(0.92 0.06 150); /* Light Green Accent */
+  --accent-foreground: oklch(0.10 0.1 150); /* Dark Green */
   --destructive: oklch(0.6 0.2 10); /* Dark Red - for destructive actions */
-  --border: oklch(0.85 0.04 150); /* Subtle Light Green Border */
-  --input: oklch(0.8 0.03 150); /* Input background - slightly darker */
-  --ring: oklch(0.3 0.2 120); /* Medium Green Ring */
+  --border: oklch(0.90 0.04 150); /* Subtle Light Green Border */
+  --input: oklch(0.85 0.03 150); /* Input background - slightly darker */
+  --ring: oklch(0.10 0.2 120); /* Medium Green Ring */
 }
 /* 5. Aplica overrides mínimos en la capa base */
 @layer base {
@@ -2899,6 +2971,10 @@ const themeToPalette: { [key: string]: string } = {
 export function ThemePaletteButton() {
   const { setTheme, theme } = useTheme();
 
+  const handleThemeChange = (palette: string) => {
+    setTheme(palette);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -2909,7 +2985,7 @@ export function ThemePaletteButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
            {colorPalettes.map((palette) => (
-               <DropdownMenuItem key={palette} onClick={() => setTheme(palette)}>
+               <DropdownMenuItem key={palette} onClick={() => handleThemeChange(palette)}>
                    {themeToPalette[palette] || palette}
                </DropdownMenuItem>
            ))}
