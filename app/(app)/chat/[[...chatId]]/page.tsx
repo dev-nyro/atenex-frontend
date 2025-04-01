@@ -14,7 +14,8 @@ import {
     getChatMessages,
     RetrievedDoc, // Use the frontend type defined/exported in api.ts
     ApiError,
-    mapApiMessageToFrontend // Import the mapping function
+    mapApiMessageToFrontend, // Import the mapping function for messages
+    mapApiSourcesToFrontend // *** AÑADIR ESTA IMPORTACIÓN ***
 } from '@/lib/api';
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle } from 'lucide-react';
@@ -170,12 +171,14 @@ export default function ChatPage() {
         id: `client-assistant-${Date.now()}`, // Temporary ID
         role: 'assistant',
         content: response.answer,
+        // *** CORREGIDO: Usar la función importada mapApiSourcesToFrontend ***
         sources: mapApiSourcesToFrontend(response.retrieved_documents),
         created_at: new Date().toISOString() // Approximate timestamp
       };
 
       // Update state with assistant message
       setMessages(prev => [...prev, assistantMessage]);
+      // *** CORREGIDO: Usar la función importada mapApiSourcesToFrontend ***
       setRetrievedDocs(mapApiSourcesToFrontend(response.retrieved_documents) || []);
 
       // If it was a new chat, update the URL *without* triggering a full history reload
