@@ -5,12 +5,11 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User as UserIcon, Menu } from "lucide-react";
+import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
 import { useAuth } from '@/lib/hooks/useAuth';
 import { APP_NAME } from '@/lib/constants';
-import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
-import { useRouter } from 'next/navigation';
 import { ThemePaletteButton } from '@/components/theme-palette-button';
+import { useRouter } from 'next/navigation';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -22,20 +21,19 @@ export function Header() {
 
     return (
       <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
-        {/* Left side - potentially breadcrumbs or title */}
-        <div>
-          {/* <Button variant="ghost" size="icon" className="md:hidden"> Mobile menu toggle if needed
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle Menu</span>
-          </Button> */}
-          <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
-          {/* Add Breadcrumbs or dynamic title here */}
+        {/* Left side - Home Link */}
+        <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+                <Home className="h-5 w-5" />
+                <span className="sr-only">Home</span>
+            </Button>
+            <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
+            {/* Add Breadcrumbs or dynamic title here */}
         </div>
 
 
         {/* Right side - Theme toggle and User menu */}
         <div className="flex items-center space-x-4">
-          <ThemeToggle /> {/* Add ThemeToggle button */}
           <ThemePaletteButton />
           {user && (
             <DropdownMenu>
@@ -61,16 +59,17 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {/* Add links to settings or profile page */}
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                   {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
                 </DropdownMenuItem>
+                {/* Remove Profile DropDown Option
                 <DropdownMenuItem>
                   <UserIcon className="mr-2 h-4 w-4" />
                   <span>Profile</span>
-                  {/* <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut> */}
-                </DropdownMenuItem>
+                  {/* <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                </DropdownMenuItem> */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                   <LogOut className="mr-2 h-4 w-4" />

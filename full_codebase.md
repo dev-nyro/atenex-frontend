@@ -2072,7 +2072,8 @@ import { RetrievedDoc } from '@/lib/api'; // Import type
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Import Button component
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog" 
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
+
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean; // Indicate when the main query is loading
@@ -2157,9 +2158,8 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
       {/* Document Dialog (Modal) */}
       <Dialog open={open} onOpenChange={setOpen}>
             {selectedDoc && (
-                <>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
+                <DialogContent className="sm:max-w-[425px]">
+                        <div className="px-6 pb-4 text-center sm:text-left">
                             <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
                             <DialogDescription>
                                 {/* Implement document viewer or preview here. For MVP, show details. */}
@@ -2170,7 +2170,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                     <p>{selectedDoc.content_preview || 'No preview available.'}</p>
                                 </ScrollArea>
                             </DialogDescription>
-                        </DialogHeader>
+                        </div>
                          {/* Action buttons in footer - View/Download */}
                         <div className="flex justify-end space-x-2">
                             <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
@@ -2178,8 +2178,8 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                 Download
                             </Button>
                         </div>
-                    </DialogContent>
-                </>
+                </DialogContent>
+                
             )}
         </Dialog>
 
