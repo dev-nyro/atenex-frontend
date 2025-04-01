@@ -1,3 +1,4 @@
+// File: components/layout/header.tsx
 "use client";
 
 import React from 'react';
@@ -9,6 +10,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
 import { useRouter } from 'next/navigation';
+import { ThemePaletteButton } from '@/components/theme-palette-button';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -34,6 +36,7 @@ export function Header() {
         {/* Right side - Theme toggle and User menu */}
         <div className="flex items-center space-x-4">
           <ThemeToggle /> {/* Add ThemeToggle button */}
+          <ThemePaletteButton />
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

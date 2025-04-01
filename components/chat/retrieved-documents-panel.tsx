@@ -1,10 +1,13 @@
-import React from 'react';
+// File: components/chat/retrieved-documents-panel.tsx
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle } from 'lucide-react';
+import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
 import { RetrievedDoc } from '@/lib/api'; // Import type
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button'; // Import Button component
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog" // Import Dialog components
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -12,13 +15,23 @@ interface RetrievedDocumentsPanelProps {
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
+    const [open, setOpen] = React.useState(false)
+    const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
 
-  const handleViewDocument = (doc: RetrievedDoc) => {
-      // TODO: Implement document viewing logic
-      // This could open a modal, navigate to a viewer page, or fetch content
-      console.log("Viewing document:", doc.document_id || doc.id);
-      alert(`Viewing document: ${doc.file_name || doc.id}\n(Implementation needed)`);
-  };
+    const handleViewDocument = (doc: RetrievedDoc) => {
+        // TODO: Implement document viewing logic
+        // This could open a modal, navigate to a viewer page, or fetch content
+        console.log("Viewing document:", doc.document_id || doc.id);
+        // alert(`Viewing document: ${doc.file_name || doc.id}\n(Implementation needed)`);
+        setSelectedDoc(doc);
+        setOpen(true); // Open the Dialog
+    };
+
+    const handleDownloadDocument = (doc: RetrievedDoc) => {
+        // TODO: Implement document download logic
+        console.log("Downloading document:", doc.document_id || doc.id);
+        alert(`Downloading document: ${doc.file_name || doc.id}\n(Implementation needed)`);
+    };
 
   return (
     <div className="flex h-full flex-col border-l bg-muted/30">
@@ -76,6 +89,36 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
           ))}
         </div>
       </ScrollArea>
+
+      {/* Document Dialog (Modal) */}
+      <Dialog open={open} onOpenChange={setOpen}>
+            {selectedDoc && (
+                <>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
+                            <DialogDescription>
+                                {/* Implement document viewer or preview here. For MVP, show details. */}
+                                <p>ID: {selectedDoc.id}</p>
+                                <p>Score: {selectedDoc.score?.toFixed(4) || 'N/A'}</p>
+                                {/* Add scrollable content area */}
+                                <ScrollArea className="max-h-[300px]">
+                                    <p>{selectedDoc.content_preview || 'No preview available.'}</p>
+                                </ScrollArea>
+                            </DialogDescription>
+                        </DialogHeader>
+                         {/* Action buttons in footer - View/Download */}
+                        <div className="flex justify-end space-x-2">
+                            <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Download
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </>
+            )}
+        </Dialog>
+
     </div>
   );
 }

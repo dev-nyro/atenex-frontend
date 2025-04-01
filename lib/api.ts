@@ -85,11 +85,19 @@ async function request<T>(
              console.warn("Could not read API error response body.");
         }
       }
-      const detailMessage = errorData?.detail
-        ? (typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail))
-        : null;
-      const fallbackMessage = errorData?.message || errorText || `HTTP error ${response.status}`;
-      const errorMessage = detailMessage || fallbackMessage;
+    
+      let errorMessage = `HTTP error ${response.status}`; // Provide a default
+      if (errorData && typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+      } else if (errorData && Array.isArray(errorData.detail)) {
+          // Handle array of errors (e.g., from Zod validation)
+          errorMessage = errorData.detail.map(e => (typeof e === 'object' && e !== null && 'msg' in e) ? e.msg : String(e)).join(', ');
+      } else if (errorData && errorData.message) {
+          errorMessage = errorData.message;
+      } else if (errorText) {
+          errorMessage = errorText;
+      }
+    
       console.error(`API Error: ${response.status} ${errorMessage}`, errorData || errorText);
       throw new ApiError(errorMessage, response.status, errorData || undefined);
     }

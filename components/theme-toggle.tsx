@@ -1,9 +1,10 @@
+// File: components/theme-toggle.tsx
 "use client";
 
 import * as React from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Palette } from "lucide-react";
 import { useTheme } from "next-themes";
-
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,28 +13,51 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const colorPalettes = [
+    'system',
+    'light',
+    'dark',
+    'blue',
+    'green',
+];
+
+const themeToPalette: { [key: string]: string } = {
+   'system': 'Default',
+   'light': 'Light',
+   'dark': 'Dark',
+   'blue': 'Blue Oasis',
+   'green': 'Emerald Depths'
+}
+
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { setTheme, theme } = useTheme();
+  const [currentPaletteIndex, setCurrentPaletteIndex] = React.useState(0);
+
+  const handlePaletteChange = () => {
+    setCurrentPaletteIndex((prevIndex) => {
+      const newIndex = (prevIndex + 1) % colorPalettes.length;
+      setTheme(colorPalettes[newIndex]);
+      return newIndex;
+    });
+  };
+
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon">
-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <Sun className={cn("h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0", theme === "dark" || theme === "blue" || theme === "green" ? "hidden" : "" )} />
+          <Moon className={cn("absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100", theme !== "dark" && theme !== "blue" && theme !== "green" ? "hidden" : "")} />
+          <Palette className={cn("absolute h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:rotate-0 dark:scale-100", theme === "blue" || theme === "green" ? "" : "hidden")} />
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          System
-        </DropdownMenuItem>
+           {colorPalettes.map((palette) => (
+               <DropdownMenuItem key={palette} onClick={() => setTheme(palette)}>
+                   {themeToPalette[palette] || palette}
+               </DropdownMenuItem>
+           ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
