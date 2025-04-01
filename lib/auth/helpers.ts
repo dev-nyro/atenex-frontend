@@ -31,10 +31,10 @@ export interface User {
 }
 
 interface JWTPayload {
-    userId: string;
+    sub: string; // id de supabase
     email: string;
-    name?: string;
-    companyId?: string;
+    // name?: string; <---Quitar
+    // companyId?: string; <---Quitar
     exp: number; // Expiration timestamp
     [key: string]: any; // Allow other properties
 }
@@ -44,16 +44,16 @@ export const getUserFromToken = (token: string | null): User | null => {
     try {
         const decoded: JWTPayload = jwtDecode(token);
 
-        if (!decoded.userId || !decoded.email) {
-            console.warn("getUserFromToken: JWT is missing required claims (userId, email).");
+        if (!decoded.sub || !decoded.email) { // Cambiar decoded.userID por decoded.sub
+            console.warn("getUserFromToken: JWT is missing required claims (sub, email).");
             return null;
         }
 
         const user: User = {
-            id: decoded.userId,
+            id: decoded.sub, // Cambiar decoded.userID por decoded.sub
             email: decoded.email,
-            name: decoded.name || undefined, // Use undefined if name is missing
-            companyId: decoded.companyId || undefined, // Example: Company ID
+            // name: decoded.name || undefined, <---Quitar
+            // companyId: decoded.companyId || undefined, <---Quitar
             // Add other properties as needed, based on your JWT payload
         };
         // console.log("getUserFromToken: Decoded user:", user);

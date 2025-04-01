@@ -30,6 +30,7 @@ atenex-frontend/
 │   └── page.tsx
 ├── components
 │   ├── auth
+│   │   ├── email-confirmation-handler.tsx
 │   │   ├── login-form.tsx
 │   │   └── register-form.tsx
 │   ├── chat
@@ -1282,49 +1283,78 @@ export default function RootLayout({
 
 ## File: `app/page.tsx`
 ```tsx
+// File: components/auth/email-confirmation-handler.tsx
 "use client";
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/hooks/useAuth';
+
+interface EmailConfirmationHandlerProps {
+    onConfirmationComplete: () => void;
+}
+
+export function EmailConfirmationHandler({ onConfirmationComplete }: EmailConfirmationHandlerProps) {
+    const router = useRouter();
+    const { login } = useAuth();
+
+    useEffect(() => {
+        const handleEmailConfirmation = async () => {
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const expiresIn = params.get('expires_in');
+
+                if (accessToken && refreshToken && expiresIn) {
+                    console.log("Found access token in URL hash:", accessToken);
+                    console.log("Attempting to set session and log in.");
+                    const session = {
+                        access_token: accessToken,
+                        refresh_token: refreshToken,
+                        expires_in: parseInt(expiresIn),
+                        token_type: 'bearer',
+                    };
+                    await login(session);
+                    router.replace('/'); // Replace current route to remove hash
+                     onConfirmationComplete();
+                }
+            }
+        };
+
+        handleEmailConfirmation();
+    }, [login, router, onConfirmationComplete]);
+
+    return null; // This component doesn't render anything
+}
+```
+
+## File: `components/auth/email-confirmation-handler.tsx`
+```tsx
+// File: app/page.tsx
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { EmailConfirmationHandler } from '@/components/auth/email-confirmation-handler';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token, login } = useAuth(); // Get login function
+  const { token } = useAuth();
+  const [confirmationHandled, setConfirmationHandled] = useState(false);
 
-  useEffect(() => {
-    const handleEmailConfirmation = async () => {
-      if (window.location.hash) {
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const expiresIn = params.get('expires_in');
-
-        if (accessToken && refreshToken && expiresIn) {
-          console.log("Found access token in URL hash:", accessToken);
-          console.log("Attempting to set session and log in.");
-           const session = {
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                expires_in: parseInt(expiresIn),
-                token_type: 'bearer',
-            };
-          await login(session);
-          router.replace('/'); // Replace current route to remove hash
-        }
-      }
-    };
-
-    handleEmailConfirmation();
-  }, [login, router]); // Dependencies: login function and router
+  const handleConfirmationComplete = () => {
+        setConfirmationHandled(true);
+   };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4"> {/* (+) Added px-4 */}
+        <div className="container flex items-center justify-between h-16 py-4 px-4">
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
           <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
             <LinkButton href="/">Home</LinkButton>
@@ -1364,11 +1394,12 @@ export default function HomePage() {
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's knowledge in one place, eliminating information silos." />
           <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
         </section>
+           {!confirmationHandled && <EmailConfirmationHandler onConfirmationComplete={handleConfirmationComplete} />}
       </main>
 
       {/* Footer (optional) */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground"> {/* (+) Added text-center */}
+        <div className="container text-center text-muted-foreground">
           © {new Date().getFullYear()} Atenex. All rights reserved.
         </div>
       </footer>
@@ -1530,10 +1561,10 @@ export function LoginForm() {
 
 ## File: `components/auth/register-form.tsx`
 ```tsx
-// components/auth/register-form.tsx
+// File: components/auth/register-form.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -1548,7 +1579,6 @@ import { ApiError } from '@/lib/api';
 import { createClient } from '@supabase/supabase-js';
 import { AuthApiError } from '@supabase/supabase-js';
 
-
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
@@ -1558,11 +1588,10 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const { login } = useAuth();
+  const {  } = useAuth(); // Remove login
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
-  const [authResponseState, setAuthResponseState] = useState<any>(null);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -1594,55 +1623,30 @@ export function RegisterForm() {
 
      console.log("Supabase client created."); // Add this
 
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+     // Try signing up the user
+     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
-          data: {
-            name: data.name || null,
-          },
+           data: {
+              name: data.name || null,
+           },
         },
-      });
+     });
+     console.log("signUp response:", authResponse, authError); // Add this
 
-        console.log("signUp response:", authResponse, authError); // Add this
-
-      if (authError) {
+     if (authError) {
         console.error("Supabase registration failed:", authError);
-        if (authError instanceof AuthApiError) {
-          setError(`Supabase registration failed: ${authError.message}`);
-          //setAuthResponseState(authError); // authError state variable is already set by try/catch block
-        } else {
-            setError(authError.message || 'Registration failed. Please try again.');
-        }
+        setError(authError.message || 'Registration failed. Please try again.');
         setIsLoading(false);
-      } else {
+     } else {
+        setSuccess(true); // Registration successful, set success state
+
         // (+) Auto sign-in after successful registration:
-        if (authResponse?.user) {
-          const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
-            email: data.email,
-            password: data.password,
-          });
-
-          if (signInError) {
-            console.error("Auto sign-in failed:", signInError);
-            setError(`Registration successful, but auto sign-in failed: ${signInError.message}`);
-          } else if (signInData?.session) {
-            console.log("Auto sign-in successful:", signInData);
-            login(signInData.session); // Calls your login function
-            setSuccess(true); // set success to true so that account created message is not displayed
-          } else {
-            setError("Registration successful, but auto sign-in failed: No session returned.");
-          }
-        } else {
-            console.warn("Supabase registration: No user object returned.");
-            setError("Registration successful, but could not automatically sign you in.  Please login.");
-        }
-      }
-
-      if (!authError) {
-        setAuthResponseState(authResponse);
-      }
-
+        // Check that email confirmation is not enabled
+        // Removed the auto sign-in part, since we need confirmation, and we should show an explicit message
+     }
+      
     } catch (err) {
       console.error("Registration failed:", err);
       let errorMessage = 'Registration failed. Please try again.';
@@ -1652,6 +1656,7 @@ export function RegisterForm() {
         errorMessage = err.message || errorMessage;
       }
       setError(errorMessage);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -1665,15 +1670,14 @@ export function RegisterForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {/* Remove this success block */}
-      {/*{success && !error && (*/}
-      {/*  <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">*/}
-      {/*    <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>*/}
-      {/*    <AlertDescription className="text-green-700 dark:text-green-300">*/}
-      {/*      Account created successfully! Please check your email to verify your account.*/}
-      {/*    </AlertDescription>*/}
-      {/*  </Alert>*/}
-      {/*)}*/}
+      {success && !error && (
+        <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
+          <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
+          <AlertDescription className="text-green-700 dark:text-green-300">
+            Account created successfully! Please check your email to verify your account.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
         <Input
@@ -4445,10 +4449,10 @@ export interface User {
 }
 
 interface JWTPayload {
-    userId: string;
+    sub: string; // id de supabase
     email: string;
-    name?: string;
-    companyId?: string;
+    // name?: string; <---Quitar
+    // companyId?: string; <---Quitar
     exp: number; // Expiration timestamp
     [key: string]: any; // Allow other properties
 }
@@ -4458,16 +4462,16 @@ export const getUserFromToken = (token: string | null): User | null => {
     try {
         const decoded: JWTPayload = jwtDecode(token);
 
-        if (!decoded.userId || !decoded.email) {
-            console.warn("getUserFromToken: JWT is missing required claims (userId, email).");
+        if (!decoded.sub || !decoded.email) { // Cambiar decoded.userID por decoded.sub
+            console.warn("getUserFromToken: JWT is missing required claims (sub, email).");
             return null;
         }
 
         const user: User = {
-            id: decoded.userId,
+            id: decoded.sub, // Cambiar decoded.userID por decoded.sub
             email: decoded.email,
-            name: decoded.name || undefined, // Use undefined if name is missing
-            companyId: decoded.companyId || undefined, // Example: Company ID
+            // name: decoded.name || undefined, <---Quitar
+            // companyId: decoded.companyId || undefined, <---Quitar
             // Add other properties as needed, based on your JWT payload
         };
         // console.log("getUserFromToken: Decoded user:", user);
@@ -4495,6 +4499,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { getToken, setToken, removeToken, getUserFromToken, User } from '@/lib/auth/helpers';
 import { useRouter } from 'next/navigation';
 import { Session } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
@@ -4522,6 +4527,7 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+// (+) AÑADE `export` aquí
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
@@ -4550,25 +4556,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
 
-  const login = useCallback((session: Session) => {
-      console.log("useAuth: Login called with session:", session);
-        if (!session?.access_token) {
-            console.error("useAuth: No access token found in session.");
-            return;
-        }
+  const login = useCallback(async (session: Session) => {
+    console.log("useAuth: Login called with session:", session);
+    if (!session?.access_token) {
+        console.error("useAuth: No access token found in session.");
+        return;
+    }
 
-        const newToken = session.access_token;
-        setToken(newToken);
+    const newToken = session.access_token;
+    setToken(newToken);
 
-        const userData = getUserFromToken(newToken);
-        if (!userData) {
-            console.error("useAuth: Failed to get user from token.");
-            return;
+    let userData = getUserFromToken(newToken);
+    if (!userData) {
+        console.error("useAuth: Failed to get user from token.");
+        return;
+    }
+
+    // Fetch user name from DB after setting the token and email and other data found in the token has been set
+    try {
+       const supabaseClient = createClient(
+             process.env.NEXT_PUBLIC_SUPABASE_URL,
+             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+         );
+
+        const { data, error } = await supabaseClient
+                 .from('users') // Replace 'users' with the name of your table
+                 .select('full_name') // Replace 'name' with the column containing the user's name
+                 .eq('id', userData.id)
+                 .single();
+        if (error) {
+           console.error("Error fetching user data", error);
+        } else {
+           //If you have other data that needs to be fetched, add the other attributes in here as well
+           userData = {
+                 ...userData,
+                 name: data?.full_name || undefined
+           };
+           console.log("Updated user data", userData)
         }
-        setUser(userData);
-        setAuthStateToken(newToken);
-        router.push('/');
-        console.log("useAuth: User logged in, token set, redirecting home.");
+    } catch (error) {
+        console.error("Error fetching additional user data:", error);
+    }
+    setUser(userData);
+    setAuthStateToken(newToken);
+    router.push('/');
+    console.log("useAuth: User logged in, token set, redirecting home.");
   }, [router]);
 
   const logout = useCallback(() => {
@@ -4583,7 +4615,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       user,
       token,
       isLoading,
-      login,
       logout
   };
 

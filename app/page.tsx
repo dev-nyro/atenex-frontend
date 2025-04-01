@@ -1,46 +1,28 @@
+// File: app/page.tsx
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
+// Se tiene que llamar diferente ya que se exporta en default
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token, login } = useAuth(); // Get login function
+  const { token } = useAuth();
+  const [confirmationHandled, setConfirmationHandled] = useState(false);
 
-  useEffect(() => {
-    const handleEmailConfirmation = async () => {
-      if (window.location.hash) {
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const expiresIn = params.get('expires_in');
-
-        if (accessToken && refreshToken && expiresIn) {
-          console.log("Found access token in URL hash:", accessToken);
-          console.log("Attempting to set session and log in.");
-           const session = {
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                expires_in: parseInt(expiresIn),
-                token_type: 'bearer',
-            };
-          await login(session);
-          router.replace('/'); // Replace current route to remove hash
-        }
-      }
-    };
-
-    handleEmailConfirmation();
-  }, [login, router]); // Dependencies: login function and router
+  const handleConfirmationComplete = () => {
+        setConfirmationHandled(true);
+   };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4"> {/* (+) Added px-4 */}
+        <div className="container flex items-center justify-between h-16 py-4 px-4">
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
           <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
             <LinkButton href="/">Home</LinkButton>
@@ -77,14 +59,15 @@ export default function HomePage() {
         <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Feature Cards - replace with actual feature descriptions */}
           <FeatureCard title="Intelligent Search" description="Find the information you need quickly and easily using natural language queries." />
-          <FeatureCard title="Centralized Knowledge" description="Access all your organization's knowledge in one place, eliminating information silos." />
+          <FeatureCard title="Centralized Knowledge" description="Access all your organization's collective knowledge in one place, eliminating information silos." />
           <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
         </section>
+           {!confirmationHandled && <EmailConfirmationHandler onConfirmationComplete={handleConfirmationComplete} />}
       </main>
 
       {/* Footer (optional) */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground"> {/* (+) Added text-center */}
+        <div className="container text-center text-muted-foreground">
           © {new Date().getFullYear()} Atenex. All rights reserved.
         </div>
       </footer>

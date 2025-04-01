@@ -25,7 +25,7 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const { login } = useAuth();
+  const {  } = useAuth(); // Remove login
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -81,25 +81,7 @@ export function RegisterForm() {
 
         // (+) Auto sign-in after successful registration:
         // Check that email confirmation is not enabled
-        if (authResponse?.user) {
-           const { data: signInData, error: signInError } = await supabaseClient.auth.signInWithPassword({
-              email: data.email,
-              password: data.password,
-           });
-
-           if (signInError) {
-              console.error("Auto sign-in failed:", signInError);
-              setError(`Registration successful, but auto sign-in failed: ${signInError.message}`);
-           } else if (signInData?.session) {
-              console.log("Auto sign-in successful:", signInData);
-              login(signInData.session); // Calls your login function
-           } else {
-              setError("Registration successful, but auto sign-in failed: No session returned.");
-           }
-        } else {
-           console.warn("Supabase registration: No user object returned.");
-           setError("Registration successful, but could not automatically sign you in.  Please login.");
-        }
+        // Removed the auto sign-in part, since we need confirmation, and we should show an explicit message
      }
       
     } catch (err) {
