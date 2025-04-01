@@ -1,4 +1,6 @@
 // app/about/page.tsx
+"use client"; // Add this line
+
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from '@/lib/constants';
