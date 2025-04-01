@@ -2,6 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // reactStrictMode: true is the default in Next.js 14 and generally recommended
+    transpilePackages: ['@radix-ui/react-dialog'],
     reactStrictMode: true,
   
     // You can add other Next.js configurations here as needed:
