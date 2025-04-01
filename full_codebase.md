@@ -60,6 +60,7 @@ atenex-frontend/
 │       ├── badge.tsx
 │       ├── button.tsx
 │       ├── card.tsx
+│       ├── dialog.tsx
 │       ├── dropdown-menu.tsx
 │       ├── input.tsx
 │       ├── label.tsx
@@ -164,7 +165,7 @@ const nextConfig = {
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0", 
+    "@tailwindcss/postcss": "^4.0.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.13.14",
@@ -175,10 +176,11 @@ const nextConfig = {
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.4",
     "postcss": "^8.5.3",
-    "tailwindcss": "^4.0.17", 
+    "tailwindcss": "^4.0.17",
     "typescript": "^5.8.2"
   }
 }
+
 ```
 
 ## File: `tsconfig.json`
@@ -2243,28 +2245,28 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-"use client"; // (+) ADDED "use client" directive
+"use client";
 
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Eye } from 'lucide-react'; // (+) ADDED Download, Eye icons
+import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
 import { RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button'; // (+) ADDED Button import
-// (+) ADDED Dialog imports from shadcn/ui (assuming it re-exports Radix)
+import { Button } from '@/components/ui/button';
+// (*) CORRECT IMPORT PATH (Ensure components/ui/dialog.tsx exists after running `npx shadcn-ui@latest add dialog`)
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogHeader, // (+) Use DialogHeader
+    DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogFooter, // (+) Use DialogFooter
-    DialogClose   // (+) Use DialogClose for explicit closing
-} from "@/components/ui/dialog"; // (*) ADJUST path if needed
-import { toast } from "sonner"; // (+) ADDED for download feedback
+    DialogFooter,
+    DialogClose
+} from "@/components/ui/dialog"; // <--- This path causes the error if the file is missing
+import { toast } from "sonner";
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -2272,33 +2274,29 @@ interface RetrievedDocumentsPanelProps {
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
-    // (+) ADDED state for dialog
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleViewDocument = (doc: RetrievedDoc) => {
         console.log("Viewing document details:", doc.document_id || doc.id);
         setSelectedDoc(doc);
-        setIsDialogOpen(true); // Open the Dialog
+        setIsDialogOpen(true);
     };
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
-        // TODO: Implement actual document download logic when backend endpoint exists
         const message = `Download requested for: ${doc.file_name || doc.id}`;
         console.log(message);
-        // Use toast for user feedback
         toast.info("Download Not Implemented", {
              description: `Backend endpoint for downloading '${doc.file_name || doc.id}' is not yet available.`,
              action: {
                 label: "Close",
-                onClick: () => {}, // No-op, just closes the toast
+                onClick: () => {},
              },
         });
-        // Close the dialog after attempting download
-        // setIsDialogOpen(false); // Optional: keep dialog open if preferred
     };
 
   return (
+    // Wrap the entire panel content potentially triggering the dialog
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
@@ -2325,7 +2323,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     </div>
                 )}
                 {documents.map((doc, index) => (
-                    // (+) Use DialogTrigger to open the modal on click
+                    // Use DialogTrigger around the Card to make it clickable
                     <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                          <Card
                             className="cursor-pointer hover:shadow-md transition-shadow duration-150"
@@ -2346,7 +2344,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                 <p className="text-xs text-muted-foreground line-clamp-2">
                                 {doc.content_preview || 'No preview available.'}
                                 </p>
-                                {/* Optional Metadata */}
                                 <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
                                     <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                     <Eye className="h-3 w-3 text-muted-foreground/50" />
@@ -2358,7 +2355,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* (+) Document Dialog Content */}
+            {/* Dialog Content - Rendered conditionally when selectedDoc is not null */}
             {selectedDoc && (
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
@@ -2370,6 +2367,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3 text-sm">
+                        {/* Details content */}
                         <div className="flex justify-between">
                             <span className="font-medium text-muted-foreground">Document ID:</span>
                             <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
@@ -2388,7 +2386,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                 <pre className="whitespace-pre-wrap break-words">{selectedDoc.content_preview || 'No content preview available.'}</pre>
                             </ScrollArea>
                         </div>
-                        {/* Display other metadata if needed */}
                         {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                              <div>
                                 <span className="font-medium text-muted-foreground block mb-1">Metadata:</span>
@@ -2401,7 +2398,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         )}
                     </div>
                     <DialogFooter>
-                        {/* Action buttons */}
                         <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
                             <Download className="mr-2 h-4 w-4" />
                             Download Original (N/A)
@@ -2413,7 +2409,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </DialogContent>
             )}
         </div>
-    </Dialog>
+    </Dialog> // Close the main Dialog wrapper
   );
 }
 ```
@@ -3403,6 +3399,146 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+}
+
+```
+
+## File: `components\ui\dialog.tsx`
+```tsx
+"use client"
+
+import * as React from "react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { XIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Dialog({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+}
+
+function DialogTrigger({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+}
+
+function DialogPortal({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+}
+
+function DialogClose({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+}
+
+function DialogOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+  return (
+    <DialogPrimitive.Overlay
+      data-slot="dialog-overlay"
+      className={cn(
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogContent({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  return (
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
+        className={cn(
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+}
+
+function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-header"
+      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn(
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  return (
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      className={cn("text-lg leading-none font-semibold", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return (
+    <DialogPrimitive.Description
+      data-slot="dialog-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
 }
 
 ```
