@@ -2,13 +2,13 @@ from pathlib import Path
 
 # Directories to exclude from the export
 EXCLUDED_DIRS = {'.git', '__pycache__', '.venv', '.idea', '.mypy_cache', '.vscode', '.github', 'node_modules', 
-                '.next', 'out', 'dist', 'coverage', 'package-lock.json'}
+                '.next', 'out', 'dist', 'coverage', 'README.md','package-lock.json'}
 
 # Important files to include even at the root level
 IMPORTANT_CONFIG_FILES = [
     'next.config.mjs', 'next.config.js', 'package.json', 'tsconfig.json', 
-    'tailwind.config.js', 'postcss.config.js', '.env.example', '.eslintrc.json',
-    'README.md'
+    'tailwind.config.js', 'postcss.config.js', '.env.example', '.eslintrc.json'#,
+    #'README.md'
 ]
 
 def build_tree(directory: Path, prefix: str = "") -> list:
