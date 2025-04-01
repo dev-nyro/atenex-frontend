@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { loginUser, ApiError } from '@/lib/api'; // Import ApiError
+import { ApiError } from '@/lib/api'; // Import ApiError
+import { createClientComponentClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -21,7 +22,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login: setAuthToken } = useAuth(); // Use the context login function
+  const { login } = useAuth(); // Use the context login function
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,20 +39,30 @@ export function LoginForm() {
     setError(null);
     try {
       console.log("Attempting login with:", data.email);
-      const token = await loginUser(data);
-      console.log("Login successful, received token.");
-      setAuthToken(token); // Update auth state and redirect
-      // Redirect happens inside useAuth's login function
+        const supabase = createClientComponentClient();
+        const { data: authResponse, error: authError } = await supabase.auth.signInWithPassword(data);
+
+        if (authError) {
+            console.error("Supabase login failed:", authError);
+            setError(authError.message || 'Login failed. Please check your credentials.');
+        } else if (authResponse.session) {
+            console.log("Supabase login successful:", authResponse);
+            login(authResponse.session); // Call the auth context to update session
+        } else {
+            console.error("Supabase login: No session returned");
+            setError('Login failed. Please check your credentials.');
+        }
     } catch (err) {
       console.error("Login failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
-       if (err instanceof ApiError) {
+      if (err instanceof ApiError) {
          // Use specific error message from API if available
          errorMessage = err.message || errorMessage;
-       } else if (err instanceof Error) {
+      } else if (err instanceof Error) {
            errorMessage = err.message || errorMessage;
-       }
+      }
       setError(errorMessage);
+    } finally {
       setIsLoading(false);
     }
     // No need to set isLoading false here if redirect happens on success

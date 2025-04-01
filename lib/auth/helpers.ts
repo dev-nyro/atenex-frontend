@@ -1,4 +1,6 @@
+// File: lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
+import { jwtDecode } from 'jwt-decode'; // Import jwtDecode
 
 // Basic token handling for client-side (use HttpOnly cookies in production)
 export const getToken = (): string | null => {
@@ -20,33 +22,45 @@ export const removeToken = (): void => {
   }
 };
 
-// You would expand this with functions to parse JWT, check expiry, etc.
-// For now, we just store/retrieve the raw token string.
-
 export interface User {
     id: string;
     email: string;
     name?: string;
-    // Add other relevant user properties like companyId, roles etc.
-    companyId?: string; // Example: Add company ID if available in JWT payload
+    companyId?: string;
+    // Add other relevant user properties, matching what your backend JWT provides
 }
 
-// Dummy function to simulate getting user from token (replace with actual JWT parsing)
+interface JWTPayload {
+    userId: string;
+    email: string;
+    name?: string;
+    companyId?: string;
+    exp: number; // Expiration timestamp
+    [key: string]: any; // Allow other properties
+}
+
 export const getUserFromToken = (token: string | null): User | null => {
-  if (!token) return null;
-  try {
-    // In a real app, decode the JWT here (e.g., using jwt-decode library)
-    // const decoded = jwt_decode(token);
-    // For demo, create a dummy user based on token presence
-    return {
-      id: "dummy-user-id", // Replace with actual ID from decoded token
-      email: "user@example.com", // Replace with actual email
-      name: "Demo User",
-      companyId: "dummy-company-id" // Example, extract from token if available
-    };
-  } catch (error) {
-    console.error("Failed to decode token:", error);
-    removeToken(); // Clear invalid token
-    return null;
-  }
+    if (!token) return null;
+    try {
+        const decoded: JWTPayload = jwtDecode(token);
+
+        if (!decoded.userId || !decoded.email) {
+            console.warn("getUserFromToken: JWT is missing required claims (userId, email).");
+            return null;
+        }
+
+        const user: User = {
+            id: decoded.userId,
+            email: decoded.email,
+            name: decoded.name || undefined, // Use undefined if name is missing
+            companyId: decoded.companyId || undefined, // Example: Company ID
+            // Add other properties as needed, based on your JWT payload
+        };
+        // console.log("getUserFromToken: Decoded user:", user);
+        return user;
+    } catch (error) {
+        console.error("getUserFromToken: Failed to decode token:", error);
+        removeToken(); // Clear invalid token
+        return null;
+    }
 };

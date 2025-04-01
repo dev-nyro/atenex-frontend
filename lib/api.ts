@@ -128,22 +128,22 @@ async function request<T>(
   }
 }
 
-// --- Auth Service (SIN CAMBIOS, usan la función 'request' modificada) ---
-export const loginUser = async (credentials: { email: string; password: string }) => {
-  const response = await request<{ access_token: string }>('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
-  return response.access_token;
-};
+// --- Auth Service (REMOVE THESE, they are not needed anymore)---
+// export const loginUser = async (credentials: { email: string; password: string }) => {
+//   const response = await request<{ access_token: string }>('/api/auth/login', {
+//     method: 'POST',
+//     body: JSON.stringify(credentials),
+//   });
+//   return response.access_token;
+// };
 
-export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-    const response = await request<{ access_token: string; user: User }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(details),
-    });
-    return response;
-};
+// export const registerUser = async (details: { email: string; password: string; name?: string }) => {
+//     const response = await request<{ access_token: string; user: User }>('/api/auth/register', {
+//         method: 'POST',
+//         body: JSON.stringify(details),
+//     });
+//     return response;
+// };
 
 
 // --- Ingest Service Endpoints (SIN CAMBIOS, usan la función 'request' modificada) ---

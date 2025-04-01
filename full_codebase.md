@@ -23,13 +23,6 @@ atenex-frontend/
 │   ├── about
 │   │   └── page.tsx
 │   ├── api
-│   │   └── auth
-│   │       ├── login
-│   │       │   └── route.ts
-│   │       ├── logout
-│   │       │   └── route.ts
-│   │       └── register
-│   │           └── route.ts
 │   ├── contact
 │   │   └── page.tsx
 │   ├── globals.css
@@ -82,11 +75,10 @@ atenex-frontend/
 │   ├── hooks
 │   │   └── useAuth.tsx
 │   └── utils.ts
+├── next-env.d.ts
 ├── next.config.mjs
 ├── package.json
 ├── postcss.config.js
-├── public
-│   └── icons
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -144,9 +136,11 @@ const nextConfig = {
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@supabase/supabase-js": "^2.49.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jsonwebtoken": "^9.0.2",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.486.0",
     "next": "^15.2.4",
     "next-themes": "^0.4.6",
@@ -164,7 +158,7 @@ const nextConfig = {
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0", 
+    "@tailwindcss/postcss": "^4.0.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.13.14",
@@ -175,10 +169,11 @@ const nextConfig = {
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.4",
     "postcss": "^8.5.3",
-    "tailwindcss": "^4.0.17", 
+    "tailwindcss": "^4.0.17",
     "typescript": "^5.8.2"
   }
 }
+
 ```
 
 ## File: `tsconfig.json`
@@ -352,10 +347,8 @@ module.exports = {
 # Example: https://your-gateway-dev.example.com if deployed
 NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
 
-# Dummy JWT Secret for local API route simulation (MATCH THE ONE IN THE API ROUTES)
-# IMPORTANT: Use a strong, unique secret and load from actual environment in production!
-JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
-
+NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
 # Add other environment variables needed by your app here
 # Example: NEXT_PUBLIC_SOME_CONFIG=value
 ```
@@ -441,7 +434,7 @@ ehthumbs_vista.db
 .history/
 ```
 
-## File: `app\(app)\chat\[[...chatId]]\page.tsx`
+## File: `app/(app)/chat/[[...chatId]]/page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx
 "use client";
@@ -487,7 +480,7 @@ export default function ChatPage() {
       console.log(`Loading history for chat: ${chatId}`);
       // --- TODO: Fetch actual messages ---
       // .catch(err => {
-      //     // Adaptar toast si se usa aquí
+      //     // (+) Adaptar toast si se usa aquí
       //     toast.error("Failed to load chat history", { description: err.message });
       //  })
       setMessages([
@@ -556,7 +549,7 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
-  // Dependencias de useCallback: no se necesita 'toast' para sonner
+  // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
   }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {
@@ -612,7 +605,7 @@ export default function ChatPage() {
 }
 ```
 
-## File: `app\(app)\knowledge\page.tsx`
+## File: `app/(app)/knowledge/page.tsx`
 ```tsx
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
@@ -655,7 +648,7 @@ export default function KnowledgePage() {
 }
 ```
 
-## File: `app\(app)\layout.tsx`
+## File: `app/(app)/layout.tsx`
 ```tsx
 // File: app/(app)/layout.tsx
 "use client";
@@ -742,7 +735,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-## File: `app\(app)\settings\page.tsx`
+## File: `app/(app)/settings/page.tsx`
 ```tsx
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -805,7 +798,7 @@ export default function SettingsPage() {
 }
 ```
 
-## File: `app\(auth)\layout.tsx`
+## File: `app/(auth)/layout.tsx`
 ```tsx
 import React from 'react';
 import Image from 'next/image';
@@ -829,7 +822,7 @@ export default function AuthLayout({
 }
 ```
 
-## File: `app\(auth)\login\page.tsx`
+## File: `app/(auth)/login/page.tsx`
 ```tsx
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -849,7 +842,7 @@ export default function LoginPage() {
 }
 ```
 
-## File: `app\(auth)\register\page.tsx`
+## File: `app/(auth)/register/page.tsx`
 ```tsx
 import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -869,7 +862,7 @@ export default function RegisterPage() {
 }
 ```
 
-## File: `app\about\page.tsx`
+## File: `app/about/page.tsx`
 ```tsx
 // app/about/page.tsx
 "use client"; // Add this line
@@ -994,134 +987,7 @@ export default function AboutPage() {
 }
 ```
 
-## File: `app\api\auth\login\route.ts`
-```ts
-// Example Backend Route (using Next.js Route Handler - BFF pattern)
-// In a real app, this might call your actual Auth microservice or handle auth logic.
-// For this example, it simulates login and returns a dummy JWT.
-
-import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken'; // Use a JWT library like 'jsonwebtoken' or 'jose'
-// You'd install this: npm install jsonwebtoken @types/jsonwebtoken
-
-export async function POST(request: Request) {
-  try {
-    const { email, password } = await request.json();
-
-    console.log(`API Route: Login attempt for ${email}`);
-
-    // --- !!! DUMMY AUTHENTICATION LOGIC !!! ---
-    // --- !!! REPLACE WITH ACTUAL AUTHENTICATION AGAINST YOUR BACKEND/DB !!! ---
-    if (email === 'user@example.com' && password === 'password') {
-      // --- DUMMY JWT GENERATION ---
-      // --- REPLACE WITH SECURE JWT SIGNING USING A STRONG SECRET KEY ---
-      const DUMMY_SECRET = process.env.JWT_SECRET || 'your-very-strong-secret-key-keep-safe'; // LOAD FROM ENV VARS
-      const payload = {
-        userId: 'dummy-user-id-from-route',
-        email: email,
-        companyId: 'dummy-company-id-from-route', // Add relevant claims
-        // Add expiry (e.g., '1h', '7d')
-        exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiry
-      };
-      const token = jwt.sign(payload, DUMMY_SECRET);
-
-       console.log(`API Route: Login successful for ${email}`);
-      return NextResponse.json({ access_token: token });
-    } else {
-        console.log(`API Route: Login failed for ${email}`);
-      return NextResponse.json({ detail: 'Invalid credentials' }, { status: 401 });
-    }
-    // --- END DUMMY LOGIC ---
-
-  } catch (error) {
-    console.error("API Route Login Error:", error);
-    return NextResponse.json({ detail: 'An error occurred during login' }, { status: 500 });
-  }
-}
-```
-
-## File: `app\api\auth\logout\route.ts`
-```ts
-// Example Backend Route for Logout (Optional)
-// Often, logout is handled purely client-side by clearing the token.
-// This route could be used for server-side session invalidation if needed.
-
-import { NextResponse } from 'next/server';
-
-export async function POST(request: Request) {
-  try {
-    console.log("API Route: Logout request received");
-    // --- SERVER-SIDE LOGOUT LOGIC (IF ANY) ---
-    // e.g., Invalidate refresh tokens, clear server-side session state.
-    // For simple JWT, there might be nothing to do here.
-    // --- END SERVER-SIDE LOGIC ---
-
-    // Respond with success
-    return NextResponse.json({ message: 'Logout successful' });
-
-  } catch (error) {
-    console.error("API Route Logout Error:", error);
-    return NextResponse.json({ detail: 'An error occurred during logout' }, { status: 500 });
-  }
-}
-
-// Note: You might also need a GET route or similar to check auth status
-// e.g., /api/auth/session which verifies the token and returns user info.
-```
-
-## File: `app\api\auth\register\route.ts`
-```ts
-// Example Backend Route for Registration
-
-import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-
-export async function POST(request: Request) {
-  try {
-    const { email, password, name } = await request.json();
-
-    console.log(`API Route: Registration attempt for ${email}`);
-
-    // --- !!! DUMMY REGISTRATION LOGIC !!! ---
-    // --- !!! REPLACE WITH ACTUAL USER CREATION IN YOUR BACKEND/DB !!! ---
-    // Check if user already exists, create user, etc.
-    // For demo, assume registration is always successful if email/password provided
-    if (!email || !password) {
-        return NextResponse.json({ detail: 'Email and password are required' }, { status: 400 });
-    }
-
-     // --- DUMMY USER CREATION ---
-     const newUser = {
-        id: `dummy-user-${Date.now()}`,
-        email: email,
-        name: name || `User ${Date.now()}`,
-        companyId: `dummy-company-${Date.now()}` // Assign a dummy company
-     }
-
-    // --- DUMMY JWT GENERATION AFTER REGISTRATION ---
-    const DUMMY_SECRET = process.env.JWT_SECRET || 'your-very-strong-secret-key-keep-safe';
-    const payload = {
-        userId: newUser.id,
-        email: newUser.email,
-        companyId: newUser.companyId,
-        exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiry
-    };
-    const token = jwt.sign(payload, DUMMY_SECRET);
-
-    console.log(`API Route: Registration successful for ${email}`);
-    // Return token and user info (omit sensitive data like password hash)
-    return NextResponse.json({ access_token: token, user: { id: newUser.id, email: newUser.email, name: newUser.name, companyId: newUser.companyId } });
-    // --- END DUMMY LOGIC ---
-
-  } catch (error) {
-    console.error("API Route Register Error:", error);
-    // Handle specific errors like "user already exists" if applicable
-    return NextResponse.json({ detail: 'An error occurred during registration' }, { status: 500 });
-  }
-}
-```
-
-## File: `app\contact\page.tsx`
+## File: `app/contact/page.tsx`
 ```tsx
 // app/contact/page.tsx
 "use client"; // Add this line
@@ -1229,7 +1095,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app\globals.css`
+## File: `app/globals.css`
 ```css
 /* File: atenex-frontend/app/globals.css */
 
@@ -1360,14 +1226,20 @@ export default function ContactPage() {
 /* 4. Aplica overrides mínimos en la capa base */
 @layer base {
     body {
-        @apply bg-background text-foreground;
+        /* (-) QUITAR ESTA LÍNEA: */
+        /* @apply bg-background text-foreground; */
+
+        /* (+) AÑADIR ESTAS LÍNEAS: */
+        background-color: var(--background);
+        color: var(--foreground);
+
         /* Asegúrate que la fuente (inter.variable) se aplique en layout.tsx */
         /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
     }
 }
 ```
 
-## File: `app\layout.tsx`
+## File: `app/layout.tsx`
 ```tsx
 // File: app/layout.tsx
 import type { Metadata } from "next";
@@ -1376,7 +1248,7 @@ import "./globals.css"; // Esta importación SÍ debe estar aquí
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// ¡¡ASEGÚRATE DE ELIMINAR LOS '//' DEL PRINCIPIO DE ESTA LÍNEA!!
+// (+) DESCOMENTAR ESTA LÍNEA:
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -1407,7 +1279,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            {/* Esta línea requiere la importación activa de arriba */}
+            {/* (+) Asegúrate de que esta línea esté activa y use el Toaster importado */}
             <Toaster />
           </ThemeProvider>
         </AuthProvider>
@@ -1417,7 +1289,7 @@ export default function RootLayout({
 }
 ```
 
-## File: `app\page.tsx`
+## File: `app/page.tsx`
 ```tsx
 // app/page.tsx
 "use client";
@@ -1509,7 +1381,7 @@ function FeatureCard({ title, description }: { title: string; description: strin
 }
 ```
 
-## File: `components\auth\login-form.tsx`
+## File: `components/auth/login-form.tsx`
 ```tsx
 "use client";
 
@@ -1524,7 +1396,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { loginUser, ApiError } from '@/lib/api'; // Import ApiError
+import { ApiError } from '@/lib/api'; // Import ApiError
+import { createClientComponentClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -1534,7 +1407,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login: setAuthToken } = useAuth(); // Use the context login function
+  const { login } = useAuth(); // Use the context login function
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1551,20 +1424,30 @@ export function LoginForm() {
     setError(null);
     try {
       console.log("Attempting login with:", data.email);
-      const token = await loginUser(data);
-      console.log("Login successful, received token.");
-      setAuthToken(token); // Update auth state and redirect
-      // Redirect happens inside useAuth's login function
+        const supabase = createClientComponentClient();
+        const { data: authResponse, error: authError } = await supabase.auth.signInWithPassword(data);
+
+        if (authError) {
+            console.error("Supabase login failed:", authError);
+            setError(authError.message || 'Login failed. Please check your credentials.');
+        } else if (authResponse.session) {
+            console.log("Supabase login successful:", authResponse);
+            login(authResponse.session); // Call the auth context to update session
+        } else {
+            console.error("Supabase login: No session returned");
+            setError('Login failed. Please check your credentials.');
+        }
     } catch (err) {
       console.error("Login failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
-       if (err instanceof ApiError) {
+      if (err instanceof ApiError) {
          // Use specific error message from API if available
          errorMessage = err.message || errorMessage;
-       } else if (err instanceof Error) {
+      } else if (err instanceof Error) {
            errorMessage = err.message || errorMessage;
-       }
+      }
       setError(errorMessage);
+    } finally {
       setIsLoading(false);
     }
     // No need to set isLoading false here if redirect happens on success
@@ -1620,7 +1503,7 @@ export function LoginForm() {
 }
 ```
 
-## File: `components\auth\register-form.tsx`
+## File: `components/auth/register-form.tsx`
 ```tsx
 "use client";
 
@@ -1635,7 +1518,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { registerUser, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { createClientComponentClient } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
@@ -1669,18 +1553,36 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
     try {
-      console.log("Attempting registration with:", data.email);
-      const response = await registerUser(data);
-      console.log("Registration successful:", response);
-      setSuccess(true);
-       // Automatically log in the user after successful registration
-       if (response.access_token) {
-         login(response.access_token);
-         // Redirect happens inside useAuth's login
-       } else {
-          setError("Registration successful, but failed to automatically log in.");
-           setIsLoading(false);
-       }
+       console.log("Attempting registration with:", data.email);
+        const supabase = createClientComponentClient();
+        const { data: authResponse, error: authError } = await supabase.auth.signUp({
+            email: data.email,
+            password: data.password,
+            options: {
+                data: {
+                    name: data.name || null, // Store the name as user metadata
+                    // Add any other custom claims you want to store
+                }
+            }
+        });
+
+        if (authError) {
+            console.error("Supabase registration failed:", authError);
+            setError(authError.message || 'Registration failed. Please try again.');
+            setIsLoading(false);
+        } else if (authResponse.session) {
+            console.log("Supabase registration successful:", authResponse);
+            setSuccess(true);
+            login(authResponse.session); // Automatically log in the user
+        }
+        else {
+            console.warn("Supabase registration: No session returned, user needs to verify email.");
+            setSuccess(true);
+            // You might want to show a message to the user that they need to check their email
+            // setError("Registration successful, but please check your email to verify your account.");
+            // Consider redirecting to a "check your email" page
+        }
+
 
     } catch (err) {
         console.error("Registration failed:", err);
@@ -1709,7 +1611,7 @@ export function RegisterForm() {
           {/* <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" /> */}
           <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Redirecting...
+            Account created successfully! {authResponse?.user?.email_confirmed_at ? "Redirecting..." : "Please check your email to verify your account."}
           </AlertDescription>
         </Alert>
       )}
@@ -1768,7 +1670,7 @@ export function RegisterForm() {
 }
 ```
 
-## File: `components\chat\chat-history.tsx`
+## File: `components/chat/chat-history.tsx`
 ```tsx
 "use client";
 
@@ -1840,7 +1742,7 @@ export function ChatHistory() {
 }
 ```
 
-## File: `components\chat\chat-input.tsx`
+## File: `components/chat/chat-input.tsx`
 ```tsx
 "use client";
 
@@ -1917,7 +1819,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 }
 ```
 
-## File: `components\chat\chat-interface.tsx`
+## File: `components/chat/chat-interface.tsx`
 ```tsx
 // File: components/chat/chat-interface.tsx
 "use client";
@@ -2085,7 +1987,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 }
 ```
 
-## File: `components\chat\chat-message.tsx`
+## File: `components/chat/chat-message.tsx`
 ```tsx
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -2172,7 +2074,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 }
 ```
 
-## File: `components\chat\retrieved-documents-panel.tsx`
+## File: `components/chat/retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
 import React, { useState } from 'react';
@@ -2299,7 +2201,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 }
 ```
 
-## File: `components\knowledge\document-status-list.tsx`
+## File: `components/knowledge/document-status-list.tsx`
 ```tsx
 // File: components/knowledge/document-status-list.tsx
 "use client";
@@ -2348,7 +2250,7 @@ export function DocumentStatusList() {
         } finally {
             setIsLoading(false);
         }
-    // Dependencias de useCallback: no se necesita 'toast' para sonner
+    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     useEffect(() => {
@@ -2474,7 +2376,7 @@ export function DocumentStatusList() {
 }
 ```
 
-## File: `components\knowledge\file-uploader.tsx`
+## File: `components/knowledge/file-uploader.tsx`
 ```tsx
 // File: components/knowledge/file-uploader.tsx
 "use client";
@@ -2569,7 +2471,7 @@ export function FileUploader() {
                  });
             }
         });
-    // Dependencias de useCallback: no se necesita 'toast' para sonner
+    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -2649,7 +2551,7 @@ export function FileUploader() {
 }
 ```
 
-## File: `components\layout\header.tsx`
+## File: `components/layout/header.tsx`
 ```tsx
     // File: components/layout/header.tsx
     "use client";
@@ -2737,7 +2639,7 @@ export function FileUploader() {
       }
 ```
 
-## File: `components\layout\sidebar.tsx`
+## File: `components/layout/sidebar.tsx`
 ```tsx
 "use client";
 
@@ -2824,7 +2726,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 }
 ```
 
-## File: `components\theme-palette-button.tsx`
+## File: `components/theme-palette-button.tsx`
 ```tsx
 // File: components/theme-palette-button.tsx
 "use client";
@@ -2883,7 +2785,7 @@ export function ThemePaletteButton() {
 }
 ```
 
-## File: `components\theme-provider.tsx`
+## File: `components/theme-provider.tsx`
 ```tsx
 // File: components/theme-provider.tsx
 "use client";
@@ -2896,12 +2798,12 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 ```
 
-## File: `components\theme-toggle.tsx`
+## File: `components/theme-toggle.tsx`
 ```tsx
 
 ```
 
-## File: `components\ui\alert.tsx`
+## File: `components/ui/alert.tsx`
 ```tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -2972,7 +2874,7 @@ export { Alert, AlertTitle, AlertDescription }
 
 ```
 
-## File: `components\ui\avatar.tsx`
+## File: `components/ui/avatar.tsx`
 ```tsx
 "use client"
 
@@ -3030,7 +2932,7 @@ export { Avatar, AvatarImage, AvatarFallback }
 
 ```
 
-## File: `components\ui\badge.tsx`
+## File: `components/ui/badge.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3081,7 +2983,7 @@ export { Badge, badgeVariants }
 
 ```
 
-## File: `components\ui\button.tsx`
+## File: `components/ui/button.tsx`
 ```tsx
 // File: components/ui/button.tsx
 import * as React from "react"
@@ -3147,7 +3049,7 @@ function Button({
 export { Button, buttonVariants }
 ```
 
-## File: `components\ui\card.tsx`
+## File: `components/ui/card.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3244,7 +3146,7 @@ export {
 
 ```
 
-## File: `components\ui\dropdown-menu.tsx`
+## File: `components/ui/dropdown-menu.tsx`
 ```tsx
 "use client"
 
@@ -3506,7 +3408,7 @@ export {
 
 ```
 
-## File: `components\ui\input.tsx`
+## File: `components/ui/input.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3532,7 +3434,7 @@ export { Input }
 
 ```
 
-## File: `components\ui\label.tsx`
+## File: `components/ui/label.tsx`
 ```tsx
 "use client"
 
@@ -3561,7 +3463,7 @@ export { Label }
 
 ```
 
-## File: `components\ui\progress.tsx`
+## File: `components/ui/progress.tsx`
 ```tsx
 "use client"
 
@@ -3597,7 +3499,7 @@ export { Progress }
 
 ```
 
-## File: `components\ui\resizable.tsx`
+## File: `components/ui/resizable.tsx`
 ```tsx
 "use client"
 
@@ -3658,7 +3560,7 @@ export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
 
 ```
 
-## File: `components\ui\scroll-area.tsx`
+## File: `components/ui/scroll-area.tsx`
 ```tsx
 "use client"
 
@@ -3721,7 +3623,7 @@ export { ScrollArea, ScrollBar }
 
 ```
 
-## File: `components\ui\separator.tsx`
+## File: `components/ui/separator.tsx`
 ```tsx
 "use client"
 
@@ -3754,7 +3656,7 @@ export { Separator }
 
 ```
 
-## File: `components\ui\skeleton.tsx`
+## File: `components/ui/skeleton.tsx`
 ```tsx
 import { cn } from "@/lib/utils"
 
@@ -3772,7 +3674,7 @@ export { Skeleton }
 
 ```
 
-## File: `components\ui\sonner.tsx`
+## File: `components/ui/sonner.tsx`
 ```tsx
 "use client"
 
@@ -3802,7 +3704,7 @@ export { Toaster }
 
 ```
 
-## File: `components\ui\table.tsx`
+## File: `components/ui/table.tsx`
 ```tsx
 "use client"
 
@@ -3923,7 +3825,7 @@ export {
 
 ```
 
-## File: `components\ui\textarea.tsx`
+## File: `components/ui/textarea.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3946,7 +3848,7 @@ export { Textarea }
 
 ```
 
-## File: `components\ui\tooltip.tsx`
+## File: `components/ui/tooltip.tsx`
 ```tsx
 "use client"
 
@@ -4152,7 +4054,7 @@ if __name__ == "__main__":
     generate_codebase_markdown()
 ```
 
-## File: `lib\api.ts`
+## File: `lib/api.ts`
 ```ts
 // File: lib/api.ts
 import { getToken } from './auth/helpers';
@@ -4284,22 +4186,22 @@ async function request<T>(
   }
 }
 
-// --- Auth Service (SIN CAMBIOS, usan la función 'request' modificada) ---
-export const loginUser = async (credentials: { email: string; password: string }) => {
-  const response = await request<{ access_token: string }>('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
-  return response.access_token;
-};
+// --- Auth Service (REMOVE THESE, they are not needed anymore)---
+// export const loginUser = async (credentials: { email: string; password: string }) => {
+//   const response = await request<{ access_token: string }>('/api/auth/login', {
+//     method: 'POST',
+//     body: JSON.stringify(credentials),
+//   });
+//   return response.access_token;
+// };
 
-export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-    const response = await request<{ access_token: string; user: User }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(details),
-    });
-    return response;
-};
+// export const registerUser = async (details: { email: string; password: string; name?: string }) => {
+//     const response = await request<{ access_token: string; user: User }>('/api/auth/register', {
+//         method: 'POST',
+//         body: JSON.stringify(details),
+//     });
+//     return response;
+// };
 
 
 // --- Ingest Service Endpoints (SIN CAMBIOS, usan la función 'request' modificada) ---
@@ -4377,9 +4279,11 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
 };
 ```
 
-## File: `lib\auth\helpers.ts`
+## File: `lib/auth/helpers.ts`
 ```ts
+// File: lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
+import { jwtDecode } from 'jwt-decode'; // Import jwtDecode
 
 // Basic token handling for client-side (use HttpOnly cookies in production)
 export const getToken = (): string | null => {
@@ -4401,81 +4305,88 @@ export const removeToken = (): void => {
   }
 };
 
-// You would expand this with functions to parse JWT, check expiry, etc.
-// For now, we just store/retrieve the raw token string.
-
 export interface User {
     id: string;
     email: string;
     name?: string;
-    // Add other relevant user properties like companyId, roles etc.
-    companyId?: string; // Example: Add company ID if available in JWT payload
+    companyId?: string;
+    // Add other relevant user properties, matching what your backend JWT provides
 }
 
-// Dummy function to simulate getting user from token (replace with actual JWT parsing)
+interface JWTPayload {
+    userId: string;
+    email: string;
+    name?: string;
+    companyId?: string;
+    exp: number; // Expiration timestamp
+    [key: string]: any; // Allow other properties
+}
+
 export const getUserFromToken = (token: string | null): User | null => {
-  if (!token) return null;
-  try {
-    // In a real app, decode the JWT here (e.g., using jwt-decode library)
-    // const decoded = jwt_decode(token);
-    // For demo, create a dummy user based on token presence
-    return {
-      id: "dummy-user-id", // Replace with actual ID from decoded token
-      email: "user@example.com", // Replace with actual email
-      name: "Demo User",
-      companyId: "dummy-company-id" // Example, extract from token if available
-    };
-  } catch (error) {
-    console.error("Failed to decode token:", error);
-    removeToken(); // Clear invalid token
-    return null;
-  }
+    if (!token) return null;
+    try {
+        const decoded: JWTPayload = jwtDecode(token);
+
+        if (!decoded.userId || !decoded.email) {
+            console.warn("getUserFromToken: JWT is missing required claims (userId, email).");
+            return null;
+        }
+
+        const user: User = {
+            id: decoded.userId,
+            email: decoded.email,
+            name: decoded.name || undefined, // Use undefined if name is missing
+            companyId: decoded.companyId || undefined, // Example: Company ID
+            // Add other properties as needed, based on your JWT payload
+        };
+        // console.log("getUserFromToken: Decoded user:", user);
+        return user;
+    } catch (error) {
+        console.error("getUserFromToken: Failed to decode token:", error);
+        removeToken(); // Clear invalid token
+        return null;
+    }
 };
 ```
 
-## File: `lib\constants.ts`
+## File: `lib/constants.ts`
 ```ts
 export const APP_NAME = "Atenex";
 export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ```
 
-## File: `lib\hooks\useAuth.tsx`
+## File: `lib/hooks/useAuth.tsx`
 ```tsx
+// File: lib/hooks/useAuth.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getToken, setToken, removeToken, getUserFromToken, User } from '@/lib/auth/helpers';
-import { useRouter } from 'next/navigation'; // Use next/navigation for App Router
+import { useRouter } from 'next/navigation';
+import { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (token: string) => void;
+  login: (session: Session) => void;
   logout: () => void;
 }
 
-// (+) Define un valor por defecto que coincide con la estructura de AuthContextType
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
-    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
-    login: (token: string) => {
-        // Función vacía o lanza error si se llama fuera del provider
+    isLoading: true,
+    login: (session: Session) => {
         console.error("Login function called outside of AuthProvider context");
-        // throw new Error("Login function called outside AuthProvider");
     },
     logout: () => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("Logout function called outside of AuthProvider context");
-        // throw new Error("Logout function called outside AuthProvider");
     },
 };
 
-// (+) Modifica createContext para usar el valor por defecto y el tipo AuthContextType (sin | undefined)
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
-// Explicitly type the props for the component, including children
 interface AuthProviderProps {
   children: React.ReactNode;
 }
@@ -4483,34 +4394,51 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Check for token on initial load
   useEffect(() => {
-    const storedToken = getToken();
-    if (storedToken) {
-      const userData = getUserFromToken(storedToken);
-      if (userData) {
-        setUser(userData);
-        setAuthStateToken(storedToken);
-      } else {
-        // Invalid token found
-        removeToken();
+    const storedToken = getToken(); // Check localStorage for token
+      if (storedToken) {
+          // console.log("useAuth: Token found in localStorage, attempting to validate.");
+          const userData = getUserFromToken(storedToken); // Validate the token
+          if (userData) {
+              // Token is valid and user data is available
+              // console.log("useAuth: Token is valid, setting user and token from localStorage.");
+              setUser(userData);
+              setAuthStateToken(storedToken);
+          } else {
+              // Token is invalid or expired
+              console.warn("useAuth: Invalid token found in localStorage, clearing.");
+              removeToken();
+          }
       }
-    }
-    setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
+      setIsLoading(false);
+      // console.log("useAuth: Initial token check complete.");
+      // Intentionally empty dependency array: This effect runs only once on mount
+  }, []);
 
-  const login = useCallback((newToken: string) => {
-    setToken(newToken);
-    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
-    setUser(userData);
-    setAuthStateToken(newToken);
-    router.push('/'); // Redirect to the main app page
-    console.log("User logged in, token set.");
-  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
+
+  const login = useCallback((session: Session) => {
+      console.log("useAuth: Login called with session:", session);
+        if (!session?.access_token) {
+            console.error("useAuth: No access token found in session.");
+            return;
+        }
+
+        const newToken = session.access_token;
+        setToken(newToken);
+
+        const userData = getUserFromToken(newToken);
+        if (!userData) {
+            console.error("useAuth: Failed to get user from token.");
+            return;
+        }
+        setUser(userData);
+        setAuthStateToken(newToken);
+        router.push('/');
+        console.log("useAuth: User logged in, token set, redirecting home.");
+  }, [router]);
 
   const logout = useCallback(() => {
     removeToken();
@@ -4520,7 +4448,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged out.");
   }, [router]);
 
-  // El valor proporcionado por el Provider ahora siempre coincide con AuthContextType
   const providerValue = {
       user,
       token,
@@ -4530,7 +4457,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    // Pasa el objeto calculado
     <AuthContext.Provider value={providerValue}>
       {children}
     </AuthContext.Provider>
@@ -4539,20 +4465,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  // La comprobación de undefined ya no es estrictamente necesaria porque
-  // createContext ahora tiene un valor por defecto válido, pero
-  // mantenerla puede ser útil para detectar errores de configuración inesperados.
-  if (context === undefined) {
-    console.error("AuthContext reached undefined state unexpectedly.");
-    throw new Error('useAuth must be used within an AuthProvider');
-    // O podrías retornar defaultAuthContextValue aquí si prefieres no lanzar error,
-    // aunque lanzar error suele ser mejor para detectar problemas.
+  if (context === undefined || context === defaultAuthContextValue) {
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
+       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
+    } else if (context === undefined) {
+       throw new Error('useAuth must be used within an AuthProvider');
+    }
   }
   return context;
 };
 ```
 
-## File: `lib\utils.ts`
+## File: `lib/utils.ts`
 ```ts
 // File: lib/utils.ts
 import { clsx, type ClassValue } from "clsx"
@@ -4591,4 +4515,14 @@ export function getApiGatewayUrl(): string {
     return apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 }
 // FIN DE LA FUNCIÓN AÑADIDA
+```
+
+## File: `next-env.d.ts`
+```ts
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
 ```

@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { registerUser, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { createClientComponentClient } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
@@ -45,18 +46,36 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
     try {
-      console.log("Attempting registration with:", data.email);
-      const response = await registerUser(data);
-      console.log("Registration successful:", response);
-      setSuccess(true);
-       // Automatically log in the user after successful registration
-       if (response.access_token) {
-         login(response.access_token);
-         // Redirect happens inside useAuth's login
-       } else {
-          setError("Registration successful, but failed to automatically log in.");
-           setIsLoading(false);
-       }
+       console.log("Attempting registration with:", data.email);
+        const supabase = createClientComponentClient();
+        const { data: authResponse, error: authError } = await supabase.auth.signUp({
+            email: data.email,
+            password: data.password,
+            options: {
+                data: {
+                    name: data.name || null, // Store the name as user metadata
+                    // Add any other custom claims you want to store
+                }
+            }
+        });
+
+        if (authError) {
+            console.error("Supabase registration failed:", authError);
+            setError(authError.message || 'Registration failed. Please try again.');
+            setIsLoading(false);
+        } else if (authResponse.session) {
+            console.log("Supabase registration successful:", authResponse);
+            setSuccess(true);
+            login(authResponse.session); // Automatically log in the user
+        }
+        else {
+            console.warn("Supabase registration: No session returned, user needs to verify email.");
+            setSuccess(true);
+            // You might want to show a message to the user that they need to check their email
+            // setError("Registration successful, but please check your email to verify your account.");
+            // Consider redirecting to a "check your email" page
+        }
+
 
     } catch (err) {
         console.error("Registration failed:", err);
@@ -85,7 +104,7 @@ export function RegisterForm() {
           {/* <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" /> */}
           <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Redirecting...
+            Account created successfully! {authResponse?.user?.email_confirmed_at ? "Redirecting..." : "Please check your email to verify your account."}
           </AlertDescription>
         </Alert>
       )}

@@ -8,6 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Import Button component
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
+import { ApiError, request } from "@/lib/api"; // Import request function
+
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -17,15 +19,53 @@ interface RetrievedDocumentsPanelProps {
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
     const [open, setOpen] = React.useState(false)
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
+    const [docContent, setDocContent] = useState<string | null>(null); // State to store document content
+    const [viewingError, setViewingError] = useState<string | null>(null); // Error when viewing doc
 
-    const handleViewDocument = (doc: RetrievedDoc) => {
-        // TODO: Implement document viewing logic
-        // This could open a modal, navigate to a viewer page, or fetch content
+
+    const handleViewDocument = async (doc: RetrievedDoc) => {
         console.log("Viewing document:", doc.document_id || doc.id);
-        // alert(`Viewing document: ${doc.file_name || doc.id}\n(Implementation needed)`);
         setSelectedDoc(doc);
-        setOpen(true); // Open the Dialog
+        setViewingError(null); // Clear any previous errors
+        setDocContent(null); // Clear previous content
+
+        try {
+             if (!doc.document_id) {
+                 throw new Error("Missing document_id for viewing");
+             }
+             const content = await fetchDocumentContent(doc.document_id);
+             setDocContent(content); // Set the content if fetch is successful
+             setOpen(true); // Open the Dialog after fetching content
+        } catch (error) {
+            console.error("Error fetching document content:", error);
+            let errorMessage = "Failed to load document content.";
+            if (error instanceof ApiError && error.message) {
+                errorMessage = error.message;
+            } else if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            setViewingError(errorMessage); // Set the error message
+            setDocContent(null); // Ensure content is cleared on error
+            setOpen(true); // Still open the dialog to display the error
+
+        }
     };
+
+
+     const fetchDocumentContent = async (documentId: string): Promise<string> => {
+        try {
+            const response = await request<string>(`/api/v1/ingest/document/${documentId}/content`, {
+                method: 'GET',
+            });
+            return response;
+
+        } catch (error) {
+            console.error("Error fetching document content:", error);
+            throw error;
+        }
+    };
+
+
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
         // TODO: Implement document download logic
@@ -97,13 +137,24 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         <div className="px-6 pb-4 text-center sm:text-left">
                             <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
                             <DialogDescription>
-                                {/* Implement document viewer or preview here. For MVP, show details. */}
-                                <p>ID: {selectedDoc.id}</p>
-                                <p>Score: {selectedDoc.score?.toFixed(4) || 'N/A'}</p>
-                                {/* Add scrollable content area */}
-                                <ScrollArea className="max-h-[300px]">
-                                    <p>{selectedDoc.content_preview || 'No preview available.'}</p>
-                                </ScrollArea>
+                                {viewingError && (
+                                    <div className="text-red-500">
+                                        Error loading document: {viewingError}
+                                    </div>
+                                )}
+                                {/* Display loading state while fetching */}
+                                 {!docContent && !viewingError && (
+                                    <div className="flex justify-center items-center h-32">
+                                        <Loader2 className="animate-spin h-6 w-6" />
+                                    </div>
+                                 )}
+
+                                {/* Display loaded content */}
+                                {docContent && (
+                                    <ScrollArea className="max-h-[300px]">
+                                        <p>{docContent}</p>
+                                    </ScrollArea>
+                                )}
                             </DialogDescription>
                         </div>
                          {/* Action buttons in footer - View/Download */}
