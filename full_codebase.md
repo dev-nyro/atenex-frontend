@@ -1268,86 +1268,81 @@ export default function ContactPage() {
 /* 1. Importa Tailwind v4 */
 @import "tailwindcss";
 
-/* 2. Define la variante custom FUERA de @theme */
-@custom-variant dark (&:is(.dark *));
-@custom-variant blue (&:is(.blue *));
-@custom-variant green (&:is(.green *));
-
-/* 3. Define variables base FUERA del @theme */
+/* 2. Define variables base FUERA del @theme */
 /* Variables para el tema claro (:root) */
 :root {
---radius: 0.625rem;
-/* Variables OKLCH */
---background: oklch(1 0 0);
---foreground: oklch(0.145 0 0);
---card: oklch(1 0 0);
---card-foreground: oklch(0.145 0 0);
---popover: oklch(1 0 0);
---popover-foreground: oklch(0.145 0 0);
---primary: oklch(0.205 0 0); /* Negro por defecto */
---primary-foreground: oklch(0.985 0 0); /* Blanco */
---secondary: oklch(0.97 0 0);
---secondary-foreground: oklch(0.205 0 0);
---muted: oklch(0.97 0 0);
---muted-foreground: oklch(0.556 0 0);
---accent: oklch(0.97 0 0);
---accent-foreground: oklch(0.205 0 0);
---destructive: oklch(0.577 0.245 27.325);
---border: oklch(0.922 0 0);
---input: oklch(0.922 0 0);
---ring: oklch(0.708 0 0); /* Color de anillo por defecto */
-/* Variables de Chart */
---chart-1: oklch(0.646 0.222 41.116);
---chart-2: oklch(0.6 0.118 184.704);
---chart-3: oklch(0.398 0.07 227.392);
---chart-4: oklch(0.828 0.189 84.429);
---chart-5: oklch(0.769 0.188 70.08);
-/* Variables de Sidebar */
---sidebar: oklch(0.985 0 0);
---sidebar-foreground: oklch(0.145 0 0);
---sidebar-primary: oklch(0.205 0 0);
---sidebar-primary-foreground: oklch(0.985 0 0);
---sidebar-accent: oklch(0.97 0 0);
---sidebar-accent-foreground: oklch(0.205 0 0);
---sidebar-border: oklch(0.922 0 0);
---sidebar-ring: oklch(0.708 0 0);
+    --radius: 0.625rem;
+    /* Variables OKLCH */
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0); /* Negro por defecto */
+    --primary-foreground: oklch(0.985 0 0); /* Blanco */
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0); /* Color de anillo por defecto */
+    /* Variables de Chart */
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    /* Variables de Sidebar */
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
 }
 
 /* Variables para el tema oscuro (.dark) */
 .dark {
---background: oklch(0.145 0 0);
---foreground: oklch(0.985 0 0);
---card: oklch(0.205 0 0);
---card-foreground: oklch(0.985 0 0);
---popover: oklch(0.205 0 0);
---popover-foreground: oklch(0.985 0 0);
---primary: oklch(0.922 0 0); /* Blanco/Gris claro en modo oscuro */
---primary-foreground: oklch(0.205 0 0); /* Negro */
---secondary: oklch(0.269 0 0);
---secondary-foreground: oklch(0.985 0 0);
---muted: oklch(0.269 0 0);
---muted-foreground: oklch(0.708 0 0);
---accent: oklch(0.269 0 0);
---accent-foreground: oklch(0.985 0 0);
---destructive: oklch(0.704 0.191 22.216);
---border: oklch(1 0 0 / 10%);
---input: oklch(1 0 0 / 15%);
---ring: oklch(0.556 0 0); /* Color de anillo por defecto */
-/* Variables de Chart */
---chart-1: oklch(0.488 0.243 264.376);
---chart-2: oklch(0.696 0.17 162.48);
---chart-3: oklch(0.769 0.188 70.08);
---chart-4: oklch(0.627 0.265 303.9);
---chart-5: oklch(0.645 0.246 16.439);
-/* Variables de Sidebar */
---sidebar: oklch(0.205 0 0);
---sidebar-foreground: oklch(0.985 0 0);
---sidebar-primary: oklch(0.488 0.243 264.376);
---sidebar-primary-foreground: oklch(0.985 0 0);
---sidebar-accent: oklch(0.269 0 0);
---sidebar-accent-foreground: oklch(0.985 0 0);
---sidebar-border: oklch(1 0 0 / 10%);
---sidebar-ring: oklch(0.556 0 0);
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0); /* Blanco/Gris claro en modo oscuro */
+    --primary-foreground: oklch(0.205 0 0); /* Negro */
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0); /* Color de anillo por defecto */
+    /* Variables de Chart */
+    --chart-1: oklch(0.488 0.243 264.376);
+    --chart-2: oklch(0.696 0.17 162.48);
+    --chart-3: oklch(0.769 0.188 70.08);
+    --chart-4: oklch(0.627 0.265 303.9);
+    --chart-5: oklch(0.645 0.246 16.439);
+    /* Variables de Sidebar */
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
 }
 
 /* Variables para el tema blue (.blue) */
@@ -1374,121 +1369,33 @@ export default function ContactPage() {
 
 /* Variables para el tema green (.green) */
 .green {
-    --background: oklch(0.2 0.1 150); /* Dark Green */
-    --foreground: oklch(0.95 0.02 30); /* Light Gray */
-    --card: oklch(0.25 0.12 150);
-    --card-foreground: oklch(0.95 0.02 30);
-    --popover: oklch(0.3 0.14 150);
-    --popover-foreground: oklch(0.95 0.02 30);
-    --primary: oklch(0.8 0.2 120); /* Light Green */
-    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
-    --secondary: oklch(0.35 0.16 150);
-    --secondary-foreground: oklch(0.9 0.01 30);
-    --muted: oklch(0.4 0.18 150);
-    --muted-foreground: oklch(0.75 0.03 30);
-    --accent: oklch(0.45 0.2 150);
-    --accent-foreground: oklch(0.9 0.01 30);
-    --destructive: oklch(0.6 0.2 10); /* Dark Red */
-    --border: oklch(0.3 0.1 150);
-    --input: oklch(0.35 0.12 150);
-    --ring: oklch(0.7 0.2 120); /* Light Green Ring */
+    --background: oklch(0.98 0.01 150); /* Very Light Green/Gray - almost white */
+    --foreground: oklch(0.10 0.1 150); /* Dark Green - Slightly brighter than pure black for readability */
+    --card: oklch(0.96 0.02 150); /* Lighter Green/Gray for cards */
+    --card-foreground: oklch(0.10 0.1 150); /* Dark Green */
+    --popover: oklch(0.97 0.03 150); /* Even Lighter - near white */
+    --popover-foreground: oklch(0.10 0.1 150); /* Dark Green */
+    --primary: oklch(0.10 0.2 120); /* Medium Green */
+    --primary-foreground: oklch(0.98 0.01 30); /* White */
+    --secondary: oklch(0.95 0.04 150); /* Light Greenish-Gray */
+    --secondary-foreground: oklch(0.10 0.1 150); /* Dark Green */
+    --muted: oklch(0.94 0.05 150); /* Subtle Light Green */
+    --muted-foreground: oklch(0.2 0.03 30); /* Slightly lighter green for text */
+    --accent: oklch(0.92 0.06 150); /* Light Green Accent */
+    --accent-foreground: oklch(0.10 0.1 150); /* Dark Green */
+    --destructive: oklch(0.6 0.2 10); /* Dark Red - for destructive actions */
+    --border: oklch(0.90 0.04 150); /* Subtle Light Green Border */
+    --input: oklch(0.85 0.03 150); /* Input background - slightly darker */
+    --ring: oklch(0.10 0.2 120); /* Medium Green Ring */
 }
 
-/* 4. Define el mapeo semántico DENTRO de @theme */
-/*    (SOLO --variable: valor;) */
-@theme {
-/* Mapeo semántico */
---radius-sm: calc(var(--radius) - 4px);
---radius-md: calc(var(--radius) - 2px);
---radius-lg: var(--radius);
---radius-xl: calc(var(--radius) + 4px);
---color-background: var(--background);
---color-foreground: var(--foreground);
---color-card: var(--card);
---color-card-foreground: var(--card-foreground);
---color-popover: var(--popover);
---color-popover-foreground: var(--popover-foreground);
---color-primary: var(--primary);
---color-primary-foreground: var(--primary-foreground);
---color-secondary: var(--secondary);
---color-secondary-foreground: var(--secondary-foreground);
---color-muted: var(--muted);
---color-muted-foreground: var(--muted-foreground);
---color-accent: var(--accent);
---color-accent-foreground: var(--accent-foreground);
---color-destructive: var(--destructive);
---color-border: var(--border);
---color-input: var(--input);
---color-ring: var(--ring);
-/* Mapeo de colores de chart */
---color-chart-1: var(--chart-1);
---color-chart-2: var(--chart-2);
---color-chart-3: var(--chart-3);
---color-chart-4: var(--chart-4);
---color-chart-5: var(--chart-5);
-/* Mapeo de colores de sidebar */
---color-sidebar: var(--sidebar);
---color-sidebar-foreground: var(--sidebar-foreground);
---color-sidebar-primary: var(--primary); /* <-- CORREGIDO: Debería usar --sidebar-primary ? O asignar var(--primary) aquí? Asumiendo que quieres el color primario general */
---color-sidebar-primary-foreground: var(--primary-foreground); /* <-- CORREGIDO: Ídem */
---color-sidebar-accent: var(--accent); /* <-- CORREGIDO: Ídem */
---color-sidebar-accent-foreground: var(--accent-foreground); /* <-- CORREGIDO: Ídem */
---color-sidebar-border: var(--border); /* <-- CORREGIDO: Ídem */
---color-sidebar-ring: var(--ring); /* <-- CORREGIDO: Ídem */
-
-/* La directiva @custom-variant se movió fuera */
-}
-
-/* Variables para el tema blue (.blue) */
-.blue {
-    --background: oklch(0.2 0.05 220); /* Dark Blue */
-    --foreground: oklch(0.95 0.02 30);  /* Light Gray */
-    --card: oklch(0.25 0.06 220);
-    --card-foreground: oklch(0.95 0.02 30);
-    --popover: oklch(0.3 0.07 220);
-    --popover-foreground: oklch(0.95 0.02 30);
-    --primary: oklch(0.8 0.1 240); /* Light Blue */
-    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
-    --secondary: oklch(0.35 0.08 220);
-    --secondary-foreground: oklch(0.9 0.01 30);
-    --muted: oklch(0.4 0.09 220);
-    --muted-foreground: oklch(0.75 0.03 30);
-    --accent: oklch(0.45 0.1 220);
-    --accent-foreground: oklch(0.9 0.01 30);
-    --destructive: oklch(0.6 0.2 10); /* Dark Red */
-    --border: oklch(0.3 0.05 220);
-    --input: oklch(0.35 0.06 220);
-    --ring: oklch(0.7 0.1 240); /* Light Blue Ring */
-}
-
-/* Variables para el tema green (.green) */
-.green {
-  --background: oklch(0.98 0.01 150); /* Very Light Green/Gray - almost white */
-  --foreground: oklch(0.10 0.1 150); /* Dark Green - Slightly brighter than pure black for readability */
-  --card: oklch(0.96 0.02 150); /* Lighter Green/Gray for cards */
-  --card-foreground: oklch(0.10 0.1 150); /* Dark Green */
-  --popover: oklch(0.97 0.03 150); /* Even Lighter - near white */
-  --popover-foreground: oklch(0.10 0.1 150); /* Dark Green */
-  --primary: oklch(0.10 0.2 120); /* Medium Green */
-  --primary-foreground: oklch(0.98 0.01 30); /* White */
-  --secondary: oklch(0.95 0.04 150); /* Light Greenish-Gray */
-  --secondary-foreground: oklch(0.10 0.1 150); /* Dark Green */
-  --muted: oklch(0.94 0.05 150); /* Subtle Light Green */
-  --muted-foreground: oklch(0.2 0.03 30); /* Slightly lighter green for text */
-  --accent: oklch(0.92 0.06 150); /* Light Green Accent */
-  --accent-foreground: oklch(0.10 0.1 150); /* Dark Green */
-  --destructive: oklch(0.6 0.2 10); /* Dark Red - for destructive actions */
-  --border: oklch(0.90 0.04 150); /* Subtle Light Green Border */
-  --input: oklch(0.85 0.03 150); /* Input background - slightly darker */
-  --ring: oklch(0.10 0.2 120); /* Medium Green Ring */
-}
-/* 5. Aplica overrides mínimos en la capa base */
+/* 4. Aplica overrides mínimos en la capa base */
 @layer base {
-body {
-    @apply bg-background text-foreground;
-    /* Asegúrate que la fuente (inter.variable) se aplique en layout.tsx */
-    /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
-}
+    body {
+        @apply bg-background text-foreground;
+        /* Asegúrate que la fuente (inter.variable) se aplique en layout.tsx */
+        /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
+    }
 }
 ```
 
