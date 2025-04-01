@@ -20,6 +20,8 @@ atenex-frontend/
 │   │   │   └── page.tsx
 │   │   └── register
 │   │       └── page.tsx
+│   ├── about
+│   │   └── page.tsx
 │   ├── api
 │   │   └── auth
 │   │       ├── login
@@ -28,6 +30,8 @@ atenex-frontend/
 │   │       │   └── route.ts
 │   │       └── register
 │   │           └── route.ts
+│   ├── contact
+│   │   └── page.tsx
 │   ├── globals.css
 │   ├── layout.tsx
 │   └── page.tsx
@@ -691,7 +695,7 @@ export default function KnowledgePage() {
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
-// import { Header } from '@/components/layout/header'; //Remove This Line
+import { Header } from '@/components/layout/header'; //Added This Line
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
@@ -758,7 +762,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={80} minSize={30}>
               <div className="flex h-full flex-col">
-                  {/* <Header />  // Remove This Line */}
+                  <Header />  // Added This Line
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
                       {children}
                   </main>
@@ -897,6 +901,31 @@ export default function RegisterPage() {
 }
 ```
 
+## File: `app/about/page.tsx`
+```tsx
+// app/about/page.tsx
+import React from 'react';
+
+export default function AboutPage() {
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-semibold mb-4">About Us</h1>
+      <p className="text-gray-700 dark:text-gray-300">
+        Atenex is an innovative knowledge management platform designed to help
+        organizations unlock the power of their collective knowledge.
+        We strive to provide a seamless and intuitive experience, allowing
+        users to easily access and share information.
+      </p>
+      <p className="mt-4 text-gray-700 dark:text-gray-300">
+        Our mission is to empower teams to make better decisions with faster access
+        to relevant insights.
+      </p>
+      {/* Add more content as needed */}
+    </div>
+  );
+}
+```
+
 ## File: `app/api/auth/login/route.ts`
 ```ts
 // Example Backend Route (using Next.js Route Handler - BFF pattern)
@@ -1024,6 +1053,31 @@ export async function POST(request: Request) {
 }
 ```
 
+## File: `app/contact/page.tsx`
+```tsx
+// app/contact/page.tsx
+import React from 'react';
+
+export default function ContactPage() {
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-semibold mb-4">Contact Us</h1>
+      <p className="text-gray-700 dark:text-gray-300">
+        We'd love to hear from you! If you have any questions or feedback,
+        please don't hesitate to reach out.
+      </p>
+      <ul className="mt-4 list-none">
+        <li>
+          Email: <a href="mailto:support@example.com">support@example.com</a>
+        </li>
+        <li>Phone: (123) 456-7890</li>
+        {/* Add more contact methods as needed */}
+      </ul>
+    </div>
+  );
+}
+```
+
 ## File: `app/globals.css`
 ```css
 /* File: atenex-frontend/app/globals.css */
@@ -1039,78 +1093,78 @@ export async function POST(request: Request) {
 /* 3. Define variables base FUERA del @theme */
 /* Variables para el tema claro (:root) */
 :root {
-  --radius: 0.625rem;
-  /* Variables OKLCH */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0); /* Negro por defecto */
-  --primary-foreground: oklch(0.985 0 0); /* Blanco */
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0); /* Color de anillo por defecto */
-  /* Variables de Chart */
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  /* Variables de Sidebar */
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+--radius: 0.625rem;
+/* Variables OKLCH */
+--background: oklch(1 0 0);
+--foreground: oklch(0.145 0 0);
+--card: oklch(1 0 0);
+--card-foreground: oklch(0.145 0 0);
+--popover: oklch(1 0 0);
+--popover-foreground: oklch(0.145 0 0);
+--primary: oklch(0.205 0 0); /* Negro por defecto */
+--primary-foreground: oklch(0.985 0 0); /* Blanco */
+--secondary: oklch(0.97 0 0);
+--secondary-foreground: oklch(0.205 0 0);
+--muted: oklch(0.97 0 0);
+--muted-foreground: oklch(0.556 0 0);
+--accent: oklch(0.97 0 0);
+--accent-foreground: oklch(0.205 0 0);
+--destructive: oklch(0.577 0.245 27.325);
+--border: oklch(0.922 0 0);
+--input: oklch(0.922 0 0);
+--ring: oklch(0.708 0 0); /* Color de anillo por defecto */
+/* Variables de Chart */
+--chart-1: oklch(0.646 0.222 41.116);
+--chart-2: oklch(0.6 0.118 184.704);
+--chart-3: oklch(0.398 0.07 227.392);
+--chart-4: oklch(0.828 0.189 84.429);
+--chart-5: oklch(0.769 0.188 70.08);
+/* Variables de Sidebar */
+--sidebar: oklch(0.985 0 0);
+--sidebar-foreground: oklch(0.145 0 0);
+--sidebar-primary: oklch(0.205 0 0);
+--sidebar-primary-foreground: oklch(0.985 0 0);
+--sidebar-accent: oklch(0.97 0 0);
+--sidebar-accent-foreground: oklch(0.205 0 0);
+--sidebar-border: oklch(0.922 0 0);
+--sidebar-ring: oklch(0.708 0 0);
 }
 
 /* Variables para el tema oscuro (.dark) */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0); /* Blanco/Gris claro en modo oscuro */
-  --primary-foreground: oklch(0.205 0 0); /* Negro */
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0); /* Color de anillo por defecto */
-  /* Variables de Chart */
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  /* Variables de Sidebar */
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+--background: oklch(0.145 0 0);
+--foreground: oklch(0.985 0 0);
+--card: oklch(0.205 0 0);
+--card-foreground: oklch(0.985 0 0);
+--popover: oklch(0.205 0 0);
+--popover-foreground: oklch(0.985 0 0);
+--primary: oklch(0.922 0 0); /* Blanco/Gris claro en modo oscuro */
+--primary-foreground: oklch(0.205 0 0); /* Negro */
+--secondary: oklch(0.269 0 0);
+--secondary-foreground: oklch(0.985 0 0);
+--muted: oklch(0.269 0 0);
+--muted-foreground: oklch(0.708 0 0);
+--accent: oklch(0.269 0 0);
+--accent-foreground: oklch(0.985 0 0);
+--destructive: oklch(0.704 0.191 22.216);
+--border: oklch(1 0 0 / 10%);
+--input: oklch(1 0 0 / 15%);
+--ring: oklch(0.556 0 0); /* Color de anillo por defecto */
+/* Variables de Chart */
+--chart-1: oklch(0.488 0.243 264.376);
+--chart-2: oklch(0.696 0.17 162.48);
+--chart-3: oklch(0.769 0.188 70.08);
+--chart-4: oklch(0.627 0.265 303.9);
+--chart-5: oklch(0.645 0.246 16.439);
+/* Variables de Sidebar */
+--sidebar: oklch(0.205 0 0);
+--sidebar-foreground: oklch(0.985 0 0);
+--sidebar-primary: oklch(0.488 0.243 264.376);
+--sidebar-primary-foreground: oklch(0.985 0 0);
+--sidebar-accent: oklch(0.269 0 0);
+--sidebar-accent-foreground: oklch(0.985 0 0);
+--sidebar-border: oklch(1 0 0 / 10%);
+--sidebar-ring: oklch(0.556 0 0);
 }
 
 /* Variables para el tema blue (.blue) */
@@ -1133,9 +1187,9 @@ export async function POST(request: Request) {
     --border: oklch(0.3 0.05 220);
     --input: oklch(0.35 0.06 220);
     --ring: oklch(0.7 0.1 240); /* Light Blue Ring */
-  }
+}
 
-  /* Variables para el tema green (.green) */
+/* Variables para el tema green (.green) */
 .green {
     --background: oklch(0.2 0.1 150); /* Dark Green */
     --foreground: oklch(0.95 0.02 30); /* Light Gray */
@@ -1155,51 +1209,51 @@ export async function POST(request: Request) {
     --border: oklch(0.3 0.1 150);
     --input: oklch(0.35 0.12 150);
     --ring: oklch(0.7 0.2 120); /* Light Green Ring */
-  }
+}
 
 /* 4. Define el mapeo semántico DENTRO de @theme */
 /*    (SOLO --variable: valor;) */
 @theme {
-  /* Mapeo semántico */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  /* Mapeo de colores de chart */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  /* Mapeo de colores de sidebar */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--primary); /* <-- CORREGIDO: Debería usar --sidebar-primary ? O asignar var(--primary) aquí? Asumiendo que quieres el color primario general */
-  --color-sidebar-primary-foreground: var(--primary-foreground); /* <-- CORREGIDO: Ídem */
-  --color-sidebar-accent: var(--accent); /* <-- CORREGIDO: Ídem */
-  --color-sidebar-accent-foreground: var(--accent-foreground); /* <-- CORREGIDO: Ídem */
-  --color-sidebar-border: var(--border); /* <-- CORREGIDO: Ídem */
-  --color-sidebar-ring: var(--ring); /* <-- CORREGIDO: Ídem */
+/* Mapeo semántico */
+--radius-sm: calc(var(--radius) - 4px);
+--radius-md: calc(var(--radius) - 2px);
+--radius-lg: var(--radius);
+--radius-xl: calc(var(--radius) + 4px);
+--color-background: var(--background);
+--color-foreground: var(--foreground);
+--color-card: var(--card);
+--color-card-foreground: var(--card-foreground);
+--color-popover: var(--popover);
+--color-popover-foreground: var(--popover-foreground);
+--color-primary: var(--primary);
+--color-primary-foreground: var(--primary-foreground);
+--color-secondary: var(--secondary);
+--color-secondary-foreground: var(--secondary-foreground);
+--color-muted: var(--muted);
+--color-muted-foreground: var(--muted-foreground);
+--color-accent: var(--accent);
+--color-accent-foreground: var(--accent-foreground);
+--color-destructive: var(--destructive);
+--color-border: var(--border);
+--color-input: var(--input);
+--color-ring: var(--ring);
+/* Mapeo de colores de chart */
+--color-chart-1: var(--chart-1);
+--color-chart-2: var(--chart-2);
+--color-chart-3: var(--chart-3);
+--color-chart-4: var(--chart-4);
+--color-chart-5: var(--chart-5);
+/* Mapeo de colores de sidebar */
+--color-sidebar: var(--sidebar);
+--color-sidebar-foreground: var(--sidebar-foreground);
+--color-sidebar-primary: var(--primary); /* <-- CORREGIDO: Debería usar --sidebar-primary ? O asignar var(--primary) aquí? Asumiendo que quieres el color primario general */
+--color-sidebar-primary-foreground: var(--primary-foreground); /* <-- CORREGIDO: Ídem */
+--color-sidebar-accent: var(--accent); /* <-- CORREGIDO: Ídem */
+--color-sidebar-accent-foreground: var(--accent-foreground); /* <-- CORREGIDO: Ídem */
+--color-sidebar-border: var(--border); /* <-- CORREGIDO: Ídem */
+--color-sidebar-ring: var(--ring); /* <-- CORREGIDO: Ídem */
 
-  /* La directiva @custom-variant se movió fuera */
+/* La directiva @custom-variant se movió fuera */
 }
 
 /* Variables para el tema blue (.blue) */
@@ -1222,9 +1276,9 @@ export async function POST(request: Request) {
     --border: oklch(0.3 0.05 220);
     --input: oklch(0.35 0.06 220);
     --ring: oklch(0.7 0.1 240); /* Light Blue Ring */
-  }
+}
 
-  /* Variables para el tema green (.green) */
+/* Variables para el tema green (.green) */
 .green {
     --background: oklch(0.2 0.1 150); /* Dark Green */
     --foreground: oklch(0.95 0.02 30); /* Light Gray */
@@ -1244,15 +1298,15 @@ export async function POST(request: Request) {
     --border: oklch(0.3 0.1 150);
     --input: oklch(0.35 0.12 150);
     --ring: oklch(0.7 0.2 120); /* Light Green Ring */
-  }
+}
 
 /* 5. Aplica overrides mínimos en la capa base */
 @layer base {
-  body {
+body {
     @apply bg-background text-foreground;
     /* Asegúrate que la fuente (inter.variable) se aplique en layout.tsx */
     /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
-  }
+}
 }
 ```
 
@@ -2547,12 +2601,11 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User as UserIcon, Menu } from "lucide-react";
+import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
 import { useAuth } from '@/lib/hooks/useAuth';
 import { APP_NAME } from '@/lib/constants';
-import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
-import { useRouter } from 'next/navigation';
 import { ThemePaletteButton } from '@/components/theme-palette-button';
+import { useRouter } from 'next/navigation';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -2564,20 +2617,19 @@ export function Header() {
 
     return (
       <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
-        {/* Left side - potentially breadcrumbs or title */}
-        <div>
-          {/* <Button variant="ghost" size="icon" className="md:hidden"> Mobile menu toggle if needed
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Toggle Menu</span>
-          </Button> */}
-          <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
-          {/* Add Breadcrumbs or dynamic title here */}
+        {/* Left side - Home Link */}
+        <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+                <Home className="h-5 w-5" />
+                <span className="sr-only">Home</span>
+            </Button>
+            <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
+            {/* Add Breadcrumbs or dynamic title here */}
         </div>
 
 
         {/* Right side - Theme toggle and User menu */}
         <div className="flex items-center space-x-4">
-          <ThemeToggle /> {/* Add ThemeToggle button */}
           <ThemePaletteButton />
           {user && (
             <DropdownMenu>
@@ -2603,16 +2655,17 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {/* Add links to settings or profile page */}
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                   {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
                 </DropdownMenuItem>
+                {/* Remove Profile DropDown Option
                 <DropdownMenuItem>
                   <UserIcon className="mr-2 h-4 w-4" />
                   <span>Profile</span>
-                  {/* <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut> */}
-                </DropdownMenuItem>
+                  {/* <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                </DropdownMenuItem> */}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                   <LogOut className="mr-2 h-4 w-4" />
@@ -2784,6 +2837,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
 ## File: `components/theme-toggle.tsx`
 ```tsx
+
 // File: components/theme-toggle.tsx
 "use client";
 
@@ -2848,6 +2902,7 @@ export function ThemeToggle() {
     </DropdownMenu>
   );
 }
+
 ```
 
 ## File: `components/ui/alert.tsx`

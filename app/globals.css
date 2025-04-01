@@ -198,26 +198,25 @@
 
 /* Variables para el tema green (.green) */
 .green {
-    --background: oklch(0.2 0.1 150); /* Dark Green */
-    --foreground: oklch(0.95 0.02 30); /* Light Gray */
-    --card: oklch(0.25 0.12 150);
-    --card-foreground: oklch(0.95 0.02 30);
-    --popover: oklch(0.3 0.14 150);
-    --popover-foreground: oklch(0.95 0.02 30);
-    --primary: oklch(0.8 0.2 120); /* Light Green */
-    --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
-    --secondary: oklch(0.35 0.16 150);
-    --secondary-foreground: oklch(0.9 0.01 30);
-    --muted: oklch(0.4 0.18 150);
-    --muted-foreground: oklch(0.75 0.03 30);
-    --accent: oklch(0.45 0.2 150);
-    --accent-foreground: oklch(0.9 0.01 30);
-    --destructive: oklch(0.6 0.2 10); /* Dark Red */
-    --border: oklch(0.3 0.1 150);
-    --input: oklch(0.35 0.12 150);
-    --ring: oklch(0.7 0.2 120); /* Light Green Ring */
+  --background: oklch(0.15 0.1 150); /* Dark Green - slightly brighter than pure black */
+  --foreground: oklch(0.95 0.02 30); /* Light Gray - almost white */
+  --card: oklch(0.18 0.12 150); /* Slightly lighter dark green for cards */
+  --card-foreground: oklch(0.95 0.02 30); /* Light Gray */
+  --popover: oklch(0.2 0.14 150); /* A bit brighter than the background */
+  --popover-foreground: oklch(0.95 0.02 30); /* Light Gray */
+  --primary: oklch(0.7 0.2 120); /* A vibrant light green for primary actions */
+  --primary-foreground: oklch(0.1 0.03 20); /* Dark Gray */
+  --secondary: oklch(0.25 0.16 150); /* A bit lighter than the background */
+  --secondary-foreground: oklch(0.9 0.01 30); /* Nearly white */
+  --muted: oklch(0.3 0.18 150); /* Even lighter for muted areas */
+  --muted-foreground: oklch(0.75 0.03 30); /* Medium Gray */
+  --accent: oklch(0.35 0.2 150); /* A bit more distinct */
+  --accent-foreground: oklch(0.9 0.01 30); /* Nearly white */
+  --destructive: oklch(0.6 0.2 10); /* Dark Red - for destructive actions */
+  --border: oklch(0.25 0.1 150); /* A subtle dark green border */
+  --input: oklch(0.3 0.12 150); /* Input backgrounds */
+  --ring: oklch(0.6 0.2 120); /* Light Green Ring */
 }
-
 /* 5. Aplica overrides mínimos en la capa base */
 @layer base {
 body {

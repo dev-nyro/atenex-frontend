@@ -1,21 +1,72 @@
 // app/about/page.tsx
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { APP_NAME } from '@/lib/constants';
+import { Separator } from "@/components/ui/separator";
 
 export default function AboutPage() {
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-semibold mb-4">About Us</h1>
-      <p className="text-gray-700 dark:text-gray-300">
-        Atenex is an innovative knowledge management platform designed to help
-        organizations unlock the power of their collective knowledge.
-        We strive to provide a seamless and intuitive experience, allowing
-        users to easily access and share information.
-      </p>
-      <p className="mt-4 text-gray-700 dark:text-gray-300">
-        Our mission is to empower teams to make better decisions with faster access
-        to relevant insights.
-      </p>
-      {/* Add more content as needed */}
-    </div>
+      <div className="container mx-auto p-6 space-y-4">
+          <h1 className="text-3xl font-semibold">About {APP_NAME}</h1>
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Our Mission</CardTitle>
+                  <CardDescription>
+                      Empowering organizations with seamless access to their collective knowledge.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <p>
+                      We are committed to providing innovative solutions that streamline knowledge management,
+                      facilitate informed decision-making, and enhance team productivity.
+                  </p>
+              </CardContent>
+          </Card>
+
+          <Separator />
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Our Vision</CardTitle>
+                  <CardDescription>
+                      To be the leading knowledge query platform, transforming how businesses leverage information.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <p>
+                      We envision a future where organizations can effortlessly tap into their internal expertise,
+                      fostering a culture of continuous learning and growth.
+                  </p>
+              </CardContent>
+          </Card>
+
+          <Separator />
+
+          <Card>
+              <CardHeader>
+                  <CardTitle>Our Values</CardTitle>
+                  <CardDescription>
+                      Integrity, Innovation, Collaboration, and Customer Success.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <ul className="list-disc list-inside space-y-1">
+                      <li>
+                          <strong>Integrity:</strong> We uphold the highest ethical standards in all our operations.
+                      </li>
+                      <li>
+                          <strong>Innovation:</strong> We continuously seek new ways to improve our platform and services.
+                      </li>
+                      <li>
+                          <strong>Collaboration:</strong> We believe in working together to achieve shared goals.
+                      </li>
+                      <li>
+                          <strong>Customer Success:</strong> We are dedicated to helping our customers succeed.
+                      </li>
+                  </ul>
+              </CardContent>
+          </Card>
+      </div>
   );
 }
