@@ -15,12 +15,12 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4">
+        <div className="container flex items-center justify-between h-16 py-4 px-4"> {/* (+) Added px-4 */}
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
           <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
-            <LinkButton href="/chat">Chat</LinkButton>
-            <LinkButton href="/knowledge">Knowledge Base</LinkButton>
-            <LinkButton href="/settings">Settings</LinkButton>
+            <LinkButton href="/">Home</LinkButton>
+            <LinkButton href="/about">About Us</LinkButton>
+            <LinkButton href="/contact">Contact Us</LinkButton>
             {token ?
               <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
                 Go to App
@@ -59,7 +59,7 @@ export default function HomePage() {
 
       {/* Footer (optional) */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground">
+        <div className="container text-center text-muted-foreground"> {/* (+) Added text-center */}
           © {new Date().getFullYear()} Atenex. All rights reserved.
         </div>
       </footer>

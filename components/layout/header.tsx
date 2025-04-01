@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react'; // (+) AÑADIR ESTA LÍNEA
+import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -11,7 +11,7 @@ import { ThemeToggle } from '@/components/theme-toggle'; // Import ThemeToggle
 import { useRouter } from 'next/navigation';
 
 export function Header() {
-  const { user, logout, token } = useAuth();
+  const { user, logout } = useAuth();
     const router = useRouter();
     const getInitials = (name?: string) => {
       if (!name) return '?';
@@ -34,14 +34,6 @@ export function Header() {
         {/* Right side - Theme toggle and User menu */}
         <div className="flex items-center space-x-4">
           <ThemeToggle /> {/* Add ThemeToggle button */}
-          {!token ? <Button onClick={() => router.push('/login')}>
-                Login
-              </Button>
-          :
-          <>
-          <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
-            Go to App
-          </Button>
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -52,9 +44,8 @@ export function Header() {
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {getInitials(user.name)}
                     </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
+                  </Button>
+                </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
@@ -84,8 +75,6 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          </>
-      }
         </div>
       </header>
     );
