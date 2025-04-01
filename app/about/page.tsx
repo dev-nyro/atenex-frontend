@@ -6,7 +6,9 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const teamMembers = [
-    { name: "Demo User", role: "Founder", imageUrl: null },
+    { name: "Demo User 1", role: "Founder", imageUrl: null },
+    { name: "Demo User 2", role: "Co-Founder", imageUrl: null },
+    { name: "Demo User 3", role: "Lead Engineer", imageUrl: null },
     // Add more team members as needed
 ];
 
@@ -87,22 +89,24 @@ export default function AboutPage() {
                       The talented individuals behind {APP_NAME}.
                   </CardDescription>
               </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {teamMembers.map((member) => (
-                      <div key={member.name} className="flex flex-col items-center">
-                          <Avatar className="h-16 w-16">
-                              {member.imageUrl ? (
-                                  <img src={member.imageUrl} alt={member.name} />
-                              ) : (
-                                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                              )}
-                          </Avatar>
-                          <div className="mt-2 text-center">
-                              <p className="font-medium">{member.name}</p>
-                              <p className="text-sm text-muted-foreground">{member.role}</p>
-                          </div>
-                      </div>
-                  ))}
+              <CardContent className="flex justify-center">
+                  <div className="grid sm:grid-cols-3 gap-4"> {/* Flex Container for centering */}
+                    {teamMembers.map((member) => (
+                        <div key={member.name} className="flex flex-col items-center">
+                            <Avatar className="h-16 w-16">
+                                {member.imageUrl ? (
+                                    <img src={member.imageUrl} alt={member.name} />
+                                ) : (
+                                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                )}
+                            </Avatar>
+                            <div className="mt-2 text-center">
+                                <p className="font-medium">{member.name}</p>
+                                <p className="text-sm text-muted-foreground">{member.role}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
               </CardContent>
           </Card>
       </div>
