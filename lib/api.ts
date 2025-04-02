@@ -6,7 +6,7 @@ import type { Message } from '@/components/chat/chat-message'; // <-- Import Fro
 
 // --- ApiError Class ---
 interface ApiErrorData {
-    detail?: string | { msg: string; type: string }[] | any;
+    detail?: string | { msg: string; type: string; loc?: string[] }[] | any; // Added loc for FastAPI errors
     message?: string;
 }
 
@@ -31,17 +31,17 @@ async function request<T>(
 
   let url: string;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // *** CORREGIDO: Identificar rutas de gateway (v1) vs. internas (simuladas) ***
+  // *** Identificar rutas de gateway (v1) vs. internas (simuladas) ***
   const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
   const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
 
   if (isGatewayRoute) {
     // Use absolute API Gateway URL for external routes
-    const gatewayUrl = getApiGatewayUrl();
+    const gatewayUrl = getApiGatewayUrl(); // Get URL from env var or default
     url = `${gatewayUrl}${cleanEndpoint}`;
     console.debug(`External API Request Target: ${url}`);
   } else if (isInternalAuthRoute) {
-     // Use relative URL for internal simulated routes (if kept for testing)
+     // Use relative URL for internal simulated routes (IF USED FOR TESTING)
      url = cleanEndpoint;
      console.warn(`Using SIMULATED internal API route: ${url}`);
      console.debug(`Internal API Request Target: ${url}`);
@@ -70,14 +70,15 @@ async function request<T>(
         headers.set('X-Company-ID', companyId); // Add Company ID header
     } else {
          console.warn(`Could not extract companyId from token for Gateway request to ${url}. Backend might reject.`);
-         // Optionally throw error if companyId is mandatory for all gateway requests
+         // Depending on backend requirements, you might need to throw an error here
+         // if companyId is mandatory for all gateway requests.
          // throw new ApiError("Company ID could not be determined from token.", 400);
     }
-  } else if (isGatewayRoute && !token) {
-      // Handle missing token for required gateway routes
+  } else if (isGatewayRoute && !token && !cleanEndpoint.includes('/auth/')) {
+      // Handle missing token for required gateway routes (excluding auth endpoints)
       console.error(`Authentication token missing for Gateway request to ${url}.`);
       // Throw an error to prevent the request if auth is mandatory
-      throw new ApiError("Authentication required.", 401);
+      throw new ApiError("Authentication required. Please log in.", 401);
   }
 
 
@@ -101,9 +102,9 @@ async function request<T>(
       } catch (e) {
         try {
            errorText = await response.text();
-           console.warn("API error response was not valid JSON:", errorText);
+           console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
         } catch (textErr) {
-             console.warn("Could not read API error response body.");
+             console.warn(`Could not read API error response body (${response.status}).`);
         }
       }
 
@@ -112,23 +113,27 @@ async function request<T>(
        if (errorData?.detail && typeof errorData.detail === 'string') {
            errorMessage = errorData.detail;
        } else if (errorData?.detail && Array.isArray(errorData.detail)) {
-           // Handle FastAPI validation errors
+           // Handle FastAPI validation errors specifically
            errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
-       } else if (errorData?.message) {
+       } else if (errorData?.message) { // Handle generic 'message' field
            errorMessage = errorData.message;
        } else if (errorText) {
            errorMessage = errorText.substring(0, 200); // Limit length
-       } else if (response.status === 401) {
-           errorMessage = "Unauthorized. Please check your credentials or session.";
-       } else if (response.status === 403) {
-           errorMessage = "Forbidden. You don't have permission.";
-       } else if (response.status === 404) {
-            errorMessage = "Resource not found.";
-       } else if (response.status === 422) {
-            errorMessage = "Validation Error. Please check your input."; // Generic validation error
-       } else if (response.status >= 500) {
-            errorMessage = "Server error. Please try again later.";
+       } else {
+           // Fallback messages based on status code
+           switch (response.status) {
+                case 400: errorMessage = "Bad Request. Please check your input."; break;
+                case 401: errorMessage = "Unauthorized. Please check credentials or login again."; break;
+                case 403: errorMessage = "Forbidden. You don't have permission."; break;
+                case 404: errorMessage = "Resource not found."; break;
+                case 422: errorMessage = "Validation Error. Please check your input."; break;
+                case 500: errorMessage = "Internal Server Error. Please try again later."; break;
+                case 502: errorMessage = "Bad Gateway. Error communicating with upstream service."; break;
+                case 503: errorMessage = "Service Unavailable. Please try again later."; break;
+                case 504: errorMessage = "Gateway Timeout. The server took too long to respond."; break;
+           }
        }
+
 
       console.error(`API Error: ${response.status} ${errorMessage}`, { url, data: errorData, text: errorText });
       throw new ApiError(errorMessage, response.status, errorData || undefined);
@@ -157,7 +162,7 @@ async function request<T>(
     } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
         // Handle Network errors specifically
         console.error('Network Error:', { url, error });
-        throw new ApiError('Network error: Could not connect to the server.', 0); // Use status 0 for network errors
+        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
     }
     else {
       // Handle other unexpected errors (e.g., programming errors in this function)
@@ -171,32 +176,29 @@ async function request<T>(
 // *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
 // Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
 export const loginUser = async (credentials: { email: string; password: string }) => {
-  console.log("Calling REAL login API via Gateway...");
+  console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
   // El backend real debe devolver una estructura como { "access_token": "..." }
-  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- CAMBIADO A RUTA GATEWAY
+  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
     method: 'POST',
     body: JSON.stringify(credentials),
   });
-  // La función 'request' ya añade el Content-Type: application/json
   return response.access_token;
 };
 
 // *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
 // Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
 export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-    console.log("Calling REAL register API via Gateway...");
-    // El backend real debería devolver algo como { "user_id": "...", "email": "...", ... }
-    // O quizás también un access_token si hace login automático tras registro.
-    // Ajusta el tipo de respuesta esperado <{ access_token?: string; user: User }> según tu backend.
-    const response = await request<{ access_token?: string; user: User }>('/api/v1/auth/register', { // <-- CAMBIADO A RUTA GATEWAY
+    console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
+    // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
+    // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
+    const response = await request<{ access_token?: string; user?: Partial<User>; message?: string }>('/api/v1/auth/register', { // <-- RUTA GATEWAY REAL
         method: 'POST',
         body: JSON.stringify(details),
     });
-    return response; // Devuelve lo que el backend real retorne
+    return response; // Devuelve la respuesta completa del backend
 };
 
 // --- Ingest Service (External API Routes - /api/v1/ingest) ---
-// (Sin cambios aquí, ya usaban /api/v1/...)
 export interface IngestResponse {
     document_id: string;
     task_id: string;
@@ -237,7 +239,6 @@ export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> 
 
 
 // --- Query & Chat Service (External API Routes - /api/v1/*) ---
-// (Sin cambios aquí, ya usaban /api/v1/...)
 
 // Type for retrieved documents within API responses (sent by Backend)
 export interface RetrievedDocApi {

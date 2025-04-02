@@ -35,13 +35,16 @@ export interface User {
 interface JwtPayload {
     // *** AJUSTA ESTOS NOMBRES DE CLAIMS para que coincidan EXACTAMENTE ***
     // *** con lo que tu backend (Auth Service / Supabase) pone en el token ***
-    user_id: string;    // Ejemplo: claim para User ID
+    user_id: string;    // Ejemplo: claim para User ID (o podría ser 'sub')
     company_id: string; // Ejemplo: claim para Company ID
     email: string;      // Claim para Email
     name?: string;     // Claim opcional para Name
     role?: string;     // Claim opcional para Role
     exp: number;       // Standard expiry timestamp (seconds since epoch) REQUIRED
     iat?: number;      // Standard issued at timestamp (optional)
+    // 'sub' (subject) es un claim estándar, a menudo contiene el user ID.
+    // Si tu backend usa 'sub' para el ID de usuario, usa 'sub' aquí en lugar de 'user_id'.
+    sub?: string;      // Ejemplo: Si el backend usa 'sub' para user ID
     // Agrega cualquier otro claim que tu backend incluya y necesites en el frontend
 }
 
@@ -51,7 +54,7 @@ export const getUserFromToken = (token: string | null): User | null => {
   try {
     // Decode the JWT
     const decoded = jwtDecode<JwtPayload>(token);
-    console.log("Decoded JWT Payload:", decoded); // <-- Log para depuración
+    console.log("getUserFromToken - Decoded JWT Payload:", decoded); // <-- Log para depuración
 
     // --- Validation ---
     // 1. Check expiry
@@ -64,22 +67,27 @@ export const getUserFromToken = (token: string | null): User | null => {
 
     // 2. Check for essential claims required by the frontend
     // *** VERIFICA que estos claims existen en tu payload decodificado ***
-    if (!decoded.user_id || !decoded.company_id || !decoded.email) {
-        console.error("Decoded token is missing essential claims (user_id, company_id, email). Actual Payload:", decoded);
+    //    Ajusta los nombres ('user_id', 'company_id') si tu backend usa otros (ej. 'sub')
+    const userId = decoded.user_id || decoded.sub; // Usa user_id o sub como fallback
+    const companyId = decoded.company_id;
+    const email = decoded.email;
+
+    if (!userId || !companyId || !email) {
+        console.error("Decoded token is missing essential claims (userId/sub, companyId, email). Actual Payload:", decoded);
         removeToken(); // Clear invalid token
         return null;
     }
 
     // --- Map decoded payload to User interface ---
     const user: User = {
-      userId: decoded.user_id,         // Map from 'user_id' claim
-      email: decoded.email,
-      companyId: decoded.company_id,   // Map from 'company_id' claim
+      userId: userId,                 // Map from 'user_id' or 'sub' claim
+      email: email,
+      companyId: companyId,           // Map from 'company_id' claim
       name: decoded.name,             // Map optional 'name' claim
       // Add other mappings if needed, e.g., role: decoded.role
     };
 
-    console.log("Mapped User object:", user); // <-- Log para depuración
+    console.log("getUserFromToken - Mapped User object:", user); // <-- Log para depuración
     return user;
 
   } catch (error) {
