@@ -6,13 +6,13 @@ import { Separator } from '@/components/ui/separator';
 export default function KnowledgePage() {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Knowledge Base Management</h1>
+      <h1 className="text-2xl font-semibold">Gestión de la Base de Conocimiento</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Upload Documents</CardTitle>
+          <CardTitle>Subir Documentos</CardTitle>
           <CardDescription>
-            Upload new documents (PDF, DOCX, TXT, etc.) to be processed and added to the knowledge base.
+            Sube nuevos documentos (PDF, DOCX, TXT, etc.) para ser procesados y añadidos a la base de conocimientos.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -24,9 +24,9 @@ export default function KnowledgePage() {
 
        <Card>
         <CardHeader>
-          <CardTitle>Document Status</CardTitle>
+          <CardTitle>Estado de los Documentos</CardTitle>
           <CardDescription>
-            View the processing status of your uploaded documents.
+            Ver el estado de procesamiento de tus documentos subidos.
           </CardDescription>
         </CardHeader>
         <CardContent>

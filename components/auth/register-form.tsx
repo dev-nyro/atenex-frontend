@@ -16,9 +16,11 @@ import { AuthError } from '@supabase/supabase-js';
 
 // --- Esquema Zod (Simplificado, sin companyId) ---
 const registerSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }).optional(), // El nombre debe tener al menos 2 caracteres
+  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }), // Dirección de correo electrónico no válida
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }), // La contraseña debe tener al menos 6 caracteres
+  // (+) AÑADIR company_id
+  companyId: z.string().uuid({message: 'ID de empresa no válido'}).optional(), // ID de empresa no válido
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -38,48 +40,51 @@ export function RegisterForm() {
     setIsLoading(true);
     setError(null);
     setSuccess(false);
-
-    // Prepare user metadata
-    const userMetaDataForSignUp: { [key: string]: any } = {};
-    if (data.name) {
-        userMetaDataForSignUp.full_name = data.name;
-    }
-
-    // Prepare redirect URL
-    let emailRedirectTo: string | undefined;
-    if (typeof window !== 'undefined') {
-        emailRedirectTo = window.location.origin;
-    }
-
     try {
-      console.log("RegisterForm: Calling signUp hook for:", data.email);
+      console.log("Attempting registration with:", data.email);
 
-      // Combine all data into a single object parameter
-      const signUpParams = {
-        email: data.email,
-        password: data.password,
-        options: {
-          data: Object.keys(userMetaDataForSignUp).length > 0 ? userMetaDataForSignUp : undefined,
-          emailRedirectTo
-        }
-      };
-
-      const { error: signUpError } = await signUp(signUpParams);
-
-      if (signUpError) {
-        setError(signUpError.message || 'Registration failed.');
-        setIsLoading(false); // Stop loading on error
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
+        setIsLoading(false);
         return;
       }
 
-      // Update local state on success
-      setSuccess(true);
-      setError(null);
-      // form.reset(); // Optional
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
 
-    } catch (err) {
-      console.error("RegisterForm: Unexpected error during registration:", err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+     console.log("Supabase client created."); // Add this
+
+     // Try signing up the user
+     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+           data: {
+              name: data.name || null,
+           },
+        },
+     });
+     console.log("signUp response:", authResponse, authError); // Add this
+
+     if (authError) {
+        console.error("Supabase registration failed:", authError);
+        setError(authError.message || 'Error al registrarse. Por favor, inténtalo de nuevo.'); // Error al registrarse. Por favor, inténtalo de nuevo.
+        setIsLoading(false);
+     } else {
+        setSuccess(true); // Registration successful, set success state
+     }
+    } catch (err: any) {
+      console.error("Registration failed:", err);
+      let errorMessage = 'Error al registrarse. Por favor, inténtalo de nuevo.'; // Error al registrarse. Por favor, inténtalo de nuevo.
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
     } finally {
       // Do not stop isLoading if success to keep the message visible
       if (!success) {
@@ -93,44 +98,81 @@ export function RegisterForm() {
       {error && !success && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Registration Error</AlertTitle>
+          <AlertTitle>Error</AlertTitle> {/* Error */}
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
        {success && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-           <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" />
-          <AlertTitle className="text-green-800 dark:text-green-200">Registration Submitted</AlertTitle>
+          <AlertTitle className="text-green-800 dark:text-green-200">Éxito</AlertTitle> {/* Éxito */}
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Please check your email ({form.getValues("email")}) to confirm your account.
-          </AlertDescription>
+            ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta.
+          </AlertDescription> {/* ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta. */}
         </Alert>
       )}
 
       {/* Campos del Formulario */}
       <div className="space-y-1">
-        <Label htmlFor="name">Name (Optional)</Label>
-        <Input id="name" type="text" placeholder="Your Name" {...form.register('name')} disabled={isLoading || success}/>
-         {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
+        <Label htmlFor="name">Nombre (Opcional)</Label> {/* Nombre (Opcional) */}
+        <Input
+          id="name"
+          type="text"
+          placeholder="Tu Nombre"
+          {...form.register('name')}
+          aria-invalid={form.formState.errors.name ? 'true' : 'false'}
+        />
+        {form.formState.errors.name && (
+          <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+        )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" placeholder="name@example.com" required {...form.register('email')} disabled={isLoading || success}/>
-        {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
+        <Label htmlFor="email">Correo electrónico</Label> {/* Correo electrónico */}
+        <Input
+          id="email"
+          type="email"
+          placeholder="nombre@ejemplo.com"
+          required
+          {...form.register('email')}
+          aria-invalid={form.formState.errors.email ? 'true' : 'false'}
+        />
+        {form.formState.errors.email && (
+          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+        )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
-        {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
+        <Label htmlFor="password">Contraseña</Label> {/* Contraseña */}
+        <Input
+          id="password"
+          type="password"
+          required
+          {...form.register('password')}
+          aria-invalid={form.formState.errors.password ? 'true' : 'false'}
+        />
+        {form.formState.errors.password && (
+          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+        )}
       </div>
-
-      <Button type="submit" className="w-full" disabled={isLoading || success}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
+      {/* (+) AÑADIR company_id */}
+      <div className="space-y-1">
+        <Label htmlFor="companyId">ID de empresa (Opcional)</Label> {/* ID de empresa (Opcional) */}
+        <Input
+          id="companyId"
+          type="text"
+          placeholder="ID de la empresa"
+          {...form.register('companyId')}
+          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
+        />
+        {form.formState.errors.companyId && (
+          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
+        )}
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Crear cuenta'} {/* Crear cuenta */}
       </Button>
       <div className="mt-4 text-center text-sm">
-        Already have an account?{" "}
+        ¿Ya tienes una cuenta?{" "} {/* ¿Ya tienes una cuenta? */}
         <Link href="/login" className="underline text-primary hover:text-primary/80">
-          Login
+          Iniciar sesión
         </Link>
       </div>
     </form>

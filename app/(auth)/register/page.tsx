@@ -5,8 +5,8 @@ export default function RegisterPage() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Create Account</CardTitle>
-        <CardDescription>Join Atenex and unlock your knowledge</CardDescription>
+        <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
+        <CardDescription>Únete a Atenex y desbloquea tu conocimiento</CardDescription>
       </CardHeader>
       <CardContent>
         <RegisterForm />

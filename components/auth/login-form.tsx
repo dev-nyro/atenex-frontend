@@ -15,8 +15,8 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth refactor
 import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error de Supabase
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(1, { message: 'Password cannot be empty' }), // Mínimo 1 para evitar envío vacío
+  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }),
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -81,7 +81,7 @@ export function LoginForm() {
         </Alert>
       )}
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Correo electrónico</Label>
         <Input
           id="email"
           type="email"
@@ -97,7 +97,7 @@ export function LoginForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Contraseña</Label>
         <Input
           id="password"
           type="password"
@@ -112,14 +112,14 @@ export function LoginForm() {
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Iniciar sesión'}
       </Button>
-       <div className="mt-4 text-center text-sm">
-         Don't have an account?{" "}
-         <Link href="/register" className="underline text-primary hover:text-primary/80">
-           Register
-         </Link>
-       </div>
+      <div className="mt-4 text-center text-sm">
+        ¿No tienes una cuenta?{" "}
+        <Link href="/register" className="underline text-primary hover:text-primary/80">
+          Registrarse
+        </Link>
+      </div>
     </form>
   );
 }

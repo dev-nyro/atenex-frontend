@@ -26,7 +26,7 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook useAuth refactor
 const welcomeMessage: Message = {
     id: 'initial-welcome',
     role: 'assistant',
-    content: 'Hello! How can I help you query your knowledge base today?',
+    content: '¡Hola! ¿Cómo puedo ayudarte a consultar tu base de conocimientos hoy?',
     created_at: new Date().toISOString(), // Usar fecha actual
 };
 
@@ -243,7 +243,7 @@ export default function ChatPage() {
           created_at: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMsgObj]);
-      toast.error("Query Failed", { description: errorMessage });
+      toast.error("Fallo en la consulta", { description: errorMessage });
 
     } finally {
       setIsSending(false); // Terminar estado de envío

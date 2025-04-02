@@ -167,7 +167,7 @@ export function ChatHistory() {
                 <AlertCircle className="mx-auto h-6 w-6 mb-1" />
                 <p className="text-sm mb-2">{error}</p>
                 <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
-                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                    <RefreshCw className="mr-1 h-3 w-3"/> Reintentar
                 </Button>
             </div>
         );
@@ -251,8 +251,8 @@ export function ChatHistory() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the chat
-                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
+                    Esta acción no se puede deshacer. Se eliminará permanentemente el chat
+                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> y todos sus mensajes.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

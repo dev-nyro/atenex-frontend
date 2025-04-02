@@ -1,45 +1,44 @@
-// app/about/page.tsx
-"use client"; // Add this line
+"use client";
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from '@/lib/constants';
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from '@/components/ui/button'; // Import the Button component
-import { useRouter } from 'next/navigation'; // Import the useRouter hook
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 const teamMembers = [
-    { name: "Demo User 1", role: "Founder", imageUrl: null },
-    { name: "Demo User 2", role: "Co-Founder", imageUrl: null },
-    { name: "Demo User 3", role: "Lead Engineer", imageUrl: null },
+    { name: "Demo User 1", role: "Fundador", imageUrl: null },
+    { name: "Demo User 2", role: "Co-Fundador", imageUrl: null },
+    { name: "Demo User 3", role: "Ingeniero Líder", imageUrl: null },
     // Add more team members as needed
 ];
 
 const milestones = [
-    { year: 2023, event: "Atenex founded with a vision for accessible knowledge." },
+    { year: 2023, event: "Atenex fundada con una visión de conocimiento accesible." },
     // Add more milestones
 ];
 
 export default function AboutPage() {
-    const router = useRouter(); // Initialize the router
+    const router = useRouter();
 
   return (
       <div className="container mx-auto p-6 space-y-4">
-          <Button variant="link" onClick={() => router.push('/')}>Back to Home</Button> {/* Button to go back */}
-          <h1 className="text-3xl font-semibold">About {APP_NAME}</h1>
+          <Button variant="link" onClick={() => router.push('/')}>Volver al Inicio</Button>
+          <h1 className="text-3xl font-semibold">Acerca de {APP_NAME}</h1>
 
           <Card>
               <CardHeader>
-                  <CardTitle>Our Mission</CardTitle>
+                  <CardTitle>Nuestra Misión</CardTitle>
                   <CardDescription>
-                      Empowering organizations with seamless access to their collective knowledge.
+                      Empoderar a las organizaciones con acceso fluido a su conocimiento colectivo.
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   <p>
-                      We are committed to providing innovative solutions that streamline knowledge management,
-                      facilitate informed decision-making, and enhance team productivity.
+                      Estamos comprometidos a proporcionar soluciones innovadoras que optimicen la gestión del conocimiento,
+                      faciliten la toma de decisiones informadas y mejoren la productividad del equipo.
                   </p>
               </CardContent>
           </Card>
@@ -48,15 +47,15 @@ export default function AboutPage() {
 
           <Card>
               <CardHeader>
-                  <CardTitle>Our Vision</CardTitle>
+                  <CardTitle>Nuestra Visión</CardTitle>
                   <CardDescription>
-                      To be the leading knowledge query platform, transforming how businesses leverage information.
+                      Ser la plataforma líder de consulta de conocimiento, transformando cómo las empresas aprovechan la información.
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   <p>
-                      We envision a future where organizations can effortlessly tap into their internal expertise,
-                      fostering a culture of continuous learning and growth.
+                      Visualizamos un futuro donde las organizaciones pueden aprovechar sin esfuerzo su experiencia interna,
+                      fomentando una cultura de aprendizaje y crecimiento continuos.
                   </p>
               </CardContent>
           </Card>
@@ -65,24 +64,24 @@ export default function AboutPage() {
 
           <Card>
               <CardHeader>
-                  <CardTitle>Our Values</CardTitle>
+                  <CardTitle>Nuestros Valores</CardTitle>
                   <CardDescription>
-                      Integrity, Innovation, Collaboration, and Customer Success.
+                      Integridad, Innovación, Colaboración y Éxito del Cliente.
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   <ul className="list-disc list-inside space-y-1">
                       <li>
-                          <strong>Integrity:</strong> We uphold the highest ethical standards in all our operations.
+                          <strong>Integridad:</strong> Mantenemos los más altos estándares éticos en todas nuestras operaciones.
                       </li>
                       <li>
-                          <strong>Innovation:</strong> We continuously seek new ways to improve our platform and services.
+                          <strong>Innovación:</strong> Buscamos continuamente nuevas formas de mejorar nuestra plataforma y servicios.
                       </li>
                       <li>
-                          <strong>Collaboration:</strong> We believe in working together to achieve shared goals.
+                          <strong>Colaboración:</strong> Creemos en trabajar juntos para lograr objetivos compartidos.
                       </li>
                       <li>
-                          <strong>Customer Success:</strong> We are dedicated to helping our customers succeed.
+                          <strong>Éxito del Cliente:</strong> Estamos dedicados a ayudar a nuestros clientes a tener éxito.
                       </li>
                   </ul>
               </CardContent>
@@ -91,13 +90,13 @@ export default function AboutPage() {
 
           <Card>
               <CardHeader>
-                  <CardTitle>Meet Our Team</CardTitle>
+                  <CardTitle>Conoce a Nuestro Equipo</CardTitle>
                   <CardDescription>
-                      The talented individuals behind {APP_NAME}.
+                      Las talentosas personas detrás de {APP_NAME}.
                   </CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center">
-                  <div className="grid sm:grid-cols-3 gap-4"> {/* Flex Container for centering */}
+                  <div className="grid sm:grid-cols-3 gap-4">
                     {teamMembers.map((member) => (
                         <div key={member.name} className="flex flex-col items-center">
                             <Avatar className="h-16 w-16">

@@ -66,10 +66,10 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
         <section className="text-center">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Unlock Your Enterprise Knowledge with <span className="text-primary">{APP_NAME}</span>
+            Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
           </h1>
-          <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Ask questions in natural language and get instant answers based on your organization's collective knowledge.
+          <p className="text-lg text-muted-foreground mb-8">
+            Haz preguntas en lenguaje natural y obtén respuestas instantáneas basadas en el conocimiento colectivo de tu organización.
           </p>
           {/* --- CORRECCIÓN: Botón principal también debe considerar isLoading --- */}
           {isAuthLoading ? (
@@ -91,11 +91,11 @@ export default function HomePage() {
           {/* --------------------------------------------------------------- */}
         </section>
 
-        {/* Sección de Features (sin cambios) */}
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <FeatureCard title="Intelligent Search" description="Find information quickly using natural language queries." />
-          <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
-          <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Feature Cards - replace with actual feature descriptions */}
+          <FeatureCard title="Búsqueda Inteligente" description="Encuentra la información que necesitas rápida y fácilmente usando consultas en lenguaje natural." />
+          <FeatureCard title="Conocimiento Centralizado" description="Accede a todo el conocimiento colectivo de tu organización en un solo lugar, eliminando los silos de información." />
+          <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo para tomar mejores decisiones con un acceso más rápido a información relevante." />
         </section>
 
         {/* Handler para confirmación de email (se mantiene igual en su lógica interna) */}
@@ -104,8 +104,8 @@ export default function HomePage() {
 
       {/* Footer (sin cambios) */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground text-sm">
-          © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
+        <div className="container text-center text-muted-foreground">
+          © {new Date().getFullYear()} Atenex. Todos los derechos reservados.
         </div>
       </footer>
     </div>

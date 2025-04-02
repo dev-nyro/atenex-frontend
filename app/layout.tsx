@@ -5,14 +5,13 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// (*) Ensure this import points to sonner's Toaster
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Atenex - Enterprise Knowledge Query",
-  description: "Query your enterprise knowledge base using natural language.",
+  title: "Atenex - Consulta de Conocimiento Empresarial",
+  description: "Consulta tu base de conocimiento empresarial usando lenguaje natural.",
 };
 
 export default function RootLayout({
@@ -21,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",

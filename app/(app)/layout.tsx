@@ -21,13 +21,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Si el bypass está activo, no hacer nada (permitir acceso)
     if (bypassAuth) {
-      console.warn("AppLayout: Auth checks bypassed via NEXT_PUBLIC_BYPASS_AUTH=true.");
+      console.warn("AppLayout: Autenticación OMITIDA debido a NEXT_PUBLIC_BYPASS_AUTH=true.");
       return;
     }
 
     // Si NO estamos cargando y NO hay sesión válida, redirigir a la página principal/pública
     if (!isLoading && !session) {
-      console.log("AppLayout: No active session found, redirecting to home page.");
+      console.log("AppLayout: No se encontró token, redirigiendo a login.");
       router.replace('/'); // Redirigir a la página principal (o '/login')
       return; // Detener ejecución del efecto
     }
