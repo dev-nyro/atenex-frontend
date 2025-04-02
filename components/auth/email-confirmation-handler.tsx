@@ -29,14 +29,14 @@ export default function EmailConfirmationHandler() {
 
                      // Create the supabaseClient
                      const supabaseClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
                      );
                     
                      // Use the access token to get the user and full session
                      const { data: { user, session }, error } = await supabaseClient.auth.setSession({
-                         access_token: accessToken,
-                         refresh_token: refreshToken,
+                         access_token: accessToken!,
+                         refresh_token: refreshToken!,
                      })
 
                      if (error) {
