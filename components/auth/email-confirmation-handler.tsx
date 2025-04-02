@@ -1,22 +1,21 @@
 // File: components/auth/email-confirmation-handler.tsx
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
-//Se tiene que agregar la función de crear cliente para que esté disponible, de otro forma no se puede usar.
 import { createClient } from '@supabase/supabase-js';
 
-interface EmailConfirmationHandlerProps {
-    onConfirmationComplete: () => void;
-}
-
-export default function EmailConfirmationHandler({ onConfirmationComplete }: EmailConfirmationHandlerProps) {
+export default function EmailConfirmationHandler() {
     const router = useRouter();
-    //Ahora se destructura el hook
     const { signIn } = useAuth();
+    const [hasConfirmed, setHasConfirmed] = useState(false);
 
     useEffect(() => {
+        if (hasConfirmed) {
+            return;
+        }
+
         const handleEmailConfirmation = async () => {
             if (window.location.hash) {
                 const params = new URLSearchParams(window.location.hash.substring(1));
@@ -42,20 +41,46 @@ export default function EmailConfirmationHandler({ onConfirmationComplete }: Ema
 
                      if (error) {
                         console.error("Error setting session:", error);
+                        return; // Stop further execution if session setup fails
                      }
                     
-                     // If email confirmation has already been performed, then it's set a correct data format to be use on AuthProvider
-                     if(session){
-                      await signIn(session);
-                      router.replace('/'); // Replace current route to remove hash
-                     onConfirmationComplete();
-                     }
+                    if (session) {
+                        try {
+                            const { error: insertError } = await supabaseClient
+                                .from('users')
+                                .insert([
+                                    {
+                                        id: user.id, // Use user.id from the session
+                                        email: user.email,
+                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
+                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
+                                        role: 'user',
+                                        is_active: true,
+                                    }
+                                ]);
+
+                            if (insertError) {
+                                console.error("Error inserting user into 'users' table:", insertError);
+                                if (insertError.code === '23505') {
+                                    console.warn("Duplicate user insertion attempted. Ignoring.");
+                                }
+                            } else {
+                                console.log("User inserted into 'users' table successfully.");
+                            }
+                        } catch (insertErr: any) {
+                            console.error("Error during user insertion:", insertErr);
+                        }
+
+                        setHasConfirmed(true);
+                        await signIn(session);
+                        router.replace('/');
+                    }
                 }
             }
         };
 
         handleEmailConfirmation();
-    }, [signIn, router, onConfirmationComplete]);
+    }, [signIn, router, hasConfirmed]);
 
-    return null; // This component doesn't render anything
+    return null;
 }

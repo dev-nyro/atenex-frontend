@@ -1,22 +1,16 @@
 // File: app/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
-// Se tiene que llamar diferente ya que se exporta en default
 import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 
 export default function HomePage() {
   const router = useRouter();
   const { token } = useAuth();
-  const [confirmationHandled, setConfirmationHandled] = useState(false);
-
-  const handleConfirmationComplete = () => {
-        setConfirmationHandled(true);
-   };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -62,7 +56,7 @@ export default function HomePage() {
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's collective knowledge in one place, eliminating information silos." />
           <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
         </section>
-           {!confirmationHandled && <EmailConfirmationHandler onConfirmationComplete={handleConfirmationComplete} />}
+           <EmailConfirmationHandler />
       </main>
 
       {/* Footer (optional) */}
@@ -86,7 +80,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({ title, description }: { title: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-xl transition-shadow duration-200">
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>

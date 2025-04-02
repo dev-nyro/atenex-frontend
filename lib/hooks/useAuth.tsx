@@ -11,7 +11,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  signIn: (session: Session) => void; // was login
+  signIn: (session: Session) => void;
   logout: () => void;
 }
 
@@ -33,7 +33,6 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// (+) AÑADE `export` aquí
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
@@ -43,22 +42,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const storedToken = getToken(); // Check localStorage for token
       if (storedToken) {
-          // console.log("useAuth: Token found in localStorage, attempting to validate.");
-          const userData = getUserFromToken(storedToken); // Validate the token
-          if (userData) {
-              // Token is valid and user data is available
-              // console.log("useAuth: Token is valid, setting user and token from localStorage.");
-              setUser(userData);
-              setAuthStateToken(storedToken);
-          } else {
-              // Token is invalid or expired
-              console.warn("useAuth: Invalid token found in localStorage, clearing.");
-              removeToken();
-          }
+          // Solo establecer el token, no intentar validarlo
+          setAuthStateToken(storedToken);
       }
       setIsLoading(false);
-      // console.log("useAuth: Initial token check complete.");
-      // Intentionally empty dependency array: This effect runs only once on mount
   }, []);
 
 
@@ -73,10 +60,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(newToken);
 
     let userData = getUserFromToken(newToken);
-    if (!userData) {
-        console.error("useAuth: Failed to get user from token.");
-        return;
-    }
+        if (!userData) {
+            console.error("useAuth: Failed to get user from token.");
+            return;
+        }
 
     // Fetch user name from DB after setting the token and email and other data found in the token has been set
     try {
@@ -87,23 +74,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const { data, error } = await supabaseClient
                  .from('users') // Replace 'users' with the name of your table
-                 .select('full_name') // Replace 'name' with the column containing the user's name
+                 .select('full_name, company_id') // Replace 'name' with the column containing the user's name
                  .eq('id', userData.id)
                  .single();
         if (error) {
            console.error("Error fetching user data", error);
+           setUser(userData);
         } else {
            //If you have other data that needs to be fetched, add the other attributes in here as well
            userData = {
                  ...userData,
-                 name: data?.full_name || undefined
-           };
+                 name: data?.full_name || undefined,
+                 companyId: data?.company_id || undefined,
+               };
            console.log("Updated user data", userData)
+           setUser(userData);
         }
     } catch (error) {
         console.error("Error fetching additional user data:", error);
+        setUser(userData);
     }
-    setUser(userData);
+
+    // Update user.name from session
+    if (session?.user?.user_metadata?.name) {
+      userData = {
+        ...userData,
+        name: session.user.user_metadata.name as string,
+      };
+      setUser(userData);
+    }
     setAuthStateToken(newToken);
     router.push('/');
     console.log("useAuth: User logged in, token set, redirecting home.");

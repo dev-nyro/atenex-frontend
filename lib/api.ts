@@ -71,7 +71,15 @@ async function request<T>(
     // Fetch usa la URL determinada (relativa o absoluta)
     const response = await fetch(url, config);
 
-    // ... (el resto del manejo de errores y respuesta permanece igual) ...
+    if (response.status === 401) {  // <-- AÑADIDO: Manejar 401
+        console.warn("API returned 401 - Unauthorized. Clearing token and redirecting to login.");
+        removeToken();  // Eliminar token
+        // Redirigir a la página de login (usar window.location.href para redirigir fuera del componente)
+        window.location.href = '/login';
+        // Lanzar una excepción para evitar que el código continúe ejecutándose
+        throw new ApiError("Unauthorized", response.status);
+    }
+
     if (!response.ok) {
       let errorData: ApiErrorData | null = null;
       let errorText = '';

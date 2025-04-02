@@ -729,14 +729,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 ## File: `app/(app)/settings/page.tsx`
 ```tsx
+// app/(app)/settings/page.tsx
+"use client";
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useState, useEffect } from 'react';
 
 // Basic placeholder settings page
 export default function SettingsPage() {
+    const { user } = useAuth();
+    const [name, setName] = useState(user?.name || '');
+
+    useEffect(() => {
+        if (user) {
+            setName(user.name || '');
+        }
+    }, [user]);
+
+    const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setName(event.target.value);
+    };
+
+    const handleSave = async () => {
+        // TODO: Implementar la lógica para guardar los cambios en el perfil del usuario.
+        // Esto implicaría hacer una llamada a la API para actualizar el nombre del usuario.
+        // Puedes usar la función 'request' de lib/api.ts para hacer la llamada a la API.
+        console.log('Saving changes:', { name });
+    };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
@@ -749,13 +774,13 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
             <div className="space-y-1">
                  <Label htmlFor="name">Name</Label>
-                 <Input id="name" defaultValue="Demo User" /> {/* TODO: Fetch user data */}
+                 <Input id="name" value={name} onChange={handleNameChange} />
             </div>
              <div className="space-y-1">
                  <Label htmlFor="email">Email</Label>
-                 <Input id="email" type="email" defaultValue="user@example.com" disabled />
+                 <Input id="email" type="email" defaultValue={user?.email} disabled />
             </div>
-             <Button>Save Changes</Button>
+             <Button onClick={handleSave}>Save Changes</Button>
         </CardContent>
       </Card>
 
@@ -1283,72 +1308,19 @@ export default function RootLayout({
 
 ## File: `app/page.tsx`
 ```tsx
-// File: components/auth/email-confirmation-handler.tsx
-"use client";
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
-
-interface EmailConfirmationHandlerProps {
-    onConfirmationComplete: () => void;
-}
-
-export function EmailConfirmationHandler({ onConfirmationComplete }: EmailConfirmationHandlerProps) {
-    const router = useRouter();
-    const { login } = useAuth();
-
-    useEffect(() => {
-        const handleEmailConfirmation = async () => {
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const expiresIn = params.get('expires_in');
-
-                if (accessToken && refreshToken && expiresIn) {
-                    console.log("Found access token in URL hash:", accessToken);
-                    console.log("Attempting to set session and log in.");
-                    const session = {
-                        access_token: accessToken,
-                        refresh_token: refreshToken,
-                        expires_in: parseInt(expiresIn),
-                        token_type: 'bearer',
-                    };
-                    await login(session);
-                    router.replace('/'); // Replace current route to remove hash
-                     onConfirmationComplete();
-                }
-            }
-        };
-
-        handleEmailConfirmation();
-    }, [login, router, onConfirmationComplete]);
-
-    return null; // This component doesn't render anything
-}
-```
-
-## File: `components/auth/email-confirmation-handler.tsx`
-```tsx
 // File: app/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { EmailConfirmationHandler } from '@/components/auth/email-confirmation-handler';
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 
 export default function HomePage() {
   const router = useRouter();
   const { token } = useAuth();
-  const [confirmationHandled, setConfirmationHandled] = useState(false);
-
-  const handleConfirmationComplete = () => {
-        setConfirmationHandled(true);
-   };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -1391,10 +1363,10 @@ export default function HomePage() {
         <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Feature Cards - replace with actual feature descriptions */}
           <FeatureCard title="Intelligent Search" description="Find the information you need quickly and easily using natural language queries." />
-          <FeatureCard title="Centralized Knowledge" description="Access all your organization's knowledge in one place, eliminating information silos." />
+          <FeatureCard title="Centralized Knowledge" description="Access all your organization's collective knowledge in one place, eliminating information silos." />
           <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
         </section>
-           {!confirmationHandled && <EmailConfirmationHandler onConfirmationComplete={handleConfirmationComplete} />}
+           <EmailConfirmationHandler />
       </main>
 
       {/* Footer (optional) */}
@@ -1418,13 +1390,103 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({ title, description }: { title: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-xl transition-shadow duration-200">
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
       <p className="text-muted-foreground">{description}</p>
     </div>
   );
+}
+```
+
+## File: `components/auth/email-confirmation-handler.tsx`
+```tsx
+// File: components/auth/email-confirmation-handler.tsx
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { createClient } from '@supabase/supabase-js';
+
+export default function EmailConfirmationHandler() {
+    const router = useRouter();
+    const { signIn } = useAuth();
+    const [hasConfirmed, setHasConfirmed] = useState(false);
+
+    useEffect(() => {
+        if (hasConfirmed) {
+            return;
+        }
+
+        const handleEmailConfirmation = async () => {
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const expiresIn = params.get('expires_in');
+
+                if (accessToken && refreshToken && expiresIn) {
+                    console.log("Found access token in URL hash:", accessToken);
+                    console.log("Attempting to set session and log in.");
+
+                     // Create the supabaseClient
+                     const supabaseClient = createClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+                     );
+                    
+                     // Use the access token to get the user and full session
+                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
+                         access_token: accessToken,
+                         refresh_token: refreshToken,
+                     })
+
+                     if (error) {
+                        console.error("Error setting session:", error);
+                        return; // Stop further execution if session setup fails
+                     }
+                    
+                    if (session) {
+                        try {
+                            const { error: insertError } = await supabaseClient
+                                .from('users')
+                                .insert([
+                                    {
+                                        id: user.id, // Use user.id from the session
+                                        email: user.email,
+                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
+                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
+                                        role: 'user',
+                                        is_active: true,
+                                    }
+                                ]);
+
+                            if (insertError) {
+                                console.error("Error inserting user into 'users' table:", insertError);
+                                if (insertError.code === '23505') {
+                                    console.warn("Duplicate user insertion attempted. Ignoring.");
+                                }
+                            } else {
+                                console.log("User inserted into 'users' table successfully.");
+                            }
+                        } catch (insertErr: any) {
+                            console.error("Error during user insertion:", insertErr);
+                        }
+
+                        setHasConfirmed(true);
+                        await signIn(session);
+                        router.replace('/');
+                    }
+                }
+            }
+        };
+
+        handleEmailConfirmation();
+    }, [signIn, router, hasConfirmed]);
+
+    return null;
 }
 ```
 
@@ -1583,12 +1645,14 @@ const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  // (+) AÑADIR company_id
+  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const {  } = useAuth(); // Remove login
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -1599,6 +1663,8 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
+      // (+) AÑADIR company_id
+      companyId: 'd7387dc8-0312-4b1c-97a5-f96f7995f36c', // Valor por defecto - cambiar en PROD
     },
   });
 
@@ -1641,13 +1707,8 @@ export function RegisterForm() {
         setIsLoading(false);
      } else {
         setSuccess(true); // Registration successful, set success state
-
-        // (+) Auto sign-in after successful registration:
-        // Check that email confirmation is not enabled
-        // Removed the auto sign-in part, since we need confirmation, and we should show an explicit message
      }
-      
-    } catch (err) {
+    } catch (err: any) {
       console.error("Registration failed:", err);
       let errorMessage = 'Registration failed. Please try again.';
       if (err instanceof ApiError) {
@@ -1716,6 +1777,20 @@ export function RegisterForm() {
         />
         {form.formState.errors.password && (
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+        )}
+      </div>
+      {/* (+) AÑADIR company_id */}
+      <div className="space-y-1">
+        <Label htmlFor="companyId">Company ID (Optional)</Label>
+        <Input
+          id="companyId"
+          type="text"
+          placeholder="Company ID"
+          {...form.register('companyId')}
+          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
+        />
+        {form.formState.errors.companyId && (
+          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
@@ -4443,16 +4518,12 @@ export const removeToken = (): void => {
 export interface User {
     id: string;
     email: string;
-    name?: string;
-    companyId?: string;
     // Add other relevant user properties, matching what your backend JWT provides
 }
 
 interface JWTPayload {
     sub: string; // id de supabase
     email: string;
-    // name?: string; <---Quitar
-    // companyId?: string; <---Quitar
     exp: number; // Expiration timestamp
     [key: string]: any; // Allow other properties
 }
@@ -4470,8 +4541,6 @@ export const getUserFromToken = (token: string | null): User | null => {
         const user: User = {
             id: decoded.sub, // Cambiar decoded.userID por decoded.sub
             email: decoded.email,
-            // name: decoded.name || undefined, <---Quitar
-            // companyId: decoded.companyId || undefined, <---Quitar
             // Add other properties as needed, based on your JWT payload
         };
         // console.log("getUserFromToken: Decoded user:", user);
@@ -4505,7 +4574,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (session: Session) => void;
+  signIn: (session: Session) => void;
   logout: () => void;
 }
 
@@ -4513,7 +4582,7 @@ const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
     isLoading: true,
-    login: (session: Session) => {
+    signIn: (session: Session) => {
         console.error("Login function called outside of AuthProvider context");
     },
     logout: () => {
@@ -4527,7 +4596,6 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// (+) AÑADE `export` aquí
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
@@ -4540,23 +4608,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // console.log("useAuth: Token found in localStorage, attempting to validate.");
           const userData = getUserFromToken(storedToken); // Validate the token
           if (userData) {
-              // Token is valid and user data is available
-              // console.log("useAuth: Token is valid, setting user and token from localStorage.");
               setUser(userData);
               setAuthStateToken(storedToken);
           } else {
-              // Token is invalid or expired
               console.warn("useAuth: Invalid token found in localStorage, clearing.");
               removeToken();
           }
       }
       setIsLoading(false);
-      // console.log("useAuth: Initial token check complete.");
-      // Intentionally empty dependency array: This effect runs only once on mount
   }, []);
 
 
-  const login = useCallback(async (session: Session) => {
+  const signIn = useCallback(async (session: Session) => {
     console.log("useAuth: Login called with session:", session);
     if (!session?.access_token) {
         console.error("useAuth: No access token found in session.");
@@ -4567,10 +4630,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(newToken);
 
     let userData = getUserFromToken(newToken);
-    if (!userData) {
-        console.error("useAuth: Failed to get user from token.");
-        return;
-    }
+        if (!userData) {
+            console.error("useAuth: Failed to get user from token.");
+            return;
+        }
 
     // Fetch user name from DB after setting the token and email and other data found in the token has been set
     try {
@@ -4581,23 +4644,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const { data, error } = await supabaseClient
                  .from('users') // Replace 'users' with the name of your table
-                 .select('full_name') // Replace 'name' with the column containing the user's name
+                 .select('full_name, company_id') // Replace 'name' with the column containing the user's name
                  .eq('id', userData.id)
                  .single();
         if (error) {
            console.error("Error fetching user data", error);
+           setUser(userData);
         } else {
            //If you have other data that needs to be fetched, add the other attributes in here as well
            userData = {
                  ...userData,
-                 name: data?.full_name || undefined
-           };
+                 name: data?.full_name || undefined,
+                 companyId: data?.company_id || undefined,
+               };
            console.log("Updated user data", userData)
+           setUser(userData);
         }
     } catch (error) {
         console.error("Error fetching additional user data:", error);
+        setUser(userData);
     }
-    setUser(userData);
+
+    // Update user.name from session
+    if (session?.user?.user_metadata?.name) {
+      userData = {
+        ...userData,
+        name: session.user.user_metadata.name as string,
+      };
+      setUser(userData);
+    }
     setAuthStateToken(newToken);
     router.push('/');
     console.log("useAuth: User logged in, token set, redirecting home.");
@@ -4615,6 +4690,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       user,
       token,
       isLoading,
+      signIn, // added
       logout
   };
 

@@ -20,12 +20,14 @@ const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  // (+) AÑADIR company_id
+  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const {  } = useAuth(); // Remove login
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -36,6 +38,8 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
+      // (+) AÑADIR company_id
+      companyId: 'd7387dc8-0312-4b1c-97a5-f96f7995f36c', // Valor por defecto - cambiar en PROD
     },
   });
 
@@ -78,13 +82,8 @@ export function RegisterForm() {
         setIsLoading(false);
      } else {
         setSuccess(true); // Registration successful, set success state
-
-        // (+) Auto sign-in after successful registration:
-        // Check that email confirmation is not enabled
-        // Removed the auto sign-in part, since we need confirmation, and we should show an explicit message
      }
-      
-    } catch (err) {
+    } catch (err: any) {
       console.error("Registration failed:", err);
       let errorMessage = 'Registration failed. Please try again.';
       if (err instanceof ApiError) {
@@ -153,6 +152,20 @@ export function RegisterForm() {
         />
         {form.formState.errors.password && (
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+        )}
+      </div>
+      {/* (+) AÑADIR company_id */}
+      <div className="space-y-1">
+        <Label htmlFor="companyId">Company ID (Optional)</Label>
+        <Input
+          id="companyId"
+          type="text"
+          placeholder="Company ID"
+          {...form.register('companyId')}
+          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
+        />
+        {form.formState.errors.companyId && (
+          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>

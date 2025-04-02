@@ -25,16 +25,12 @@ export const removeToken = (): void => {
 export interface User {
     id: string;
     email: string;
-    name?: string;
-    companyId?: string;
     // Add other relevant user properties, matching what your backend JWT provides
 }
 
 interface JWTPayload {
     sub: string; // id de supabase
     email: string;
-    // name?: string; <---Quitar
-    // companyId?: string; <---Quitar
     exp: number; // Expiration timestamp
     [key: string]: any; // Allow other properties
 }
@@ -52,8 +48,6 @@ export const getUserFromToken = (token: string | null): User | null => {
         const user: User = {
             id: decoded.sub, // Cambiar decoded.userID por decoded.sub
             email: decoded.email,
-            // name: decoded.name || undefined, <---Quitar
-            // companyId: decoded.companyId || undefined, <---Quitar
             // Add other properties as needed, based on your JWT payload
         };
         // console.log("getUserFromToken: Decoded user:", user);

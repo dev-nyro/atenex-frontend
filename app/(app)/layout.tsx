@@ -20,14 +20,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!isLoading && !token) {
       console.log("AppLayout: No token found, redirecting to login.");
       router.push('/'); // Cambiado a '/'
-    } else if (!isLoading && token && !user) {
-      console.log("AppLayout: Invalid token found, redirecting to login.");
-      // Ahora TypeScript sabe qué es removeToken gracias a la importación
-      removeToken();
-      router.push('/'); // Cambiado a '/'
     }
-    // La función removeToken importada es estable, no necesita estar en las dependencias.
-  }, [user, isLoading, token, router]);
+  }, [isLoading, token, router]);
 
   // Muestra un spinner mientras se verifica la autenticación
   if (isLoading || (!token && !isLoading)) {
