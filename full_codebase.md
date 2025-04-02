@@ -143,6 +143,7 @@ const nextConfig = {
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.55.0",
+    "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",
     "remark-gfm": "^4.0.1",
@@ -443,14 +444,26 @@ import { ChatInput } from '@/components/chat/chat-input';
 import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
+import {
+    postQuery,
+    getChatMessages,
+    RetrievedDoc, // Usar tipo frontend
+    ApiError,
+    mapApiMessageToFrontend,
+    mapApiSourcesToFrontend
+} from '@/lib/api';
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook useAuth refactorizado
 
-const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: '¡Hola! ¿Cómo puedo ayudarte a consultar tu base de conocimientos hoy?' }
-];
+// Mensaje inicial de bienvenida
+const welcomeMessage: Message = {
+    id: 'initial-welcome',
+    role: 'assistant',
+    content: '¡Hola! ¿Cómo puedo ayudarte a consultar tu base de conocimientos hoy?',
+    created_at: new Date().toISOString(), // Usar fecha actual
+};
 
 export default function ChatPage() {
   const params = useParams();
@@ -474,23 +487,87 @@ export default function ChatPage() {
 
   // Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const fetchedChatIdRef = useRef<string | undefined>(undefined); // Para evitar fetches duplicados
 
   // Sincronizar chatId del estado con el parámetro de la ruta
   useEffect(() => {
-    // Reset state for new/different chat
-    setMessages(initialMessages);
-    setRetrievedDocs([]);
-    setIsLoading(false); // Ensure loading is reset
+    setChatId(chatIdParam);
+  }, [chatIdParam]);
 
-    if (chatId) {
-      console.log(`Loading history for chat: ${chatId}`);
-      // --- TODO: Fetch actual messages ---
-      // .catch(err => {
-      //     toast.error("Failed to load chat history", { description: err.message });
-      //  })
-      setMessages([
-           { id: 'initial-1', role: 'assistant', content: `Bienvenido de nuevo al chat ${chatId}. ¡Pregúntame lo que quieras!` }
-      ]);
+  // --- Efecto para Cargar Historial de Chat ---
+  useEffect(() => {
+    const isAuthenticated = !!session || bypassAuth; // Determinar si está autenticado
+
+    // Si estamos esperando que la autenticación termine (y no estamos en bypass), mostrar carga
+    if (!bypassAuth && isAuthLoading) {
+        console.log("ChatPage: Waiting for auth state...");
+        setIsLoadingHistory(true); // Reutilizar estado de carga de historial
+        setMessages([welcomeMessage]); // Mostrar bienvenida mientras carga auth
+        setHistoryError(null);
+        fetchedChatIdRef.current = undefined; // Resetear ref
+        return;
+    }
+
+    // Si está autenticado, hay un chatId, y es diferente al último que buscamos...
+    if (isAuthenticated && chatId && fetchedChatIdRef.current !== chatId) {
+      console.log(`ChatPage: Auth ready. Fetching history for chat ${chatId}...`);
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      fetchedChatIdRef.current = chatId; // Marcar como buscado
+
+      getChatMessages(chatId)
+        .then(apiMessages => {
+           // Ordenar mensajes por fecha (por si acaso la API no los devuelve ordenados)
+           apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+           // Mapear mensajes de la API al formato del frontend
+           const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
+           // Establecer mensajes (o bienvenida si el historial está vacío)
+           setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
+           console.log(`ChatPage: History loaded for ${chatId}, ${mappedMessages.length} messages.`);
+        })
+        .catch(error => {
+          // Manejo de errores al cargar historial
+          let message = "Error loading chat history.";
+          console.error(`ChatPage: Error loading history for ${chatId}:`, error);
+          if (error instanceof ApiError) {
+              message = error.message || message;
+              // Si no se encuentra el chat, redirigir a /chat (nuevo chat)
+              if (error.status === 404) {
+                  toast.error("Chat Not Found", { description: `The chat with ID ${chatId} could not be found.` });
+                  router.replace('/chat');
+                  return; // Detener ejecución
+              }
+              // Si hay error de autenticación (401) o autorización (403), desloguear
+              if (error.status === 401 || error.status === 403) {
+                  toast.error("Authentication Error", { description: "Your session may have expired. Please log in again." });
+                  signOut(); // Usar signOut del contexto
+              }
+          } else if (error instanceof Error) {
+              message = error.message;
+          }
+          setHistoryError(message);
+          setMessages([welcomeMessage]); // Mostrar bienvenida en caso de error
+          toast.error("Failed to Load Chat", { description: message });
+        })
+        .finally(() => {
+          setIsLoadingHistory(false); // Terminar carga de historial
+        });
+
+    } else if (!chatId) {
+      // Si no hay chatId (estamos en /chat), resetear a estado inicial
+      console.log("ChatPage: No chat ID provided, showing welcome message.");
+      setMessages([welcomeMessage]);
+      setRetrievedDocs([]);
+      setIsLoadingHistory(false);
+      setHistoryError(null);
+      fetchedChatIdRef.current = undefined; // Resetear ref
+    } else if (!isAuthenticated && !isAuthLoading) {
+         // Si no está autenticado (y auth ya cargó), mostrar mensaje de login
+         console.log("ChatPage: Not authenticated, showing login prompt.");
+         setIsLoadingHistory(false);
+         setHistoryError("Please log in to view chat history.");
+         setMessages([welcomeMessage]);
+         fetchedChatIdRef.current = undefined; // Resetear ref
     } else {
         // Caso residual: ya se cargó este chat o no se cumplen condiciones. Asegurar que no quede cargando.
         if (isLoadingHistory) setIsLoadingHistory(false);
@@ -578,25 +655,49 @@ export default function ChatPage() {
       console.log(`ChatPage: Query successful. Answer received.`);
 
     } catch (error) {
-      console.error("Query failed:", error);
-      let errorMessage = "Lo siento, encontré un error al intentar responder tu pregunta.";
-       if (error instanceof ApiError && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       } else if (error instanceof Error && error.message) {
+      // Manejo de errores al enviar query
+      let errorMessage = "Sorry, I encountered an error trying to answer.";
+      console.error("ChatPage: Query failed:", error);
+      if (error instanceof ApiError) {
+           errorMessage = error.message || `API Error (${error.status})`;
+           // Si es error de autenticación/autorización, desloguear
+           if (error.status === 401 || error.status === 403) {
+               errorMessage = "Authentication error. Please log in again.";
+               signOut(); // Usar signOut del contexto
+           }
+       } else if (error instanceof Error) {
            errorMessage = `Error: ${error.message}`;
        }
 
-      const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
-      setMessages(prev => [...prev, errorMessageObj]);
-
-      toast.error("Fallo en la consulta", {
-        description: errorMessage,
-      });
+      // Crear y añadir mensaje de error al chat
+      const errorMsgObj: Message = {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: errorMessage,
+          isError: true,
+          created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMsgObj]);
+      toast.error("Fallo en la consulta", { description: errorMessage });
 
     } finally {
       setIsSending(false); // Terminar estado de envío
     }
-  }, [isLoading, isPanelOpen]);
+  // --- CORRECCIÓN: Dependencias del useCallback ---
+  }, [isSending, chatId, router, session, bypassAuth, isPanelOpen, signOut]);
+  // -------------------------------------------
+
+  // Toggle para el panel derecho
+  const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
+
+  // --- Componentes de Renderizado Internos ---
+  const renderHistoryLoading = () => (
+       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Loading chat history...</p>
+            {isAuthLoading && <p className="text-xs text-muted-foreground/70 mt-1">(Waiting for authentication...)</p>}
+        </div>
+  );
 
   const renderHistoryError = () => (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
@@ -629,7 +730,6 @@ export default function ChatPage() {
                     <div className="absolute top-2 right-2 z-10">
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                            <span className="sr-only">{isPanelOpen ? 'Cerrar panel de fuentes' : 'Abrir panel de fuentes'}</span>
                         </Button>
                     </div>
 
@@ -740,7 +840,9 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react'; // Para el spinner
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, token, logout } = useAuth();
+  // --- CORRECCIÓN: Usar session, user, isLoading, signOut del hook useAuth ---
+  const { session, user, isLoading, signOut } = useAuth();
+  // ----------------------------------------------------------------------
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -749,17 +851,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     // Si el bypass está activo, no hacer nada (permitir acceso)
     if (bypassAuth) {
       console.warn("AppLayout: Autenticación OMITIDA debido a NEXT_PUBLIC_BYPASS_AUTH=true.");
-      return; // Skip auth check if bypass is enabled
+      return;
     }
 
-    if (!isLoading && !token) {
+    // Si NO estamos cargando y NO hay sesión válida, redirigir a la página principal/pública
+    if (!isLoading && !session) {
       console.log("AppLayout: No se encontró token, redirigiendo a login.");
-      router.push('/'); // Cambiado a '/'
+      router.replace('/'); // Redirigir a la página principal (o '/login')
+      return; // Detener ejecución del efecto
     }
-  }, [isLoading, token, router, bypassAuth]);
 
-  // Muestra un spinner mientras se verifica la autenticación
-  if (isLoading || (!token && !isLoading)) {
+    // --- CORRECCIÓN: Chequeo adicional si companyId es obligatorio ---
+    // Si hay sesión pero el usuario mapeado es null (posiblemente por falta de companyId
+    // u otro dato requerido en app_metadata), forzar logout.
+    // Descomenta y ajusta si `companyId` es estrictamente necesario para acceder al app.
+    // if (!isLoading && session && !user) {
+    //   console.error("AppLayout: Session exists but user mapping failed (missing required data like companyId?). Forcing logout.");
+    //   signOut(); // Forzar logout si el estado del usuario no es válido
+    //   // No necesitas redirigir aquí, el signOut provocará un cambio de estado que
+    //   // llevará a la condición !session en la próxima ejecución del efecto.
+    //   return;
+    // }
+    // -------------------------------------------------------------
+
+  // --- CORRECCIÓN: Dependencias del useEffect ---
+  // Incluir todas las variables usadas: isLoading, session, user, router, bypassAuth, signOut
+  }, [isLoading, session, user, router, bypassAuth, signOut]);
+  // -------------------------------------------
+
+  // --- Estado de Carga ---
+  // Mostrar spinner mientras isLoading es true Y no estamos en modo bypass
+  if (isLoading && !bypassAuth) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -1092,23 +1214,24 @@ export default function AboutPage() {
 
 ## File: `app\contact\page.tsx`
 ```tsx
-// File: app/page.tsx
+// File: app/contact/page.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LucideIcon, Mail, Phone, Linkedin, MessageCircle } from 'lucide-react'; // Changed Whatsapp to MessageCircle
 
-export default function HomePage() {
+export default function ContactPage() {
   const router = useRouter();
   const { token } = useAuth();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Header/Navigation */}
+      {/* Header/Navigation (replicated from app/page.tsx) */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
         <div className="container flex items-center justify-between h-16 py-4 px-4">
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
@@ -1125,35 +1248,37 @@ export default function HomePage() {
                 Iniciar sesión
               </Button>
             }
-
           </nav>
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - Contact Form */}
       <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
         <section className="text-center">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
+            Contáctanos
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
-            Haz preguntas en lenguaje natural y obtén respuestas instantáneas basadas en el conocimiento colectivo de tu organización.
+            ¡Nos encantaría saber de ti! Por favor, utiliza el formulario a continuación para ponerte en contacto.
           </p>
-          <Button size="lg" onClick={() => token ? router.push('/chat') : router.push('/register')}>
-            {token ? 'Ir al Chat' : 'Comenzar'}
-          </Button>
         </section>
 
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Feature Cards - replace with actual feature descriptions */}
-          <FeatureCard title="Búsqueda Inteligente" description="Encuentra la información que necesitas rápida y fácilmente usando consultas en lenguaje natural." />
-          <FeatureCard title="Conocimiento Centralizado" description="Accede a todo el conocimiento colectivo de tu organización en un solo lugar, eliminando los silos de información." />
-          <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo para tomar mejores decisiones con un acceso más rápido a información relevante." />
+        <section className="max-w-lg mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>Envíanos un mensaje</CardTitle>
+              <CardDescription>
+                Te responderemos lo antes posible.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ContactForm />
+            </CardContent>
+          </Card>
         </section>
-           <EmailConfirmationHandler />
       </main>
 
-      {/* Footer (optional) */}
+      {/* Footer (replicated from app/page.tsx) */}
       <footer className="bg-secondary/10 border-t py-8">
         <div className="container text-center text-muted-foreground">
           © {new Date().getFullYear()} Atenex. Todos los derechos reservados.
@@ -1163,7 +1288,7 @@ export default function HomePage() {
   );
 }
 
-// Reusable Button Component
+// Reusable Button Component (defined inside ContactPage)
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   const router = useRouter();
   return (
@@ -1173,12 +1298,96 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-// Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string; description: string }) {
+// Contact Form Component (separate component for better organization)
+function ContactForm() {
   return (
-    <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-xl transition-shadow duration-200">
-      <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-muted-foreground">{description}</p>
+    <div className="space-y-6">
+      <form className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            Nombre:
+          </label>
+          <input
+            type="text"
+            id="name"
+            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+            placeholder="Tu Nombre"
+          />
+        </div>
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            Correo electrónico:
+          </label>
+          <input
+            type="email"
+            id="email"
+            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+            placeholder="Tu Correo electrónico"
+          />
+        </div>
+        <div>
+          <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+            Mensaje:
+          </label>
+          <textarea
+            id="message"
+            rows={4}
+            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+            placeholder="Tu Mensaje"
+          />
+        </div>
+        <Button type="submit" className="w-full">
+          Enviar Mensaje
+        </Button>
+      </form>
+
+      <div className="space-y-3 mt-8">
+        <div className="flex items-center space-x-2">
+          <Mail className="h-5 w-5 text-muted-foreground" />
+          <span>Contacto:</span>
+          <a
+            href="mailto:info@example.com"
+            className="text-primary hover:underline"
+          >
+            info@example.com
+          </a>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Phone className="h-5 w-5 text-muted-foreground" />
+          <span>Contacto:</span>
+          <a
+            href="tel:+15551234567"
+            className="text-primary hover:underline"
+          >
+            +15551234567
+          </a>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Linkedin className="h-5 w-5 text-muted-foreground" />
+          <a
+            href="https://www.linkedin.com/company/example"
+            className="text-primary hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            LinkedIn
+          </a>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <MessageCircle className="h-5 w-5 text-muted-foreground" />
+          <a
+            href="https://wa.me/15551234567"
+            className="text-primary hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WhatsApp
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1367,7 +1576,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            <Toaster />
+            {/* (*) Ensure this Toaster component is rendered */}
+            <Toaster richColors position="top-right" /> {/* Added richColors and position */}
           </ThemeProvider>
         </AuthProvider>
       </body>
@@ -1404,22 +1614,40 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4">
-          <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
-          <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
-            <LinkButton href="/">Inicio</LinkButton>
-            <LinkButton href="/about">Nosotros</LinkButton>
-            <LinkButton href="/contact">Contacto</LinkButton>
-            {token ?
-              <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
-                Ir a la App
-              </Button>
-              :
-              <Button onClick={() => router.push('/login')}>
-                Iniciar sesión
-              </Button>
-            }
-
+        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6">
+          {/* --- CORRECCIÓN: Usar Link de Next o router.push para navegación SPA --- */}
+          <button onClick={() => router.push('/')} className="font-bold text-2xl text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+            {APP_NAME}
+          </button>
+          {/* -------------------------------------------------------------------- */}
+          <nav className="flex items-center space-x-2 sm:space-x-4">
+            <LinkButton href="/">Home</LinkButton>
+            <LinkButton href="/about">About</LinkButton>
+            <LinkButton href="/contact">Contact</LinkButton>
+            <div className="ml-2"> {/* Contenedor para botón de Login/App */}
+                {/* --- CORRECCIÓN: Mostrar estado de carga o botón correspondiente --- */}
+                {isAuthLoading ? (
+                    <Button variant="secondary" disabled={true} size="sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    </Button>
+                ) : isAuthenticated ? (
+                    <Button variant="secondary" onClick={() => router.push('/chat')} size="sm">
+                        Go to App
+                    </Button>
+                ) : (
+                    <Button
+                        onClick={() => router.push('/login')}
+                        size="sm" // Hacerlo consistente con el botón "Go to App"
+                        className={cn(
+                            "transition-colors duration-150",
+                            "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        )}
+                    >
+                        Login
+                    </Button>
+                )}
+                {/* --------------------------------------------------------------- */}
+            </div>
           </nav>
         </div>
       </header>
@@ -1433,9 +1661,24 @@ export default function HomePage() {
           <p className="text-lg text-muted-foreground mb-8">
             Haz preguntas en lenguaje natural y obtén respuestas instantáneas basadas en el conocimiento colectivo de tu organización.
           </p>
-          <Button size="lg" onClick={() => token ? router.push('/chat') : router.push('/register')}>
-            {token ? 'Ir al Chat' : 'Comenzar'}
-          </Button>
+          {/* --- CORRECCIÓN: Botón principal también debe considerar isLoading --- */}
+          {isAuthLoading ? (
+               <Button size="lg" disabled={true}>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading...
+               </Button>
+          ) : (
+            <Button
+                size="lg"
+                onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
+                className={cn(
+                    "transition-colors duration-150",
+                    "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                )}
+            >
+                {isAuthenticated ? 'Go to Chat' : 'Get Started'}
+            </Button>
+          )}
+          {/* --------------------------------------------------------------- */}
         </section>
 
         <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -1473,7 +1716,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-// Reusable Feature Card Component
+// Reusable Feature Card Component (sin cambios)
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border">
@@ -1509,72 +1752,48 @@ export default function EmailConfirmationHandler() {
             return;
         }
 
-        const handleEmailConfirmation = async () => {
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const expiresIn = params.get('expires_in');
+        console.log("EmailConfirmationHandler: Mounted. Setting up listener.");
 
-                if (accessToken && refreshToken && expiresIn) {
-                    console.log("Found access token in URL hash:", accessToken);
-                    console.log("Attempting to set session and log in.");
+        // Escuchar cambios de autenticación. El evento clave es SIGNED_IN
+        // que ocurre después de que Supabase procesa el hash de la URL.
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            (event, session) => {
+                // Solo actuar en el evento SIGNED_IN y si no lo hemos procesado ya.
+                if (event === 'SIGNED_IN' && session && !processedAuthEvent.current) {
+                    console.log("EmailConfirmationHandler: Detected SIGNED_IN event after email confirmation.");
+                    processedAuthEvent.current = true; // Marcar como procesado
 
-                     // Create the supabaseClient
-                     const supabaseClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                     );
-                    
-                     // Use the access token to get the user and full session
-                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
-                         access_token: accessToken!,
-                         refresh_token: refreshToken!,
-                     })
+                    // Mostrar notificación de éxito
+                    toast.success("Email Confirmed", {
+                        description: "Your email address has been successfully confirmed. You are now logged in.",
+                    });
 
-                     if (error) {
-                        console.error("Error setting session:", error);
-                        return; // Stop further execution if session setup fails
-                     }
-                    
-                    if (session && user) {
-                        try {
-                            const { error: insertError } = await supabaseClient
-                                .from('users')
-                                .insert([
-                                    {
-                                        id: user.id, // Use user.id from the session
-                                        email: user.email,
-                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
-                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
-                                        role: 'user',
-                                        is_active: true,
-                                    }
-                                ]);
+                    // Redirigir al usuario a la aplicación principal (ej. /chat)
+                    // Usamos replace para no añadir la URL de confirmación al historial
+                    router.replace('/chat');
 
-                            if (insertError) {
-                                console.error("Error inserting user into 'users' table:", insertError);
-                                if (insertError.code === '23505') {
-                                    console.warn("Duplicate user insertion attempted. Ignoring.");
-                                }
-                            } else {
-                                console.log("User inserted into 'users' table successfully.");
-                            }
-                        } catch (insertErr: any) {
-                            console.error("Error during user insertion:", insertErr);
-                        }
-
-                        setHasConfirmed(true);
-                        await signIn(session);
-                        router.replace('/');
-                    }
+                } else if (event === 'PASSWORD_RECOVERY') {
+                     // Manejar evento de recuperación de contraseña si es necesario
+                     console.log("EmailConfirmationHandler: Detected PASSWORD_RECOVERY event.");
+                     // Podrías redirigir a una página de cambio de contraseña o mostrar un mensaje.
+                     // Por ahora, solo lo logueamos.
+                     toast.info("Password Recovery", { description: "Please follow the instructions to set a new password." });
+                     // router.push('/update-password'); // Ejemplo de redirección
                 }
             }
+        );
+
+        // Limpieza del listener al desmontar el componente
+        return () => {
+            console.log("EmailConfirmationHandler: Unmounting. Unsubscribing listener.");
+            authListener?.subscription.unsubscribe();
         };
 
-        handleEmailConfirmation();
-    }, [signIn, router, hasConfirmed]);
+    // Solo ejecutar este efecto una vez al montar el componente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Dependencias vacías para ejecutar solo al montar
 
+    // Este componente no renderiza nada visible
     return null;
 }
 ```
@@ -1620,42 +1839,35 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting login with:", data.email);
-
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
-        setIsLoading(false);
-        return;
-      }
-
-      const supabaseClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+      console.log("LoginForm: Attempting login with:", data.email);
+      // Llamar a la función del contexto que encapsula supabase.auth.signInWithPassword
+      await signInWithPassword({
         email: data.email,
         password: data.password,
       });
+      // Si la función signInWithPassword tiene éxito, la redirección
+      // o actualización de estado será manejada por el AuthProvider o AppLayout.
+      // No es necesario hacer nada más aquí en caso de éxito.
+      console.log("LoginForm: signInWithPassword call succeeded (further actions handled by AuthProvider).");
+      // No detener isLoading aquí, dejar que el cambio de estado lo haga.
 
-      if (authError) {
-        console.error("Supabase login failed:", authError);
-        setError(authError.message || 'Error al iniciar sesión. Por favor, verifica tus credenciales.');
-      } else if (authResponse.session) {
-        console.log("Supabase login successful:", authResponse);
-        login(authResponse.session.access_token);
-      } else {
-        console.error("Supabase login: No session returned");
-        setError('Error al iniciar sesión. Por favor, verifica tus credenciales.');
-      }
     } catch (err) {
-      console.error("Login failed:", err);
-      let errorMessage = 'Error al iniciar sesión. Por favor, verifica tus credenciales.';
-      if (err instanceof ApiError) {
-        errorMessage = err.message || errorMessage;
-      } else if (err instanceof Error) {
-        errorMessage = err.message || errorMessage;
-      }
+      // El hook signInWithPassword debería haber lanzado un error en caso de fallo
+      console.error("LoginForm: signInWithPassword failed:", err);
+      let errorMessage = 'Login failed. Please check your credentials.';
+       // Usar AuthError de Supabase para mensajes específicos
+       if (err instanceof AuthError) {
+           errorMessage = err.message || errorMessage;
+           // Puedes añadir lógica específica para códigos de error si es necesario
+           if (err.message.includes("Invalid login credentials")) {
+               errorMessage = "Invalid email or password.";
+           } else if (err.message.includes("Email not confirmed")) {
+               errorMessage = "Please confirm your email address first.";
+           }
+       } else if (err instanceof Error) {
+           // Otros errores (poco probables aquí si el hook maneja bien)
+           errorMessage = err.message;
+       }
       setError(errorMessage);
       setIsLoading(false); // Detener carga solo en caso de error
     }
@@ -1675,7 +1887,8 @@ export function LoginForm() {
         <Input
           id="email"
           type="email"
-          placeholder="nombre@ejemplo.com"
+          placeholder="name@example.com"
+          autoComplete="email"
           required
           disabled={isLoading}
           {...form.register('email')}
@@ -1804,7 +2017,7 @@ export function RegisterForm() {
       }
       setError(errorMessage);
     } finally {
-      // No detener isLoading si fue éxito para mantener el mensaje visible
+      // Do not stop isLoading if success to keep the message visible
       if (!success) {
           setIsLoading(false);
       }
@@ -1942,11 +2155,21 @@ export function ChatHistory() {
 
   // --- Función para buscar el historial ---
   const fetchChatHistory = useCallback(async (showToast = false) => {
-    if (!token) {
-        console.log("ChatHistory: No token, skipping fetch.");
-        setChats([]); // Clear chats if not logged in
-        setIsLoading(false);
-        setError("Por favor, inicia sesión para ver el historial de chat."); 
+    const isAuthenticated = !!session || bypassAuth;
+
+    // Esperar a que auth cargue si es necesario (y no bypass)
+    if (!bypassAuth && isAuthLoading) {
+        console.log("ChatHistory: Waiting for auth state...");
+        // No establecer isLoading aquí, dejar que el renderContent lo maneje
+        return; // Salir temprano si auth está cargando
+    }
+
+    // Si no está autenticado (y auth ya cargó), no hacer nada
+    if (!isAuthenticated) {
+        console.log("ChatHistory: Not authenticated, skipping fetch.");
+        setChats([]);
+        setError(null); // Limpiar errores previos
+        // No mostrar error de login aquí, renderContent lo hará
         return;
     }
 
@@ -1959,23 +2182,22 @@ export function ChatHistory() {
       // Ordenar por fecha de actualización descendente
       fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setChats(fetchedChats);
-       if (showToast) {
-           toast.success("Historial de chat actualizado");
-       }
+      console.log(`ChatHistory: Fetched ${fetchedChats.length} chats.`);
+      if (showToast) toast.success("Chat History Refreshed");
     } catch (err) {
-      console.error("Failed to fetch chat history:", err);
-      let message = "No se pudo cargar el historial de chat.";
-       if (err instanceof ApiError) {
-         message = err.message || message;
-         if (err.status === 401) { // Handle unauthorized specifically
-             message = "Sesión expirada o inválida. Por favor, inicia sesión nuevamente.";
-             // Optionally trigger logout here
-         }
-       } else if (err instanceof Error) {
-         message = err.message;
-       }
+      console.error("ChatHistory: Failed to fetch chat history:", err);
+      let message = "Could not load chat history.";
+      if (err instanceof ApiError) {
+        message = err.message || message;
+        // Si es error de auth/forbidden, desloguear
+        if (err.status === 401 || err.status === 403) {
+          message = "Session expired or invalid. Please log in again.";
+          signOut(); // Usar signOut del contexto
+        }
+      } else if (err instanceof Error) { message = err.message; }
       setError(message);
-      toast.error("Error al cargar los chats", { description: message });
+      setChats([]); // Limpiar chats en caso de error
+      toast.error("Error Loading Chats", { description: message });
     } finally {
       setIsLoading(false); // Terminar carga de la lista
     }
@@ -2007,22 +2229,20 @@ export function ChatHistory() {
         await deleteChat(chatToDelete.id);
         // Actualizar estado local para reflejar el borrado
         setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
-        toast.success("Chat eliminado", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" eliminado.`});
-
-        // If the currently active chat is deleted, navigate to the base chat page
+        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+        // Si el chat borrado era el activo, navegar a /chat (nuevo chat)
         const currentChatId = pathname.split('/').pop();
         if (currentChatId === chatToDelete.id) {
             router.push('/chat');
         }
     } catch (err) {
-        console.error("Failed to delete chat:", err);
-        let message = "No se pudo eliminar el chat.";
+        console.error("ChatHistory: Failed to delete chat:", err);
+        let message = "Could not delete chat.";
         if (err instanceof ApiError) {
             message = err.message || message;
-        } else if (err instanceof Error) {
-            message = err.message;
-        }
-        toast.error("Error al eliminar", { description: message });
+            if (err.status === 401 || err.status === 403) signOut(); // Desloguear si falla por auth
+        } else if (err instanceof Error) { message = err.message; }
+        toast.error("Deletion Failed", { description: message });
     } finally {
         setIsDeleting(false);
         setIsAlertOpen(false);
@@ -2044,8 +2264,8 @@ export function ChatHistory() {
     if (!isAuthenticated) {
          return (
              <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Por favor, inicia sesión para ver o iniciar chats.</p>
-                 <Button size="sm" onClick={() => router.push('/login')}>Iniciar sesión</Button>
+                 <p className="text-sm mb-2">Log in to see your chat history.</p>
+                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
              </div>
          );
      }
@@ -2067,8 +2287,10 @@ export function ChatHistory() {
             </div>
         );
     }
-    if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
-        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No hay historial de chat todavía.</p>;
+
+    // 5. Historial Vacío
+    if (chats.length === 0) {
+        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
     }
 
     // 6. Renderizar Lista de Chats
@@ -2103,7 +2325,8 @@ export function ChatHistory() {
                             isDeleting && chatToDelete?.id === chat.id ? "opacity-50" : "" // Atenuar si se está borrando este
                         )}
                         onClick={(e) => openDeleteConfirmation(chat, e)}
-                        aria-label={`Eliminar chat: ${displayTitle}`}
+                        aria-label={`Delete chat: ${displayTitle}`}
+                        disabled={isDeleting && chatToDelete?.id === chat.id} // Deshabilitar mientras borra
                     >
                          {isDeleting && chatToDelete?.id === chat.id ? (
                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -2141,21 +2364,21 @@ export function ChatHistory() {
         {/* Contenido del Diálogo de Confirmación (se renderiza en portal) */}
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
                     Esta acción no se puede deshacer. Se eliminará permanentemente el chat
                     <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> y todos sus mensajes.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
-                <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                     onClick={handleDeleteConfirmed}
                     disabled={isDeleting}
                     className={buttonVariants({ variant: "destructive" })} // Aplicar variante destructiva
                 >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar"}
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Delete
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
@@ -2538,11 +2761,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-      
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Loader2 } from 'lucide-react'; // Import Download icon
+// --- MODIFICACIÓN: Añadir 'Eye' a la importación ---
+import { FileText, AlertCircle, Download, Loader2, Eye } from 'lucide-react';
+// -------------------------------------------------
 import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -2565,7 +2789,6 @@ interface RetrievedDocumentsPanelProps {
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
-    const [open, setOpen] = useState(false)
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -2817,14 +3040,25 @@ export function DocumentStatusList() {
             <TableRow key={doc.document_id}>
                 <TableCell className="font-medium truncate max-w-xs" title={doc.file_name || 'N/A'}>{doc.file_name || 'N/A'}</TableCell>
                 <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">
-                    {/* Display error message prominently if status is error */}
-                    {doc.status === 'error'
-                        ? <span className="text-destructive truncate block" title={doc.error_message || 'Unknown error'}>{doc.error_message ?? 'Unknown error'}</span>
-                        : doc.status === 'processed' || doc.status === 'indexed'
-                            ? `${doc.chunk_count ?? '?'} chunks`
-                            // Display the backend message otherwise, or default '--'
-                            : doc.message || '--'}
+                <TableCell className="text-muted-foreground text-xs max-w-sm">
+                    {doc.status === 'error' ? (
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="text-destructive truncate block cursor-help underline decoration-dotted">
+                                        {doc.error_message || 'Unknown error'}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs text-xs">
+                                    <p>{doc.error_message || 'No details provided.'}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    ) : doc.status === 'processed' || doc.status === 'indexed' ? (
+                        `${doc.chunk_count ?? '?'} chunks indexed`
+                    ) : (
+                        doc.message || '--'
+                    )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                     {formatDateTime(doc.last_updated)}
@@ -2834,15 +3068,33 @@ export function DocumentStatusList() {
     };
 
     return (
-        <div className="space-y-2">
-            <div className="flex justify-end">
-                {error && statuses.length > 0 && <span className="text-xs text-destructive mr-2 self-center">Refresh failed: {error}</span>}
+       <div className="space-y-2">
+           <div className="flex justify-end items-center gap-2">
+                {error && statuses.length > 0 && (
+                    <TooltipProvider delayDuration={100}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="text-xs text-destructive flex items-center gap-1 cursor-help">
+                                    <AlertCircle className="h-4 w-4"/> Refresh Error
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-xs text-xs">
+                                <p>{error}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
                 <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
                     <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                     Refresh
                 </Button>
-            </div>
-            <ScrollArea className="h-[400px] border rounded-md">
+           </div>
+            <ScrollArea className="h-[400px] border rounded-md relative">
+                {isLoading && statuses.length > 0 && (
+                   <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-20">
+                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                   </div>
+                )}
                 <Table>
                     <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
                         <TableRow>
@@ -3041,82 +3293,112 @@ export function FileUploader() {
 ```tsx
 // File: components/layout/header.tsx
 "use client";
+// File: components/layout/header.tsx
+"use client";
 
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
-import { useAuth } from '@/lib/hooks/useAuth';
+import { LogOut, Settings, User as UserIcon, Home } from "lucide-react"; // Quitado Menu, añadido Home
+import { useAuth } from '@/lib/hooks/useAuth'; // Hook refactorizado
 import { APP_NAME } from '@/lib/constants';
 import { ThemePaletteButton } from '@/components/theme-palette-button';
 import { useRouter } from 'next/navigation';
 
 export function Header() {
-  const { user, logout } = useAuth();
-    const router = useRouter();
-    const getInitials = (name?: string) => {
-      if (!name) return '?';
-      return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-    };
+  // --- CORRECCIÓN: Usar user y signOut del hook useAuth ---
+  const { user, signOut } = useAuth();
+  // -----------------------------------------------------
+  const router = useRouter();
 
-    return (
-      <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
-        {/* Left side - Home Link */}
-        <div className="flex items-center">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-                <Home className="h-5 w-5" />
-                <span className="sr-only">Inicio</span>
-            </Button>
-            <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
-            {/* Add Breadcrumbs or dynamic title here */}
-        </div>
+  // Helper para obtener iniciales (sin cambios)
+  const getInitials = (name?: string | null) => { // Permitir null
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  };
 
+  const handleLogout = async () => {
+      console.log("Header: Initiating logout...");
+      await signOut(); // Llamar a signOut del contexto
+      // La redirección será manejada por el AuthProvider o AppLayout al detectar el cambio de estado
+      console.log("Header: signOut called.");
+  };
 
-        {/* Right side - Theme toggle and User menu */}
-        <div className="flex items-center space-x-4">
-          <ThemePaletteButton />
-          {user && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                  <Avatar className="h-9 w-9">
-                    {/* Add AvatarImage if user has profile picture URL */}
-                    {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name || 'Usuario'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:px-6">
+      {/* Lado Izquierdo - Enlace a Home y Título (opcional) */}
+      <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/')} aria-label="Go to Homepage">
+              <Home className="h-5 w-5" />
+          </Button>
+          {/* Opcional: Mostrar nombre de la app o título de la página actual */}
+          {/* <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span> */}
+      </div>
+
+      {/* Lado Derecho - Controles (Tema y Menú de Usuario) */}
+      <div className="flex items-center space-x-2 md:space-x-4">
+        <ThemePaletteButton />
+
+        {/* Menú de Usuario (solo si hay usuario) */}
+        {user && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                <Avatar className="h-9 w-9 border">
+                  {/* <AvatarImage src="/path/to/user-image.jpg" alt={user.name || 'User Avatar'} /> */}
+                  <AvatarFallback className="bg-secondary text-secondary-foreground font-medium">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="sr-only">Open user menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              {/* Información del Usuario */}
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none truncate" title={user.name || 'User'}>
+                    {user.name || 'User'}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground truncate" title={user.email}>
+                    {user.email}
+                  </p>
+                  {/* Mostrar Company ID si existe */}
+                  {user.companyId && (
+                    <p className="text-xs leading-none text-muted-foreground/80 mt-1" title={`Company ID: ${user.companyId}`}>
+                      Company: {user.companyId.substring(0,8)}...
                     </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {/* Add links to settings or profile page */}
-                <DropdownMenuItem onClick={() => router.push('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configuración</span>
-                </DropdownMenuItem>
-                {/* Remove Profile DropDown Option */}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Cerrar sesión</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </header>
-    );
-  }
+                  )}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {/* Opciones del Menú */}
+              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              {/* Podrías añadir más items aquí (ej. Profile, Billing, etc.) */}
+              {/*
+              <DropdownMenuItem onClick={() => router.push('/profile')} className="cursor-pointer">
+                <UserIcon className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              */}
+              <DropdownMenuSeparator />
+              {/* Logout */}
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {/* Fin Menú de Usuario */}
+      </div>
+    </header>
+  );
+}
 ```
 
 ## File: `components\layout\sidebar.tsx`
@@ -4867,297 +5149,53 @@ export async function request<T>(
     }
     const gatewayUrl = getApiGatewayUrl();
     url = `${gatewayUrl}${cleanEndpoint}`;
-    console.debug(`External API Request Target: ${url}`);
-  } else if (isInternalAuthRoute) {
-     // Use relative URL for internal simulated routes (IF USED FOR TESTING)
-     url = cleanEndpoint;
-     console.warn(`Using SIMULATED internal API route: ${url}`);
-     console.debug(`Internal API Request Target: ${url}`);
-  } else {
-     // Handle other potential internal routes if needed
-     url = cleanEndpoint;
-     console.debug(`Other Internal API Request Target: ${url}`);
-  }
-
-
-  const token = getToken();
-  const headers = new Headers(options.headers || {});
-  let companyId: string | null = null;
-
-  headers.set('Accept', 'application/json');
-  if (!(options.body instanceof FormData)) {
-     headers.set('Content-Type', 'application/json');
-  }
-
-  // Add Authorization and X-Company-ID (if applicable and available) only for Gateway routes
-  if (isGatewayRoute && token) {
-    headers.set('Authorization', `Bearer ${token}`);
-    const user = getUserFromToken(token); // Decode token to get user info
-    if (user?.companyId) {
-        companyId = user.companyId;
-        headers.set('X-Company-ID', companyId); // Add Company ID header
-    } else {
-         console.warn(`Could not extract companyId from token for Gateway request to ${url}. Backend might reject.`);
-         // Depending on backend requirements, you might need to throw an error here
-         // if companyId is mandatory for all gateway requests.
-         // throw new ApiError("Company ID could not be determined from token.", 400);
-    }
-  } else if (isGatewayRoute && !token && !cleanEndpoint.includes('/auth/')) {
-      // Handle missing token for required gateway routes (excluding auth endpoints)
-      console.error(`Authentication token missing for Gateway request to ${url}.`);
-      // Throw an error to prevent the request if auth is mandatory
-      throw new ApiError("Se requiere autenticación. Por favor, inicie sesión.", 401);
-  }
-
-
-  const config: RequestInit = {
-    ...options,
-    headers,
-  };
-
-  console.log(`API Request: ${config.method || 'GET'} ${url}`);
-  if (companyId) console.log(` > With Company ID: ${companyId}`);
-
-
-  try {
-    const response = await fetch(url, config);
-
-    if (!response.ok) {
-      let errorData: ApiErrorData | null = null;
-      let errorText = '';
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        try {
-           errorText = await response.text();
-           console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
-        } catch (textErr) {
-             console.warn(`Could not read API error response body (${response.status}).`);
-        }
-      }
-
-      // Extract a meaningful error message
-      let errorMessage = `HTTP error ${response.status}`;
-       if (errorData?.detail && typeof errorData.detail === 'string') {
-           errorMessage = errorData.detail;
-       } else if (errorData?.detail && Array.isArray(errorData.detail)) {
-           // Handle FastAPI validation errors specifically
-           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Error de validación';
-       } else if (errorData?.message) { // Handle generic 'message' field
-           errorMessage = errorData.message;
-       } else if (errorText) {
-           errorMessage = errorText.substring(0, 200); // Limit length
-       } else {
-           // Fallback messages based on status code
-           switch (response.status) {
-                case 400: errorMessage = "Solicitud incorrecta. Por favor, revisa tus datos."; break;
-                case 401: errorMessage = "No autorizado. Por favor, verifica tus credenciales o inicia sesión nuevamente."; break;
-                case 403: errorMessage = "Acceso prohibido. No tienes permisos suficientes."; break;
-                case 404: errorMessage = "Recurso no encontrado."; break;
-                case 422: errorMessage = "Error de validación. Por favor, revisa tus datos."; break;
-                case 500: errorMessage = "Error interno del servidor. Por favor, intenta más tarde."; break;
-                case 502: errorMessage = "Error de puerta de enlace. Error al comunicarse con el servicio."; break;
-                case 503: errorMessage = "Servicio no disponible. Por favor, intenta más tarde."; break;
-                case 504: errorMessage = "Tiempo de espera agotado. El servidor tardó demasiado en responder."; break;
-           }
-       }
-
-
-      console.error(`API Error: ${response.status} ${errorMessage}`, { url, data: errorData, text: errorText });
-      throw new ApiError(errorMessage, response.status, errorData || undefined);
-    }
-
-    // Handle No Content response (e.g., for DELETE)
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-        console.log(`API Success: ${response.status} No Content`);
-        return null as T; // Return null for No Content
-    }
-
-    // Parse successful JSON response
+    let token: string | null = null;
     try {
-        const data: T = await response.json();
-        // console.debug(`API Success: ${response.status}`, { url, data });
-        return data;
-    } catch (jsonError) {
-         console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
-         throw new ApiError(`Respuesta JSON inválida del servidor`, response.status);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) { console.error("API Request: Error getting Supabase session:", sessionError); }
+      token = sessionData?.session?.access_token || null;
+      if (!token) { console.warn(`API Request: No Supabase access token found for ${cleanEndpoint}.`); }
+    } catch (e) { console.error("API Request: Unexpected error fetching Supabase session:", e); }
+    const headers = new Headers(options.headers || {});
+    headers.set('Accept', 'application/json');
+    if (!(options.body instanceof FormData)) { headers.set('Content-Type', 'application/json'); }
+    if (token) { headers.set('Authorization', `Bearer ${token}`); }
+    const config: RequestInit = { ...options, headers };
+    console.log(`API Request: ${config.method || 'GET'} ${url} (Token ${token ? 'Present' : 'Absent'})`);
+    try {
+      const response = await fetch(url, config);
+      if (!response.ok) {
+        let errorData: ApiErrorData | null = null; let errorText = ''; const contentType = response.headers.get('content-type');
+        try { if (contentType && contentType.includes('application/json')) { errorData = await response.json(); } else { errorText = await response.text(); } } catch (e) { console.warn(`API Request: Could not parse error response body for ${response.status} from ${url}`, e); try { errorText = await response.text(); } catch {} }
+        let errorMessage = `API Error (${response.status})`;
+        if (errorData?.detail && typeof errorData.detail === 'string') { errorMessage = errorData.detail; } else if (errorData?.detail && Array.isArray(errorData.detail) && errorData.detail.length > 0) { errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error'; } else if (errorData?.message && typeof errorData.message === 'string') { errorMessage = errorData.message; } else if (errorText) { errorMessage = errorText.substring(0, 200); } else { switch (response.status) { case 400: errorMessage = 'Bad Request'; break; case 401: errorMessage = 'Authentication required or token invalid.'; break; case 403: errorMessage = 'Forbidden. Missing permissions or required data (like Company ID).'; break; case 404: errorMessage = 'Resource not found.'; break; case 500: errorMessage = 'Internal Server Error'; break; default: errorMessage = `HTTP error ${response.status}`; } }
+        console.error(`API Error Response: ${response.status} ${errorMessage}`, { url, status: response.status, errorData, errorText });
+        throw new ApiError(errorMessage, response.status, errorData || undefined);
+      }
+      if (response.status === 204 || response.headers.get('content-length') === '0') { return null as T; }
+      try { const data: T = await response.json(); return data; } catch (jsonError) { console.error(`API Request: Invalid JSON response for successful request from ${url}`, jsonError); throw new ApiError(`Invalid JSON response received from server.`, response.status); }
+    } catch (error) {
+      if (error instanceof ApiError) { throw error; } else if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) { const networkErrorMessage = `Network error connecting to API Gateway at ${gatewayUrl}. Check connection/gateway status.`; console.error('API Request Network Error:', { url, gatewayUrl, error: error.message }); throw new ApiError(networkErrorMessage, 0); } else { console.error('API Request Unexpected Error:', { url, error }); const message = error instanceof Error ? error.message : 'An unexpected error occurred during the API request.'; throw new ApiError(message, 500); }
     }
-
-  } catch (error) {
-    if (error instanceof ApiError) {
-      // Re-throw known API errors
-      throw error;
-    } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
-        // Handle Network errors specifically
-        console.error('Network Error:', { url, error });
-        throw new ApiError('Error de red: No se pudo conectar con el servidor. ¿Está funcionando y accesible el API Gateway?', 0); // Use status 0 for network errors
-    }
-    else {
-      // Handle other unexpected errors (e.g., programming errors in this function)
-      console.error('Unexpected error during API request:', { url, error });
-      throw new ApiError(error instanceof Error ? error.message : 'Ha ocurrido un error inesperado', 500);
-    }
-  }
 }
 
-// --- Auth Service ---
-// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
-// Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
-export const loginUser = async (credentials: { email: string; password: string }) => {
-  console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
-  // El backend real debe devolver una estructura como { "access_token": "..." }
-  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
-  return response.access_token;
-};
-
-// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
-// Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
-export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-    console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
-    // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
-    // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
-    const response = await request<{ access_token?: string; user?: Partial<User>; message?: string }>('/api/v1/auth/register', { // <-- RUTA GATEWAY REAL
-        method: 'POST',
-        body: JSON.stringify(details),
-    });
-    return response; // Devuelve la respuesta completa del backend
-};
-
-// --- Ingest Service (External API Routes - /api/v1/ingest) ---
-export interface IngestResponse {
-    document_id: string;
-    task_id: string;
-    status: string;
-    message: string;
-}
-
-export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => {
-    formData.append('metadata_json', JSON.stringify(metadata));
-    return request<IngestResponse>('/api/v1/ingest', {
-        method: 'POST',
-        body: formData,
-    });
-};
-
-export interface DocumentStatusResponse {
-    document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
-    error_message?: string | null;
-    last_updated?: string; // ISO 8601 date string
-    message?: string | null;
-}
-
-export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
-  return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
-    method: 'GET',
-  });
-};
-
-export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    return request<DocumentStatusResponse[]>('/api/v1/ingest/status', {
-         method: 'GET',
-    });
-};
-
-
-// --- Query & Chat Service (External API Routes - /api/v1/*) ---
-
-// Type for retrieved documents within API responses (sent by Backend)
-export interface RetrievedDocApi {
-    id: string;             // Chunk ID from vector store (Milvus)
-    score?: number | null;
-    content_preview?: string | null; // Backend should provide this preview
-    metadata?: Record<string, any> | null;
-    document_id?: string | null; // Original document ID (from Supabase DOCUMENTS table)
-    file_name?: string | null;   // Original filename (from Supabase DOCUMENTS table)
-}
-
-// Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
-export interface RetrievedDoc {
-    id: string; // Chunk ID
-    score?: number | null;
-    content_preview?: string | null;
-    metadata?: Record<string, any> | null;
-    document_id?: string | null;
-    file_name?: string | null;
-}
-
-// Types for Chat History API (Backend Responses)
-export interface ChatSummary {
-    id: string;          // Chat UUID
-    title: string | null; // Chat title
-    updated_at: string;  // ISO 8601 timestamp
-}
-
-export interface ChatMessageApi {
-    id: string;          // Message UUID
-    role: 'user' | 'assistant';
-    content: string;
-    sources: RetrievedDocApi[] | null; // Sources associated with assistant message
-    created_at: string;  // ISO 8601 timestamp
-}
-
-// Payload for POST /query
-export interface QueryPayload {
-    query: string;
-    retriever_top_k?: number;
-    chat_id?: string | null; // Send null or omit for a new chat
-}
-
-// Response from POST /query
-export interface QueryApiResponse {
-    answer: string;
-    retrieved_documents: RetrievedDocApi[]; // Docs used for this specific answer
-    query_log_id?: string | null;
-    chat_id: string; // Backend MUST return the chat_id (new or existing)
-}
-
-
-// --- API Functions for Chat History ---
-
-// Function to list chats for the authenticated user
-export const getChats = async (): Promise<ChatSummary[]> => {
-    return request<ChatSummary[]>('/api/v1/chats', {
-        method: 'GET',
-    });
-};
-
-// Function to get messages for a specific chat
-export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
-    if (!chatId) {
-        console.warn("getChatMessages called with empty chatId");
-        return []; // Return empty array if no chatId provided
-    }
-    return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`, {
-        method: 'GET',
-    });
-};
-
-// Function to send a query (which handles message saving and chat creation/continuation)
-export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-  const body = { ...payload, chat_id: payload.chat_id || null };
-  return request<QueryApiResponse>('/api/v1/query', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-};
-
-// Function to delete a chat
-export const deleteChat = async (chatId: string): Promise<void> => {
-    if (!chatId) {
-        throw new Error("Cannot delete chat with empty ID");
-    }
-    await request<null>(`/api/v1/chats/${chatId}`, {
-        method: 'DELETE',
-    });
-};
-
+// --- Funciones Específicas de API ---
+export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
+export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => request<IngestResponse>('/api/v1/ingest/documents', { method: 'POST', body: formData });
+export interface DocumentStatusResponse { document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; last_updated?: string; message?: string | null; }
+export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => request<DocumentStatusResponse[]>('/api/v1/ingest/documents/status');
+export interface RetrievedDocApi { id: string; score?: number | null; content_preview?: string | null; metadata?: Record<string, any> | null; document_id?: string | null; file_name?: string | null; }
+export type RetrievedDoc = RetrievedDocApi;
+export interface ChatSummary { id: string; title: string | null; updated_at: string; created_at: string;}
+export interface ChatMessageApi { id: string; chat_id: string; role: 'user' | 'assistant'; content: string; sources: RetrievedDocApi[] | null; created_at: string; }
+export interface QueryPayload { query: string; retriever_top_k?: number; chat_id?: string | null; }
+export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id?: string | null; chat_id: string; }
+export const getChats = async (): Promise<ChatSummary[]> => request<ChatSummary[]>('/api/v1/query/chats');
+export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`);
+export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => request<QueryApiResponse>('/api/v1/query/ask', { method: 'POST', body: JSON.stringify({...payload, chat_id: payload.chat_id || null}) });
+export const deleteChat = async (chatId: string): Promise<void> => { await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' }); };
+interface EnsureCompanyResponse { message: string; company_id?: string; }
+export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
 
 // --- Type Mapping Helpers (IMPLEMENTACIONES RESTAURADAS) ---
 export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
@@ -5177,13 +5215,20 @@ export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): R
     })); // Esta función ahora siempre devuelve RetrievedDoc[] o undefined
 };
 
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
-    id: apiMessage.id,
-    role: apiMessage.role,
-    content: apiMessage.content,
-    sources: mapApiSourcesToFrontend(apiMessage.sources),
-    isError: false,
-});
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
+    // Llama a la función de mapeo de fuentes
+    const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
+
+    // Construye y devuelve el objeto Message del frontend
+    return {
+        id: apiMessage.id,
+        role: apiMessage.role,
+        content: apiMessage.content,
+        sources: mappedSources, // Usa las fuentes mapeadas
+        isError: false, // Asume que no hay error al mapear una respuesta exitosa de la API
+        created_at: apiMessage.created_at, // Conserva el timestamp
+    }; // Esta función ahora siempre devuelve un objeto Message
+};
 ```
 
 ## File: `lib\auth\helpers.ts`
@@ -5256,35 +5301,33 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User as AppUser } from '@/lib/auth/helpers';
-// --- MODIFICACIÓN: Quitar SignUpOptions ---
 import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials } from '@supabase/supabase-js';
-// ------------------------------------------
 import { toast } from "sonner";
 import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api';
 
-// --- Interfaz del Contexto de Autenticación (Firma de signUp modificada) ---
 interface AuthContextType {
   user: AppUser | null;
   session: Session | null;
   isLoading: boolean;
-  signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
-  login: (token: string) => void;
-  logout: () => void;
+  signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>;
+  signUp: (params: {
+    email: string;
+    password: string;
+    options?: {
+      data?: object;
+      emailRedirectTo?: string;
+    };
+  }) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
+  signOut: () => Promise<void>;
 }
 
 const defaultAuthContextValue: AuthContextType = {
-    user: null,
-    token: null,
-    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
-    signIn: (session: any) => {
-        console.error("signIn function called outside of AuthProvider context");
-    },
-    login: (token: string) => {
-        console.error("Login function called outside of AuthProvider context");
-    },
-    logout: () => {
-        console.error("Logout function called outside of AuthProvider context");
-    },
+  user: null,
+  session: null,
+  isLoading: true,
+  signInWithPassword: async () => { console.error("signInWithPassword called outside of AuthProvider"); throw new Error("Not initialized"); },
+  signUp: async () => { console.error("signUp called outside of AuthProvider"); return { data: { user: null, session: null }, error: new Error("Not initialized") as AuthError }; },
+  signOut: async () => { console.error("signOut called outside of AuthProvider"); },
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
@@ -5293,60 +5336,111 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
+    if (!supabaseUser) return null;
+    const companyIdRaw = supabaseUser.app_metadata?.company_id;
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined;
+    const roles = supabaseUser.app_metadata?.roles as string[] | undefined;
+    return {
+        userId: supabaseUser.id, email: supabaseUser.email,
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
+        companyId: companyId, roles: roles,
+    };
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+  const ensureCompanyCallPending = useRef(false);
 
-  useEffect(() => {
-    const storedToken = getToken();
-    if (storedToken) {
-      const userData = getUserFromToken(storedToken);
-      if (userData) {
-        setUser(userData);
-        setAuthStateToken(storedToken);
-      } else {
-        removeToken();
-      }
-    }
-    setIsLoading(false);
+  const signOut = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) { toast.error("Logout Failed", { description: error.message }); }
+      else { console.log("AuthProvider: signOut successful."); }
+    } catch (error) { toast.error("Logout Failed", { description: "An unexpected error occurred." }); }
+    finally { /* Dejar que onAuthStateChange maneje isLoading */ }
   }, []);
 
-  const login = useCallback((newToken: string) => {
-    setToken(newToken);
-    const userData = getUserFromToken(newToken);
-    setUser(userData);
-    setAuthStateToken(newToken);
-    router.push('/');
-    console.log("User logged in, token set.");
-  }, [router]);
+  useEffect(() => {
+    console.log("AuthProvider: Setting up auth state listener.");
+    setIsLoading(true);
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+        setSession(initialSession);
+        const mappedUser = mapSupabaseUserToAppUser(initialSession?.user);
+        setUser(mappedUser);
+        if (initialSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
+            ensureCompanyCallPending.current = true;
+            try {
+                await ensureCompanyAssociation(); await supabase.auth.refreshSession();
+            } catch (error) { toast.error("Company Setup Failed", { description: error instanceof EnsureCompanyApiError ? error.message : "Could not associate company." }); }
+            finally { ensureCompanyCallPending.current = false; }
+        }
+        setIsLoading(false);
+    }).catch(error => { console.error("AuthProvider: Error fetching initial session:", error); setIsLoading(false); });
+    const { data: authListener } = supabase.auth.onAuthStateChange( async (event, newSession) => {
+        setSession(newSession); const mappedUser = mapSupabaseUserToAppUser(newSession?.user); setUser(mappedUser);
+        if (event === 'SIGNED_IN' && newSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
+            ensureCompanyCallPending.current = true;
+            try {
+                await ensureCompanyAssociation(); await supabase.auth.refreshSession();
+            } catch (error) { toast.error("Company Setup Failed", { description: error instanceof EnsureCompanyApiError ? error.message : "Could not associate company." }); }
+            finally { ensureCompanyCallPending.current = false; }
+        }
+        if (event === 'SIGNED_OUT') { if (pathname?.startsWith('/chat') || pathname?.startsWith('/knowledge') || pathname?.startsWith('/settings')) { router.push('/'); } }
+        if (isLoading) setIsLoading(false);
+    });
+    return () => { authListener?.subscription.unsubscribe(); };
+  }, [isLoading, router, pathname, signOut]);
 
-  const signIn = useCallback((session: any) => {
-    const newToken = session.access_token;
-    setToken(newToken);
-    const userData = getUserFromToken(newToken);
-    setUser(userData);
-    setAuthStateToken(newToken);
-    router.push('/');
-    console.log("User signed in (via setSession), token set.");
-  }, [router]);
+  const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword(credentials);
+      if (error) { throw error; }
+    } finally { setIsLoading(false); }
+  }, []);
 
-  const logout = useCallback(() => {
-    removeToken();
-    setUser(null);
-    setAuthStateToken(null);
-    router.push('/login');
-    console.log("User logged out.");
-  }, [router]);
+  const signUp = useCallback(async (params: {
+    email: string;
+    password: string;
+    options?: {
+      data?: object;
+      emailRedirectTo?: string;
+    };
+  }) => {
+    setIsLoading(true);
+    try {
+      const { email, password, options } = params;
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        ...options,
+      });
+      if (error) {
+        toast.error("Registration Failed", { description: error.message || "Could not create account." });
+      } else if (data.user && data.user.identities?.length === 0) {
+        toast.success("Registration Submitted", { description: `Please check your email (${email}) to confirm.` });
+      } else if (data.user) {
+        toast.success("Registration Successful");
+      } else {
+        toast.warning("Registration Status Unknown");
+      }
+      return { data, error };
+    } catch (error) {
+      toast.error("Registration Failed", { description: "An unexpected error occurred." });
+      return { data: { user: null, session: null }, error: error as AuthError };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const providerValue = {
-      user,
-      token,
-      isLoading,
-      signIn,
-      login,
-      logout
+  const providerValue: AuthContextType = {
+    user, session, isLoading, signInWithPassword, signUp, signOut,
   };
 
   return (
@@ -5356,17 +5450,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-// --- Hook useAuth (sin cambios) ---
 export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined || context === defaultAuthContextValue) {
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
-       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
-    } else if (context === undefined) {
-       throw new Error('useAuth must be used within an AuthProvider');
-    }
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) { throw new Error('useAuth must be used within an AuthProvider'); }
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') { console.warn("useAuth hook used possibly outside of AuthProvider or before initialization."); }
+    return context;
 };
 ```
 
