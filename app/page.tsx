@@ -71,7 +71,7 @@ export default function HomePage() {
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
           <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
-           <EmailConfirmationHandler />
+         <EmailConfirmationHandler />
       </main>
 
       {/* Footer */}
@@ -102,7 +102,8 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string }) {
+// (+) ACTUALIZAR ESTA DEFINICIÓN PARA ACEPTAR 'description'
+function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border"> {/* Added border */}
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
