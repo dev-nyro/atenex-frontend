@@ -9,7 +9,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (token: string) => void;
+  // (+) AÑADIR 'signIn' a la definición de AuthContextType
+  signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
   logout: () => void;
 }
 
@@ -18,6 +19,11 @@ const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
     isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
+    signIn: (session: any) => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("signIn function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
+    },
     login: (token: string) => {
         // Función vacía o lanza error si se llama fuera del provider
         console.error("Login function called outside of AuthProvider context");
@@ -71,6 +77,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged in, token set.");
   }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
+  const signIn = useCallback((session: any) => {
+        // (+) Implementa la lógica de signIn (ej: guardar info de session)
+        const newToken = session.access_token; // Asume que session tiene access_token
+        setToken(newToken);
+        const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+        setUser(userData);
+        setAuthStateToken(newToken);
+        router.push('/');
+        console.log("User signed in (via setSession), token set.");
+
+  }, [router]);
+
   const logout = useCallback(() => {
     removeToken();
     setUser(null);
@@ -84,6 +102,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       user,
       token,
       isLoading,
+      // (+) Asegúrate de que 'signIn' está incluido en el valor del provider
+      signIn,
       login,
       logout
   };
