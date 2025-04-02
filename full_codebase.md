@@ -446,7 +446,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import {
     postQuery,
     getChatMessages,
-    RetrievedDoc,
+    RetrievedDoc, // Usar tipo frontend
     ApiError,
     mapApiMessageToFrontend,
     mapApiSourcesToFrontend
@@ -454,142 +454,247 @@ import {
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/lib/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook useAuth refactorizado
 
-// Mensaje inicial
+// Mensaje inicial de bienvenida
 const welcomeMessage: Message = {
     id: 'initial-welcome',
     role: 'assistant',
     content: 'Hello! How can I help you query your knowledge base today?',
-    created_at: new Date().toISOString(),
+    created_at: new Date().toISOString(), // Usar fecha actual
 };
 
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
-  // --- CORRECCIÓN: Usar session y user en lugar de token ---
+  // --- CORRECCIÓN: Usar session, user, isLoading, signOut del hook useAuth ---
   const { session, user, isLoading: isAuthLoading, signOut } = useAuth();
-  // -------------------------------------------------------
+  // ---------------------------------------------------------------------
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
+  // Obtener chatId de los parámetros de la ruta
   const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
   const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
+
+  // Estados del componente
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSending, setIsSending] = useState(false); // Enviando un nuevo mensaje
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false); // Cargando historial
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [isPanelOpen, setIsPanelOpen] = useState(true); // Panel derecho de fuentes
+
+  // Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const fetchedChatIdRef = useRef<string | undefined>(undefined);
+  const fetchedChatIdRef = useRef<string | undefined>(undefined); // Para evitar fetches duplicados
 
-  useEffect(() => { setChatId(chatIdParam); }, [chatIdParam]);
-
-  // Cargar historial de chat
+  // Sincronizar chatId del estado con el parámetro de la ruta
   useEffect(() => {
-    const isAuthenticated = session || bypassAuth;
+    setChatId(chatIdParam);
+  }, [chatIdParam]);
 
+  // --- Efecto para Cargar Historial de Chat ---
+  useEffect(() => {
+    const isAuthenticated = !!session || bypassAuth; // Determinar si está autenticado
+
+    // Si estamos esperando que la autenticación termine (y no estamos en bypass), mostrar carga
     if (!bypassAuth && isAuthLoading) {
-        setIsLoadingHistory(true); // Mostrar carga mientras auth verifica
+        console.log("ChatPage: Waiting for auth state...");
+        setIsLoadingHistory(true); // Reutilizar estado de carga de historial
+        setMessages([welcomeMessage]); // Mostrar bienvenida mientras carga auth
+        setHistoryError(null);
+        fetchedChatIdRef.current = undefined; // Resetear ref
         return;
     }
 
+    // Si está autenticado, hay un chatId, y es diferente al último que buscamos...
     if (isAuthenticated && chatId && fetchedChatIdRef.current !== chatId) {
+      console.log(`ChatPage: Auth ready. Fetching history for chat ${chatId}...`);
       setIsLoadingHistory(true);
       setHistoryError(null);
-      fetchedChatIdRef.current = chatId;
+      fetchedChatIdRef.current = chatId; // Marcar como buscado
 
       getChatMessages(chatId)
         .then(apiMessages => {
+           // Ordenar mensajes por fecha (por si acaso la API no los devuelve ordenados)
            apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+           // Mapear mensajes de la API al formato del frontend
            const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
+           // Establecer mensajes (o bienvenida si el historial está vacío)
            setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
+           console.log(`ChatPage: History loaded for ${chatId}, ${mappedMessages.length} messages.`);
         })
         .catch(error => {
+          // Manejo de errores al cargar historial
           let message = "Error loading chat history.";
+          console.error(`ChatPage: Error loading history for ${chatId}:`, error);
           if (error instanceof ApiError) {
               message = error.message || message;
-              if (error.status === 404) { router.replace('/chat'); return; }
-              if (error.status === 401) { signOut(); } // Forzar logout en 401
-          } else if (error instanceof Error) { message = error.message; }
-          setHistoryError(message); setMessages([welcomeMessage]);
+              // Si no se encuentra el chat, redirigir a /chat (nuevo chat)
+              if (error.status === 404) {
+                  toast.error("Chat Not Found", { description: `The chat with ID ${chatId} could not be found.` });
+                  router.replace('/chat');
+                  return; // Detener ejecución
+              }
+              // Si hay error de autenticación (401) o autorización (403), desloguear
+              if (error.status === 401 || error.status === 403) {
+                  toast.error("Authentication Error", { description: "Your session may have expired. Please log in again." });
+                  signOut(); // Usar signOut del contexto
+              }
+          } else if (error instanceof Error) {
+              message = error.message;
+          }
+          setHistoryError(message);
+          setMessages([welcomeMessage]); // Mostrar bienvenida en caso de error
           toast.error("Failed to Load Chat", { description: message });
         })
-        .finally(() => { setIsLoadingHistory(false); });
+        .finally(() => {
+          setIsLoadingHistory(false); // Terminar carga de historial
+        });
 
     } else if (!chatId) {
-      setMessages([welcomeMessage]); setRetrievedDocs([]);
-      setIsLoadingHistory(false); setHistoryError(null);
-      fetchedChatIdRef.current = undefined;
+      // Si no hay chatId (estamos en /chat), resetear a estado inicial
+      console.log("ChatPage: No chat ID provided, showing welcome message.");
+      setMessages([welcomeMessage]);
+      setRetrievedDocs([]);
+      setIsLoadingHistory(false);
+      setHistoryError(null);
+      fetchedChatIdRef.current = undefined; // Resetear ref
     } else if (!isAuthenticated && !isAuthLoading) {
-         setIsLoadingHistory(false); setHistoryError("Please log in to view chat history.");
-         setMessages([welcomeMessage]); fetchedChatIdRef.current = undefined;
+         // Si no está autenticado (y auth ya cargó), mostrar mensaje de login
+         console.log("ChatPage: Not authenticated, showing login prompt.");
+         setIsLoadingHistory(false);
+         setHistoryError("Please log in to view chat history.");
+         setMessages([welcomeMessage]);
+         fetchedChatIdRef.current = undefined; // Resetear ref
+    } else {
+        // Caso residual: ya se cargó este chat o no se cumplen condiciones. Asegurar que no quede cargando.
+        if (isLoadingHistory) setIsLoadingHistory(false);
     }
-  }, [chatId, session, isAuthLoading, bypassAuth, router, signOut]);
+  // --- CORRECCIÓN: Dependencias del useEffect ---
+  }, [chatId, session, isAuthLoading, bypassAuth, router, signOut, isLoadingHistory]); // Incluir isLoadingHistory para evitar bucles si cambia rápido
+  // -------------------------------------------
 
-  // Scroll al final
+  // --- Efecto para Scroll al Final ---
   useEffect(() => {
     if (scrollAreaRef.current) {
+        // Usar un pequeño timeout para asegurar que el DOM se actualice antes de hacer scroll
         const timer = setTimeout(() => {
              if (scrollAreaRef.current) {
                  scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
              }
-        }, 100);
-        return () => clearTimeout(timer);
+        }, 100); // 100ms suele ser suficiente
+        return () => clearTimeout(timer); // Limpiar timeout al desmontar o si las dependencias cambian
     }
-  }, [messages, isSending, isLoadingHistory]);
+  }, [messages, isSending, isLoadingHistory]); // Depender de mensajes, envío y carga de historial
 
-  // Enviar mensaje
+  // --- Función para Enviar Mensaje ---
   const handleSendMessage = useCallback(async (query: string) => {
-    const isAuthenticated = session || bypassAuth;
+    const isAuthenticated = !!session || bypassAuth;
     if (!query.trim() || isSending || !isAuthenticated) {
-        if (!isAuthenticated) toast.error("Authentication Error", { description: "Please log in to send messages." });
+        if (!isAuthenticated) {
+             toast.error("Authentication Error", { description: "Please log in to send messages." });
+        } else if (isSending) {
+             console.warn("ChatPage: Message sending already in progress.");
+        } else {
+             console.warn("ChatPage: Cannot send empty message.");
+        }
         return;
     }
 
-    const userMessage: Message = { id: `client-user-${Date.now()}`, role: 'user', content: query, created_at: new Date().toISOString() };
+    // Crear mensaje del usuario y añadirlo al estado
+    const userMessage: Message = {
+        id: `client-user-${Date.now()}`, // ID temporal del cliente
+        role: 'user',
+        content: query,
+        created_at: new Date().toISOString()
+    };
+    // Usar callback de setState para asegurar que usamos el estado más reciente
     setMessages(prev => [...prev, userMessage]);
-    setIsSending(true); setRetrievedDocs([]);
-    const currentChatIdForApi = chatId || null;
+    setIsSending(true);
+    setRetrievedDocs([]); // Limpiar documentos anteriores
+    const currentChatIdForApi = chatId || null; // Enviar null si es un chat nuevo
+
+    console.log(`ChatPage: Sending query to API (Chat ID: ${currentChatIdForApi || 'New'})...`);
 
     try {
+      // Llamar a la API para obtener la respuesta
       const response = await postQuery({ query, chat_id: currentChatIdForApi });
-      const returnedChatId = response.chat_id;
-      const assistantMessage: Message = {
-        id: `client-assistant-${Date.now()}`, role: 'assistant', content: response.answer,
-        sources: mapApiSourcesToFrontend(response.retrieved_documents),
-        created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      setRetrievedDocs(mapApiSourcesToFrontend(response.retrieved_documents) || []);
+      const returnedChatId = response.chat_id; // La API debe devolver el ID del chat
 
+      // Mapear fuentes/documentos recuperados
+      const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents);
+
+      // Crear mensaje del asistente
+      const assistantMessage: Message = {
+        id: `client-assistant-${Date.now()}`, // ID temporal del cliente
+        role: 'assistant',
+        content: response.answer,
+        sources: mappedSources, // Adjuntar fuentes mapeadas
+        created_at: new Date().toISOString() // Usar fecha actual
+      };
+
+      // Añadir mensaje del asistente al estado
+      setMessages(prev => [...prev, assistantMessage]);
+      setRetrievedDocs(mappedSources || []); // Actualizar panel de documentos
+
+      // Si era un chat nuevo y la API devolvió un ID, actualizar la URL y el estado
       if (!currentChatIdForApi && returnedChatId) {
-        setChatId(returnedChatId); fetchedChatIdRef.current = returnedChatId;
+        console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL.`);
+        setChatId(returnedChatId);
+        fetchedChatIdRef.current = returnedChatId; // Actualizar ref para evitar recarga
+        // Usar replace para no añadir al historial del navegador, scroll: false para evitar saltos
         router.replace(`/chat/${returnedChatId}`, { scroll: false });
       }
-      if (response.retrieved_documents?.length && !isPanelOpen) setIsPanelOpen(true);
+
+      // Si se recuperaron documentos y el panel estaba cerrado, abrirlo
+      if (mappedSources && mappedSources.length > 0 && !isPanelOpen) {
+          setIsPanelOpen(true);
+      }
+      console.log(`ChatPage: Query successful. Answer received.`);
 
     } catch (error) {
+      // Manejo de errores al enviar query
       let errorMessage = "Sorry, I encountered an error trying to answer.";
-       if (error instanceof ApiError) {
+      console.error("ChatPage: Query failed:", error);
+      if (error instanceof ApiError) {
            errorMessage = error.message || `API Error (${error.status})`;
-           if (error.status === 401) { errorMessage = "Authentication error."; signOut(); }
-       } else if (error instanceof Error) { errorMessage = `Error: ${error.message}`; }
-      const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true, created_at: new Date().toISOString() };
+           // Si es error de autenticación/autorización, desloguear
+           if (error.status === 401 || error.status === 403) {
+               errorMessage = "Authentication error. Please log in again.";
+               signOut(); // Usar signOut del contexto
+           }
+       } else if (error instanceof Error) {
+           errorMessage = `Error: ${error.message}`;
+       }
+
+      // Crear y añadir mensaje de error al chat
+      const errorMsgObj: Message = {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: errorMessage,
+          isError: true,
+          created_at: new Date().toISOString()
+      };
       setMessages(prev => [...prev, errorMsgObj]);
       toast.error("Query Failed", { description: errorMessage });
-    } finally {
-      setIsSending(false);
-    }
-  }, [isSending, chatId, router, session, bypassAuth, isPanelOpen, signOut]);
 
+    } finally {
+      setIsSending(false); // Terminar estado de envío
+    }
+  // --- CORRECCIÓN: Dependencias del useCallback ---
+  }, [isSending, chatId, router, session, bypassAuth, isPanelOpen, signOut]);
+  // -------------------------------------------
+
+  // Toggle para el panel derecho
   const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
 
-  // --- CORRECCIÓN: Restaurar implementación de funciones de renderizado ---
+  // --- Componentes de Renderizado Internos ---
   const renderHistoryLoading = () => (
        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
             <p className="text-muted-foreground">Loading chat history...</p>
+            {isAuthLoading && <p className="text-xs text-muted-foreground/70 mt-1">(Waiting for authentication...)</p>}
         </div>
   );
 
@@ -598,59 +703,76 @@ export default function ChatPage() {
           <AlertCircle className="h-8 w-8 text-destructive mb-4" />
           <p className="text-destructive font-medium mb-2">Error Loading History</p>
           <p className="text-sm text-muted-foreground mb-4">{historyError}</p>
+          {/* Podrías añadir un botón de reintento si historyError no es por auth */}
           {/* <Button variant="outline" size="sm" onClick={retryFetchHistory}>Retry</Button> */}
       </div>
   );
 
-  const renderWelcomeOrMessages = () => {
-      // Renderizar mensajes existentes o el mensaje de bienvenida si es apropiado
-      if (messages.length === 0 || (messages.length === 1 && messages[0].id === 'initial-welcome' && !chatId)) {
-          return <ChatMessage key={welcomeMessage.id} message={welcomeMessage} />;
-      }
-      return messages.map((message) => (
+  const renderMessages = () => {
+      // Filtrar el mensaje de bienvenida inicial si ya hay otros mensajes cargados
+      const messagesToRender = messages.filter(m => !(m.id === 'initial-welcome' && messages.length > 1));
+
+      return messagesToRender.map((message) => (
           <ChatMessage key={message.id} message={message} />
       ));
   };
-  // --- FIN CORRECCIÓN ---
+  // --- Fin Componentes de Renderizado ---
 
-  const showLoading = (isLoadingHistory || (isAuthLoading && !bypassAuth));
+  // Determinar si mostrar el estado de carga principal
+  const showLoading = (isLoadingHistory || (isAuthLoading && !bypassAuth && !chatId)); // Mostrar carga si historial carga, o si auth carga y no estamos en bypass y no hay chat ID aún
 
   return (
-     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]">
+     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Ajustar altura */}
             <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
                 <div className="flex h-full flex-col relative">
-                    <div className="absolute top-2 right-2 z-10"> {/* Panel Toggle Button */}
+                    {/* Botón para ocultar/mostrar panel derecho */}
+                    <div className="absolute top-2 right-2 z-10">
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                         </Button>
                     </div>
-                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}> {/* Chat Messages Area */}
+
+                    {/* Área de Mensajes del Chat */}
+                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
                          {showLoading ? (
-                            renderHistoryLoading() // Mostrar carga
+                            renderHistoryLoading() // Mostrar spinner de carga
                          ) : historyError ? (
-                             renderHistoryError() // Mostrar error
+                             renderHistoryError() // Mostrar mensaje de error
                          ) : (
-                            <div className="space-y-4 pr-4">
-                                {renderWelcomeOrMessages()} {/* Mostrar mensajes */}
-                                {isSending && ( // Skeleton de envío
+                            <div className="space-y-4 pr-4"> {/* Añadir padding para que no se pegue al borde */}
+                                {renderMessages()} {/* Mostrar mensajes */}
+                                {/* Skeleton de "pensando" mientras se envía */}
+                                {isSending && (
                                     <div className="flex items-start space-x-3">
-                                        <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center"><BrainCircuit className="h-5 w-5 text-primary"/></Skeleton>
+                                        <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0"><BrainCircuit className="h-5 w-5 text-primary"/></Skeleton>
                                         <div className="space-y-2 flex-1 pt-1"><Skeleton className="h-4 w-16" /></div>
                                     </div>
                                 )}
                             </div>
                          )}
                     </ScrollArea>
-                    <div className="border-t p-4 bg-muted/30"> {/* Input Area */}
-                        <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || showLoading} />
+
+                    {/* Área de Input */}
+                    <div className="border-t p-4 bg-muted/30">
+                        <ChatInput
+                            onSendMessage={handleSendMessage}
+                            // Deshabilitar input si está cargando historial, enviando, o si auth está cargando y no bypass
+                            isLoading={isSending || showLoading}
+                        />
                     </div>
                 </div>
             </ResizablePanel>
-            {isPanelOpen && ( /* Retrieved Documents Panel */
+
+            {/* Panel de Documentos Recuperados (condicional) */}
+            {isPanelOpen && (
                 <>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
+                        <RetrievedDocumentsPanel
+                            documents={retrievedDocs}
+                            // Mostrar carga en el panel solo mientras se está enviando la respuesta
+                            isLoading={isSending}
+                        />
                     </ResizablePanel>
                 </>
             )}
@@ -714,54 +836,80 @@ import { Header } from '@/components/layout/header';
 import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook actualizado
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
-// removeToken ya no se usa aquí directamente, signOut se encarga
-// import { removeToken } from '@/lib/auth/helpers';
+import { Loader2 } from 'lucide-react'; // Para el spinner
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, token, logout } = useAuth();
+  // --- CORRECCIÓN: Usar session, user, isLoading, signOut del hook useAuth ---
+  const { session, user, isLoading, signOut } = useAuth();
+  // ----------------------------------------------------------------------
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   useEffect(() => {
+    // Si el bypass está activo, no hacer nada (permitir acceso)
     if (bypassAuth) {
-      console.warn("AppLayout: Auth checks bypassed.");
-      return; // No hacer nada si el bypass está activo
+      console.warn("AppLayout: Auth checks bypassed via NEXT_PUBLIC_BYPASS_AUTH=true.");
+      return;
     }
 
-    // Si no está cargando y NO hay sesión válida, redirigir a login (o a '/')
+    // Si NO estamos cargando y NO hay sesión válida, redirigir a la página principal/pública
     if (!isLoading && !session) {
-      console.log("AppLayout: No active session found, redirecting to login page.");
-      router.push('/'); // Redirigir a la página principal/pública
+      console.log("AppLayout: No active session found, redirecting to home page.");
+      router.replace('/'); // Redirigir a la página principal (o '/login')
+      return; // Detener ejecución del efecto
     }
-    // Opcional: Si hay sesión pero el mapeo a 'user' falló (ej. falta companyId)
-    // podrías forzar un logout o mostrar un error específico aquí.
-    // else if (!isLoading && session && !user) {
-    //   console.error("AppLayout: Session exists but user mapping failed (missing required data?). Forcing logout.");
+
+    // --- CORRECCIÓN: Chequeo adicional si companyId es obligatorio ---
+    // Si hay sesión pero el usuario mapeado es null (posiblemente por falta de companyId
+    // u otro dato requerido en app_metadata), forzar logout.
+    // Descomenta y ajusta si `companyId` es estrictamente necesario para acceder al app.
+    // if (!isLoading && session && !user) {
+    //   console.error("AppLayout: Session exists but user mapping failed (missing required data like companyId?). Forcing logout.");
     //   signOut(); // Forzar logout si el estado del usuario no es válido
+    //   // No necesitas redirigir aquí, el signOut provocará un cambio de estado que
+    //   // llevará a la condición !session en la próxima ejecución del efecto.
+    //   return;
     // }
+    // -------------------------------------------------------------
 
-  }, [isLoading, session, user, router, bypassAuth, signOut]); // Añadir signOut a dependencias si se usa
+  // --- CORRECCIÓN: Dependencias del useEffect ---
+  // Incluir todas las variables usadas: isLoading, session, user, router, bypassAuth, signOut
+  }, [isLoading, session, user, router, bypassAuth, signOut]);
+  // -------------------------------------------
 
-  // Mostrar spinner mientras carga Y no estamos en modo bypass
+  // --- Estado de Carga ---
+  // Mostrar spinner mientras isLoading es true Y no estamos en modo bypass
   if (isLoading && !bypassAuth) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        {/* Opcional: Añadir texto */}
+        {/* <p className="mt-4 text-muted-foreground">Loading session...</p> */}
       </div>
     );
   }
+  // --- Fin Estado de Carga ---
 
-  // Si NO estamos en bypass Y (estamos cargando o no hay sesión o no hay usuario mapeado), no renderizar el layout protegido.
-  // Esto evita flashes de contenido protegido.
-  if (!bypassAuth && (isLoading || !session || !user)) {
-     // No renderizar nada mientras se redirige o si el estado no es válido
-     // El useEffect se encargará de la redirección.
-     console.log("AppLayout: Not rendering protected layout (isLoading, no session, or no mapped user).");
-     return null;
+  // --- Guardia de Autenticación ---
+  // Si NO estamos en bypass Y (aún estamos cargando O no hay sesión O no hay usuario mapeado),
+  // no renderizar el layout protegido. Esto evita flashes de contenido.
+  // El useEffect se encargará de la redirección si es necesario.
+  if (!bypassAuth && (isLoading || !session /* || !user */)) {
+     // Descomenta `|| !user` si el chequeo de usuario mapeado es estricto
+     console.log("AppLayout: Not rendering protected layout (isLoading, no session, or no valid user). Waiting for redirect or state update.");
+     // Renderizar null o un spinner mínimo mientras se redirige o el estado cambia.
+     // Usar el mismo spinner que arriba puede ser buena idea para consistencia.
+     return (
+       <div className="flex h-screen items-center justify-center bg-background">
+         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+       </div>
+     );
   }
+  // --- Fin Guardia de Autenticación ---
 
-  // Si llegamos aquí, o estamos en bypass, o estamos autenticados y autorizados (user mapeado existe)
+  // Si llegamos aquí, o estamos en bypass, o estamos autenticados y autorizados.
+  console.log("AppLayout: Rendering protected layout.");
   return (
     <div className="flex h-screen bg-secondary/30 dark:bg-muted/30">
       <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
@@ -771,11 +919,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onExpand={() => setIsSidebarCollapsed(false)}
               className={cn("transition-all duration-300 ease-in-out", isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]")}
           >
+              {/* Pasar user al Sidebar si necesita mostrar info del usuario */}
               <Sidebar isCollapsed={isSidebarCollapsed} />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={80} minSize={30}>
               <div className="flex h-full flex-col">
+                   {/* Pasar user y signOut al Header */}
                   <Header />
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
                       {children}
@@ -1379,44 +1529,56 @@ import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth'; // Hook actualizado
 import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react'; // Para estado de carga
 
 export default function HomePage() {
   const router = useRouter();
-  // --- CORRECCIÓN: Usar 'session' en lugar de 'token' ---
-  // 'session' será null si no hay sesión activa, o un objeto si la hay.
-  const { session, user } = useAuth(); // Obtener 'session' y 'user' del hook
-  // -----------------------------------------------------
+  // --- CORRECCIÓN: Usar 'session' e 'isLoading' del hook useAuth ---
+  const { session, isLoading: isAuthLoading } = useAuth();
+  // ---------------------------------------------------------------
 
   // Determinar si el usuario está autenticado basado en la sesión
-  const isAuthenticated = !!session; // Es true si session no es null
+  // Solo consideramos autenticado si NO está cargando Y hay sesión
+  const isAuthenticated = !isAuthLoading && !!session;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
         <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6">
-          <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
+          {/* --- CORRECCIÓN: Usar Link de Next o router.push para navegación SPA --- */}
+          <button onClick={() => router.push('/')} className="font-bold text-2xl text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+            {APP_NAME}
+          </button>
+          {/* -------------------------------------------------------------------- */}
           <nav className="flex items-center space-x-2 sm:space-x-4">
             <LinkButton href="/">Home</LinkButton>
             <LinkButton href="/about">About</LinkButton>
             <LinkButton href="/contact">Contact</LinkButton>
-            {/* --- CORRECCIÓN: Usar 'isAuthenticated' --- */}
-            {isAuthenticated ? (
-              <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
-                Go to App
-              </Button>
-            ) : (
-              <Button
-                 onClick={() => router.push('/login')}
-                 className={cn(
-                     "transition-colors duration-150",
-                     "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                 )}
-              >
-                Login
-              </Button>
-            )}
-            {/* ------------------------------------- */}
+            <div className="ml-2"> {/* Contenedor para botón de Login/App */}
+                {/* --- CORRECCIÓN: Mostrar estado de carga o botón correspondiente --- */}
+                {isAuthLoading ? (
+                    <Button variant="secondary" disabled={true} size="sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    </Button>
+                ) : isAuthenticated ? (
+                    <Button variant="secondary" onClick={() => router.push('/chat')} size="sm">
+                        Go to App
+                    </Button>
+                ) : (
+                    <Button
+                        onClick={() => router.push('/login')}
+                        size="sm" // Hacerlo consistente con el botón "Go to App"
+                        className={cn(
+                            "transition-colors duration-150",
+                            "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        )}
+                    >
+                        Login
+                    </Button>
+                )}
+                {/* --------------------------------------------------------------- */}
+            </div>
           </nav>
         </div>
       </header>
@@ -1430,30 +1592,38 @@ export default function HomePage() {
           <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
             Ask questions in natural language and get instant answers based on your organization's collective knowledge.
           </p>
-          {/* --- CORRECCIÓN: Usar 'isAuthenticated' --- */}
-          <Button
-            size="lg"
-            onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
-            className={cn(
-                 "transition-colors duration-150",
-                 "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-             )}
-          >
-            {isAuthenticated ? 'Go to Chat' : 'Get Started'}
-          </Button>
-          {/* ------------------------------------- */}
+          {/* --- CORRECCIÓN: Botón principal también debe considerar isLoading --- */}
+          {isAuthLoading ? (
+               <Button size="lg" disabled={true}>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading...
+               </Button>
+          ) : (
+            <Button
+                size="lg"
+                onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
+                className={cn(
+                    "transition-colors duration-150",
+                    "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                )}
+            >
+                {isAuthenticated ? 'Go to Chat' : 'Get Started'}
+            </Button>
+          )}
+          {/* --------------------------------------------------------------- */}
         </section>
 
+        {/* Sección de Features (sin cambios) */}
         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
           <FeatureCard title="Intelligent Search" description="Find information quickly using natural language queries." />
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
           <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
-        {/* Handler para confirmación de email (se mantiene igual) */}
+
+        {/* Handler para confirmación de email (se mantiene igual en su lógica interna) */}
         <EmailConfirmationHandler />
       </main>
 
-      {/* Footer */}
+      {/* Footer (sin cambios) */}
       <footer className="bg-secondary/10 border-t py-8">
         <div className="container text-center text-muted-foreground text-sm">
           © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
@@ -1477,7 +1647,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-// Reusable Feature Card Component
+// Reusable Feature Card Component (sin cambios)
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border">
@@ -1495,87 +1665,66 @@ function FeatureCard({ title, description }: { title: string; description: strin
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient'; // Usar el cliente global
 import { toast } from "sonner";
 
-// Este componente se monta en una página (ej. '/') y escucha el evento
-// SIGNED_IN que Supabase dispara después de procesar el hash de la URL.
+// Este componente se monta en una página pública (ej. '/')
+// y escucha el evento SIGNED_IN que Supabase dispara después
+// de procesar el hash de la URL de confirmación.
 export default function EmailConfirmationHandler() {
     const router = useRouter();
-    // Usamos una ref para evitar que el efecto se ejecute múltiples veces innecesariamente
-    const processedRef = useRef(false);
+    // Usamos una ref para evitar que el efecto se ejecute múltiples veces
+    // si el componente se re-renderiza por otras razones.
+    const processedAuthEvent = useRef(false);
 
     useEffect(() => {
-        if (hasConfirmed) {
+        // Si ya hemos procesado un evento, no hacer nada más.
+        if (processedAuthEvent.current) {
             return;
         }
 
-        const handleEmailConfirmation = async () => {
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const expiresIn = params.get('expires_in');
+        console.log("EmailConfirmationHandler: Mounted. Setting up listener.");
 
-                if (accessToken && refreshToken && expiresIn) {
-                    console.log("Found access token in URL hash:", accessToken);
-                    console.log("Attempting to set session and log in.");
+        // Escuchar cambios de autenticación. El evento clave es SIGNED_IN
+        // que ocurre después de que Supabase procesa el hash de la URL.
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            (event, session) => {
+                // Solo actuar en el evento SIGNED_IN y si no lo hemos procesado ya.
+                if (event === 'SIGNED_IN' && session && !processedAuthEvent.current) {
+                    console.log("EmailConfirmationHandler: Detected SIGNED_IN event after email confirmation.");
+                    processedAuthEvent.current = true; // Marcar como procesado
 
-                     // Create the supabaseClient
-                     const supabaseClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                     );
-                    
-                     // Use the access token to get the user and full session
-                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
-                         access_token: accessToken!,
-                         refresh_token: refreshToken!,
-                     })
+                    // Mostrar notificación de éxito
+                    toast.success("Email Confirmed", {
+                        description: "Your email address has been successfully confirmed. You are now logged in.",
+                    });
 
-                     if (error) {
-                        console.error("Error setting session:", error);
-                        return; // Stop further execution if session setup fails
-                     }
-                    
-                    if (session && user) {
-                        try {
-                            const { error: insertError } = await supabaseClient
-                                .from('users')
-                                .insert([
-                                    {
-                                        id: user.id, // Use user.id from the session
-                                        email: user.email,
-                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
-                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
-                                        role: 'user',
-                                        is_active: true,
-                                    }
-                                ]);
+                    // Redirigir al usuario a la aplicación principal (ej. /chat)
+                    // Usamos replace para no añadir la URL de confirmación al historial
+                    router.replace('/chat');
 
-                            if (insertError) {
-                                console.error("Error inserting user into 'users' table:", insertError);
-                                if (insertError.code === '23505') {
-                                    console.warn("Duplicate user insertion attempted. Ignoring.");
-                                }
-                            } else {
-                                console.log("User inserted into 'users' table successfully.");
-                            }
-                        } catch (insertErr: any) {
-                            console.error("Error during user insertion:", insertErr);
-                        }
-
-                        setHasConfirmed(true);
-                        await signIn(session);
-                        router.replace('/');
-                    }
+                } else if (event === 'PASSWORD_RECOVERY') {
+                     // Manejar evento de recuperación de contraseña si es necesario
+                     console.log("EmailConfirmationHandler: Detected PASSWORD_RECOVERY event.");
+                     // Podrías redirigir a una página de cambio de contraseña o mostrar un mensaje.
+                     // Por ahora, solo lo logueamos.
+                     toast.info("Password Recovery", { description: "Please follow the instructions to set a new password." });
+                     // router.push('/update-password'); // Ejemplo de redirección
                 }
             }
+        );
+
+        // Limpieza del listener al desmontar el componente
+        return () => {
+            console.log("EmailConfirmationHandler: Unmounting. Unsubscribing listener.");
+            authListener?.subscription.unsubscribe();
         };
 
-        handleEmailConfirmation();
-    }, [signIn, router, hasConfirmed]);
+    // Solo ejecutar este efecto una vez al montar el componente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Dependencias vacías para ejecutar solo al montar
 
+    // Este componente no renderiza nada visible
     return null;
 }
 ```
@@ -1594,18 +1743,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth
-import { ApiError } from '@/lib/api'; // ApiError sigue siendo útil para errores generales
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth refactorizado
+// import { ApiError } from '@/lib/api'; // Ya no es necesario para errores de login específicos de Supabase
+import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error de Supabase
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
+  password: z.string().min(1, { message: 'Password cannot be empty' }), // Mínimo 1 para evitar envío vacío
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { signIn } = useAuth(); // <-- Usar signIn del contexto
+  // --- CORRECCIÓN: Usar signInWithPassword del contexto useAuth ---
+  const { signInWithPassword } = useAuth();
+  // ----------------------------------------------------------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1618,51 +1770,38 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting login with:", data.email);
-
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
-        setIsLoading(false);
-        return;
-      }
-
-      const supabaseClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+      console.log("LoginForm: Attempting login with:", data.email);
+      // Llamar a la función del contexto que encapsula supabase.auth.signInWithPassword
+      await signInWithPassword({
         email: data.email,
         password: data.password,
       });
+      // Si la función signInWithPassword tiene éxito, la redirección
+      // o actualización de estado será manejada por el AuthProvider o AppLayout.
+      // No es necesario hacer nada más aquí en caso de éxito.
+      console.log("LoginForm: signInWithPassword call succeeded (further actions handled by AuthProvider).");
+      // No detener isLoading aquí, dejar que el cambio de estado lo haga.
 
-      if (authError) {
-        console.error("Supabase login failed:", authError);
-        setError(authError.message || 'Login failed. Please check your credentials.');
-      } else if (authResponse.session) {
-        console.log("Supabase login successful:", authResponse);
-        login(authResponse.session.access_token);
-      } else {
-        console.error("Supabase login: No session returned");
-        setError('Login failed. Please check your credentials.');
-      }
     } catch (err) {
-      // El hook signIn debería lanzar un error en caso de fallo
-      console.error("LoginForm: signIn failed:", err);
+      // El hook signInWithPassword debería haber lanzado un error en caso de fallo
+      console.error("LoginForm: signInWithPassword failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
-       // Usar ApiError para mostrar el mensaje específico si viene del hook
-       if (err instanceof ApiError) {
-         errorMessage = err.message || errorMessage;
-         if (err.status === 400) { // Supabase suele usar 400 para credenciales inválidas
-             errorMessage = "Invalid email or password.";
-         }
+       // Usar AuthError de Supabase para mensajes específicos
+       if (err instanceof AuthError) {
+           errorMessage = err.message || errorMessage;
+           // Puedes añadir lógica específica para códigos de error si es necesario
+           if (err.message.includes("Invalid login credentials")) {
+               errorMessage = "Invalid email or password.";
+           } else if (err.message.includes("Email not confirmed")) {
+               errorMessage = "Please confirm your email address first.";
+           }
        } else if (err instanceof Error) {
-         errorMessage = err.message;
+           // Otros errores (poco probables aquí si el hook maneja bien)
+           errorMessage = err.message;
        }
       setError(errorMessage);
       setIsLoading(false); // Detener carga solo en caso de error
     }
-    // No poner setIsLoading(false) aquí, el estado de carga se maneja en el hook/página
   };
 
   return (
@@ -1734,10 +1873,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
-import { AuthApiError } from '@supabase/supabase-js';
+// import { supabase } from '@/lib/supabaseClient'; // Ya no se usa directamente
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook refactorizado
+import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error
 
-// Esquema Zod
+// Esquema Zod (sin cambios, companyId sigue siendo opcional aquí)
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
@@ -1751,9 +1891,12 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 const DEFAULT_DEV_COMPANY_ID = process.env.NEXT_PUBLIC_DEV_COMPANY_ID || '';
 
 export function RegisterForm() {
+  // --- CORRECCIÓN: Usar signUp del contexto useAuth ---
+  const { signUp } = useAuth();
+  // -------------------------------------------------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false); // Para mostrar mensaje de confirmación
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -1761,6 +1904,7 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
+      // Pre-rellenar companyId en desarrollo si está disponible
       companyId: process.env.NODE_ENV === 'development' && DEFAULT_DEV_COMPANY_ID ? DEFAULT_DEV_COMPANY_ID : '',
     },
   });
@@ -1770,95 +1914,73 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
 
-    // Metadata para user_metadata (lo que el usuario puede gestionar)
-    const userMetaData = { full_name: data.name || null };
-
-    // --- IMPORTANTE ---
-    // El companyId (y roles) idealmente van en app_metadata, pero NO se pueden
-    // establecer directamente desde el cliente con signUp.
-    // Se debe usar un TRIGGER en la base de datos Supabase (en la tabla auth.users)
-    // o una Edge Function llamada después para copiar esta información
-    // (posiblemente desde user_metadata o una tabla intermedia) a app_metadata
-    // o a tu tabla pública de perfiles.
-    //
-    // Por ahora, si recogemos companyId en el form, podríamos pasarlo en 'data'
-    // para que el trigger lo pueda leer desde user_metadata, o ignorarlo aquí
-    // si el trigger lo obtiene de otra fuente.
-    //
-    // Opción 1: Pasar companyId DENTRO de 'data' (user_metadata) para que un trigger lo lea
-    // const userMetaDataWithCompany = { ...userMetaData, dev_company_id_ref: data.companyId };
-
-    // Opción 2: No pasar companyId aquí y confiar en que el trigger/backend lo obtendrá
-    // (por ejemplo, si el usuario se registra a través de una URL de invitación específica de la compañía)
-
-    // Usaremos la Opción 1 por ahora como ejemplo, asumiendo un trigger leerá dev_company_id_ref
-    const userMetaDataForSignUp = {
-        ...userMetaData,
-        // Añadimos companyId aquí temporalmente para que un trigger lo pueda leer
-        // ¡CUIDADO! Esto es visible/editable por el usuario via updateUser.
-        // Una solución más segura es usar un endpoint backend o Edge Function post-registro.
-        company_id_signup_ref: data.companyId || null,
-    };
-    // ------------------
+    // --- Preparar metadata para user_metadata ---
+    // Incluir nombre y, si se proporciona, el companyId como referencia (signup_company_id_ref)
+    // Un trigger/función backend en Supabase DEBERÍA leer 'signup_company_id_ref' de user_metadata
+    // y copiarlo a app_metadata.company_id de forma segura.
+    const userMetaDataForSignUp: { [key: string]: any } = {};
+    if (data.name) {
+        userMetaDataForSignUp.full_name = data.name;
+    }
+    if (data.companyId) {
+        // ¡Importante! Esto solo sirve como referencia para el backend.
+        // NO otorga acceso basado en companyId directamente.
+        userMetaDataForSignUp.signup_company_id_ref = data.companyId;
+        console.warn(`RegisterForm: Sending companyId (${data.companyId}) in user_metadata.signup_company_id_ref. Ensure backend logic moves it to app_metadata.`);
+    }
+    // ------------------------------------------
 
     try {
       console.log("RegisterForm: Attempting Supabase signUp for:", data.email);
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Llamar a la función signUp del contexto
+      const { data: signUpData, error: signUpError } = await signUp({
         email: data.email,
         password: data.password,
         options: {
-          // Pasar metadata a user_metadata
-          data: userMetaDataForSignUp, // <-- Usar los datos preparados
-
-          // --- NO SE PUEDE PASAR app_metadata DESDE EL CLIENTE ---
-          // app_metadata: appMetaData, // <-- ESTA LÍNEA CAUSABA EL ERROR Y SE ELIMINA
-
-          // Redirección para confirmación de email
-          emailRedirectTo: window.location.origin,
+          // Pasar metadata preparada a user_metadata
+          data: userMetaDataForSignUp,
+          // Redirección para confirmación de email (si aplica)
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       });
 
+      // El hook useAuth ya maneja las notificaciones (toast)
       if (signUpError) {
-        console.error("Supabase signUp error:", signUpError);
-        if (signUpError instanceof AuthApiError && signUpError.message.includes("User already registered")) {
-             setError("This email is already registered. Try logging in.");
-        } else {
-            setError(signUpError.message || 'Registration failed. Please try again.');
-        }
-        setIsLoading(false);
+        // El hook ya mostró el toast, solo actualizamos el estado local de error
+        setError(signUpError.message || 'Registration failed.');
+        setIsLoading(false); // Detener carga en error
         return;
       }
 
-      console.log("Supabase signUp successful:", signUpData);
-
-      // Manejo de éxito y confirmación de email
-      if (signUpData.user && signUpData.user.identities?.length === 0) {
-          setSuccess(true); setError(null);
-      } else if (signUpData.user) {
-           setSuccess(true); setError("Registration successful! You might be logged in automatically.");
-      } else {
-           setError("Registration completed with unexpected status. Please try logging in.");
-      }
+      // Si no hubo error, asumimos éxito (requiere confirmación o no)
+      // El hook useAuth ya mostró el toast de éxito/confirmación
+      setSuccess(true); // Mostrar mensaje de éxito/revisar email en el formulario
+      setError(null);
+      // form.reset(); // Opcional: Limpiar formulario en éxito
 
     } catch (err) {
-      console.error("Unexpected error during registration:", err);
+      // Capturar errores inesperados si el hook no los maneja completamente
+      console.error("RegisterForm: Unexpected error during registration:", err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      // Asegurar que el toast de error se muestre (aunque el hook debería hacerlo)
+      // toast.error("Registration Failed", { description: error || 'An unexpected error occurred.' });
     } finally {
-      setIsLoading(false);
+      // Detener carga solo si no fue exitoso (para mantener el mensaje de éxito visible)
+      if (!success) setIsLoading(false);
     }
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {error && (
+      {error && !success && ( // Mostrar error solo si no hay éxito
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Registration Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && (
+       {success && ( // Mostrar mensaje de éxito/confirmación
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
            <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" />
           <AlertTitle className="text-green-800 dark:text-green-200">Registration Submitted</AlertTitle>
@@ -1867,7 +1989,8 @@ export function RegisterForm() {
           </AlertDescription>
         </Alert>
       )}
-      {/* Campos del Formulario */}
+
+      {/* Campos del Formulario (deshabilitados en éxito o carga) */}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
         <Input id="name" type="text" placeholder="Your Name" {...form.register('name')} disabled={isLoading || success}/>
@@ -1883,14 +2006,28 @@ export function RegisterForm() {
         <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
         {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
       </div>
+       {/* Campo Company ID (opcional, principalmente para desarrollo/triggers) */}
        <div className="space-y-1">
-         <Label htmlFor="companyId">Company ID (Optional - Dev Only)</Label>
-         <Input id="companyId" type="text" placeholder="Enter Company UUID" {...form.register('companyId')} disabled={isLoading || success}/>
+         <Label htmlFor="companyId">Company ID (Optional)</Label>
+         <Input
+            id="companyId"
+            type="text"
+            placeholder="Enter Company UUID (if provided)"
+            {...form.register('companyId')}
+            disabled={isLoading || success}
+         />
          {form.formState.errors.companyId && <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>}
+         <p className="text-xs text-muted-foreground pt-1">
+            Usually assigned automatically. Only fill if instructed.
+         </p>
        </div>
+
+      {/* Botón de Envío */}
       <Button type="submit" className="w-full" disabled={isLoading || success}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
+
+      {/* Enlace a Login */}
       <div className="mt-4 text-center text-sm">
         Already have an account?{" "}
         <Link href="/login" className="underline text-primary hover:text-primary/80">
@@ -1907,12 +2044,12 @@ export function RegisterForm() {
 // File: components/chat/chat-history.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react'; // Importar React solo una vez
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button, buttonVariants } from '@/components/ui/button'; // Importar Button Y buttonVariants
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react'; // Importar iconos solo una vez
+import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook actualizado
@@ -1929,13 +2066,12 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// --- INICIO DEL COMPONENTE (SIN DUPLICACIÓN) ---
 export function ChatHistory() {
   const pathname = usePathname();
   const router = useRouter();
-  // --- CORRECCIÓN: Usar session o user en lugar de token ---
-  const { session, user, isLoading: isAuthLoading, signOut } = useAuth();
-  // -----------------------------------------------------
+  // --- CORRECCIÓN: Usar session, isLoading, signOut del hook useAuth ---
+  const { session, isLoading: isAuthLoading, signOut } = useAuth();
+  // ------------------------------------------------------------------
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -1945,57 +2081,70 @@ export function ChatHistory() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
+  // --- Función para buscar el historial ---
   const fetchChatHistory = useCallback(async (showToast = false) => {
-    const isAuthenticated = session || bypassAuth;
+    const isAuthenticated = !!session || bypassAuth;
 
-    // Esperar a que auth cargue si es necesario
+    // Esperar a que auth cargue si es necesario (y no bypass)
     if (!bypassAuth && isAuthLoading) {
-        console.log("ChatHistory: Waiting for auth to load...");
-        setIsLoading(true); // Mostrar carga mientras auth verifica
-        return;
+        console.log("ChatHistory: Waiting for auth state...");
+        // No establecer isLoading aquí, dejar que el renderContent lo maneje
+        return; // Salir temprano si auth está cargando
     }
 
+    // Si no está autenticado (y auth ya cargó), no hacer nada
     if (!isAuthenticated) {
         console.log("ChatHistory: Not authenticated, skipping fetch.");
         setChats([]);
-        setIsLoading(false);
-        if (!bypassAuth) setError("Please log in to view chat history.");
+        setError(null); // Limpiar errores previos
+        // No mostrar error de login aquí, renderContent lo hará
         return;
     }
 
-    console.log("ChatHistory: Auth loaded. Fetching chat list...");
-    setIsLoading(true);
+    // Si está autenticado, proceder a buscar
+    console.log("ChatHistory: Auth ready or bypassed. Fetching chat list...");
+    setIsLoading(true); // Iniciar carga de la lista
     setError(null);
     try {
       const fetchedChats = await getChats();
+      // Ordenar por fecha de actualización descendente
       fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setChats(fetchedChats);
+      console.log(`ChatHistory: Fetched ${fetchedChats.length} chats.`);
       if (showToast) toast.success("Chat History Refreshed");
     } catch (err) {
-      console.error("Failed to fetch chat history:", err);
+      console.error("ChatHistory: Failed to fetch chat history:", err);
       let message = "Could not load chat history.";
       if (err instanceof ApiError) {
         message = err.message || message;
-        if (err.status === 401) {
+        // Si es error de auth/forbidden, desloguear
+        if (err.status === 401 || err.status === 403) {
           message = "Session expired or invalid. Please log in again.";
-          signOut(); // Forzar logout
+          signOut(); // Usar signOut del contexto
         }
       } else if (err instanceof Error) { message = err.message; }
       setError(message);
+      setChats([]); // Limpiar chats en caso de error
       toast.error("Error Loading Chats", { description: message });
     } finally {
-      setIsLoading(false); // Terminar carga específica de la lista
+      setIsLoading(false); // Terminar carga de la lista
     }
-  // --- CORRECCIÓN: Dependencias ---
-  }, [session, isAuthLoading, bypassAuth, signOut]);
-  // ------------------------------
+  // --- CORRECCIÓN: Dependencias del useCallback ---
+  }, [session, isAuthLoading, bypassAuth, signOut]); // Depender del estado de auth
+  // -------------------------------------------
 
+  // --- Efecto para buscar al montar o cuando cambie el estado de auth ---
   useEffect(() => {
-    fetchChatHistory(false);
-  }, [fetchChatHistory]); // Ejecutar al montar y cuando cambien las dependencias de fetchChatHistory
+    // Solo buscar si no estamos en bypass O si la carga de auth ha terminado
+    if (bypassAuth || !isAuthLoading) {
+        fetchChatHistory(false); // Buscar sin toast al inicio
+    }
+    // El efecto se re-ejecutará si isAuthLoading o session cambian gracias a las dependencias de fetchChatHistory
+  }, [fetchChatHistory, isAuthLoading, bypassAuth]); // Depender de la función y estado de carga
 
+  // --- Funciones de Manejo de Borrado ---
   const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
-     event.stopPropagation();
+     event.stopPropagation(); // Evitar navegar al chat
      event.preventDefault();
      setChatToDelete(chat);
      setIsAlertOpen(true);
@@ -2006,15 +2155,21 @@ export function ChatHistory() {
     setIsDeleting(true);
     try {
         await deleteChat(chatToDelete.id);
+        // Actualizar estado local para reflejar el borrado
         setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
         toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+        // Si el chat borrado era el activo, navegar a /chat (nuevo chat)
         const currentChatId = pathname.split('/').pop();
-        if (currentChatId === chatToDelete.id) router.push('/chat');
+        if (currentChatId === chatToDelete.id) {
+            router.push('/chat');
+        }
     } catch (err) {
-        console.error("Failed to delete chat:", err);
+        console.error("ChatHistory: Failed to delete chat:", err);
         let message = "Could not delete chat.";
-        if (err instanceof ApiError) message = err.message || message;
-        else if (err instanceof Error) message = err.message;
+        if (err instanceof ApiError) {
+            message = err.message || message;
+            if (err.status === 401 || err.status === 403) signOut(); // Desloguear si falla por auth
+        } else if (err instanceof Error) { message = err.message; }
         toast.error("Deletion Failed", { description: message });
     } finally {
         setIsDeleting(false);
@@ -2022,27 +2177,34 @@ export function ChatHistory() {
         setChatToDelete(null);
     }
   };
+  // --- Fin Funciones de Borrado ---
 
-  // --- RENDER CONTENT ---
+  // --- Lógica de Renderizado ---
   const renderContent = () => {
-    const isAuthenticated = session || bypassAuth;
-    const showAuthLoad = !bypassAuth && isAuthLoading; // Mostrar carga solo si auth está cargando y no bypass
+    const isAuthenticated = !!session || bypassAuth;
 
-    // Mostrar carga si auth está cargando O si la lista está cargando
-    if (showAuthLoad || isLoading) {
+    // 1. Estado de Carga de Autenticación (si no bypass)
+    if (!bypassAuth && isAuthLoading) {
         return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
     }
 
-    if (!isAuthenticated && !bypassAuth) { // Mostrar login solo si no auth, no bypass
+    // 2. No Autenticado (y auth ya cargó)
+    if (!isAuthenticated) {
          return (
              <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Please log in to view chat history.</p>
+                 <p className="text-sm mb-2">Log in to see your chat history.</p>
                  <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
              </div>
          );
      }
 
-    if (error) { // Mostrar error si existe (después de cargar)
+    // 3. Cargando Historial (ya autenticado)
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    }
+
+    // 4. Error al Cargar Historial
+    if (error) {
         return (
             <div className="px-2 py-4 text-center text-destructive">
                 <AlertCircle className="mx-auto h-6 w-6 mb-1" />
@@ -2053,60 +2215,104 @@ export function ChatHistory() {
             </div>
         );
     }
-    if (chats.length === 0) { // Mostrar vacío si no hay chats (y no hay error/carga)
+
+    // 5. Historial Vacío
+    if (chats.length === 0) {
         return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
     }
 
-    // Render chat list
+    // 6. Renderizar Lista de Chats
     return chats.map((chat) => {
         const isActive = pathname === `/chat/${chat.id}`;
+        // Usar título o ID corto como fallback
         const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+        const displayDate = new Date(chat.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
         return (
-            <div key={chat.id} className="flex items-center group w-full">
+            <div key={chat.id} className="relative group w-full pr-8"> {/* Añadir padding para botón */}
                 <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
                     <a
                         className={cn(
-                            buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
-                            "flex-1 justify-start h-10 overflow-hidden mr-1",
-                            isActive ? "bg-muted hover:bg-muted" : ""
+                            buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }), // Usar size="sm"
+                            "w-full justify-start h-auto py-1.5 px-2 overflow-hidden text-left", // Ajustar padding/altura
+                            isActive ? "bg-muted hover:bg-muted font-medium" : "hover:bg-muted/50"
                         )}
                         title={displayTitle}
                     >
                         <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
                         <span className="truncate flex-1 text-sm">{displayTitle}</span>
+                        <span className="text-xs text-muted-foreground/70 ml-2 flex-shrink-0">{displayDate}</span>
                     </a>
                 </Link>
+                {/* Botón de borrado (aparece al hacer hover) */}
                 <AlertDialogTrigger asChild>
                     <Button
                         variant="ghost" size="icon"
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
+                        className={cn(
+                            "absolute right-0 top-1/2 -translate-y-1/2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100",
+                            isDeleting && chatToDelete?.id === chat.id ? "opacity-50" : "" // Atenuar si se está borrando este
+                        )}
                         onClick={(e) => openDeleteConfirmation(chat, e)}
                         aria-label={`Delete chat: ${displayTitle}`}
+                        disabled={isDeleting && chatToDelete?.id === chat.id} // Deshabilitar mientras borra
                     >
-                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                         {isDeleting && chatToDelete?.id === chat.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                         ) : (
+                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                         )}
                     </Button>
                 </AlertDialogTrigger>
             </div>
         );
     });
   };
-  // --- FIN RENDER CONTENT ---
+  // --- Fin Lógica de Renderizado ---
 
   return (
      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <ScrollArea className="h-full flex-1">
-            <div className="flex flex-col gap-1 p-2">
-                {renderContent()}
+        {/* Contenedor principal con botón de refrescar arriba */}
+        <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center p-2 border-b">
+                 <h3 className="px-1 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+                     Chat History
+                 </h3>
+                 <Button variant="ghost" size="sm" onClick={() => fetchChatHistory(true)} disabled={isLoading || (!bypassAuth && isAuthLoading)}>
+                     <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || (!bypassAuth && isAuthLoading)) && "animate-spin")} />
+                     <span className="sr-only">Refresh History</span>
+                 </Button>
             </div>
-        </ScrollArea>
+            <ScrollArea className="flex-1">
+                <div className="flex flex-col gap-0.5 p-2"> {/* Reducir gap */}
+                    {renderContent()}
+                </div>
+            </ScrollArea>
+        </div>
+
+        {/* Contenido del Diálogo de Confirmación (se renderiza en portal) */}
         <AlertDialogContent>
-            <AlertDialogHeader> <AlertDialogTitle>Are you sure?</AlertDialogTitle> <AlertDialogDescription> This action cannot be undone. This will permanently delete the chat <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages. </AlertDialogDescription> </AlertDialogHeader>
-            <AlertDialogFooter> <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleDeleteConfirmed} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"> {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"} </AlertDialogAction> </AlertDialogFooter>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the chat
+                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleDeleteConfirmed}
+                    disabled={isDeleting}
+                    className={buttonVariants({ variant: "destructive" })} // Aplicar variante destructiva
+                >
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
   );
 }
-// --- FIN DEL COMPONENTE (SIN DUPLICACIÓN) ---
 ```
 
 ## File: `components\chat\chat-input.tsx`
@@ -3016,90 +3222,112 @@ export function FileUploader() {
 
 ## File: `components\layout\header.tsx`
 ```tsx
-    // File: components/layout/header.tsx
-    "use client";
+// File: components/layout/header.tsx
+"use client";
 
-    import React from 'react';
-    import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-    import { Button } from "@/components/ui/button";
-    import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-    import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
-    import { useAuth } from '@/lib/hooks/useAuth';
-    import { APP_NAME } from '@/lib/constants';
-    import { ThemePaletteButton } from '@/components/theme-palette-button';
-    import { useRouter } from 'next/navigation';
+import React from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LogOut, Settings, User as UserIcon, Home } from "lucide-react"; // Quitado Menu, añadido Home
+import { useAuth } from '@/lib/hooks/useAuth'; // Hook refactorizado
+import { APP_NAME } from '@/lib/constants';
+import { ThemePaletteButton } from '@/components/theme-palette-button';
+import { useRouter } from 'next/navigation';
 
-    export function Header() {
-      const { user, logout } = useAuth();
-        const router = useRouter();
-        const getInitials = (name?: string) => {
-          if (!name) return '?';
-          return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-        };
+export function Header() {
+  // --- CORRECCIÓN: Usar user y signOut del hook useAuth ---
+  const { user, signOut } = useAuth();
+  // -----------------------------------------------------
+  const router = useRouter();
 
-        return (
-          <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
-            {/* Left side - Home Link */}
-            <div className="flex items-center">
-                <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-                    <Home className="h-5 w-5" />
-                    <span className="sr-only">Home</span>
-                </Button>
-                <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
-                {/* Add Breadcrumbs or dynamic title here */}
-            </div>
+  // Helper para obtener iniciales (sin cambios)
+  const getInitials = (name?: string | null) => { // Permitir null
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  };
 
+  const handleLogout = async () => {
+      console.log("Header: Initiating logout...");
+      await signOut(); // Llamar a signOut del contexto
+      // La redirección será manejada por el AuthProvider o AppLayout al detectar el cambio de estado
+      console.log("Header: signOut called.");
+  };
 
-            {/* Right side - Theme toggle and User menu */}
-            <div className="flex items-center space-x-4">
-              <ThemePaletteButton />
-              {user && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                      <Avatar className="h-9 w-9">
-                        {/* Add AvatarImage if user has profile picture URL */}
-                        {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user.name || 'User'}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {/* Add links to settings or profile page */}
-                    <DropdownMenuItem onClick={() => router.push('/settings')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                      {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
-                    </DropdownMenuItem>
-                    {/* Remove Profile DropDown Option
-                    <DropdownMenuItem>
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                      {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                    </DropdownMenuItem> */}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </header>
-        );
-      }
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:px-6">
+      {/* Lado Izquierdo - Enlace a Home y Título (opcional) */}
+      <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/')} aria-label="Go to Homepage">
+              <Home className="h-5 w-5" />
+          </Button>
+          {/* Opcional: Mostrar nombre de la app o título de la página actual */}
+          {/* <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span> */}
+      </div>
+
+      {/* Lado Derecho - Controles (Tema y Menú de Usuario) */}
+      <div className="flex items-center space-x-2 md:space-x-4">
+        <ThemePaletteButton />
+
+        {/* Menú de Usuario (solo si hay usuario) */}
+        {user && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                <Avatar className="h-9 w-9 border">
+                  {/* <AvatarImage src="/path/to/user-image.jpg" alt={user.name || 'User Avatar'} /> */}
+                  <AvatarFallback className="bg-secondary text-secondary-foreground font-medium">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="sr-only">Open user menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              {/* Información del Usuario */}
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none truncate" title={user.name || 'User'}>
+                    {user.name || 'User'}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground truncate" title={user.email}>
+                    {user.email}
+                  </p>
+                  {/* Mostrar Company ID si existe */}
+                  {user.companyId && (
+                    <p className="text-xs leading-none text-muted-foreground/80 mt-1" title={`Company ID: ${user.companyId}`}>
+                      Company: {user.companyId.substring(0,8)}...
+                    </p>
+                  )}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {/* Opciones del Menú */}
+              <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              {/* Podrías añadir más items aquí (ej. Profile, Billing, etc.) */}
+              {/*
+              <DropdownMenuItem onClick={() => router.push('/profile')} className="cursor-pointer">
+                <UserIcon className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              */}
+              <DropdownMenuSeparator />
+              {/* Logout */}
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {/* Fin Menú de Usuario */}
+      </div>
+    </header>
+  );
+}
 ```
 
 ## File: `components\layout\sidebar.tsx`
@@ -4830,14 +5058,20 @@ interface ApiErrorData {
     message?: string;
 }
 export class ApiError extends Error {
-  status: number; data?: ApiErrorData;
+  status: number;
+  data?: ApiErrorData;
+
   constructor(message: string, status: number, data?: ApiErrorData) {
-    super(message); this.name = 'ApiError'; this.status = status; this.data = data;
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+    // Mantener la cadena de prototipos para instanceof
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
 
-// --- Core Request Function (Catch block corregido) ---
+// --- Core Request Function (Modificada para obtener token de Supabase) ---
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -4845,166 +5079,305 @@ async function request<T>(
   let url: string;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-  if (cleanEndpoint.startsWith('/api/v1/')) {
-    const gatewayUrl = getApiGatewayUrl();
-    url = `${gatewayUrl}${cleanEndpoint}`;
-  } else {
+  // Validar que el endpoint sea para el API Gateway
+  if (!cleanEndpoint.startsWith('/api/v1/')) {
     throw new Error(`Invalid API endpoint: ${cleanEndpoint}. Must start with /api/v1/`);
   }
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) console.error("Error getting Supabase session:", sessionError);
-  const token = sessionData?.session?.access_token || null;
+  const gatewayUrl = getApiGatewayUrl();
+  url = `${gatewayUrl}${cleanEndpoint}`;
+
+  // --- CORRECCIÓN: Obtener token de la sesión de Supabase ---
+  let token: string | null = null;
+  try {
+    // Obtener la sesión actual. Esto podría devolver una sesión expirada que se refrescará.
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error("API Request: Error getting Supabase session:", sessionError);
+      // Decide cómo manejar esto: ¿continuar sin token o lanzar error?
+      // Por ahora, continuamos sin token, el backend lo rechazará si es necesario.
+    }
+    token = sessionData?.session?.access_token || null;
+    if (!token) {
+        console.warn(`API Request: No Supabase access token found for ${cleanEndpoint}. Request might fail if endpoint is protected.`);
+    }
+  } catch (e) {
+      console.error("API Request: Unexpected error fetching Supabase session:", e);
+  }
+  // --------------------------------------------------------
 
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
-  if (!(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  // No establecer Content-Type si el body es FormData
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  // Añadir token de autorización si existe
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   const config: RequestInit = { ...options, headers };
+
+  // Loguear la solicitud (sin el cuerpo para evitar data sensible en logs)
   console.log(`API Request: ${config.method || 'GET'} ${url} (Token ${token ? 'Present' : 'Absent'})`);
 
   try {
     const response = await fetch(url, config);
 
+    // --- Manejo de Respuesta (Mejorado) ---
     if (!response.ok) {
-      let errorData: ApiErrorData | null = null; let errorText = '';
-      try { errorData = await response.json(); } catch { try { errorText = await response.text(); } catch {} }
-      let errorMessage = `HTTP error ${response.status}`;
-      // ... (extracción de mensaje de error detallado - sin cambios) ...
-      if (errorData?.detail && typeof errorData.detail === 'string') { errorMessage = errorData.detail; }
-      else if (errorData?.detail && Array.isArray(errorData.detail)) { errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error'; }
-      else if (errorData?.message) { errorMessage = errorData.message; }
-      else if (errorText) { errorMessage = errorText.substring(0, 200); }
-      else { switch (response.status) { /* ... cases ... */ } }
-      console.error(`API Error: ${response.status} ${errorMessage}`, { url, data: errorData, text: errorText });
+      let errorData: ApiErrorData | null = null;
+      let errorText = '';
+      const contentType = response.headers.get('content-type');
+
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+        } else {
+          errorText = await response.text(); // Leer como texto si no es JSON
+        }
+      } catch (e) {
+        // Ignorar errores al parsear el cuerpo del error, puede estar vacío o no ser parseable
+        console.warn(`API Request: Could not parse error response body for ${response.status} from ${url}`, e);
+        try { errorText = await response.text(); } catch {} // Intentar leer como texto como fallback
+      }
+
+      let errorMessage = `API Error (${response.status})`;
+
+      // Extraer mensaje de error detallado (priorizando 'detail', luego 'message')
+      if (errorData?.detail && typeof errorData.detail === 'string') {
+        errorMessage = errorData.detail;
+      } else if (errorData?.detail && Array.isArray(errorData.detail) && errorData.detail.length > 0) {
+        // Manejar errores de validación de FastAPI
+        errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
+      } else if (errorData?.message && typeof errorData.message === 'string') {
+        errorMessage = errorData.message;
+      } else if (errorText) {
+        // Usar texto si no hay JSON o datos útiles
+        errorMessage = errorText.substring(0, 200); // Limitar longitud
+      } else {
+        // Mensajes genéricos por código de estado
+        switch (response.status) {
+          case 400: errorMessage = 'Bad Request'; break;
+          case 401: errorMessage = 'Authentication required or token invalid.'; break; // Más específico
+          case 403: errorMessage = 'Forbidden. You might be missing permissions or required data (like Company ID).'; break; // Más específico
+          case 404: errorMessage = 'Resource not found.'; break;
+          case 500: errorMessage = 'Internal Server Error'; break;
+          default: errorMessage = `HTTP error ${response.status}`;
+        }
+      }
+
+      console.error(`API Error Response: ${response.status} ${errorMessage}`, { url, status: response.status, errorData, errorText });
       throw new ApiError(errorMessage, response.status, errorData || undefined);
     }
 
-    if (response.status === 204 || response.headers.get('content-length') === '0') return null as T;
+    // Manejar respuestas sin contenido (ej. 204 No Content)
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return null as T; // Devolver null explícitamente
+    }
 
-    try { const data: T = await response.json(); return data; }
-    catch (jsonError) { throw new ApiError(`Invalid JSON response`, response.status); }
+    // Parsear JSON para respuestas exitosas con contenido
+    try {
+      const data: T = await response.json();
+      return data;
+    } catch (jsonError) {
+      console.error(`API Request: Invalid JSON response for successful request from ${url}`, jsonError);
+      throw new ApiError(`Invalid JSON response received from server.`, response.status);
+    }
+    // --- Fin Manejo de Respuesta ---
 
-  // --- BLOQUE CATCH CORREGIDO ---
   } catch (error) {
-    // Primero, manejar ApiError conocido (ya lanzado desde el bloque try)
+    // --- Manejo de Errores de Red y Otros (Mejorado) ---
     if (error instanceof ApiError) {
+      // Si ya es un ApiError (lanzado arriba), simplemente re-lanzarlo.
       throw error;
+    } else if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
+      // Error de red (no se pudo conectar al servidor)
+      const networkErrorMessage = `Network error connecting to API Gateway at ${gatewayUrl}. Please check your connection and the gateway status.`;
+      console.error('API Request Network Error:', { url, gatewayUrl, error: error.message });
+      throw new ApiError(networkErrorMessage, 0); // Usar status 0 o un código específico para red
+    } else {
+      // Otros errores inesperados durante la solicitud
+      console.error('API Request Unexpected Error:', { url, error });
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred during the API request.';
+      throw new ApiError(message, 500); // Asumir 500 para errores genéricos
     }
-    // Luego, manejar errores de red específicos (TypeError de fetch)
-    // Usamos una comprobación más genérica para cubrir diferentes mensajes de error de red
-    else if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('NetworkError') || error.message.includes('Load failed'))) {
-      console.error('Network Error:', { url, error: error.message });
-      throw new ApiError(`Network error connecting to API Gateway at ${url}. Please check connection and gateway status.`, 0); // Status 0 para errores de red
-    }
-    // Finalmente, otros errores inesperados
-    else {
-      console.error('Unexpected error during API request:', { url, error });
-      const message = error instanceof Error ? error.message : 'An unexpected error occurred during the request.';
-      throw new ApiError(message, 500); // Status 500 genérico
-    }
+    // --- Fin Manejo de Errores ---
   }
-  // --- FIN BLOQUE CATCH CORREGIDO ---
 }
 
-// --- Funciones de API (Ingest, Query, Chat - sin cambios) ---
-export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
-export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => { /* ... */ };
-export interface DocumentStatusResponse { document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; last_updated?: string; message?: string | null; }
-export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => { /* ... */ };
-export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => { /* ... */ };
+// --- Funciones Específicas de API (Usando la función `request` refactorizada) ---
 
-export interface RetrievedDocApi { id: string; score?: number | null; content_preview?: string | null; metadata?: Record<string, any> | null; document_id?: string | null; file_name?: string | null; }
-export interface RetrievedDoc { id: string; score?: number | null; content_preview?: string | null; metadata?: Record<string, any> | null; document_id?: string | null; file_name?: string | null; }
-export interface ChatSummary { id: string; title: string | null; updated_at: string; }
-export interface ChatMessageApi { id: string; role: 'user' | 'assistant'; content: string; sources: RetrievedDocApi[] | null; created_at: string; }
-export interface QueryPayload { query: string; retriever_top_k?: number; chat_id?: string | null; }
-export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id?: string | null; chat_id: string; }
+// Ingest Service Types
+export interface IngestResponse {
+    document_id: string;
+    task_id: string; // ID de la tarea de Celery (o similar) para seguimiento
+    status: string; // Estado inicial (e.g., 'queued')
+    message: string;
+}
 
-export const getChats = async (): Promise<ChatSummary[]> => request<ChatSummary[]>('/api/v1/chats');
-export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`);
-export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => request<QueryApiResponse>('/api/v1/query', { method: 'POST', body: JSON.stringify({...payload, chat_id: payload.chat_id || null}) });
-export const deleteChat = async (chatId: string): Promise<void> => { await request<null>(`/api/v1/chats/${chatId}`, { method: 'DELETE' }); };
-
-// --- Type Mapping Helpers ---
-
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
-    if (!apiSources) return undefined;
-    return apiSources.map(source => ({
-        id: source.id,
-        score: source.score,
-        content_preview: source.content_preview,
-        metadata: source.metadata,
-        document_id: source.document_id,
-        file_name: source.file_name,
-    }));
+// Ingest Service Endpoints
+export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}): Promise<IngestResponse> => {
+    // Metadata podría necesitar ser enviada como un campo separado o stringified si el endpoint lo espera así.
+    // Por ahora, asumimos que se puede añadir al FormData si el backend lo soporta, o se ignora si no.
+    // formData.append('metadata', JSON.stringify(metadata)); // Descomentar si el backend espera 'metadata' en el form
+    console.log("Uploading document via API Gateway...");
+    return request<IngestResponse>('/api/v1/ingest/documents', {
+        method: 'POST',
+        body: formData,
+        // No establecer 'Content-Type': 'multipart/form-data', fetch lo hace automáticamente con FormData
+    });
 };
 
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
-    id: apiMessage.id,
-    role: apiMessage.role,
-    content: apiMessage.content,
-    sources: mapApiSourcesToFrontend(apiMessage.sources),
-    isError: false,
-});
+// Query/Chat Service Types
+export interface DocumentStatusResponse {
+    document_id: string;
+    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string; // Añadir string para estados desconocidos
+    file_name?: string | null;
+    file_type?: string | null;
+    chunk_count?: number | null;
+    error_message?: string | null;
+    last_updated?: string; // ISO 8601 string
+    message?: string | null; // Mensaje adicional del backend
+}
+
+export interface RetrievedDocApi {
+    id: string; // ID del chunk/documento recuperado
+    score?: number | null;
+    content_preview?: string | null;
+    metadata?: Record<string, any> | null;
+    document_id?: string | null; // ID del documento original
+    file_name?: string | null; // Nombre del archivo original
+}
+// Interfaz Frontend (puede ser la misma si no hay transformación necesaria)
+export type RetrievedDoc = RetrievedDocApi;
+
+export interface ChatSummary {
+    id: string; // Chat ID
+    title: string | null; // Título del chat (puede ser generado o el primer mensaje)
+    created_at: string; // ISO 8601 string
+    updated_at: string; // ISO 8601 string
+}
+
+export interface ChatMessageApi {
+    id: string; // Message ID
+    chat_id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    sources: RetrievedDocApi[] | null; // Documentos usados para generar la respuesta del asistente
+    created_at: string; // ISO 8601 string
+}
+
+export interface QueryPayload {
+    query: string;
+    retriever_top_k?: number; // Opcional: cuántos documentos recuperar
+    chat_id?: string | null; // ID del chat existente o null/undefined para uno nuevo
+}
+
+export interface QueryApiResponse {
+    answer: string;
+    retrieved_documents: RetrievedDocApi[];
+    query_log_id?: string | null; // ID para seguimiento/logs
+    chat_id: string; // ID del chat (nuevo o existente)
+}
+
+// Query/Chat Service Endpoints
+export const getChats = async (): Promise<ChatSummary[]> => {
+    console.log("Fetching chat list...");
+    return request<ChatSummary[]>('/api/v1/query/chats'); // Asumiendo endpoint /chats en query-service
+};
+
+export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
+    console.log(`Fetching messages for chat ${chatId}...`);
+    return request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`); // Asumiendo endpoint anidado
+};
+
+export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
+    console.log(`Posting query (Chat ID: ${payload.chat_id || 'New'})...`);
+    return request<QueryApiResponse>('/api/v1/query/ask', { // Asumiendo endpoint /ask en query-service
+        method: 'POST',
+        body: JSON.stringify({
+            ...payload,
+            chat_id: payload.chat_id || null // Asegurar que se envía null si es undefined
+        }),
+    });
+};
+
+export const deleteChat = async (chatId: string): Promise<void> => {
+    console.log(`Deleting chat ${chatId}...`);
+    // Esperamos una respuesta 204 No Content o similar
+    await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
+};
+
+// Status Endpoint (asumiendo que está en Ingest Service)
+export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
+    console.log("Fetching all document statuses...");
+    // Asumiendo que el endpoint para listar todos los estados está en /api/v1/ingest/documents/status
+    // O podría ser /api/v1/ingest/statuses - Ajusta según tu backend real
+    return request<DocumentStatusResponse[]>('/api/v1/ingest/documents/status');
+};
+
+// --- Type Mapping Helpers (sin cambios, ya parecen correctos) ---
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => { /* ... */ };
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ };
 ```
 
 ## File: `lib\auth\helpers.ts`
 ```ts
 // lib/auth/helpers.ts
-import { AUTH_TOKEN_KEY } from "@/lib/constants";
-// jwt-decode ya no es estrictamente necesario aquí si confiamos en Supabase
-// import { jwtDecode, InvalidTokenError } from 'jwt-decode';
+// import { AUTH_TOKEN_KEY } from "@/lib/constants"; // Ya no es necesario para el token principal
 
-// --- Funciones básicas de localStorage (pueden eliminarse si no se usan en otro lugar) ---
-// Supabase JS client maneja su propio almacenamiento de sesión, por lo que estas
-// funciones manuales para *el token de autenticación* ya no son la fuente principal.
-// Podrían mantenerse si necesitas almacenar OTROS tokens o datos relacionados con auth.
+// --- Funciones manuales de localStorage (OBSOLETAS para el token de sesión) ---
+// Estas funciones ya no deben usarse para gestionar el token de sesión de Supabase.
+// El cliente Supabase JS maneja esto internamente. Se dejan aquí comentadas
+// o con advertencias por si se usan para otros fines, pero idealmente deberían eliminarse.
+
+/*
 export const getToken = (): string | null => {
   if (typeof window !== "undefined") {
-    // Podrías intentar obtener el token de Supabase aquí, pero es mejor usar getSession()
-    // return localStorage.getItem(AUTH_TOKEN_KEY); // <-- Evitar esto para el token de auth
-    console.warn("getToken() manual llamado, considera usar supabase.auth.getSession()");
-    return localStorage.getItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
+    console.warn("getToken() manual llamado. Supabase maneja la sesión. Considera eliminar esta función.");
+    // return localStorage.getItem(AUTH_TOKEN_KEY); // Evitar leer directamente
+    return null; // Devolver null para evitar conflictos
   }
   return null;
 };
 
 export const setToken = (token: string): void => {
    if (typeof window !== "undefined") {
-     // Evitar sobrescribir el manejo de sesión de Supabase
-     // localStorage.setItem(AUTH_TOKEN_KEY, token); // <-- Evitar esto
-     console.warn("setToken() manual llamado, Supabase maneja la sesión.");
-     localStorage.setItem(AUTH_TOKEN_KEY, token); // Mantener por si acaso, pero advertir
+     console.warn("setToken() manual llamado. Supabase maneja la sesión. Considera eliminar esta función.");
+     // localStorage.setItem(AUTH_TOKEN_KEY, token); // Evitar escribir directamente
    }
 };
 
 export const removeToken = (): void => {
    if (typeof window !== "undefined") {
-     // Podría interferir con Supabase si borra su clave, es mejor usar supabase.auth.signOut()
-     // localStorage.removeItem(AUTH_TOKEN_KEY); // <-- Evitar esto
-     console.warn("removeToken() manual llamado, considera usar supabase.auth.signOut()");
-     localStorage.removeItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
+     console.warn("removeToken() manual llamado. Usa supabase.auth.signOut(). Considera eliminar esta función.");
+     // localStorage.removeItem(AUTH_TOKEN_KEY); // Evitar eliminar directamente
    }
 };
-// --- FIN Funciones localStorage ---
+*/
+// --- FIN Funciones localStorage obsoletas ---
 
 
-// Frontend User interface - Definición de cómo queremos que luzca el usuario en el frontend
-// Esta interfaz se poblará con datos de la sesión de Supabase.
+// --- Interfaz User del Frontend (sin cambios) ---
+// Define la estructura del usuario que usaremos en el frontend.
+// Esta interfaz se poblará con datos de la sesión de Supabase via useAuth.
 export interface User {
-    userId: string;    // Mapeado desde Supabase User ID (user.id)
-    email?: string;    // Mapeado desde Supabase User Email (user.email)
-    name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name)
-    companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
-    roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
-    // Añade otros campos necesarios del objeto User de Supabase
+  userId: string;    // Mapeado desde Supabase User ID (user.id)
+  email?: string;    // Mapeado desde Supabase User Email (user.email)
+  name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name o name)
+  companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
+  roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
+  // Añade otros campos necesarios del objeto User de Supabase si los necesitas en el frontend
 }
 
 // --- getUserFromToken ELIMINADO ---
-// Ya no decodificaremos manualmente el token. Usaremos los datos del usuario
-// proporcionados por el cliente Supabase (supabase.auth.getUser() o de la sesión).
+// Ya no necesitamos decodificar el token manualmente en el frontend.
+// La información del usuario vendrá directamente del objeto User/Session de Supabase
+// gestionado por el hook useAuth.
 ```
 
 ## File: `lib\constants.ts`
@@ -5019,123 +5392,223 @@ export const AUTH_TOKEN_KEY = "atenex_auth_token";
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient'; // Importar cliente Supabase
-import { User as AppUser } from '@/lib/auth/helpers'; // Importar nuestra interfaz User frontend
-import type { Session, User as SupabaseUser } from '@supabase/supabase-js'; // Tipos de Supabase
+import { useRouter, usePathname } from 'next/navigation'; // Import usePathname
+import { supabase } from '@/lib/supabaseClient';
+import { User as AppUser } from '@/lib/auth/helpers'; // Nuestra interfaz User frontend
+import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpOptions } from '@supabase/supabase-js'; // Tipos de Supabase
+import { toast } from "sonner"; // Para notificaciones
 
+// --- Interfaz del Contexto de Autenticación ---
 interface AuthContextType {
-  user: AppUser | null; // Nuestra interfaz User
-  session: Session | null; // La sesión completa de Supabase
-  isLoading: boolean;
-  signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
-  login: (token: string) => void;
-  logout: () => void;
+  user: AppUser | null;         // El usuario mapeado de nuestra aplicación
+  session: Session | null;      // La sesión completa de Supabase
+  isLoading: boolean;         // Indica si la sesión inicial se está cargando
+  signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>;
+  signUp: (options: SignUpOptions) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
+  signOut: () => Promise<void>;
+  // login y signIn ya no son necesarios como funciones separadas
 }
 
+// --- Valor por defecto para el contexto ---
+// Usado si se intenta acceder fuera del Provider o antes de la inicialización
 const defaultAuthContextValue: AuthContextType = {
-    user: null,
-    token: null,
-    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
-    signIn: (session: any) => {
-        console.error("signIn function called outside of AuthProvider context");
-    },
-    login: (token: string) => {
-        console.error("Login function called outside of AuthProvider context");
-    },
-    logout: () => {
-        console.error("Logout function called outside of AuthProvider context");
-    },
+  user: null,
+  session: null,
+  isLoading: true, // Empieza cargando
+  signInWithPassword: async () => { console.error("signInWithPassword called outside of AuthProvider"); throw new Error("Not initialized"); },
+  signUp: async () => { console.error("signUp called outside of AuthProvider"); return { data: { user: null, session: null }, error: new Error("Not initialized") as AuthError }; },
+  signOut: async () => { console.error("signOut called outside of AuthProvider"); },
 };
 
+// --- Creación del Contexto ---
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
+// --- Props del Provider ---
 interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// Helper para mapear SupabaseUser a nuestra AppUser
+// --- Helper para mapear SupabaseUser a nuestra AppUser ---
 const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
     if (!supabaseUser) return null;
 
-    // Extraer companyId y roles de app_metadata (¡Ajusta las claves si son diferentes!)
+    // --- CORRECCIÓN: Extraer companyId y roles de app_metadata ---
+    // El README del Gateway especifica que company_id está en app_metadata
     const companyIdRaw = supabaseUser.app_metadata?.company_id;
-    const companyId = companyIdRaw ? String(companyIdRaw) : undefined;
-    const roles = supabaseUser.app_metadata?.roles as string[] | undefined;
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Asegurar que es string
+    const roles = supabaseUser.app_metadata?.roles as string[] | undefined; // Asumir que roles también está en app_metadata
+    // -----------------------------------------------------------
 
-    // Validar que companyId exista si es obligatorio para tu app
-    if (!companyId) {
-        console.warn("Supabase user is missing 'company_id' in app_metadata.", supabaseUser.app_metadata);
-        // Decide cómo manejar esto: ¿permitir usuario sin companyId o considerarlo inválido?
-        // return null; // Ejemplo: considerar inválido si companyId es mandatorio
-    }
+    // --- Validación Opcional de companyId ---
+    // Descomenta esto si un usuario SIN companyId NO debe considerarse válido en el frontend
+    // if (!companyId) {
+    //     console.warn("AuthProvider: Supabase user is missing required 'company_id' in app_metadata. User considered invalid.", supabaseUser.id, supabaseUser.app_metadata);
+    //     // Podrías forzar un logout aquí o simplemente devolver null
+    //     // supabase.auth.signOut().catch(console.error); // Ejemplo: Forzar logout
+    //     return null; // Considerar usuario inválido
+    // }
+    // ----------------------------------------
 
     return {
         userId: supabaseUser.id,
         email: supabaseUser.email,
-        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name, // Intentar con full_name o name
-        companyId: companyId, // Usar el companyId extraído
+        // Intentar obtener nombre de user_metadata (full_name o name)
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
+        companyId: companyId, // Usar el companyId extraído de app_metadata
         roles: roles,
     };
 };
 
-
+// --- Componente Provider ---
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Empieza cargando
   const router = useRouter();
+  const pathname = usePathname(); // Obtener la ruta actual
 
+  // --- Efecto para manejar cambios de autenticación ---
   useEffect(() => {
-    const storedToken = getToken();
-    if (storedToken) {
-      const userData = getUserFromToken(storedToken);
-      if (userData) {
-        setUser(userData);
-        setAuthStateToken(storedToken);
-      } else {
-        removeToken();
+    console.log("AuthProvider: Setting up auth state listener.");
+    setIsLoading(true); // Marcar como cargando al inicio del efecto
+
+    // 1. Intenta obtener la sesión inicial
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+        console.log("AuthProvider: Initial session fetched.", initialSession ? `User: ${initialSession.user.id}` : "No initial session");
+        setSession(initialSession);
+        setUser(mapSupabaseUserToAppUser(initialSession?.user));
+        setIsLoading(false); // Terminar carga después de obtener sesión inicial
+    }).catch(error => {
+        console.error("AuthProvider: Error fetching initial session:", error);
+        setIsLoading(false); // Terminar carga incluso si hay error
+    });
+
+    // 2. Escucha cambios futuros
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        console.log(`AuthProvider: Auth state changed - Event: ${event}`, newSession ? `New User: ${newSession.user.id}` : "No session");
+        setSession(newSession);
+        const mappedUser = mapSupabaseUserToAppUser(newSession?.user);
+        setUser(mappedUser);
+
+        // Si el usuario ya no es válido (ej. falta companyId después de mapear), forzar logout
+        // if (newSession && !mappedUser) {
+        //    console.warn("AuthProvider: User became invalid after auth change, forcing sign out.");
+        //    await signOut();
+        // }
+
+        // Manejar redirecciones post-evento si es necesario
+        if (event === 'SIGNED_IN') {
+            // No redirigir automáticamente aquí, dejar que AppLayout maneje la protección
+            // o que la página específica (ej. login) redirija.
+            // router.push('/chat'); // Evitar redirección automática general
+        } else if (event === 'SIGNED_OUT') {
+             // Redirigir a la página de inicio o login solo si estamos en una ruta protegida
+             if (pathname?.startsWith('/chat') || pathname?.startsWith('/knowledge') || pathname?.startsWith('/settings')) {
+                 router.push('/'); // O '/login' si prefieres
+             }
+        }
+
+        // Asegurar que isLoading sea false después del primer evento recibido
+        if (isLoading) setIsLoading(false);
       }
+    );
+
+    // Limpieza del listener al desmontar
+    return () => {
+      console.log("AuthProvider: Cleaning up auth state listener.");
+      authListener?.subscription.unsubscribe();
+    };
+  }, [isLoading, router, pathname]); // Añadir pathname a dependencias
+
+  // --- Función signInWithPassword ---
+  const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
+    setIsLoading(true); // Opcional: mostrar carga durante el login
+    try {
+      const { error } = await supabase.auth.signInWithPassword(credentials);
+      if (error) {
+        console.error("AuthProvider: signInWithPassword error:", error);
+        toast.error("Login Failed", { description: error.message || "Invalid credentials." });
+        throw error; // Re-lanzar para que el form lo maneje
+      }
+      // El onAuthStateChange se encargará de actualizar el estado y redirigir si es necesario
+      console.log("AuthProvider: signInWithPassword successful (state update via listener).");
+      // No necesitas redirigir aquí, AppLayout o la página de origen lo harán.
+      // router.push('/chat');
+    } catch (error) {
+       // El error ya fue notificado, solo asegurar que isLoading se detenga
+    } finally {
+      setIsLoading(false); // Detener carga
     }
-    setIsLoading(false);
   }, []);
 
-  const login = useCallback((newToken: string) => {
-    setToken(newToken);
-    const userData = getUserFromToken(newToken);
-    setUser(userData);
-    setAuthStateToken(newToken);
-    router.push('/');
-    console.log("User logged in, token set.");
-  }, [router]);
+  // --- Función signUp ---
+  const signUp = useCallback(async (options: SignUpOptions) => {
+    setIsLoading(true); // Opcional: mostrar carga durante el registro
+    try {
+        // Nota: app_metadata NO se puede pasar aquí directamente desde el cliente.
+        // Debe configurarse mediante triggers/funciones en Supabase.
+        const { data, error } = await supabase.auth.signUp(options);
 
-  const signIn = useCallback((session: any) => {
-    const newToken = session.access_token;
-    setToken(newToken);
-    const userData = getUserFromToken(newToken);
-    setUser(userData);
-    setAuthStateToken(newToken);
-    router.push('/');
-    console.log("User signed in (via setSession), token set.");
-  }, [router]);
+        if (error) {
+            console.error("AuthProvider: signUp error:", error);
+            toast.error("Registration Failed", { description: error.message || "Could not create account." });
+        } else if (data.user && data.user.identities?.length === 0) {
+            // Caso común: requiere confirmación por email
+            toast.success("Registration Submitted", { description: `Please check your email (${options.email}) to confirm your account.` });
+            console.log("AuthProvider: signUp successful, email confirmation required.");
+        } else if (data.user) {
+            // Caso menos común: usuario creado y sesión iniciada (ej. email/pass deshabilitado)
+             toast.success("Registration Successful", { description: "Account created successfully." });
+             console.log("AuthProvider: signUp successful, user created and potentially signed in.");
+             // El onAuthStateChange manejará la actualización del estado si hay sesión
+        } else {
+             toast.warning("Registration Status Unknown", { description: "Account may have been created, but status is unclear. Please try logging in or checking your email." });
+             console.warn("AuthProvider: signUp completed with unexpected response data:", data);
+        }
+        return { data, error }; // Devolver resultado para el form
+    } catch (error) {
+        console.error("AuthProvider: Unexpected signUp error:", error);
+        toast.error("Registration Failed", { description: "An unexpected error occurred." });
+        return { data: { user: null, session: null }, error: error as AuthError };
+    } finally {
+        setIsLoading(false); // Detener carga
+    }
+  }, []);
 
-  const logout = useCallback(() => {
-    removeToken();
-    setUser(null);
-    setAuthStateToken(null);
-    router.push('/login');
-    console.log("User logged out.");
-  }, [router]);
+  // --- Función signOut ---
+  const signOut = useCallback(async () => {
+    setIsLoading(true); // Opcional: mostrar carga durante logout
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("AuthProvider: signOut error:", error);
+        toast.error("Logout Failed", { description: error.message || "Could not sign out." });
+      } else {
+        console.log("AuthProvider: signOut successful (state update via listener).");
+        // El onAuthStateChange limpiará user/session y redirigirá si es necesario
+        // router.push('/'); // Redirección manejada por listener o AppLayout
+      }
+    } catch (error) {
+       // Manejar errores inesperados si los hubiera
+       console.error("AuthProvider: Unexpected signOut error:", error);
+       toast.error("Logout Failed", { description: "An unexpected error occurred during sign out." });
+    } finally {
+        setIsLoading(false);
+    }
+  }, []);
 
-  const providerValue = {
-      user,
-      token,
-      isLoading,
-      signIn,
-      login,
-      logout
+  // --- Valor del Contexto a proveer ---
+  const providerValue: AuthContextType = {
+    user,
+    session,
+    isLoading,
+    signInWithPassword,
+    signUp,
+    signOut,
   };
 
+  // Renderizar Provider con el valor calculado
   return (
     <AuthContext.Provider value={providerValue}>
       {children}
@@ -5143,14 +5616,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
+// --- Hook para consumir el contexto ---
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined || context === defaultAuthContextValue) {
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
-       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
-    } else if (context === undefined) {
-       throw new Error('useAuth must be used within an AuthProvider');
-    }
+  // Comprobación para asegurar que se usa dentro del Provider
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  // Advertencia si se usa el valor por defecto (podría indicar uso fuera o antes de inicializar)
+  if (context === defaultAuthContextValue && typeof window !== 'undefined') {
+     console.warn("useAuth hook used possibly outside of AuthProvider or before initialization.");
   }
   return context;
 };

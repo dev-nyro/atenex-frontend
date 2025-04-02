@@ -271,6 +271,26 @@ export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> 
     return request<DocumentStatusResponse[]>('/api/v1/ingest/documents/status');
 };
 
+// --- NUEVA FUNCIÓN: Ensure Company Association ---
+interface EnsureCompanyResponse {
+  message: string;
+  company_id?: string; // El ID que se asoció (opcional, pero útil)
+}
+/**
+ * Llama al endpoint del gateway para asegurar que el usuario autenticado
+ * tenga una compañía asociada en sus metadatos.
+ * Esta función DEBE llamarse con el token JWT del usuario.
+ */
+export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
+  console.log("Calling API to ensure company association for the current user...");
+  // No se envía body, el backend determina el company ID
+  return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', {
+      method: 'POST',
+      // No body needed if backend uses default or derives companyId
+  });
+};
+// --- FIN NUEVA FUNCIÓN ---
+
 // --- Type Mapping Helpers (sin cambios, ya parecen correctos) ---
 export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => { /* ... */ };
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ };
