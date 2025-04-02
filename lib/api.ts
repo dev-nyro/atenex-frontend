@@ -78,7 +78,7 @@ export async function request<T>(
       // Handle missing token for required gateway routes (excluding auth endpoints)
       console.error(`Authentication token missing for Gateway request to ${url}.`);
       // Throw an error to prevent the request if auth is mandatory
-      throw new ApiError("Authentication required. Please log in.", 401);
+      throw new ApiError("Se requiere autenticación. Por favor, inicie sesión.", 401);
   }
 
 
@@ -114,7 +114,7 @@ export async function request<T>(
            errorMessage = errorData.detail;
        } else if (errorData?.detail && Array.isArray(errorData.detail)) {
            // Handle FastAPI validation errors specifically
-           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
+           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Error de validación';
        } else if (errorData?.message) { // Handle generic 'message' field
            errorMessage = errorData.message;
        } else if (errorText) {
@@ -122,15 +122,15 @@ export async function request<T>(
        } else {
            // Fallback messages based on status code
            switch (response.status) {
-                case 400: errorMessage = "Bad Request. Please check your input."; break;
-                case 401: errorMessage = "Unauthorized. Please check credentials or login again."; break;
-                case 403: errorMessage = "Forbidden. You don't have permission."; break;
-                case 404: errorMessage = "Resource not found."; break;
-                case 422: errorMessage = "Validation Error. Please check your input."; break;
-                case 500: errorMessage = "Internal Server Error. Please try again later."; break;
-                case 502: errorMessage = "Bad Gateway. Error communicating with upstream service."; break;
-                case 503: errorMessage = "Service Unavailable. Please try again later."; break;
-                case 504: errorMessage = "Gateway Timeout. The server took too long to respond."; break;
+                case 400: errorMessage = "Solicitud incorrecta. Por favor, revisa tus datos."; break;
+                case 401: errorMessage = "No autorizado. Por favor, verifica tus credenciales o inicia sesión nuevamente."; break;
+                case 403: errorMessage = "Acceso prohibido. No tienes permisos suficientes."; break;
+                case 404: errorMessage = "Recurso no encontrado."; break;
+                case 422: errorMessage = "Error de validación. Por favor, revisa tus datos."; break;
+                case 500: errorMessage = "Error interno del servidor. Por favor, intenta más tarde."; break;
+                case 502: errorMessage = "Error de puerta de enlace. Error al comunicarse con el servicio."; break;
+                case 503: errorMessage = "Servicio no disponible. Por favor, intenta más tarde."; break;
+                case 504: errorMessage = "Tiempo de espera agotado. El servidor tardó demasiado en responder."; break;
            }
        }
 
@@ -152,7 +152,7 @@ export async function request<T>(
         return data;
     } catch (jsonError) {
          console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
-         throw new ApiError(`Invalid JSON response from server`, response.status);
+         throw new ApiError(`Respuesta JSON inválida del servidor`, response.status);
     }
 
   } catch (error) {
@@ -162,12 +162,12 @@ export async function request<T>(
     } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
         // Handle Network errors specifically
         console.error('Network Error:', { url, error });
-        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
+        throw new ApiError('Error de red: No se pudo conectar con el servidor. ¿Está funcionando y accesible el API Gateway?', 0); // Use status 0 for network errors
     }
     else {
       // Handle other unexpected errors (e.g., programming errors in this function)
       console.error('Unexpected error during API request:', { url, error });
-      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred', 500);
+      throw new ApiError(error instanceof Error ? error.message : 'Ha ocurrido un error inesperado', 500);
     }
   }
 }

@@ -41,7 +41,7 @@ export function ChatHistory() {
         console.log("ChatHistory: No token, skipping fetch.");
         setChats([]); // Clear chats if not logged in
         setIsLoading(false);
-        setError("Please log in to view chat history."); // Inform user
+        setError("Por favor, inicia sesión para ver el historial de chat."); 
         return;
     }
     console.log("ChatHistory: Fetching chat list...");
@@ -53,22 +53,22 @@ export function ChatHistory() {
       fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setChats(fetchedChats);
        if (showToast) {
-           toast.success("Chat History Refreshed");
+           toast.success("Historial de chat actualizado");
        }
     } catch (err) {
       console.error("Failed to fetch chat history:", err);
-      let message = "Could not load chat history.";
+      let message = "No se pudo cargar el historial de chat.";
        if (err instanceof ApiError) {
          message = err.message || message;
          if (err.status === 401) { // Handle unauthorized specifically
-             message = "Session expired or invalid. Please log in again.";
+             message = "Sesión expirada o inválida. Por favor, inicia sesión nuevamente.";
              // Optionally trigger logout here
          }
        } else if (err instanceof Error) {
          message = err.message;
        }
       setError(message);
-      toast.error("Error Loading Chats", { description: message });
+      toast.error("Error al cargar los chats", { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +94,7 @@ export function ChatHistory() {
         await deleteChat(chatToDelete.id);
         // Optimistically update UI or refetch
         setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
-        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+        toast.success("Chat eliminado", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" eliminado.`});
 
         // If the currently active chat is deleted, navigate to the base chat page
         const currentChatId = pathname.split('/').pop();
@@ -104,13 +104,13 @@ export function ChatHistory() {
         }
     } catch (err) {
         console.error("Failed to delete chat:", err);
-        let message = "Could not delete chat.";
+        let message = "No se pudo eliminar el chat.";
         if (err instanceof ApiError) {
             message = err.message || message;
         } else if (err instanceof Error) {
             message = err.message;
         }
-        toast.error("Deletion Failed", { description: message });
+        toast.error("Error al eliminar", { description: message });
     } finally {
         setIsDeleting(false);
         setIsAlertOpen(false); // Close the dialog
@@ -122,8 +122,8 @@ export function ChatHistory() {
     if (!token && !isLoading) { // Show login prompt if not logged in and not loading
          return (
              <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Please log in to view or start chats.</p>
-                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
+                 <p className="text-sm mb-2">Por favor, inicia sesión para ver o iniciar chats.</p>
+                 <Button size="sm" onClick={() => router.push('/login')}>Iniciar sesión</Button>
              </div>
          );
      }
@@ -137,13 +137,13 @@ export function ChatHistory() {
                 <AlertCircle className="mx-auto h-6 w-6 mb-1" />
                 <p className="text-sm mb-2">{error}</p>
                 <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
-                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                    <RefreshCw className="mr-1 h-3 w-3"/> Reintentar
                 </Button>
             </div>
         );
     }
     if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
-        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
+        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No hay historial de chat todavía.</p>;
     }
 
     // Render chat list
@@ -173,7 +173,7 @@ export function ChatHistory() {
                         size="icon"
                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
                         onClick={(e) => openDeleteConfirmation(chat, e)}
-                        aria-label={`Delete chat: ${displayTitle}`}
+                        aria-label={`Eliminar chat: ${displayTitle}`}
                     >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                     </Button>
@@ -195,21 +195,21 @@ export function ChatHistory() {
         {/* Dialog Content - Placed outside the loop */}
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the chat
-                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
+                    Esta acción no se puede deshacer. Se eliminará permanentemente el chat
+                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> y todos sus mensajes.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                     onClick={handleDeleteConfirmed} // Changed to trigger confirmed delete
                     disabled={isDeleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar"}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

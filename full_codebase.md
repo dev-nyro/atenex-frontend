@@ -443,14 +443,12 @@ import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA (si no existe):
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
+    { id: 'initial-1', role: 'assistant', content: '¡Hola! ¿Cómo puedo ayudarte a consultar tu base de conocimientos hoy?' }
 ];
 
 export default function ChatPage() {
@@ -462,7 +460,6 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
   // Load chat history based on chatId
   useEffect(() => {
@@ -475,11 +472,10 @@ export default function ChatPage() {
       console.log(`Loading history for chat: ${chatId}`);
       // --- TODO: Fetch actual messages ---
       // .catch(err => {
-      //     // (+) Adaptar toast si se usa aquí
       //     toast.error("Failed to load chat history", { description: err.message });
       //  })
       setMessages([
-           { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
+           { id: 'initial-1', role: 'assistant', content: `Bienvenido de nuevo al chat ${chatId}. ¡Pregúntame lo que quieras!` }
       ]);
     } else {
       setMessages(initialMessages);
@@ -520,7 +516,7 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Query failed:", error);
-      let errorMessage = "Sorry, I encountered an error trying to answer your question.";
+      let errorMessage = "Lo siento, encontré un error al intentar responder tu pregunta.";
        if (error instanceof ApiError && error.message) {
            errorMessage = `Error: ${error.message}`;
        } else if (error instanceof Error && error.message) {
@@ -530,21 +526,13 @@ export default function ChatPage() {
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      // (-) QUITAR ESTO (si existía):
-      // toast({
-      //   variant: "destructive",
-      //   title: "Query Failed",
-      //   description: errorMessage,
-      // });
-      // (+) AÑADIR/USAR ESTO:
-      toast.error("Query Failed", {
+      toast.error("Fallo en la consulta", {
         description: errorMessage,
       });
 
     } finally {
       setIsLoading(false);
     }
-  // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
   }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {
@@ -558,7 +546,7 @@ export default function ChatPage() {
                     <div className="absolute top-2 right-2 z-10">
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon">
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                            <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
+                            <span className="sr-only">{isPanelOpen ? 'Cerrar panel de fuentes' : 'Abrir panel de fuentes'}</span>
                         </Button>
                     </div>
 
@@ -610,13 +598,13 @@ import { Separator } from '@/components/ui/separator';
 export default function KnowledgePage() {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Knowledge Base Management</h1>
+      <h1 className="text-2xl font-semibold">Gestión de la Base de Conocimiento</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Upload Documents</CardTitle>
+          <CardTitle>Subir Documentos</CardTitle>
           <CardDescription>
-            Upload new documents (PDF, DOCX, TXT, etc.) to be processed and added to the knowledge base.
+            Sube nuevos documentos (PDF, DOCX, TXT, etc.) para ser procesados y añadidos a la base de conocimientos.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -628,9 +616,9 @@ export default function KnowledgePage() {
 
        <Card>
         <CardHeader>
-          <CardTitle>Document Status</CardTitle>
+          <CardTitle>Estado de los Documentos</CardTitle>
           <CardDescription>
-            View the processing status of your uploaded documents.
+            Ver el estado de procesamiento de tus documentos subidos.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -659,7 +647,7 @@ import { cn } from '@/lib/utils';
 import { removeToken } from '@/lib/auth/helpers';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, token } = useAuth();
+  const { user, isLoading, token, logout } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -668,12 +656,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (bypassAuth) {
-      console.warn("AppLayout: Authentication BYPASSED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
+      console.warn("AppLayout: Autenticación OMITIDA debido a NEXT_PUBLIC_BYPASS_AUTH=true.");
       return; // Skip auth check if bypass is enabled
     }
 
     if (!isLoading && !token) {
-      console.log("AppLayout: No token found, redirecting to login.");
+      console.log("AppLayout: No se encontró token, redirigiendo a login.");
       router.push('/'); // Cambiado a '/'
     }
   }, [isLoading, token, router, bypassAuth]);
@@ -734,7 +722,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 ## File: `app/(app)/settings/page.tsx`
 ```tsx
-// app/(app)/settings/page.tsx
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -764,28 +751,28 @@ export default function SettingsPage() {
         // TODO: Implementar la lógica para guardar los cambios en el perfil del usuario.
         // Esto implicaría hacer una llamada a la API para actualizar el nombre del usuario.
         // Puedes usar la función 'request' de lib/api.ts para hacer la llamada a la API.
-        console.log('Saving changes:', { name });
+        console.log('Guardando cambios:', { name });
     };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className="text-2xl font-semibold">Configuración</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Manage your personal information.</CardDescription>
+          <CardTitle>Perfil</CardTitle>
+          <CardDescription>Administra tu información personal.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
             <div className="space-y-1">
-                 <Label htmlFor="name">Name</Label>
+                 <Label htmlFor="name">Nombre</Label>
                  <Input id="name" value={name} onChange={handleNameChange} />
             </div>
              <div className="space-y-1">
-                 <Label htmlFor="email">Email</Label>
+                 <Label htmlFor="email">Correo electrónico</Label>
                  <Input id="email" type="email" defaultValue={user?.email} disabled />
             </div>
-             <Button onClick={handleSave}>Save Changes</Button>
+             <Button onClick={handleSave}>Guardar Cambios</Button>
         </CardContent>
       </Card>
 
@@ -793,12 +780,11 @@ export default function SettingsPage() {
 
        <Card>
         <CardHeader>
-          <CardTitle>Company Settings</CardTitle>
-          <CardDescription>Manage settings related to your company.</CardDescription>
+          <CardTitle>Configuración de la Empresa</CardTitle>
+          <CardDescription>Administra la configuración relacionada con tu empresa.</CardDescription>
         </CardHeader>
         <CardContent>
-           <p className="text-sm text-muted-foreground">Company settings management is not yet implemented.</p>
-           {/* Add company settings fields here */}
+           <p className="text-sm text-muted-foreground">La gestión de la configuración de la empresa aún no está implementada.</p>
         </CardContent>
       </Card>
 
@@ -806,12 +792,11 @@ export default function SettingsPage() {
 
        <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Customize the look and feel.</CardDescription>
+          <CardTitle>Apariencia</CardTitle>
+          <CardDescription>Personaliza la apariencia.</CardDescription>
         </CardHeader>
         <CardContent>
-           <p className="text-sm text-muted-foreground">Theme selection is available in the header.</p>
-           {/* Add other appearance settings if needed */}
+           <p className="text-sm text-muted-foreground">La selección de temas está disponible en el encabezado.</p>
         </CardContent>
       </Card>
 
@@ -853,8 +838,8 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Welcome Back!</CardTitle>
-        <CardDescription>Sign in to access your Atenex workspace</CardDescription>
+        <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
+        <CardDescription>Accede a tu cuenta Atenex</CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm />
@@ -873,8 +858,8 @@ export default function RegisterPage() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Create Account</CardTitle>
-        <CardDescription>Join Atenex and unlock your knowledge</CardDescription>
+        <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
+        <CardDescription>Únete a Atenex y desbloquea tu conocimiento</CardDescription>
       </CardHeader>
       <CardContent>
         <RegisterForm />
@@ -886,48 +871,47 @@ export default function RegisterPage() {
 
 ## File: `app/about/page.tsx`
 ```tsx
-// app/about/page.tsx
-"use client"; // Add this line
+"use client";
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from '@/lib/constants';
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from '@/components/ui/button'; // Import the Button component
-import { useRouter } from 'next/navigation'; // Import the useRouter hook
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 const teamMembers = [
-    { name: "Demo User 1", role: "Founder", imageUrl: null },
-    { name: "Demo User 2", role: "Co-Founder", imageUrl: null },
-    { name: "Demo User 3", role: "Lead Engineer", imageUrl: null },
+    { name: "Demo User 1", role: "Fundador", imageUrl: null },
+    { name: "Demo User 2", role: "Co-Fundador", imageUrl: null },
+    { name: "Demo User 3", role: "Ingeniero Líder", imageUrl: null },
     // Add more team members as needed
 ];
 
 const milestones = [
-    { year: 2023, event: "Atenex founded with a vision for accessible knowledge." },
+    { year: 2023, event: "Atenex fundada con una visión de conocimiento accesible." },
     // Add more milestones
 ];
 
 export default function AboutPage() {
-    const router = useRouter(); // Initialize the router
+    const router = useRouter();
 
   return (
       <div className="container mx-auto p-6 space-y-4">
-          <Button variant="link" onClick={() => router.push('/')}>Back to Home</Button> {/* Button to go back */}
-          <h1 className="text-3xl font-semibold">About {APP_NAME}</h1>
+          <Button variant="link" onClick={() => router.push('/')}>Volver al Inicio</Button>
+          <h1 className="text-3xl font-semibold">Acerca de {APP_NAME}</h1>
 
           <Card>
               <CardHeader>
-                  <CardTitle>Our Mission</CardTitle>
+                  <CardTitle>Nuestra Misión</CardTitle>
                   <CardDescription>
-                      Empowering organizations with seamless access to their collective knowledge.
+                      Empoderar a las organizaciones con acceso fluido a su conocimiento colectivo.
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   <p>
-                      We are committed to providing innovative solutions that streamline knowledge management,
-                      facilitate informed decision-making, and enhance team productivity.
+                      Estamos comprometidos a proporcionar soluciones innovadoras que optimicen la gestión del conocimiento,
+                      faciliten la toma de decisiones informadas y mejoren la productividad del equipo.
                   </p>
               </CardContent>
           </Card>
@@ -936,15 +920,15 @@ export default function AboutPage() {
 
           <Card>
               <CardHeader>
-                  <CardTitle>Our Vision</CardTitle>
+                  <CardTitle>Nuestra Visión</CardTitle>
                   <CardDescription>
-                      To be the leading knowledge query platform, transforming how businesses leverage information.
+                      Ser la plataforma líder de consulta de conocimiento, transformando cómo las empresas aprovechan la información.
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   <p>
-                      We envision a future where organizations can effortlessly tap into their internal expertise,
-                      fostering a culture of continuous learning and growth.
+                      Visualizamos un futuro donde las organizaciones pueden aprovechar sin esfuerzo su experiencia interna,
+                      fomentando una cultura de aprendizaje y crecimiento continuos.
                   </p>
               </CardContent>
           </Card>
@@ -953,24 +937,24 @@ export default function AboutPage() {
 
           <Card>
               <CardHeader>
-                  <CardTitle>Our Values</CardTitle>
+                  <CardTitle>Nuestros Valores</CardTitle>
                   <CardDescription>
-                      Integrity, Innovation, Collaboration, and Customer Success.
+                      Integridad, Innovación, Colaboración y Éxito del Cliente.
                   </CardDescription>
               </CardHeader>
               <CardContent>
                   <ul className="list-disc list-inside space-y-1">
                       <li>
-                          <strong>Integrity:</strong> We uphold the highest ethical standards in all our operations.
+                          <strong>Integridad:</strong> Mantenemos los más altos estándares éticos en todas nuestras operaciones.
                       </li>
                       <li>
-                          <strong>Innovation:</strong> We continuously seek new ways to improve our platform and services.
+                          <strong>Innovación:</strong> Buscamos continuamente nuevas formas de mejorar nuestra plataforma y servicios.
                       </li>
                       <li>
-                          <strong>Collaboration:</strong> We believe in working together to achieve shared goals.
+                          <strong>Colaboración:</strong> Creemos en trabajar juntos para lograr objetivos compartidos.
                       </li>
                       <li>
-                          <strong>Customer Success:</strong> We are dedicated to helping our customers succeed.
+                          <strong>Éxito del Cliente:</strong> Estamos dedicados a ayudar a nuestros clientes a tener éxito.
                       </li>
                   </ul>
               </CardContent>
@@ -979,13 +963,13 @@ export default function AboutPage() {
 
           <Card>
               <CardHeader>
-                  <CardTitle>Meet Our Team</CardTitle>
+                  <CardTitle>Conoce a Nuestro Equipo</CardTitle>
                   <CardDescription>
-                      The talented individuals behind {APP_NAME}.
+                      Las talentosas personas detrás de {APP_NAME}.
                   </CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center">
-                  <div className="grid sm:grid-cols-3 gap-4"> {/* Flex Container for centering */}
+                  <div className="grid sm:grid-cols-3 gap-4">
                     {teamMembers.map((member) => (
                         <div key={member.name} className="flex flex-col items-center">
                             <Avatar className="h-16 w-16">
@@ -1011,109 +995,95 @@ export default function AboutPage() {
 
 ## File: `app/contact/page.tsx`
 ```tsx
-// app/contact/page.tsx
-"use client"; // Add this line
+// File: app/page.tsx
+"use client";
 
-import React from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
-import { Mail, Phone, MapPin } from 'lucide-react';
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { useRouter } from 'next/navigation'; // Import the useRouter hook
+import { useAuth } from '@/lib/hooks/useAuth';
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 
-export default function ContactPage() {
-    const router = useRouter(); // Initialize the router
+export default function HomePage() {
+  const router = useRouter();
+  const { token } = useAuth();
 
-    return (
-        <div className="container mx-auto p-6 space-y-4">
-            <Button variant="link" onClick={() => router.push('/')}>Back to Home</Button> {/* Button to go back */}
-            <h1 className="text-3xl font-semibold">Contact {APP_NAME}</h1>
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header/Navigation */}
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
+        <div className="container flex items-center justify-between h-16 py-4 px-4">
+          <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
+          <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
+            <LinkButton href="/">Inicio</LinkButton>
+            <LinkButton href="/about">Nosotros</LinkButton>
+            <LinkButton href="/contact">Contacto</LinkButton>
+            {token ?
+              <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
+                Ir a la App
+              </Button>
+              :
+              <Button onClick={() => router.push('/login')}>
+                Iniciar sesión
+              </Button>
+            }
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>General Inquiries</CardTitle>
-                    <CardDescription>
-                        For questions about our platform, features, or pricing.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <a href="mailto:info@example.com">info@example.com</a>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>(123) 456-7890</span>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Separator />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Support</CardTitle>
-                    <CardDescription>
-                        Need help with using the platform? Contact our support team.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <a href="mailto:support@example.com">support@example.com</a>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Separator />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Contact Form</CardTitle>
-                    <CardDescription>Send us a message directly.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form className="grid gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Your Name</Label>
-                            <Input id="name" placeholder="John Doe" type="text" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" placeholder="johndoe@example.com" type="email" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="message">Message</Label>
-                            <Textarea id="message" placeholder="Write your message here." />
-                        </div>
-                        <Button>Send Message</Button>
-                    </form>
-                </CardContent>
-            </Card>
-
-            <Separator />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Our Office</CardTitle>
-                    <CardDescription>
-                        Visit us at our headquarters.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>123 Main Street, Anytown, CA 12345</span>
-                    </div>
-                    {/* Google Maps Embed or similar here if desired */}
-                </CardContent>
-            </Card>
+          </nav>
         </div>
-    );
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
+        <section className="text-center">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
+            Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8">
+            Haz preguntas en lenguaje natural y obtén respuestas instantáneas basadas en el conocimiento colectivo de tu organización.
+          </p>
+          <Button size="lg" onClick={() => token ? router.push('/chat') : router.push('/register')}>
+            {token ? 'Ir al Chat' : 'Comenzar'}
+          </Button>
+        </section>
+
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Feature Cards - replace with actual feature descriptions */}
+          <FeatureCard title="Búsqueda Inteligente" description="Encuentra la información que necesitas rápida y fácilmente usando consultas en lenguaje natural." />
+          <FeatureCard title="Conocimiento Centralizado" description="Accede a todo el conocimiento colectivo de tu organización en un solo lugar, eliminando los silos de información." />
+          <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo para tomar mejores decisiones con un acceso más rápido a información relevante." />
+        </section>
+           <EmailConfirmationHandler />
+      </main>
+
+      {/* Footer (optional) */}
+      <footer className="bg-secondary/10 border-t py-8">
+        <div className="container text-center text-muted-foreground">
+          © {new Date().getFullYear()} Atenex. Todos los derechos reservados.
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Reusable Button Component
+function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+  const router = useRouter();
+  return (
+    <Button variant="link" onClick={() => router.push(href)}>
+      {children}
+    </Button>
+  );
+}
+
+// Reusable Feature Card Component
+function FeatureCard({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-xl transition-shadow duration-200">
+      <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-muted-foreground">{description}</p>
+    </div>
+  );
 }
 ```
 
@@ -1270,14 +1240,13 @@ import "./globals.css"; // Esta importación SÍ debe estar aquí
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// (+) DESCOMENTAR ESTA LÍNEA:
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Atenex - Enterprise Knowledge Query",
-  description: "Query your enterprise knowledge base using natural language.",
+  title: "Atenex - Consulta de Conocimiento Empresarial",
+  description: "Consulta tu base de conocimiento empresarial usando lenguaje natural.",
 };
 
 export default function RootLayout({
@@ -1286,7 +1255,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
@@ -1301,7 +1270,6 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            {/* (+) Asegúrate de que esta línea esté activa y use el Toaster importado */}
             <Toaster />
           </ThemeProvider>
         </AuthProvider>
@@ -1334,16 +1302,16 @@ export default function HomePage() {
         <div className="container flex items-center justify-between h-16 py-4 px-4">
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
           <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
-            <LinkButton href="/">Home</LinkButton>
-            <LinkButton href="/about">About Us</LinkButton>
-            <LinkButton href="/contact">Contact Us</LinkButton>
+            <LinkButton href="/">Inicio</LinkButton>
+            <LinkButton href="/about">Nosotros</LinkButton>
+            <LinkButton href="/contact">Contacto</LinkButton>
             {token ?
               <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
-                Go to App
+                Ir a la App
               </Button>
               :
               <Button onClick={() => router.push('/login')}>
-                Login
+                Iniciar sesión
               </Button>
             }
 
@@ -1355,21 +1323,21 @@ export default function HomePage() {
       <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
         <section className="text-center">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Unlock Your Enterprise Knowledge with <span className="text-primary">{APP_NAME}</span>
+            Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
-            Ask questions in natural language and get instant answers based on your organization's collective knowledge.
+            Haz preguntas en lenguaje natural y obtén respuestas instantáneas basadas en el conocimiento colectivo de tu organización.
           </p>
           <Button size="lg" onClick={() => token ? router.push('/chat') : router.push('/register')}>
-            {token ? 'Go to Chat' : 'Get Started'}
+            {token ? 'Ir al Chat' : 'Comenzar'}
           </Button>
         </section>
 
         <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Feature Cards - replace with actual feature descriptions */}
-          <FeatureCard title="Intelligent Search" description="Find the information you need quickly and easily using natural language queries." />
-          <FeatureCard title="Centralized Knowledge" description="Access all your organization's collective knowledge in one place, eliminating information silos." />
-          <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
+          <FeatureCard title="Búsqueda Inteligente" description="Encuentra la información que necesitas rápida y fácilmente usando consultas en lenguaje natural." />
+          <FeatureCard title="Conocimiento Centralizado" description="Accede a todo el conocimiento colectivo de tu organización en un solo lugar, eliminando los silos de información." />
+          <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo para tomar mejores decisiones con un acceso más rápido a información relevante." />
         </section>
            <EmailConfirmationHandler />
       </main>
@@ -1377,7 +1345,7 @@ export default function HomePage() {
       {/* Footer (optional) */}
       <footer className="bg-secondary/10 border-t py-8">
         <div className="container text-center text-muted-foreground">
-          © {new Date().getFullYear()} Atenex. All rights reserved.
+          © {new Date().getFullYear()} Atenex. Todos los derechos reservados.
         </div>
       </footer>
     </div>
@@ -1395,7 +1363,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string }) {
+function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-xl transition-shadow duration-200">
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
@@ -1438,14 +1406,14 @@ export default function EmailConfirmationHandler() {
 
                      // Create the supabaseClient
                      const supabaseClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
                      );
                     
                      // Use the access token to get the user and full session
                      const { data: { user, session }, error } = await supabaseClient.auth.setSession({
-                         access_token: accessToken,
-                         refresh_token: refreshToken,
+                         access_token: accessToken!,
+                         refresh_token: refreshToken!,
                      })
 
                      if (error) {
@@ -1453,7 +1421,7 @@ export default function EmailConfirmationHandler() {
                         return; // Stop further execution if session setup fails
                      }
                     
-                    if (session) {
+                    if (session && user) {
                         try {
                             const { error: insertError } = await supabaseClient
                                 .from('users')
@@ -1514,8 +1482,8 @@ import { ApiError } from '@/lib/api';
 import { createClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }),
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -1541,7 +1509,7 @@ export function LoginForm() {
 
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
+        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
         setIsLoading(false);
         return;
       }
@@ -1550,21 +1518,24 @@ export function LoginForm() {
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword(data);
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
       if (authError) {
         console.error("Supabase login failed:", authError);
-        setError(authError.message || 'Login failed. Please check your credentials.');
+        setError(authError.message || 'Error al iniciar sesión. Por favor, verifica tus credenciales.');
       } else if (authResponse.session) {
         console.log("Supabase login successful:", authResponse);
-        login(authResponse.session);
+        login(authResponse.session.access_token);
       } else {
         console.error("Supabase login: No session returned");
-        setError('Login failed. Please check your credentials.');
+        setError('Error al iniciar sesión. Por favor, verifica tus credenciales.');
       }
     } catch (err) {
       console.error("Login failed:", err);
-      let errorMessage = 'Login failed. Please check your credentials.';
+      let errorMessage = 'Error al iniciar sesión. Por favor, verifica tus credenciales.';
       if (err instanceof ApiError) {
         errorMessage = err.message || errorMessage;
       } else if (err instanceof Error) {
@@ -1586,11 +1557,11 @@ export function LoginForm() {
         </Alert>
       )}
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Correo electrónico</Label>
         <Input
           id="email"
           type="email"
-          placeholder="name@example.com"
+          placeholder="nombre@ejemplo.com"
           required
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
@@ -1600,7 +1571,7 @@ export function LoginForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Contraseña</Label>
         <Input
           id="password"
           type="password"
@@ -1613,12 +1584,12 @@ export function LoginForm() {
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Iniciar sesión'}
       </Button>
       <div className="mt-4 text-center text-sm">
-        Don't have an account?{" "}
+        ¿No tienes una cuenta?{" "}
         <Link href="/register" className="underline text-primary hover:text-primary/80">
-          Register
+          Registrarse
         </Link>
       </div>
     </form>
@@ -1647,11 +1618,11 @@ import { createClient } from '@supabase/supabase-js';
 import { AuthApiError } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }).optional(), // El nombre debe tener al menos 2 caracteres
+  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }), // Dirección de correo electrónico no válida
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }), // La contraseña debe tener al menos 6 caracteres
   // (+) AÑADIR company_id
-  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
+  companyId: z.string().uuid({message: 'ID de empresa no válido'}).optional(), // ID de empresa no válido
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -1682,7 +1653,7 @@ export function RegisterForm() {
 
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
+        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
         setIsLoading(false);
         return;
       }
@@ -1708,14 +1679,14 @@ export function RegisterForm() {
 
      if (authError) {
         console.error("Supabase registration failed:", authError);
-        setError(authError.message || 'Registration failed. Please try again.');
+        setError(authError.message || 'Error al registrarse. Por favor, inténtalo de nuevo.'); // Error al registrarse. Por favor, inténtalo de nuevo.
         setIsLoading(false);
      } else {
         setSuccess(true); // Registration successful, set success state
      }
     } catch (err: any) {
       console.error("Registration failed:", err);
-      let errorMessage = 'Registration failed. Please try again.';
+      let errorMessage = 'Error al registrarse. Por favor, inténtalo de nuevo.'; // Error al registrarse. Por favor, inténtalo de nuevo.
       if (err instanceof ApiError) {
         errorMessage = err.message || errorMessage;
       } else if (err instanceof Error) {
@@ -1732,24 +1703,24 @@ export function RegisterForm() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>Error</AlertTitle> {/* Error */}
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       {success && !error && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
+          <AlertTitle className="text-green-800 dark:text-green-200">Éxito</AlertTitle> {/* Éxito */}
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Please check your email to verify your account.
-          </AlertDescription>
+            ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta.
+          </AlertDescription> {/* ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta. */}
         </Alert>
       )}
       <div className="space-y-1">
-        <Label htmlFor="name">Name (Optional)</Label>
+        <Label htmlFor="name">Nombre (Opcional)</Label> {/* Nombre (Opcional) */}
         <Input
           id="name"
           type="text"
-          placeholder="Your Name"
+          placeholder="Tu Nombre"
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
@@ -1758,11 +1729,11 @@ export function RegisterForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Correo electrónico</Label> {/* Correo electrónico */}
         <Input
           id="email"
           type="email"
-          placeholder="name@example.com"
+          placeholder="nombre@ejemplo.com"
           required
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
@@ -1772,7 +1743,7 @@ export function RegisterForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Contraseña</Label> {/* Contraseña */}
         <Input
           id="password"
           type="password"
@@ -1786,11 +1757,11 @@ export function RegisterForm() {
       </div>
       {/* (+) AÑADIR company_id */}
       <div className="space-y-1">
-        <Label htmlFor="companyId">Company ID (Optional)</Label>
+        <Label htmlFor="companyId">ID de empresa (Opcional)</Label> {/* ID de empresa (Opcional) */}
         <Input
           id="companyId"
           type="text"
-          placeholder="Company ID"
+          placeholder="ID de la empresa"
           {...form.register('companyId')}
           aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
         />
@@ -1799,12 +1770,12 @@ export function RegisterForm() {
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Crear cuenta'} {/* Crear cuenta */}
       </Button>
       <div className="mt-4 text-center text-sm">
-        Already have an account?{" "}
+        ¿Ya tienes una cuenta?{" "} {/* ¿Ya tienes una cuenta? */}
         <Link href="/login" className="underline text-primary hover:text-primary/80">
-          Login
+          Iniciar sesión
         </Link>
       </div>
     </form>
@@ -1857,7 +1828,7 @@ export function ChatHistory() {
         console.log("ChatHistory: No token, skipping fetch.");
         setChats([]); // Clear chats if not logged in
         setIsLoading(false);
-        setError("Please log in to view chat history."); // Inform user
+        setError("Por favor, inicia sesión para ver el historial de chat."); 
         return;
     }
     console.log("ChatHistory: Fetching chat list...");
@@ -1869,22 +1840,22 @@ export function ChatHistory() {
       fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setChats(fetchedChats);
        if (showToast) {
-           toast.success("Chat History Refreshed");
+           toast.success("Historial de chat actualizado");
        }
     } catch (err) {
       console.error("Failed to fetch chat history:", err);
-      let message = "Could not load chat history.";
+      let message = "No se pudo cargar el historial de chat.";
        if (err instanceof ApiError) {
          message = err.message || message;
          if (err.status === 401) { // Handle unauthorized specifically
-             message = "Session expired or invalid. Please log in again.";
+             message = "Sesión expirada o inválida. Por favor, inicia sesión nuevamente.";
              // Optionally trigger logout here
          }
        } else if (err instanceof Error) {
          message = err.message;
        }
       setError(message);
-      toast.error("Error Loading Chats", { description: message });
+      toast.error("Error al cargar los chats", { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -1910,7 +1881,7 @@ export function ChatHistory() {
         await deleteChat(chatToDelete.id);
         // Optimistically update UI or refetch
         setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
-        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+        toast.success("Chat eliminado", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" eliminado.`});
 
         // If the currently active chat is deleted, navigate to the base chat page
         const currentChatId = pathname.split('/').pop();
@@ -1920,13 +1891,13 @@ export function ChatHistory() {
         }
     } catch (err) {
         console.error("Failed to delete chat:", err);
-        let message = "Could not delete chat.";
+        let message = "No se pudo eliminar el chat.";
         if (err instanceof ApiError) {
             message = err.message || message;
         } else if (err instanceof Error) {
             message = err.message;
         }
-        toast.error("Deletion Failed", { description: message });
+        toast.error("Error al eliminar", { description: message });
     } finally {
         setIsDeleting(false);
         setIsAlertOpen(false); // Close the dialog
@@ -1938,8 +1909,8 @@ export function ChatHistory() {
     if (!token && !isLoading) { // Show login prompt if not logged in and not loading
          return (
              <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Please log in to view or start chats.</p>
-                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
+                 <p className="text-sm mb-2">Por favor, inicia sesión para ver o iniciar chats.</p>
+                 <Button size="sm" onClick={() => router.push('/login')}>Iniciar sesión</Button>
              </div>
          );
      }
@@ -1953,13 +1924,13 @@ export function ChatHistory() {
                 <AlertCircle className="mx-auto h-6 w-6 mb-1" />
                 <p className="text-sm mb-2">{error}</p>
                 <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
-                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                    <RefreshCw className="mr-1 h-3 w-3"/> Reintentar
                 </Button>
             </div>
         );
     }
     if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
-        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
+        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No hay historial de chat todavía.</p>;
     }
 
     // Render chat list
@@ -1989,7 +1960,7 @@ export function ChatHistory() {
                         size="icon"
                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
                         onClick={(e) => openDeleteConfirmation(chat, e)}
-                        aria-label={`Delete chat: ${displayTitle}`}
+                        aria-label={`Eliminar chat: ${displayTitle}`}
                     >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                     </Button>
@@ -2011,21 +1982,21 @@ export function ChatHistory() {
         {/* Dialog Content - Placed outside the loop */}
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the chat
-                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
+                    Esta acción no se puede deshacer. Se eliminará permanentemente el chat
+                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> y todos sus mensajes.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                     onClick={handleDeleteConfirmed} // Changed to trigger confirmed delete
                     disabled={isDeleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar"}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
@@ -2391,11 +2362,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ## File: `components/chat/retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-// File: components/chat/retrieved-documents-panel.tsx
       
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
+import { FileText, AlertCircle, Download, Loader2 } from 'lucide-react'; // Import Download icon
 import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -2409,7 +2380,7 @@ interface RetrievedDocumentsPanelProps {
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
-    const [open, setOpen] = React.useState(false)
+    const [open, setOpen] = useState(false)
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [docContent, setDocContent] = useState<string | null>(null); // State to store document content
     const [viewingError, setViewingError] = useState<string | null>(null); // Error when viewing doc
@@ -2579,8 +2550,6 @@ import { listDocumentStatuses, DocumentStatusResponse } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA (si no existe):
 import { toast } from "sonner";
 
 type DocumentStatus = DocumentStatusResponse;
@@ -2589,7 +2558,6 @@ export function DocumentStatusList() {
     const [statuses, setStatuses] = useState<DocumentStatus[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
     const fetchStatuses = useCallback(async (showToast = false) => {
         setIsLoading(true);
@@ -2598,24 +2566,19 @@ export function DocumentStatusList() {
             const data = await listDocumentStatuses();
             setStatuses(data);
             if (showToast) {
-                 // (-) QUITAR ESTO (si existía): toast({ title: "Statuses Refreshed", description: `Loaded ${data.length} document statuses.`});
-                 // (+) AÑADIR/USAR ESTO:
-                 toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
+                toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
             } else if (data.length === 0) {
-                 console.log("No document statuses found.");
+                console.log("No document statuses found.");
             }
         } catch (err) {
             console.error("Failed to fetch document statuses:", err);
             const message = err instanceof Error ? err.message : "Could not load document statuses.";
             setError(message);
-            // (-) QUITAR ESTO (si existía): toast({ variant: "destructive", title: "Error Loading Statuses", description: message });
-            // (+) AÑADIR/USAR ESTO:
             toast.error("Error Loading Statuses", { description: message });
             setStatuses([]);
         } finally {
             setIsLoading(false);
         }
-    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     useEffect(() => {
@@ -2627,7 +2590,7 @@ export function DocumentStatusList() {
     };
 
     const getStatusBadge = (status: DocumentStatus['status']) => {
-       switch (status) {
+        switch (status) {
             case 'uploaded':
                 return <Badge variant="outline"><Clock className="mr-1 h-3 w-3" />Uploaded</Badge>;
             case 'processing':
@@ -2645,7 +2608,7 @@ export function DocumentStatusList() {
     };
 
     const formatDateTime = (dateString?: string) => {
-      if (!dateString) return 'N/A';
+        if (!dateString) return 'N/A';
         try {
             // Format for better readability, adjust locale/options as needed
             return new Date(dateString).toLocaleString(undefined, {
@@ -2657,8 +2620,8 @@ export function DocumentStatusList() {
         }
     };
 
-     const renderContent = () => {
-      if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
+    const renderContent = () => {
+        if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
             return Array.from({ length: 5 }).map((_, index) => ( // Render more skeleton rows
                 <TableRow key={`skel-${index}`}>
                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
@@ -2696,12 +2659,12 @@ export function DocumentStatusList() {
         // Render the actual data rows
         return statuses.map((doc) => (
             <TableRow key={doc.document_id}>
-                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name}>{doc.file_name || 'N/A'}</TableCell>
+                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name || 'N/A'}>{doc.file_name || 'N/A'}</TableCell>
                 <TableCell>{getStatusBadge(doc.status)}</TableCell>
                 <TableCell className="text-muted-foreground text-xs">
-                     {/* Display error message prominently if status is error */}
+                    {/* Display error message prominently if status is error */}
                     {doc.status === 'error'
-                        ? <span className="text-destructive truncate block" title={doc.error_message || 'Unknown error'}>{doc.error_message || 'Unknown error'}</span>
+                        ? <span className="text-destructive truncate block" title={doc.error_message || 'Unknown error'}>{doc.error_message ?? 'Unknown error'}</span>
                         : doc.status === 'processed' || doc.status === 'indexed'
                             ? `${doc.chunk_count ?? '?'} chunks`
                             // Display the backend message otherwise, or default '--'
@@ -2713,14 +2676,14 @@ export function DocumentStatusList() {
     };
 
     return (
-       <div className="space-y-2">
-           <div className="flex justify-end">
+        <div className="space-y-2">
+            <div className="flex justify-end">
                 {error && statuses.length > 0 && <span className="text-xs text-destructive mr-2 self-center">Refresh failed: {error}</span>}
                 <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
                     <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                     Refresh
                 </Button>
-           </div>
+            </div>
             <ScrollArea className="h-[400px] border rounded-md">
                 <Table>
                     <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
@@ -2732,11 +2695,11 @@ export function DocumentStatusList() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                       {renderContent()}
+                        {renderContent()}
                     </TableBody>
                 </Table>
             </ScrollArea>
-       </div>
+        </div>
     );
 }
 ```
@@ -2918,90 +2881,84 @@ export function FileUploader() {
 
 ## File: `components/layout/header.tsx`
 ```tsx
-    // File: components/layout/header.tsx
-    "use client";
+// File: components/layout/header.tsx
+"use client";
 
-    import React from 'react';
-    import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-    import { Button } from "@/components/ui/button";
-    import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-    import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
-    import { useAuth } from '@/lib/hooks/useAuth';
-    import { APP_NAME } from '@/lib/constants';
-    import { ThemePaletteButton } from '@/components/theme-palette-button';
-    import { useRouter } from 'next/navigation';
+import React from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LogOut, Settings, User as UserIcon, Menu, Home } from "lucide-react";
+import { useAuth } from '@/lib/hooks/useAuth';
+import { APP_NAME } from '@/lib/constants';
+import { ThemePaletteButton } from '@/components/theme-palette-button';
+import { useRouter } from 'next/navigation';
 
-    export function Header() {
-      const { user, logout } = useAuth();
-        const router = useRouter();
-        const getInitials = (name?: string) => {
-          if (!name) return '?';
-          return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-        };
+export function Header() {
+  const { user, logout } = useAuth();
+    const router = useRouter();
+    const getInitials = (name?: string) => {
+      if (!name) return '?';
+      return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+    };
 
-        return (
-          <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
-            {/* Left side - Home Link */}
-            <div className="flex items-center">
-                <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-                    <Home className="h-5 w-5" />
-                    <span className="sr-only">Home</span>
+    return (
+      <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background px-4 md:px-6">
+        {/* Left side - Home Link */}
+        <div className="flex items-center">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
+                <Home className="h-5 w-5" />
+                <span className="sr-only">Inicio</span>
+            </Button>
+            <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
+            {/* Add Breadcrumbs or dynamic title here */}
+        </div>
+
+
+        {/* Right side - Theme toggle and User menu */}
+        <div className="flex items-center space-x-4">
+          <ThemePaletteButton />
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                  <Avatar className="h-9 w-9">
+                    {/* Add AvatarImage if user has profile picture URL */}
+                    {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {getInitials(user.name)}
+                    </AvatarFallback>
+                  </Avatar>
                 </Button>
-                <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span>
-                {/* Add Breadcrumbs or dynamic title here */}
-            </div>
-
-
-            {/* Right side - Theme toggle and User menu */}
-            <div className="flex items-center space-x-4">
-              <ThemePaletteButton />
-              {user && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                      <Avatar className="h-9 w-9">
-                        {/* Add AvatarImage if user has profile picture URL */}
-                        {/* <AvatarImage src="/avatars/01.png" alt={user.name || user.email} /> */}
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56" align="end" forceMount>
-                    <DropdownMenuLabel className="font-normal">
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user.name || 'User'}</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {/* Add links to settings or profile page */}
-                    <DropdownMenuItem onClick={() => router.push('/settings')}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                      {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut> */}
-                    </DropdownMenuItem>
-                    {/* Remove Profile DropDown Option
-                    <DropdownMenuItem>
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                      {/* <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                    </DropdownMenuItem> */}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </header>
-        );
-      }
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.name || 'Usuario'}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {/* Add links to settings or profile page */}
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configuración</span>
+                </DropdownMenuItem>
+                {/* Remove Profile DropDown Option */}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Cerrar sesión</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </header>
+    );
+  }
 ```
 
 ## File: `components/layout/sidebar.tsx`
@@ -4803,7 +4760,7 @@ export async function request<T>(
       // Handle missing token for required gateway routes (excluding auth endpoints)
       console.error(`Authentication token missing for Gateway request to ${url}.`);
       // Throw an error to prevent the request if auth is mandatory
-      throw new ApiError("Authentication required. Please log in.", 401);
+      throw new ApiError("Se requiere autenticación. Por favor, inicie sesión.", 401);
   }
 
 
@@ -4839,7 +4796,7 @@ export async function request<T>(
            errorMessage = errorData.detail;
        } else if (errorData?.detail && Array.isArray(errorData.detail)) {
            // Handle FastAPI validation errors specifically
-           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
+           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Error de validación';
        } else if (errorData?.message) { // Handle generic 'message' field
            errorMessage = errorData.message;
        } else if (errorText) {
@@ -4847,15 +4804,15 @@ export async function request<T>(
        } else {
            // Fallback messages based on status code
            switch (response.status) {
-                case 400: errorMessage = "Bad Request. Please check your input."; break;
-                case 401: errorMessage = "Unauthorized. Please check credentials or login again."; break;
-                case 403: errorMessage = "Forbidden. You don't have permission."; break;
-                case 404: errorMessage = "Resource not found."; break;
-                case 422: errorMessage = "Validation Error. Please check your input."; break;
-                case 500: errorMessage = "Internal Server Error. Please try again later."; break;
-                case 502: errorMessage = "Bad Gateway. Error communicating with upstream service."; break;
-                case 503: errorMessage = "Service Unavailable. Please try again later."; break;
-                case 504: errorMessage = "Gateway Timeout. The server took too long to respond."; break;
+                case 400: errorMessage = "Solicitud incorrecta. Por favor, revisa tus datos."; break;
+                case 401: errorMessage = "No autorizado. Por favor, verifica tus credenciales o inicia sesión nuevamente."; break;
+                case 403: errorMessage = "Acceso prohibido. No tienes permisos suficientes."; break;
+                case 404: errorMessage = "Recurso no encontrado."; break;
+                case 422: errorMessage = "Error de validación. Por favor, revisa tus datos."; break;
+                case 500: errorMessage = "Error interno del servidor. Por favor, intenta más tarde."; break;
+                case 502: errorMessage = "Error de puerta de enlace. Error al comunicarse con el servicio."; break;
+                case 503: errorMessage = "Servicio no disponible. Por favor, intenta más tarde."; break;
+                case 504: errorMessage = "Tiempo de espera agotado. El servidor tardó demasiado en responder."; break;
            }
        }
 
@@ -4877,7 +4834,7 @@ export async function request<T>(
         return data;
     } catch (jsonError) {
          console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
-         throw new ApiError(`Invalid JSON response from server`, response.status);
+         throw new ApiError(`Respuesta JSON inválida del servidor`, response.status);
     }
 
   } catch (error) {
@@ -4887,12 +4844,12 @@ export async function request<T>(
     } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
         // Handle Network errors specifically
         console.error('Network Error:', { url, error });
-        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
+        throw new ApiError('Error de red: No se pudo conectar con el servidor. ¿Está funcionando y accesible el API Gateway?', 0); // Use status 0 for network errors
     }
     else {
       // Handle other unexpected errors (e.g., programming errors in this function)
       console.error('Unexpected error during API request:', { url, error });
-      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred', 500);
+      throw new ApiError(error instanceof Error ? error.message : 'Ha ocurrido un error inesperado', 500);
     }
   }
 }
@@ -5075,7 +5032,6 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
     role: apiMessage.role,
     content: apiMessage.content,
     sources: mapApiSourcesToFrontend(apiMessage.sources),
-    created_at: apiMessage.created_at,
     isError: false,
 });
 ```
@@ -5202,37 +5158,28 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  // (+) AÑADIR 'signIn' a la definición de AuthContextType
   signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
+  login: (token: string) => void;
   logout: () => void;
 }
 
-// (+) Define un valor por defecto que coincide con la estructura de AuthContextType
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
     isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
     signIn: (session: any) => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("signIn function called outside of AuthProvider context");
-        // throw new Error("Login function called outside AuthProvider");
     },
     login: (token: string) => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("Login function called outside of AuthProvider context");
-        // throw new Error("Login function called outside AuthProvider");
     },
     logout: () => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("Logout function called outside of AuthProvider context");
-        // throw new Error("Logout function called outside AuthProvider");
     },
 };
 
-// (+) Modifica createContext para usar el valor por defecto y el tipo AuthContextType (sin | undefined)
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
-// Explicitly type the props for the component, including children
 interface AuthProviderProps {
   children: React.ReactNode;
 }
@@ -5243,7 +5190,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
   const router = useRouter();
 
-  // Check for token on initial load
   useEffect(() => {
     const storedToken = getToken();
     if (storedToken) {
@@ -5252,34 +5198,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userData);
         setAuthStateToken(storedToken);
       } else {
-        // Invalid token found
         removeToken();
       }
     }
     setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
+  }, []);
 
   const login = useCallback((newToken: string) => {
     setToken(newToken);
-    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+    const userData = getUserFromToken(newToken);
     setUser(userData);
     setAuthStateToken(newToken);
-    // (+) Cambiado a '/' para ir a la página principal después del login
     router.push('/');
     console.log("User logged in, token set.");
-  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
+  }, [router]);
 
   const signIn = useCallback((session: any) => {
-        // (+) Implementa la lógica de signIn (ej: guardar info de session)
-        const newToken = session.access_token; // Asume que session tiene access_token
-        setToken(newToken);
-        const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
-        setUser(userData);
-        setAuthStateToken(newToken);
-        router.push('/');
-        console.log("User signed in (via setSession), token set.");
-
+    const newToken = session.access_token;
+    setToken(newToken);
+    const userData = getUserFromToken(newToken);
+    setUser(userData);
+    setAuthStateToken(newToken);
+    router.push('/');
+    console.log("User signed in (via setSession), token set.");
   }, [router]);
 
   const logout = useCallback(() => {
@@ -5290,19 +5231,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged out.");
   }, [router]);
 
-  // El valor proporcionado por el Provider ahora siempre coincide con AuthContextType
   const providerValue = {
       user,
       token,
       isLoading,
-      // (+) Asegúrate de que 'signIn' está incluido en el valor del provider
       signIn,
       login,
       logout
   };
 
   return (
-    // Pasa el objeto calculado
     <AuthContext.Provider value={providerValue}>
       {children}
     </AuthContext.Provider>
@@ -5311,12 +5249,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  // La comprobación de undefined ya no es estrictamente necesaria porque
-  // createContext ahora tiene un valor por defecto válido, pero
-  // mantenerla puede ser útil para detectar errores de configuración inesperados.
-  if (context === undefined || context === defaultAuthContextValue) { // (+) Check against default value too
-    // Only throw error if it's truly used outside and hasn't received the real value
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') { // Avoid throwing during SSR/build if possible
+  if (context === undefined || context === defaultAuthContextValue) {
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
        console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
     } else if (context === undefined) {
        throw new Error('useAuth must be used within an AuthProvider');

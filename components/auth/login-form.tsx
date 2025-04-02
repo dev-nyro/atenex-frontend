@@ -15,8 +15,8 @@ import { ApiError } from '@/lib/api';
 import { createClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }),
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -42,7 +42,7 @@ export function LoginForm() {
 
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
+        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
         setIsLoading(false);
         return;
       }
@@ -58,17 +58,17 @@ export function LoginForm() {
 
       if (authError) {
         console.error("Supabase login failed:", authError);
-        setError(authError.message || 'Login failed. Please check your credentials.');
+        setError(authError.message || 'Error al iniciar sesión. Por favor, verifica tus credenciales.');
       } else if (authResponse.session) {
         console.log("Supabase login successful:", authResponse);
         login(authResponse.session.access_token);
       } else {
         console.error("Supabase login: No session returned");
-        setError('Login failed. Please check your credentials.');
+        setError('Error al iniciar sesión. Por favor, verifica tus credenciales.');
       }
     } catch (err) {
       console.error("Login failed:", err);
-      let errorMessage = 'Login failed. Please check your credentials.';
+      let errorMessage = 'Error al iniciar sesión. Por favor, verifica tus credenciales.';
       if (err instanceof ApiError) {
         errorMessage = err.message || errorMessage;
       } else if (err instanceof Error) {
@@ -90,11 +90,11 @@ export function LoginForm() {
         </Alert>
       )}
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Correo electrónico</Label>
         <Input
           id="email"
           type="email"
-          placeholder="name@example.com"
+          placeholder="nombre@ejemplo.com"
           required
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
@@ -104,7 +104,7 @@ export function LoginForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Contraseña</Label>
         <Input
           id="password"
           type="password"
@@ -117,12 +117,12 @@ export function LoginForm() {
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Iniciar sesión'}
       </Button>
       <div className="mt-4 text-center text-sm">
-        Don't have an account?{" "}
+        ¿No tienes una cuenta?{" "}
         <Link href="/register" className="underline text-primary hover:text-primary/80">
-          Register
+          Registrarse
         </Link>
       </div>
     </form>

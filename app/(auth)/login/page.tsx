@@ -5,8 +5,8 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Welcome Back!</CardTitle>
-        <CardDescription>Sign in to access your Atenex workspace</CardDescription>
+        <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
+        <CardDescription>Accede a tu cuenta Atenex</CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm />

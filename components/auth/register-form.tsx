@@ -17,11 +17,11 @@ import { createClient } from '@supabase/supabase-js';
 import { AuthApiError } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }).optional(), // El nombre debe tener al menos 2 caracteres
+  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }), // Dirección de correo electrónico no válida
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }), // La contraseña debe tener al menos 6 caracteres
   // (+) AÑADIR company_id
-  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
+  companyId: z.string().uuid({message: 'ID de empresa no válido'}).optional(), // ID de empresa no válido
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -52,7 +52,7 @@ export function RegisterForm() {
 
       if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
         console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
+        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
         setIsLoading(false);
         return;
       }
@@ -78,14 +78,14 @@ export function RegisterForm() {
 
      if (authError) {
         console.error("Supabase registration failed:", authError);
-        setError(authError.message || 'Registration failed. Please try again.');
+        setError(authError.message || 'Error al registrarse. Por favor, inténtalo de nuevo.'); // Error al registrarse. Por favor, inténtalo de nuevo.
         setIsLoading(false);
      } else {
         setSuccess(true); // Registration successful, set success state
      }
     } catch (err: any) {
       console.error("Registration failed:", err);
-      let errorMessage = 'Registration failed. Please try again.';
+      let errorMessage = 'Error al registrarse. Por favor, inténtalo de nuevo.'; // Error al registrarse. Por favor, inténtalo de nuevo.
       if (err instanceof ApiError) {
         errorMessage = err.message || errorMessage;
       } else if (err instanceof Error) {
@@ -102,24 +102,24 @@ export function RegisterForm() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>Error</AlertTitle> {/* Error */}
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       {success && !error && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
+          <AlertTitle className="text-green-800 dark:text-green-200">Éxito</AlertTitle> {/* Éxito */}
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Please check your email to verify your account.
-          </AlertDescription>
+            ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta.
+          </AlertDescription> {/* ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta. */}
         </Alert>
       )}
       <div className="space-y-1">
-        <Label htmlFor="name">Name (Optional)</Label>
+        <Label htmlFor="name">Nombre (Opcional)</Label> {/* Nombre (Opcional) */}
         <Input
           id="name"
           type="text"
-          placeholder="Your Name"
+          placeholder="Tu Nombre"
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
@@ -128,11 +128,11 @@ export function RegisterForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">Correo electrónico</Label> {/* Correo electrónico */}
         <Input
           id="email"
           type="email"
-          placeholder="name@example.com"
+          placeholder="nombre@ejemplo.com"
           required
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
@@ -142,7 +142,7 @@ export function RegisterForm() {
         )}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Contraseña</Label> {/* Contraseña */}
         <Input
           id="password"
           type="password"
@@ -156,11 +156,11 @@ export function RegisterForm() {
       </div>
       {/* (+) AÑADIR company_id */}
       <div className="space-y-1">
-        <Label htmlFor="companyId">Company ID (Optional)</Label>
+        <Label htmlFor="companyId">ID de empresa (Opcional)</Label> {/* ID de empresa (Opcional) */}
         <Input
           id="companyId"
           type="text"
-          placeholder="Company ID"
+          placeholder="ID de la empresa"
           {...form.register('companyId')}
           aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
         />
@@ -169,12 +169,12 @@ export function RegisterForm() {
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Crear cuenta'} {/* Crear cuenta */}
       </Button>
       <div className="mt-4 text-center text-sm">
-        Already have an account?{" "}
+        ¿Ya tienes una cuenta?{" "} {/* ¿Ya tienes una cuenta? */}
         <Link href="/login" className="underline text-primary hover:text-primary/80">
-          Login
+          Iniciar sesión
         </Link>
       </div>
     </form>

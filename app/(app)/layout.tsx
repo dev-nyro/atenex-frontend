@@ -21,12 +21,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (bypassAuth) {
-      console.warn("AppLayout: Authentication BYPASSED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
+      console.warn("AppLayout: Autenticación OMITIDA debido a NEXT_PUBLIC_BYPASS_AUTH=true.");
       return; // Skip auth check if bypass is enabled
     }
 
     if (!isLoading && !token) {
-      console.log("AppLayout: No token found, redirecting to login.");
+      console.log("AppLayout: No se encontró token, redirigiendo a login.");
       router.push('/'); // Cambiado a '/'
     }
   }, [isLoading, token, router, bypassAuth]);

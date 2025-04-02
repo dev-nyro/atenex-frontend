@@ -10,14 +10,12 @@ import { ChatMessage, Message } from '@/components/chat/chat-message';
 import { RetrievedDocumentsPanel } from '@/components/chat/retrieved-documents-panel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA (si no existe):
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
+    { id: 'initial-1', role: 'assistant', content: '¡Hola! ¿Cómo puedo ayudarte a consultar tu base de conocimientos hoy?' }
 ];
 
 export default function ChatPage() {
@@ -29,7 +27,6 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
   // Load chat history based on chatId
   useEffect(() => {
@@ -42,11 +39,10 @@ export default function ChatPage() {
       console.log(`Loading history for chat: ${chatId}`);
       // --- TODO: Fetch actual messages ---
       // .catch(err => {
-      //     // (+) Adaptar toast si se usa aquí
       //     toast.error("Failed to load chat history", { description: err.message });
       //  })
       setMessages([
-           { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
+           { id: 'initial-1', role: 'assistant', content: `Bienvenido de nuevo al chat ${chatId}. ¡Pregúntame lo que quieras!` }
       ]);
     } else {
       setMessages(initialMessages);
@@ -87,7 +83,7 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Query failed:", error);
-      let errorMessage = "Sorry, I encountered an error trying to answer your question.";
+      let errorMessage = "Lo siento, encontré un error al intentar responder tu pregunta.";
        if (error instanceof ApiError && error.message) {
            errorMessage = `Error: ${error.message}`;
        } else if (error instanceof Error && error.message) {
@@ -97,21 +93,13 @@ export default function ChatPage() {
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      // (-) QUITAR ESTO (si existía):
-      // toast({
-      //   variant: "destructive",
-      //   title: "Query Failed",
-      //   description: errorMessage,
-      // });
-      // (+) AÑADIR/USAR ESTO:
-      toast.error("Query Failed", {
+      toast.error("Fallo en la consulta", {
         description: errorMessage,
       });
 
     } finally {
       setIsLoading(false);
     }
-  // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
   }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {
@@ -125,7 +113,7 @@ export default function ChatPage() {
                     <div className="absolute top-2 right-2 z-10">
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon">
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                            <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
+                            <span className="sr-only">{isPanelOpen ? 'Cerrar panel de fuentes' : 'Abrir panel de fuentes'}</span>
                         </Button>
                     </div>
 
