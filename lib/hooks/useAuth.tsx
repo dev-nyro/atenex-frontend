@@ -3,32 +3,37 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getToken, setToken, removeToken, getUserFromToken, User } from '@/lib/auth/helpers';
-import { useRouter } from 'next/navigation';
-import { Session } from '@supabase/supabase-js';
-import { createClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation'; // Use next/navigation for App Router
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  signIn: (session: Session) => void;
+  login: (token: string) => void;
   logout: () => void;
 }
 
+// (+) Define un valor por defecto que coincide con la estructura de AuthContextType
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
-    isLoading: true,
-    signIn: (session: Session) => {
+    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
+    login: (token: string) => {
+        // Función vacía o lanza error si se llama fuera del provider
         console.error("Login function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
     },
     logout: () => {
+        // Función vacía o lanza error si se llama fuera del provider
         console.error("Logout function called outside of AuthProvider context");
+        // throw new Error("Logout function called outside AuthProvider");
     },
 };
 
+// (+) Modifica createContext para usar el valor por defecto y el tipo AuthContextType (sin | undefined)
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
+// Explicitly type the props for the component, including children
 interface AuthProviderProps {
   children: React.ReactNode;
 }
@@ -36,77 +41,35 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
   const router = useRouter();
 
+  // Check for token on initial load
   useEffect(() => {
-    const storedToken = getToken(); // Check localStorage for token
-      if (storedToken) {
-          // Solo establecer el token, no intentar validarlo
-          setAuthStateToken(storedToken);
-      }
-      setIsLoading(false);
-  }, []);
-
-
-  const signIn = useCallback(async (session: Session) => {
-    console.log("useAuth: Login called with session:", session);
-    if (!session?.access_token) {
-        console.error("useAuth: No access token found in session.");
-        return;
-    }
-
-    const newToken = session.access_token;
-    setToken(newToken);
-
-    let userData = getUserFromToken(newToken);
-        if (!userData) {
-            console.error("useAuth: Failed to get user from token.");
-            return;
-        }
-
-    // Fetch user name from DB after setting the token and email and other data found in the token has been set
-    try {
-       const supabaseClient = createClient(
-             process.env.NEXT_PUBLIC_SUPABASE_URL,
-             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-         );
-
-        const { data, error } = await supabaseClient
-                 .from('users') // Replace 'users' with the name of your table
-                 .select('full_name, company_id') // Replace 'name' with the column containing the user's name
-                 .eq('id', userData.id)
-                 .single();
-        if (error) {
-           console.error("Error fetching user data", error);
-           setUser(userData);
-        } else {
-           //If you have other data that needs to be fetched, add the other attributes in here as well
-           userData = {
-                 ...userData,
-                 name: data?.full_name || undefined,
-                 companyId: data?.company_id || undefined,
-               };
-           console.log("Updated user data", userData)
-           setUser(userData);
-        }
-    } catch (error) {
-        console.error("Error fetching additional user data:", error);
+    const storedToken = getToken();
+    if (storedToken) {
+      const userData = getUserFromToken(storedToken);
+      if (userData) {
         setUser(userData);
+        setAuthStateToken(storedToken);
+      } else {
+        // Invalid token found
+        removeToken();
+      }
     }
+    setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
 
-    // Update user.name from session
-    if (session?.user?.user_metadata?.name) {
-      userData = {
-        ...userData,
-        name: session.user.user_metadata.name as string,
-      };
-      setUser(userData);
-    }
+  const login = useCallback((newToken: string) => {
+    setToken(newToken);
+    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+    setUser(userData);
     setAuthStateToken(newToken);
+    // (+) Cambiado a '/' para ir a la página principal después del login
     router.push('/');
-    console.log("useAuth: User logged in, token set, redirecting home.");
-  }, [router]);
+    console.log("User logged in, token set.");
+  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
   const logout = useCallback(() => {
     removeToken();
@@ -116,15 +79,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged out.");
   }, [router]);
 
+  // El valor proporcionado por el Provider ahora siempre coincide con AuthContextType
   const providerValue = {
       user,
       token,
       isLoading,
-      signIn, // added
+      login,
       logout
   };
 
   return (
+    // Pasa el objeto calculado
     <AuthContext.Provider value={providerValue}>
       {children}
     </AuthContext.Provider>
@@ -133,8 +98,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined || context === defaultAuthContextValue) {
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
+  // La comprobación de undefined ya no es estrictamente necesaria porque
+  // createContext ahora tiene un valor por defecto válido, pero
+  // mantenerla puede ser útil para detectar errores de configuración inesperados.
+  if (context === undefined || context === defaultAuthContextValue) { // (+) Check against default value too
+    // Only throw error if it's truly used outside and hasn't received the real value
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') { // Avoid throwing during SSR/build if possible
        console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
     } else if (context === undefined) {
        throw new Error('useAuth must be used within an AuthProvider');

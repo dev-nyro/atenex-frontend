@@ -1,16 +1,16 @@
 // File: components/chat/retrieved-documents-panel.tsx
-import React, { useState } from 'react';
+// File: components/chat/retrieved-documents-panel.tsx
+      
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
-import { RetrievedDoc } from '@/lib/api'; // Import type
+import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Import Button component
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
-import { ApiError, request } from "@/lib/api"; // Import request function
 
-
+    
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean; // Indicate when the main query is loading

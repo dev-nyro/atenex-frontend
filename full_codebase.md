@@ -49,11 +49,13 @@ atenex-frontend/
 │   ├── theme-provider.tsx
 │   ├── theme-toggle.tsx
 │   └── ui
+│       ├── alert-dialog.tsx
 │       ├── alert.tsx
 │       ├── avatar.tsx
 │       ├── badge.tsx
 │       ├── button.tsx
 │       ├── card.tsx
+│       ├── dialog.tsx
 │       ├── dropdown-menu.tsx
 │       ├── input.tsx
 │       ├── label.tsx
@@ -343,6 +345,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
 # Add other environment variables needed by your app here
 # Example: NEXT_PUBLIC_SOME_CONFIG=value
+JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
+NEXT_PUBLIC_USE_MOCK_AUTH=true
 ```
 
 ## File: `.gitignore`
@@ -664,14 +668,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!isLoading && !token) {
       console.log("AppLayout: No token found, redirecting to login.");
       router.push('/'); // Cambiado a '/'
-    } else if (!isLoading && token && !user) {
-      console.log("AppLayout: Invalid token found, redirecting to login.");
-      // Ahora TypeScript sabe qué es removeToken gracias a la importación
-      removeToken();
-      router.push('/'); // Cambiado a '/'
     }
-    // La función removeToken importada es estable, no necesita estar en las dependencias.
-  }, [user, isLoading, token, router]);
+  }, [isLoading, token, router]);
 
   // Muestra un spinner mientras se verifica la autenticación
   if (isLoading || (!token && !isLoading)) {
@@ -1809,72 +1807,222 @@ export function RegisterForm() {
 
 ## File: `components/chat/chat-history.tsx`
 ```tsx
+// File: components/chat/chat-history.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
+// *** CORREGIDO: Importar Button Y buttonVariants ***
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Trash2 } from 'lucide-react'; // Import icons
+import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// Dummy data - replace with actual chat history fetching
-const dummyHistory = [
-  { id: 'chat-1', title: 'Q3 Marketing Strategy' },
-  { id: 'chat-2', title: 'Competitor Analysis - Project X' },
-  { id: 'chat-3', title: 'Onboarding Process Review' },
-  { id: 'chat-4', title: 'API Documentation Query' },
-  { id: 'chat-5', title: 'Financial Report Summary' },
-  { id: 'chat-6', title: 'Long Chat Title That Might Need Truncation Example' },
-];
+import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/hooks/useAuth'; // To ensure user is logged in
+import { toast } from "sonner";
+// Correct import path for AlertDialog
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function ChatHistory() {
   const pathname = usePathname();
-  // TODO: Fetch actual chat history, maybe store in state or use a hook
-  const [history, setHistory] = useState(dummyHistory);
+  const router = useRouter(); // Initialize router
+  const { token } = useAuth(); // Get token to know if user is authenticated
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isAlertOpen, setIsAlertOpen] = useState(false); // Control alert dialog visibility
 
-  const handleDeleteChat = (id: string, event: React.MouseEvent) => {
-     event.stopPropagation(); // Prevent link navigation when clicking delete
+  const fetchChatHistory = useCallback(async (showToast = false) => {
+    if (!token) {
+        console.log("ChatHistory: No token, skipping fetch.");
+        setChats([]); // Clear chats if not logged in
+        setIsLoading(false);
+        setError("Please log in to view chat history."); // Inform user
+        return;
+    }
+    console.log("ChatHistory: Fetching chat list...");
+    setIsLoading(true);
+    setError(null); // Clear previous errors
+    try {
+      const fetchedChats = await getChats();
+      // Sort chats by updated_at descending (newest first)
+      fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      setChats(fetchedChats);
+       if (showToast) {
+           toast.success("Chat History Refreshed");
+       }
+    } catch (err) {
+      console.error("Failed to fetch chat history:", err);
+      let message = "Could not load chat history.";
+       if (err instanceof ApiError) {
+         message = err.message || message;
+         if (err.status === 401) { // Handle unauthorized specifically
+             message = "Session expired or invalid. Please log in again.";
+             // Optionally trigger logout here
+         }
+       } else if (err instanceof Error) {
+         message = err.message;
+       }
+      setError(message);
+      toast.error("Error Loading Chats", { description: message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]); // Depend only on token
+
+  useEffect(() => {
+    fetchChatHistory(false);
+  }, [fetchChatHistory]); // Fetch when component mounts or token changes
+
+  const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
+     event.stopPropagation();
      event.preventDefault();
-     console.log("Deleting chat:", id);
-     // TODO: Implement actual deletion logic (API call, update state)
-     setHistory(prev => prev.filter(chat => chat.id !== id));
-  }
+     setChatToDelete(chat);
+     setIsAlertOpen(true); // Open the dialog
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!chatToDelete) return;
+
+    console.log("Deleting chat:", chatToDelete.id);
+    setIsDeleting(true);
+    try {
+        await deleteChat(chatToDelete.id);
+        // Optimistically update UI or refetch
+        setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
+        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+
+        // If the currently active chat is deleted, navigate to the base chat page
+        const currentChatId = pathname.split('/').pop();
+        if (currentChatId === chatToDelete.id) {
+             console.log("Active chat deleted, navigating to /chat");
+             router.push('/chat'); // Use Next.js router for navigation
+        }
+    } catch (err) {
+        console.error("Failed to delete chat:", err);
+        let message = "Could not delete chat.";
+        if (err instanceof ApiError) {
+            message = err.message || message;
+        } else if (err instanceof Error) {
+            message = err.message;
+        }
+        toast.error("Deletion Failed", { description: message });
+    } finally {
+        setIsDeleting(false);
+        setIsAlertOpen(false); // Close the dialog
+        setChatToDelete(null); // Clear the chat to delete
+    }
+  };
+
+  const renderContent = () => {
+    if (!token && !isLoading) { // Show login prompt if not logged in and not loading
+         return (
+             <div className="px-2 py-4 text-center text-muted-foreground">
+                 <p className="text-sm mb-2">Please log in to view or start chats.</p>
+                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
+             </div>
+         );
+     }
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    }
+    if (error && !isLoading) { // Show error only if not loading
+        return (
+            <div className="px-2 py-4 text-center text-destructive">
+                <AlertCircle className="mx-auto h-6 w-6 mb-1" />
+                <p className="text-sm mb-2">{error}</p>
+                <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
+                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                </Button>
+            </div>
+        );
+    }
+    if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
+        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
+    }
+
+    // Render chat list
+    return chats.map((chat) => {
+        const isActive = pathname === `/chat/${chat.id}`;
+        const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+        return (
+            // Use AlertDialogTrigger on the delete button, not the whole Link
+            <div key={chat.id} className="flex items-center group">
+                <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
+                    <a
+                        className={cn(
+                            // *** CORREGIDO: Ahora buttonVariants está importado y se puede usar ***
+                            buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
+                            "w-full justify-start h-10 flex-1 overflow-hidden mr-1", // Adjust styling
+                            isActive ? "bg-muted hover:bg-muted" : ""
+                        )}
+                        title={displayTitle}
+                    >
+                        <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span className="truncate flex-1 text-sm">{displayTitle}</span>
+                    </a>
+                </Link>
+                <AlertDialogTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
+                        onClick={(e) => openDeleteConfirmation(chat, e)}
+                        aria-label={`Delete chat: ${displayTitle}`}
+                    >
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                    </Button>
+                </AlertDialogTrigger>
+            </div>
+        );
+    });
+  };
 
   return (
-    <ScrollArea className="h-[300px] flex-1"> {/* Adjust height as needed */}
-      <div className="flex flex-col gap-1 p-2">
-        {history.length === 0 && (
-          <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>
-        )}
-        {history.map((chat) => {
-           const isActive = pathname === `/chat/${chat.id}`;
-           return (
-            <Link key={chat.id} href={`/chat/${chat.id}`} passHref legacyBehavior>
-                <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={cn(
-                        "w-full justify-between h-10 group",
-                        isActive ? "bg-muted hover:bg-muted" : ""
-                    )}
-                    title={chat.title}
+     // Wrap with AlertDialog component, controlled by isAlertOpen state
+     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <ScrollArea className="h-full flex-1"> {/* Let parent control height */}
+            <div className="flex flex-col gap-1 p-2">
+                {renderContent()}
+            </div>
+        </ScrollArea>
+
+        {/* Dialog Content - Placed outside the loop */}
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the chat
+                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleDeleteConfirmed} // Changed to trigger confirmed delete
+                    disabled={isDeleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                    <div className="flex items-center overflow-hidden">
-                        <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="truncate flex-1 text-sm">{chat.title}</span>
-                    </div>
-                    <Trash2
-                        className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 hover:text-destructive"
-                        onClick={(e) => handleDeleteChat(chat.id, e)}
-                        aria-label={`Delete chat: ${chat.title}`}
-                    />
-                </Button>
-            </Link>
-           );
-        })}
-      </div>
-    </ScrollArea>
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
   );
 }
 ```
@@ -2236,17 +2384,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ## File: `components/chat/retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
+// File: components/chat/retrieved-documents-panel.tsx
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
-import { RetrievedDoc } from '@/lib/api'; // Import type
+import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Import Button component
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
-import { ApiError, request } from "@/lib/api"; // Import request function
-
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -3013,6 +3160,168 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
 ```
 
+## File: `components/ui/alert-dialog.tsx`
+```tsx
+"use client"
+
+import * as React from "react"
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
+
+import { cn } from "@/lib/utils"
+import { buttonVariants } from "@/components/ui/button"
+
+function AlertDialog({
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
+  return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
+}
+
+function AlertDialogTrigger({
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Trigger>) {
+  return (
+    <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
+  )
+}
+
+function AlertDialogPortal({
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Portal>) {
+  return (
+    <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />
+  )
+}
+
+function AlertDialogOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
+  return (
+    <AlertDialogPrimitive.Overlay
+      data-slot="alert-dialog-overlay"
+      className={cn(
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AlertDialogContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+  return (
+    <AlertDialogPortal>
+      <AlertDialogOverlay />
+      <AlertDialogPrimitive.Content
+        data-slot="alert-dialog-content"
+        className={cn(
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          className
+        )}
+        {...props}
+      />
+    </AlertDialogPortal>
+  )
+}
+
+function AlertDialogHeader({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-dialog-header"
+      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      {...props}
+    />
+  )
+}
+
+function AlertDialogFooter({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="alert-dialog-footer"
+      className={cn(
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function AlertDialogTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {
+  return (
+    <AlertDialogPrimitive.Title
+      data-slot="alert-dialog-title"
+      className={cn("text-lg font-semibold", className)}
+      {...props}
+    />
+  )
+}
+
+function AlertDialogDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Description>) {
+  return (
+    <AlertDialogPrimitive.Description
+      data-slot="alert-dialog-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+function AlertDialogAction({
+  className,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Action>) {
+  return (
+    <AlertDialogPrimitive.Action
+      className={cn(buttonVariants(), className)}
+      {...props}
+    />
+  )
+}
+
+function AlertDialogCancel({
+  className,
+  ...props
+}: React.ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
+  return (
+    <AlertDialogPrimitive.Cancel
+      className={cn(buttonVariants({ variant: "outline" }), className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  AlertDialog,
+  AlertDialogPortal,
+  AlertDialogOverlay,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+}
+
+```
+
 ## File: `components/ui/alert.tsx`
 ```tsx
 import * as React from "react"
@@ -3352,6 +3661,146 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+}
+
+```
+
+## File: `components/ui/dialog.tsx`
+```tsx
+"use client"
+
+import * as React from "react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { XIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Dialog({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+}
+
+function DialogTrigger({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+}
+
+function DialogPortal({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+}
+
+function DialogClose({
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Close>) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+}
+
+function DialogOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+  return (
+    <DialogPrimitive.Overlay
+      data-slot="dialog-overlay"
+      className={cn(
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogContent({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  return (
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
+        className={cn(
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  )
+}
+
+function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-header"
+      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn(
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function DialogTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  return (
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      className={cn("text-lg leading-none font-semibold", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return (
+    <DialogPrimitive.Description
+      data-slot="dialog-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
 }
 
 ```
@@ -4267,14 +4716,15 @@ if __name__ == "__main__":
 ## File: `lib/api.ts`
 ```ts
 // File: lib/api.ts
-import { getToken } from './auth/helpers';
+import { getToken, getUserFromToken, User } from './auth/helpers';
 import { getApiGatewayUrl } from './utils';
-import type { User } from './auth/helpers'; // Import User type
+// Import Message type from chat-message to align response mapping
+import type { Message } from '@/components/chat/chat-message'; // <-- Import Frontend Message type
 
-// ... (ApiError class y otras interfaces permanecen igual) ...
+// --- ApiError Class ---
 interface ApiErrorData {
-    detail?: string | { msg: string; type: string }[] | any; // FastAPI often uses 'detail'
-    message?: string; // General fallback
+    detail?: string | { msg: string; type: string; loc?: string[] }[] | any; // Added loc for FastAPI errors
+    message?: string;
 }
 
 export class ApiError extends Error {
@@ -4286,10 +4736,11 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.data = data;
+    Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
 
-
+// --- Core Request Function ---
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -4297,49 +4748,69 @@ async function request<T>(
 
   let url: string;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  // *** Identificar rutas de gateway (v1) vs. internas (simuladas) ***
+  const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
+  const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
 
-  // --- Inicio de la Lógica Modificada ---
-  // Determina si es una ruta interna de Next.js API (ej: /api/auth/...)
-  // o una ruta del gateway externo (ej: /api/v1/...)
-  const isInternalApiRoute = cleanEndpoint.startsWith('/api/') && !cleanEndpoint.startsWith('/api/v1/');
-
-  if (isInternalApiRoute) {
-    // Para rutas internas, usar una URL relativa (el navegador la completará)
-    url = cleanEndpoint;
-    console.log(`Internal API Request Target: ${url}`);
-  } else {
-    // Para rutas externas, usar el API Gateway URL
-    const gatewayUrl = getApiGatewayUrl();
+  if (isGatewayRoute) {
+    // Use absolute API Gateway URL for external routes
+    const gatewayUrl = getApiGatewayUrl(); // Get URL from env var or default
     url = `${gatewayUrl}${cleanEndpoint}`;
-    console.log(`External API Request Target: ${url}`);
+    console.debug(`External API Request Target: ${url}`);
+  } else if (isInternalAuthRoute) {
+     // Use relative URL for internal simulated routes (IF USED FOR TESTING)
+     url = cleanEndpoint;
+     console.warn(`Using SIMULATED internal API route: ${url}`);
+     console.debug(`Internal API Request Target: ${url}`);
+  } else {
+     // Handle other potential internal routes if needed
+     url = cleanEndpoint;
+     console.debug(`Other Internal API Request Target: ${url}`);
   }
-  // --- Fin de la Lógica Modificada ---
 
 
   const token = getToken();
   const headers = new Headers(options.headers || {});
+  let companyId: string | null = null;
 
   headers.set('Accept', 'application/json');
   if (!(options.body instanceof FormData)) {
      headers.set('Content-Type', 'application/json');
   }
 
-  if (token) {
+  // Add Authorization and X-Company-ID (if applicable and available) only for Gateway routes
+  if (isGatewayRoute && token) {
     headers.set('Authorization', `Bearer ${token}`);
+    const user = getUserFromToken(token); // Decode token to get user info
+    if (user?.companyId) {
+        companyId = user.companyId;
+        headers.set('X-Company-ID', companyId); // Add Company ID header
+    } else {
+         console.warn(`Could not extract companyId from token for Gateway request to ${url}. Backend might reject.`);
+         // Depending on backend requirements, you might need to throw an error here
+         // if companyId is mandatory for all gateway requests.
+         // throw new ApiError("Company ID could not be determined from token.", 400);
+    }
+  } else if (isGatewayRoute && !token && !cleanEndpoint.includes('/auth/')) {
+      // Handle missing token for required gateway routes (excluding auth endpoints)
+      console.error(`Authentication token missing for Gateway request to ${url}.`);
+      // Throw an error to prevent the request if auth is mandatory
+      throw new ApiError("Authentication required. Please log in.", 401);
   }
+
 
   const config: RequestInit = {
     ...options,
     headers,
   };
 
-  console.log(`API Request: ${config.method || 'GET'} ${url}`); // Loguea la URL final que se usará
+  console.log(`API Request: ${config.method || 'GET'} ${url}`);
+  if (companyId) console.log(` > With Company ID: ${companyId}`);
+
 
   try {
-    // Fetch usa la URL determinada (relativa o absoluta)
     const response = await fetch(url, config);
 
-    // ... (el resto del manejo de errores y respuesta permanece igual) ...
     if (!response.ok) {
       let errorData: ApiErrorData | null = null;
       let errorText = '';
@@ -4348,154 +4819,266 @@ async function request<T>(
       } catch (e) {
         try {
            errorText = await response.text();
-           console.warn("API error response was not valid JSON:", errorText);
+           console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
         } catch (textErr) {
-             console.warn("Could not read API error response body.");
+             console.warn(`Could not read API error response body (${response.status}).`);
         }
       }
-    
-      let errorMessage = `HTTP error ${response.status}`; // Provide a default
-      if (errorData && typeof errorData.detail === 'string') {
-          errorMessage = errorData.detail;
-      } else if (errorData && Array.isArray(errorData.detail)) {
-          // Handle array of errors (e.g., from Zod validation)
-          errorMessage = errorData.detail.map(e => (typeof e === 'object' && e !== null && 'msg' in e) ? e.msg : String(e)).join(', ');
-      } else if (errorData && errorData.message) {
-          errorMessage = errorData.message;
-      } else if (errorText) {
-          errorMessage = errorText;
-      }
-    
-      console.error(`API Error: ${response.status} ${errorMessage}`, errorData || errorText);
+
+      // Extract a meaningful error message
+      let errorMessage = `HTTP error ${response.status}`;
+       if (errorData?.detail && typeof errorData.detail === 'string') {
+           errorMessage = errorData.detail;
+       } else if (errorData?.detail && Array.isArray(errorData.detail)) {
+           // Handle FastAPI validation errors specifically
+           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
+       } else if (errorData?.message) { // Handle generic 'message' field
+           errorMessage = errorData.message;
+       } else if (errorText) {
+           errorMessage = errorText.substring(0, 200); // Limit length
+       } else {
+           // Fallback messages based on status code
+           switch (response.status) {
+                case 400: errorMessage = "Bad Request. Please check your input."; break;
+                case 401: errorMessage = "Unauthorized. Please check credentials or login again."; break;
+                case 403: errorMessage = "Forbidden. You don't have permission."; break;
+                case 404: errorMessage = "Resource not found."; break;
+                case 422: errorMessage = "Validation Error. Please check your input."; break;
+                case 500: errorMessage = "Internal Server Error. Please try again later."; break;
+                case 502: errorMessage = "Bad Gateway. Error communicating with upstream service."; break;
+                case 503: errorMessage = "Service Unavailable. Please try again later."; break;
+                case 504: errorMessage = "Gateway Timeout. The server took too long to respond."; break;
+           }
+       }
+
+
+      console.error(`API Error: ${response.status} ${errorMessage}`, { url, data: errorData, text: errorText });
       throw new ApiError(errorMessage, response.status, errorData || undefined);
     }
 
-    if (response.status === 204 || (response.ok && response.headers.get('content-length') === '0')) {
+    // Handle No Content response (e.g., for DELETE)
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
         console.log(`API Success: ${response.status} No Content`);
-        return {} as T;
+        return null as T; // Return null for No Content
     }
 
+    // Parse successful JSON response
     try {
         const data: T = await response.json();
-        console.log(`API Success: ${response.status}`);
+        // console.debug(`API Success: ${response.status}`, { url, data });
         return data;
     } catch (jsonError) {
-         console.error(`API Error: Failed to parse JSON response for ${response.status}`, jsonError);
+         console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
          throw new ApiError(`Invalid JSON response from server`, response.status);
     }
 
   } catch (error) {
     if (error instanceof ApiError) {
+      // Re-throw known API errors
       throw error;
-    } else {
-      // Aquí es donde probablemente cae el NetworkError original
-      console.error('Network or unexpected error during fetch:', error);
-      // Devolvemos un ApiError con status 0 para identificarlo
-      throw new ApiError(error instanceof Error ? error.message : 'Network error or unexpected issue', 0, undefined);
+    } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
+        // Handle Network errors specifically
+        console.error('Network Error:', { url, error });
+        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
+    }
+    else {
+      // Handle other unexpected errors (e.g., programming errors in this function)
+      console.error('Unexpected error during API request:', { url, error });
+      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred', 500);
     }
   }
 }
 
-// --- Auth Service (REMOVE THESE, they are not needed anymore)---
-// export const loginUser = async (credentials: { email: string; password: string }) => {
-//   const response = await request<{ access_token: string }>('/api/auth/login', {
-//     method: 'POST',
-//     body: JSON.stringify(credentials),
-//   });
-//   return response.access_token;
-// };
+// --- Auth Service ---
+// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
+// Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
+export const loginUser = async (credentials: { email: string; password: string }) => {
+  console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
+  // El backend real debe devolver una estructura como { "access_token": "..." }
+  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+  return response.access_token;
+};
 
-// export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-//     const response = await request<{ access_token: string; user: User }>('/api/auth/register', {
-//         method: 'POST',
-//         body: JSON.stringify(details),
-//     });
-//     return response;
-// };
+// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
+// Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
+export const registerUser = async (details: { email: string; password: string; name?: string }) => {
+    console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
+    // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
+    // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
+    const response = await request<{ access_token?: string; user?: Partial<User>; message?: string }>('/api/v1/auth/register', { // <-- RUTA GATEWAY REAL
+        method: 'POST',
+        body: JSON.stringify(details),
+    });
+    return response; // Devuelve la respuesta completa del backend
+};
 
-
-// --- Ingest Service Endpoints (SIN CAMBIOS, usan la función 'request' modificada) ---
-// ... (uploadDocument, getDocumentStatus, listDocumentStatuses permanecen igual) ...
+// --- Ingest Service (External API Routes - /api/v1/ingest) ---
 export interface IngestResponse {
     document_id: string;
     task_id: string;
     status: string;
     message: string;
 }
+
 export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => {
     formData.append('metadata_json', JSON.stringify(metadata));
-    const headers = new Headers();
-    const token = getToken();
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    }
-    // Endpoint externo, `request` usará el gatewayUrl
     return request<IngestResponse>('/api/v1/ingest', {
         method: 'POST',
         body: formData,
-        headers: headers,
     });
 };
+
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error';
-    file_name?: string;
-    file_type?: string;
+    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
+    file_name?: string | null;
+    file_type?: string | null;
     chunk_count?: number | null;
     error_message?: string | null;
-    last_updated?: string;
+    last_updated?: string; // ISO 8601 date string
     message?: string | null;
 }
+
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
-    // Endpoint externo, `request` usará el gatewayUrl
   return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
     method: 'GET',
   });
 };
+
 export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    console.log("Attempting to call /api/v1/ingest/status (list)...");
-    // Endpoint externo, `request` usará el gatewayUrl
     return request<DocumentStatusResponse[]>('/api/v1/ingest/status', {
          method: 'GET',
     });
 };
 
 
-// --- Query Service Endpoints (SIN CAMBIOS, usan la función 'request' modificada) ---
-// ... (QueryPayload, RetrievedDoc, QueryApiResponse interfaces permanecen igual) ...
-interface QueryPayload {
-    query: string;
-    retriever_top_k?: number;
+// --- Query & Chat Service (External API Routes - /api/v1/*) ---
+
+// Type for retrieved documents within API responses (sent by Backend)
+export interface RetrievedDocApi {
+    id: string;             // Chunk ID from vector store (Milvus)
+    score?: number | null;
+    content_preview?: string | null; // Backend should provide this preview
+    metadata?: Record<string, any> | null;
+    document_id?: string | null; // Original document ID (from Supabase DOCUMENTS table)
+    file_name?: string | null;   // Original filename (from Supabase DOCUMENTS table)
 }
+
+// Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
 export interface RetrievedDoc {
-    id: string;
+    id: string; // Chunk ID
     score?: number | null;
     content_preview?: string | null;
     metadata?: Record<string, any> | null;
     document_id?: string | null;
     file_name?: string | null;
 }
-interface QueryApiResponse {
-    answer: string;
-    retrieved_documents: RetrievedDoc[];
-    query_log_id?: string | null;
+
+// Types for Chat History API (Backend Responses)
+export interface ChatSummary {
+    id: string;          // Chat UUID
+    title: string | null; // Chat title
+    updated_at: string;  // ISO 8601 timestamp
 }
+
+export interface ChatMessageApi {
+    id: string;          // Message UUID
+    role: 'user' | 'assistant';
+    content: string;
+    sources: RetrievedDocApi[] | null; // Sources associated with assistant message
+    created_at: string;  // ISO 8601 timestamp
+}
+
+// Payload for POST /query
+export interface QueryPayload {
+    query: string;
+    retriever_top_k?: number;
+    chat_id?: string | null; // Send null or omit for a new chat
+}
+
+// Response from POST /query
+export interface QueryApiResponse {
+    answer: string;
+    retrieved_documents: RetrievedDocApi[]; // Docs used for this specific answer
+    query_log_id?: string | null;
+    chat_id: string; // Backend MUST return the chat_id (new or existing)
+}
+
+
+// --- API Functions for Chat History ---
+
+// Function to list chats for the authenticated user
+export const getChats = async (): Promise<ChatSummary[]> => {
+    return request<ChatSummary[]>('/api/v1/chats', {
+        method: 'GET',
+    });
+};
+
+// Function to get messages for a specific chat
+export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
+    if (!chatId) {
+        console.warn("getChatMessages called with empty chatId");
+        return []; // Return empty array if no chatId provided
+    }
+    return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`, {
+        method: 'GET',
+    });
+};
+
+// Function to send a query (which handles message saving and chat creation/continuation)
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-    // Endpoint externo, `request` usará el gatewayUrl
+  const body = { ...payload, chat_id: payload.chat_id || null };
   return request<QueryApiResponse>('/api/v1/query', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 };
+
+// Function to delete a chat
+export const deleteChat = async (chatId: string): Promise<void> => {
+    if (!chatId) {
+        throw new Error("Cannot delete chat with empty ID");
+    }
+    await request<null>(`/api/v1/chats/${chatId}`, {
+        method: 'DELETE',
+    });
+};
+
+
+// --- Type Mapping Helpers ---
+
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
+    if (!apiSources) return undefined;
+    return apiSources.map(source => ({
+        id: source.id,
+        score: source.score,
+        content_preview: source.content_preview,
+        metadata: source.metadata,
+        document_id: source.document_id,
+        file_name: source.file_name,
+    }));
+};
+
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
+    id: apiMessage.id,
+    role: apiMessage.role,
+    content: apiMessage.content,
+    sources: mapApiSourcesToFrontend(apiMessage.sources),
+    created_at: apiMessage.created_at,
+    isError: false,
+});
 ```
 
 ## File: `lib/auth/helpers.ts`
 ```ts
 // File: lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-import { jwtDecode } from 'jwt-decode'; // Import jwtDecode
+import { jwtDecode } from 'jwt-decode';
 
-// Basic token handling for client-side (use HttpOnly cookies in production)
+// Basic token handling for client-side
 export const getToken = (): string | null => {
   if (typeof window !== "undefined") {
     return localStorage.getItem(AUTH_TOKEN_KEY);
@@ -4515,41 +5098,80 @@ export const removeToken = (): void => {
   }
 };
 
+// Frontend User interface - needs to align with JWT claims
 export interface User {
-    id: string;
-    email: string;
-    // Add other relevant user properties, matching what your backend JWT provides
+    userId: string;    // Expecting 'user_id' claim in JWT
+    email: string;     // Expecting 'email' claim in JWT
+    name?: string;     // Expecting optional 'name' claim in JWT
+    companyId: string; // Expecting 'company_id' claim in JWT
+    // Add other fields if needed, e.g., roles
 }
 
-interface JWTPayload {
-    sub: string; // id de supabase
-    email: string;
-    exp: number; // Expiration timestamp
-    [key: string]: any; // Allow other properties
+// Interface for the expected JWT payload structure from your REAL Auth Service
+interface JwtPayload {
+    // *** AJUSTA ESTOS NOMBRES DE CLAIMS para que coincidan EXACTAMENTE ***
+    // *** con lo que tu backend (Auth Service / Supabase) pone en el token ***
+    user_id: string;    // Ejemplo: claim para User ID (o podría ser 'sub')
+    company_id: string; // Ejemplo: claim para Company ID
+    email: string;      // Claim para Email
+    name?: string;     // Claim opcional para Name
+    role?: string;     // Claim opcional para Role
+    exp: number;       // Standard expiry timestamp (seconds since epoch) REQUIRED
+    iat?: number;      // Standard issued at timestamp (optional)
+    // 'sub' (subject) es un claim estándar, a menudo contiene el user ID.
+    // Si tu backend usa 'sub' para el ID de usuario, usa 'sub' aquí en lugar de 'user_id'.
+    sub?: string;      // Ejemplo: Si el backend usa 'sub' para user ID
+    // Agrega cualquier otro claim que tu backend incluya y necesites en el frontend
 }
 
+// Function to get user details from the JWT token
 export const getUserFromToken = (token: string | null): User | null => {
-    if (!token) return null;
-    try {
-        const decoded: JWTPayload = jwtDecode(token);
+  if (!token) return null;
+  try {
+    // Decode the JWT
+    const decoded = jwtDecode<JwtPayload>(token);
+    console.log("getUserFromToken - Decoded JWT Payload:", decoded); // <-- Log para depuración
 
-        if (!decoded.sub || !decoded.email) { // Cambiar decoded.userID por decoded.sub
-            console.warn("getUserFromToken: JWT is missing required claims (sub, email).");
-            return null;
-        }
+    // --- Validation ---
+    // 1. Check expiry
+    const now = Date.now() / 1000; // Current time in seconds
+    if (decoded.exp < now) {
+      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Current time: ${new Date()}.`);
+      removeToken(); // Clear expired token
+      return null;
+    }
 
-        const user: User = {
-            id: decoded.sub, // Cambiar decoded.userID por decoded.sub
-            email: decoded.email,
-            // Add other properties as needed, based on your JWT payload
-        };
-        // console.log("getUserFromToken: Decoded user:", user);
-        return user;
-    } catch (error) {
-        console.error("getUserFromToken: Failed to decode token:", error);
+    // 2. Check for essential claims required by the frontend
+    // *** VERIFICA que estos claims existen en tu payload decodificado ***
+    //    Ajusta los nombres ('user_id', 'company_id') si tu backend usa otros (ej. 'sub')
+    const userId = decoded.user_id || decoded.sub; // Usa user_id o sub como fallback
+    const companyId = decoded.company_id;
+    const email = decoded.email;
+
+    if (!userId || !companyId || !email) {
+        console.error("Decoded token is missing essential claims (userId/sub, companyId, email). Actual Payload:", decoded);
         removeToken(); // Clear invalid token
         return null;
     }
+
+    // --- Map decoded payload to User interface ---
+    const user: User = {
+      userId: userId,                 // Map from 'user_id' or 'sub' claim
+      email: email,
+      companyId: companyId,           // Map from 'company_id' claim
+      name: decoded.name,             // Map optional 'name' claim
+      // Add other mappings if needed, e.g., role: decoded.role
+    };
+
+    console.log("getUserFromToken - Mapped User object:", user); // <-- Log para depuración
+    return user;
+
+  } catch (error) {
+    // Handle various decoding errors (invalid token format, etc.)
+    console.error("Failed to decode or validate token:", error);
+    removeToken(); // Clear invalid token
+    return null;
+  }
 };
 ```
 
@@ -4566,32 +5188,37 @@ export const AUTH_TOKEN_KEY = "atenex_auth_token";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getToken, setToken, removeToken, getUserFromToken, User } from '@/lib/auth/helpers';
-import { useRouter } from 'next/navigation';
-import { Session } from '@supabase/supabase-js';
-import { createClient } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation'; // Use next/navigation for App Router
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  signIn: (session: Session) => void;
+  login: (token: string) => void;
   logout: () => void;
 }
 
+// (+) Define un valor por defecto que coincide con la estructura de AuthContextType
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
-    isLoading: true,
-    signIn: (session: Session) => {
+    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
+    login: (token: string) => {
+        // Función vacía o lanza error si se llama fuera del provider
         console.error("Login function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
     },
     logout: () => {
+        // Función vacía o lanza error si se llama fuera del provider
         console.error("Logout function called outside of AuthProvider context");
+        // throw new Error("Logout function called outside AuthProvider");
     },
 };
 
+// (+) Modifica createContext para usar el valor por defecto y el tipo AuthContextType (sin | undefined)
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
+// Explicitly type the props for the component, including children
 interface AuthProviderProps {
   children: React.ReactNode;
 }
@@ -4599,84 +5226,35 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setAuthStateToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
   const router = useRouter();
 
+  // Check for token on initial load
   useEffect(() => {
-    const storedToken = getToken(); // Check localStorage for token
-      if (storedToken) {
-          // console.log("useAuth: Token found in localStorage, attempting to validate.");
-          const userData = getUserFromToken(storedToken); // Validate the token
-          if (userData) {
-              setUser(userData);
-              setAuthStateToken(storedToken);
-          } else {
-              console.warn("useAuth: Invalid token found in localStorage, clearing.");
-              removeToken();
-          }
-      }
-      setIsLoading(false);
-  }, []);
-
-
-  const signIn = useCallback(async (session: Session) => {
-    console.log("useAuth: Login called with session:", session);
-    if (!session?.access_token) {
-        console.error("useAuth: No access token found in session.");
-        return;
-    }
-
-    const newToken = session.access_token;
-    setToken(newToken);
-
-    let userData = getUserFromToken(newToken);
-        if (!userData) {
-            console.error("useAuth: Failed to get user from token.");
-            return;
-        }
-
-    // Fetch user name from DB after setting the token and email and other data found in the token has been set
-    try {
-       const supabaseClient = createClient(
-             process.env.NEXT_PUBLIC_SUPABASE_URL,
-             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-         );
-
-        const { data, error } = await supabaseClient
-                 .from('users') // Replace 'users' with the name of your table
-                 .select('full_name, company_id') // Replace 'name' with the column containing the user's name
-                 .eq('id', userData.id)
-                 .single();
-        if (error) {
-           console.error("Error fetching user data", error);
-           setUser(userData);
-        } else {
-           //If you have other data that needs to be fetched, add the other attributes in here as well
-           userData = {
-                 ...userData,
-                 name: data?.full_name || undefined,
-                 companyId: data?.company_id || undefined,
-               };
-           console.log("Updated user data", userData)
-           setUser(userData);
-        }
-    } catch (error) {
-        console.error("Error fetching additional user data:", error);
+    const storedToken = getToken();
+    if (storedToken) {
+      const userData = getUserFromToken(storedToken);
+      if (userData) {
         setUser(userData);
+        setAuthStateToken(storedToken);
+      } else {
+        // Invalid token found
+        removeToken();
+      }
     }
+    setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
 
-    // Update user.name from session
-    if (session?.user?.user_metadata?.name) {
-      userData = {
-        ...userData,
-        name: session.user.user_metadata.name as string,
-      };
-      setUser(userData);
-    }
+  const login = useCallback((newToken: string) => {
+    setToken(newToken);
+    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+    setUser(userData);
     setAuthStateToken(newToken);
+    // (+) Cambiado a '/' para ir a la página principal después del login
     router.push('/');
-    console.log("useAuth: User logged in, token set, redirecting home.");
-  }, [router]);
+    console.log("User logged in, token set.");
+  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
   const logout = useCallback(() => {
     removeToken();
@@ -4686,15 +5264,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged out.");
   }, [router]);
 
+  // El valor proporcionado por el Provider ahora siempre coincide con AuthContextType
   const providerValue = {
       user,
       token,
       isLoading,
-      signIn, // added
+      login,
       logout
   };
 
   return (
+    // Pasa el objeto calculado
     <AuthContext.Provider value={providerValue}>
       {children}
     </AuthContext.Provider>
@@ -4703,8 +5283,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined || context === defaultAuthContextValue) {
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
+  // La comprobación de undefined ya no es estrictamente necesaria porque
+  // createContext ahora tiene un valor por defecto válido, pero
+  // mantenerla puede ser útil para detectar errores de configuración inesperados.
+  if (context === undefined || context === defaultAuthContextValue) { // (+) Check against default value too
+    // Only throw error if it's truly used outside and hasn't received the real value
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') { // Avoid throwing during SSR/build if possible
        console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
     } else if (context === undefined) {
        throw new Error('useAuth must be used within an AuthProvider');

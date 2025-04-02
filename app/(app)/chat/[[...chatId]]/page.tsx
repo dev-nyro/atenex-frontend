@@ -26,7 +26,7 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
