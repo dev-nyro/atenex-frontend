@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { removeToken } from '@/lib/auth/helpers';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, token } = useAuth();
+  const { user, isLoading, token, logout } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 

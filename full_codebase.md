@@ -22,7 +22,6 @@ atenex-frontend/
 │   │       └── page.tsx
 │   ├── about
 │   │   └── page.tsx
-│   ├── api
 │   ├── contact
 │   │   └── page.tsx
 │   ├── globals.css
@@ -346,7 +345,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 # Add other environment variables needed by your app here
 # Example: NEXT_PUBLIC_SOME_CONFIG=value
 JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
-NEXT_PUBLIC_USE_MOCK_AUTH=true
+NEXT_PUBLIC_BYPASS_AUTH=true
 ```
 
 ## File: `.gitignore`
@@ -460,7 +459,7 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
@@ -664,12 +663,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // NEW: Check if we should bypass auth based on env variable
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
   useEffect(() => {
+    if (bypassAuth) {
+      console.warn("AppLayout: Authentication BYPASSED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
+      return; // Skip auth check if bypass is enabled
+    }
+
     if (!isLoading && !token) {
       console.log("AppLayout: No token found, redirecting to login.");
       router.push('/'); // Cambiado a '/'
     }
-  }, [isLoading, token, router]);
+  }, [isLoading, token, router, bypassAuth]);
 
   // Muestra un spinner mientras se verifica la autenticación
   if (isLoading || (!token && !isLoading)) {
@@ -2385,7 +2392,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
 // File: components/chat/retrieved-documents-panel.tsx
-import React, { useState } from 'react';
+      
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
@@ -2395,6 +2402,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Import Button component
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
 
+    
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean; // Indicate when the main query is loading
@@ -4741,7 +4749,7 @@ export class ApiError extends Error {
 }
 
 // --- Core Request Function ---
-async function request<T>(
+export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -5194,7 +5202,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (token: string) => void;
+  // (+) AÑADIR 'signIn' a la definición de AuthContextType
+  signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
   logout: () => void;
 }
 
@@ -5203,6 +5212,11 @@ const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
     isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
+    signIn: (session: any) => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("signIn function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
+    },
     login: (token: string) => {
         // Función vacía o lanza error si se llama fuera del provider
         console.error("Login function called outside of AuthProvider context");
@@ -5256,6 +5270,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged in, token set.");
   }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
+  const signIn = useCallback((session: any) => {
+        // (+) Implementa la lógica de signIn (ej: guardar info de session)
+        const newToken = session.access_token; // Asume que session tiene access_token
+        setToken(newToken);
+        const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+        setUser(userData);
+        setAuthStateToken(newToken);
+        router.push('/');
+        console.log("User signed in (via setSession), token set.");
+
+  }, [router]);
+
   const logout = useCallback(() => {
     removeToken();
     setUser(null);
@@ -5269,6 +5295,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       user,
       token,
       isLoading,
+      // (+) Asegúrate de que 'signIn' está incluido en el valor del provider
+      signIn,
       login,
       logout
   };
