@@ -35,10 +35,7 @@ const defaultAuthContextValue: AuthContextType = {
   signInWithPassword: async () => { console.error("signInWithPassword called outside of AuthProvider"); throw new Error("Not initialized"); },
   // --- MODIFICACIÓN: Ajustar valor por defecto de signUp ---
   // La firma de la función vacía no necesita cambiar aquí, solo el tipo en la interfaz
-  signUp: async (credentials: { email: string; password: string; }, options?: { data?: object; emailRedirectTo?: string; }) => { 
-    console.error("signUp called outside of AuthProvider"); 
-    return { data: { user: null, session: null }, error: new Error("Not initialized") as AuthError }; 
-  },
+  signUp: async () => { console.error("signUp called outside of AuthProvider"); return { data: { user: null, session: null }, error: new Error("Not initialized") as AuthError }; },
   // ---------------------------------------------------
   signOut: async () => { console.error("signOut called outside of AuthProvider"); },
 };
