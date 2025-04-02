@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { loginUser, ApiError } from '@/lib/api'; // Import ApiError
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -21,7 +22,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login: setAuthToken } = useAuth(); // Use the context login function
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,32 +38,22 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null); // Clear previous errors
     try {
-      console.log("LoginForm: Attempting login via API with:", data.email);
-      // *** LLAMADA A LA FUNCIÓN loginUser ACTUALIZADA (que apunta al gateway) ***
+      console.log("Attempting login with:", data.email);
       const token = await loginUser(data);
-      console.log("LoginForm: Login successful, received token.");
-      setAuthToken(token); // Update auth state and redirect (redirect happens in useAuth)
-      // No necesitas setIsLoading(false) aquí si el redirect tiene éxito
+      console.log("Login successful, received token.");
+      setAuthToken(token); // Update auth state and redirect
+      // Redirect happens inside useAuth's login function
     } catch (err) {
-      console.error("LoginForm: Login failed:", err);
-      let errorMessage = 'Login failed. Please check your credentials or try again later.'; // Default message
-       if (err instanceof ApiError) {
-         // Use specific error message from API if available and meaningful
-         errorMessage = err.message || errorMessage;
-         // Optionally handle specific statuses differently
-         if (err.status === 401) {
-             errorMessage = "Invalid email or password.";
-         } else if (err.status === 0) {
-             errorMessage = "Cannot connect to the server. Please check your connection.";
-         } else if (err.status >= 500) {
-              errorMessage = "Server error during login. Please try again later.";
-         }
-       } else if (err instanceof Error) {
-           // Catch unexpected errors during the process
-           errorMessage = err.message || errorMessage;
-       }
-      setError(errorMessage); // Display the error message to the user
-      setIsLoading(false); // Stop loading indicator on error
+      console.error("Login failed:", err);
+      let errorMessage = 'Login failed. Please check your credentials.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 

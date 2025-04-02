@@ -4,6 +4,8 @@
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
+import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
 import { RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';

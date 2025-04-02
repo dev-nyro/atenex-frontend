@@ -5,18 +5,10 @@ const nextConfig = {
     transpilePackages: ['@radix-ui/react-dialog'],
     reactStrictMode: true,
   
-    // You can add other Next.js configurations here as needed:
-    // images: {
-    //   remotePatterns: [
-    //     {
-    //       protocol: 'https',
-    //       hostname: 'example.com', // Add hostnames for external images
-    //     },
-    //   ],
-    // },
-    // experimental: {
-    //   // Add experimental features if you use any
-    // },
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    },
   };
   
   export default nextConfig;

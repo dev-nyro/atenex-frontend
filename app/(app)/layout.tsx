@@ -16,18 +16,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // NEW: Check if we should bypass auth based on env variable
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
   useEffect(() => {
+    if (bypassAuth) {
+      console.warn("AppLayout: Authentication BYPASSED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
+      return; // Skip auth check if bypass is enabled
+    }
+
     if (!isLoading && !token) {
       console.log("AppLayout: No token found, redirecting to login.");
       router.push('/'); // Cambiado a '/'
-    } else if (!isLoading && token && !user) {
-      console.log("AppLayout: Invalid token found, redirecting to login.");
-      // Ahora TypeScript sabe qué es removeToken gracias a la importación
-      removeToken();
-      router.push('/'); // Cambiado a '/'
     }
-    // La función removeToken importada es estable, no necesita estar en las dependencias.
-  }, [user, isLoading, token, router]);
+  }, [isLoading, token, router, bypassAuth]);
 
   // Muestra un spinner mientras se verifica la autenticación
   if (isLoading || (!token && !isLoading)) {

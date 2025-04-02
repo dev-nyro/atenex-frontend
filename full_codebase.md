@@ -23,9 +23,6 @@ atenex-frontend/
 │   ├── about
 │   │   └── page.tsx
 │   ├── api
-│   │   └── auth
-│   │       └── logout
-│   │           └── route.ts
 │   ├── contact
 │   │   └── page.tsx
 │   ├── globals.css
@@ -33,6 +30,7 @@ atenex-frontend/
 │   └── page.tsx
 ├── components
 │   ├── auth
+│   │   ├── email-confirmation-handler.tsx
 │   │   ├── login-form.tsx
 │   │   └── register-form.tsx
 │   ├── chat
@@ -80,11 +78,10 @@ atenex-frontend/
 │   ├── hooks
 │   │   └── useAuth.tsx
 │   └── utils.ts
+├── next-env.d.ts
 ├── next.config.mjs
 ├── package.json
 ├── postcss.config.js
-├── public
-│   └── icons
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -100,18 +97,10 @@ const nextConfig = {
     transpilePackages: ['@radix-ui/react-dialog'],
     reactStrictMode: true,
   
-    // You can add other Next.js configurations here as needed:
-    // images: {
-    //   remotePatterns: [
-    //     {
-    //       protocol: 'https',
-    //       hostname: 'example.com', // Add hostnames for external images
-    //     },
-    //   ],
-    // },
-    // experimental: {
-    //   // Add experimental features if you use any
-    // },
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    },
   };
   
   export default nextConfig;
@@ -142,6 +131,7 @@ const nextConfig = {
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@supabase/supabase-js": "^2.49.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jsonwebtoken": "^9.0.2",
@@ -350,14 +340,13 @@ module.exports = {
 # Base URL of your deployed API Gateway (REQUIRED for API calls to work)
 # Example: http://localhost:8080 if running gateway locally
 # Example: https://your-gateway-dev.example.com if deployed
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:8080
-
-# Dummy JWT Secret for local API route simulation (MATCH THE ONE IN THE API ROUTES)
-# IMPORTANT: Use a strong, unique secret and load from actual environment in production!
-JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
-
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:9999  # Una URL falsa
+NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
 # Add other environment variables needed by your app here
 # Example: NEXT_PUBLIC_SOME_CONFIG=value
+JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
+NEXT_PUBLIC_USE_MOCK_AUTH=true
 ```
 
 ## File: `.gitignore`
@@ -441,7 +430,7 @@ ehthumbs_vista.db
 .history/
 ```
 
-## File: `app\(app)\chat\[[...chatId]]\page.tsx`
+## File: `app/(app)/chat/[[...chatId]]/page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx
 "use client";
@@ -497,81 +486,25 @@ export default function ChatPage() {
 
   // Update chatId state if the param changes (e.g., navigation)
   useEffect(() => {
-    setChatId(chatIdParam);
-  }, [chatIdParam]);
+    // Reset state for new/different chat
+    setMessages(initialMessages);
+    setRetrievedDocs([]);
+    setIsLoading(false); // Ensure loading is reset
 
-  // Load chat history from API based on chatId
-  useEffect(() => {
-    // Only fetch if:
-    // 1. User is logged in (token exists)
-    // 2. A chatId is present in the state
-    // 3. We haven't already fetched for this specific chatId
-    if (token && chatId && fetchedChatIdRef.current !== chatId) {
-      console.log(`ChatPage: Fetching history for chat ID: ${chatId}`);
-      setIsLoadingHistory(true);
-      setHistoryError(null);
-      fetchedChatIdRef.current = chatId; // Mark this ID as being fetched
-
-      getChatMessages(chatId)
-        .then(apiMessages => {
-            // Sort messages by creation time ascending (oldest first)
-           apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-           const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
-
-           if (mappedMessages.length > 0) {
-                setMessages(mappedMessages);
-                console.log(`ChatPage: Loaded ${mappedMessages.length} messages for chat ${chatId}.`);
-           } else {
-                // Chat exists but has no messages (or API returned empty)
-                setMessages([welcomeMessage]); // Start with welcome message
-                console.log(`ChatPage: Chat ${chatId} has no messages. Displaying welcome message.`);
-           }
-        })
-        .catch(error => {
-          console.error(`ChatPage: Failed to load chat history for ${chatId}:`, error);
-          let message = "Error loading chat history.";
-          if (error instanceof ApiError) {
-              message = error.message || message;
-              if (error.status === 404) {
-                  message = "Chat not found or you don't have access.";
-                  // Redirect to base chat page if not found
-                  toast.error("Chat Not Found", { description: message });
-                  router.replace('/chat');
-                  return; // Stop further processing in this effect
-              } else if (error.status === 401) {
-                   message = "Authentication error. Please log in again.";
-                   // Optionally trigger logout or redirect to login
-                   router.push('/login'); // Example redirect
-              }
-          } else if (error instanceof Error) {
-              message = error.message;
-          }
-          setHistoryError(message);
-          setMessages([welcomeMessage]); // Show welcome message on error
-          toast.error("Failed to Load Chat", { description: message });
-        })
-        .finally(() => {
-          setIsLoadingHistory(false);
-        });
-
-    } else if (!chatId) {
-      // Reset for the '/chat' page (new chat state)
-      console.log("ChatPage: No chatId, preparing for new chat.");
-      setMessages([welcomeMessage]);
-      setRetrievedDocs([]);
-      setIsLoadingHistory(false);
-      setHistoryError(null);
-      fetchedChatIdRef.current = undefined; // Reset fetch flag
-    } else if (!token) {
-         console.log("ChatPage: User not authenticated, cannot load history.");
-         setIsLoadingHistory(false);
-         setHistoryError("Please log in to view chat history.");
-         setMessages([welcomeMessage]); // Show welcome message
-         fetchedChatIdRef.current = undefined;
+    if (chatId) {
+      console.log(`Loading history for chat: ${chatId}`);
+      // --- TODO: Fetch actual messages ---
+      // .catch(err => {
+      //     // (+) Adaptar toast si se usa aquí
+      //     toast.error("Failed to load chat history", { description: err.message });
+      //  })
+      setMessages([
+           { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
+      ]);
+    } else {
+      setMessages(initialMessages);
     }
-
-  // Depend on chatId (state) and token
-  }, [chatId, token, router]); // Add router to dependencies
+  }, [chatId]);
 
   // Scroll to bottom when messages change or loading starts/stops
   useEffect(() => {
@@ -676,7 +609,8 @@ export default function ChatPage() {
     } finally {
       setIsSending(false);
     }
-  }, [isSending, chatId, router, token, isPanelOpen]); // Include dependencies
+  // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
+  }, [isLoading, isPanelOpen]);
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
@@ -768,7 +702,7 @@ export default function ChatPage() {
 }
 ```
 
-## File: `app\(app)\knowledge\page.tsx`
+## File: `app/(app)/knowledge/page.tsx`
 ```tsx
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
@@ -811,7 +745,7 @@ export default function KnowledgePage() {
 }
 ```
 
-## File: `app\(app)\layout.tsx`
+## File: `app/(app)/layout.tsx`
 ```tsx
 // File: app/(app)/layout.tsx
 "use client";
@@ -835,14 +769,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!isLoading && !token) {
       console.log("AppLayout: No token found, redirecting to login.");
       router.push('/'); // Cambiado a '/'
-    } else if (!isLoading && token && !user) {
-      console.log("AppLayout: Invalid token found, redirecting to login.");
-      // Ahora TypeScript sabe qué es removeToken gracias a la importación
-      removeToken();
-      router.push('/'); // Cambiado a '/'
     }
-    // La función removeToken importada es estable, no necesita estar en las dependencias.
-  }, [user, isLoading, token, router]);
+  }, [isLoading, token, router]);
 
   // Muestra un spinner mientras se verifica la autenticación
   if (isLoading || (!token && !isLoading)) {
@@ -898,16 +826,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-## File: `app\(app)\settings\page.tsx`
+## File: `app/(app)/settings/page.tsx`
 ```tsx
+// app/(app)/settings/page.tsx
+"use client";
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useState, useEffect } from 'react';
 
 // Basic placeholder settings page
 export default function SettingsPage() {
+    const { user } = useAuth();
+    const [name, setName] = useState(user?.name || '');
+
+    useEffect(() => {
+        if (user) {
+            setName(user.name || '');
+        }
+    }, [user]);
+
+    const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setName(event.target.value);
+    };
+
+    const handleSave = async () => {
+        // TODO: Implementar la lógica para guardar los cambios en el perfil del usuario.
+        // Esto implicaría hacer una llamada a la API para actualizar el nombre del usuario.
+        // Puedes usar la función 'request' de lib/api.ts para hacer la llamada a la API.
+        console.log('Saving changes:', { name });
+    };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Settings</h1>
@@ -920,13 +873,13 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
             <div className="space-y-1">
                  <Label htmlFor="name">Name</Label>
-                 <Input id="name" defaultValue="Demo User" /> {/* TODO: Fetch user data */}
+                 <Input id="name" value={name} onChange={handleNameChange} />
             </div>
              <div className="space-y-1">
                  <Label htmlFor="email">Email</Label>
-                 <Input id="email" type="email" defaultValue="user@example.com" disabled />
+                 <Input id="email" type="email" defaultValue={user?.email} disabled />
             </div>
-             <Button>Save Changes</Button>
+             <Button onClick={handleSave}>Save Changes</Button>
         </CardContent>
       </Card>
 
@@ -961,7 +914,7 @@ export default function SettingsPage() {
 }
 ```
 
-## File: `app\(auth)\layout.tsx`
+## File: `app/(auth)/layout.tsx`
 ```tsx
 import React from 'react';
 import Image from 'next/image';
@@ -985,7 +938,7 @@ export default function AuthLayout({
 }
 ```
 
-## File: `app\(auth)\login\page.tsx`
+## File: `app/(auth)/login/page.tsx`
 ```tsx
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -1005,7 +958,7 @@ export default function LoginPage() {
 }
 ```
 
-## File: `app\(auth)\register\page.tsx`
+## File: `app/(auth)/register/page.tsx`
 ```tsx
 import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -1025,7 +978,7 @@ export default function RegisterPage() {
 }
 ```
 
-## File: `app\about\page.tsx`
+## File: `app/about/page.tsx`
 ```tsx
 // app/about/page.tsx
 "use client"; // Add this line
@@ -1150,36 +1103,7 @@ export default function AboutPage() {
 }
 ```
 
-## File: `app\api\auth\logout\route.ts`
-```ts
-// Example Backend Route for Logout (Optional)
-// Often, logout is handled purely client-side by clearing the token.
-// This route could be used for server-side session invalidation if needed.
-
-import { NextResponse } from 'next/server';
-
-export async function POST(request: Request) {
-  try {
-    console.log("API Route: Logout request received");
-    // --- SERVER-SIDE LOGOUT LOGIC (IF ANY) ---
-    // e.g., Invalidate refresh tokens, clear server-side session state.
-    // For simple JWT, there might be nothing to do here.
-    // --- END SERVER-SIDE LOGIC ---
-
-    // Respond with success
-    return NextResponse.json({ message: 'Logout successful' });
-
-  } catch (error) {
-    console.error("API Route Logout Error:", error);
-    return NextResponse.json({ detail: 'An error occurred during logout' }, { status: 500 });
-  }
-}
-
-// Note: You might also need a GET route or similar to check auth status
-// e.g., /api/auth/session which verifies the token and returns user info.
-```
-
-## File: `app\contact\page.tsx`
+## File: `app/contact/page.tsx`
 ```tsx
 // app/contact/page.tsx
 "use client"; // Add this line
@@ -1287,7 +1211,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app\globals.css`
+## File: `app/globals.css`
 ```css
 /* File: atenex-frontend/app/globals.css */
 
@@ -1431,7 +1355,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app\layout.tsx`
+## File: `app/layout.tsx`
 ```tsx
 // File: app/layout.tsx
 import type { Metadata } from "next";
@@ -1440,7 +1364,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// (*) Ensure this import points to sonner's Toaster
+// (+) DESCOMENTAR ESTA LÍNEA:
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -1471,8 +1395,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            {/* (*) Ensure this Toaster component is rendered */}
-            <Toaster richColors position="top-right" /> {/* Added richColors and position */}
+            {/* (+) Asegúrate de que esta línea esté activa y use el Toaster importado */}
+            <Toaster />
           </ThemeProvider>
         </AuthProvider>
       </body>
@@ -1481,17 +1405,17 @@ export default function RootLayout({
 }
 ```
 
-## File: `app\page.tsx`
+## File: `app/page.tsx`
 ```tsx
-// app/page.tsx
+// File: app/page.tsx
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { cn } from '@/lib/utils'; // Import cn for conditional classes
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 
 export default function HomePage() {
   const router = useRouter();
@@ -1501,7 +1425,7 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6"> {/* Adjusted padding */}
+        <div className="container flex items-center justify-between h-16 py-4 px-4">
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
           <nav className="flex items-center space-x-2 sm:space-x-4"> {/* Reduced base spacing */}
             <LinkButton href="/">Home</LinkButton>
@@ -1549,18 +1473,19 @@ export default function HomePage() {
           </Button>
         </section>
 
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Feature Cards */}
-          <FeatureCard title="Intelligent Search" description="Find information quickly using natural language queries." />
-          <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
-          <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Feature Cards - replace with actual feature descriptions */}
+          <FeatureCard title="Intelligent Search" description="Find the information you need quickly and easily using natural language queries." />
+          <FeatureCard title="Centralized Knowledge" description="Access all your organization's collective knowledge in one place, eliminating information silos." />
+          <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
         </section>
+           <EmailConfirmationHandler />
       </main>
 
       {/* Footer */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground text-sm"> {/* Adjusted size */}
-          © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
+        <div className="container text-center text-muted-foreground">
+          © {new Date().getFullYear()} Atenex. All rights reserved.
         </div>
       </footer>
     </div>
@@ -1585,7 +1510,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({ title, description }: { title: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border"> {/* Added border */}
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
@@ -1595,7 +1520,97 @@ function FeatureCard({ title, description }: { title: string; description: strin
 }
 ```
 
-## File: `components\auth\login-form.tsx`
+## File: `components/auth/email-confirmation-handler.tsx`
+```tsx
+// File: components/auth/email-confirmation-handler.tsx
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { createClient } from '@supabase/supabase-js';
+
+export default function EmailConfirmationHandler() {
+    const router = useRouter();
+    const { signIn } = useAuth();
+    const [hasConfirmed, setHasConfirmed] = useState(false);
+
+    useEffect(() => {
+        if (hasConfirmed) {
+            return;
+        }
+
+        const handleEmailConfirmation = async () => {
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const expiresIn = params.get('expires_in');
+
+                if (accessToken && refreshToken && expiresIn) {
+                    console.log("Found access token in URL hash:", accessToken);
+                    console.log("Attempting to set session and log in.");
+
+                     // Create the supabaseClient
+                     const supabaseClient = createClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+                     );
+                    
+                     // Use the access token to get the user and full session
+                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
+                         access_token: accessToken,
+                         refresh_token: refreshToken,
+                     })
+
+                     if (error) {
+                        console.error("Error setting session:", error);
+                        return; // Stop further execution if session setup fails
+                     }
+                    
+                    if (session) {
+                        try {
+                            const { error: insertError } = await supabaseClient
+                                .from('users')
+                                .insert([
+                                    {
+                                        id: user.id, // Use user.id from the session
+                                        email: user.email,
+                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
+                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
+                                        role: 'user',
+                                        is_active: true,
+                                    }
+                                ]);
+
+                            if (insertError) {
+                                console.error("Error inserting user into 'users' table:", insertError);
+                                if (insertError.code === '23505') {
+                                    console.warn("Duplicate user insertion attempted. Ignoring.");
+                                }
+                            } else {
+                                console.log("User inserted into 'users' table successfully.");
+                            }
+                        } catch (insertErr: any) {
+                            console.error("Error during user insertion:", insertErr);
+                        }
+
+                        setHasConfirmed(true);
+                        await signIn(session);
+                        router.replace('/');
+                    }
+                }
+            }
+        };
+
+        handleEmailConfirmation();
+    }, [signIn, router, hasConfirmed]);
+
+    return null;
+}
+```
+
+## File: `components/auth/login-form.tsx`
 ```tsx
 "use client";
 
@@ -1610,7 +1625,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { loginUser, ApiError } from '@/lib/api'; // Import ApiError
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
@@ -1620,7 +1636,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login: setAuthToken } = useAuth(); // Use the context login function
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1636,32 +1652,42 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null); // Clear previous errors
     try {
-      console.log("LoginForm: Attempting login via API with:", data.email);
-      // *** LLAMADA A LA FUNCIÓN loginUser ACTUALIZADA (que apunta al gateway) ***
-      const token = await loginUser(data);
-      console.log("LoginForm: Login successful, received token.");
-      setAuthToken(token); // Update auth state and redirect (redirect happens in useAuth)
-      // No necesitas setIsLoading(false) aquí si el redirect tiene éxito
+      console.log("Attempting login with:", data.email);
+
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword(data);
+
+      if (authError) {
+        console.error("Supabase login failed:", authError);
+        setError(authError.message || 'Login failed. Please check your credentials.');
+      } else if (authResponse.session) {
+        console.log("Supabase login successful:", authResponse);
+        login(authResponse.session);
+      } else {
+        console.error("Supabase login: No session returned");
+        setError('Login failed. Please check your credentials.');
+      }
     } catch (err) {
-      console.error("LoginForm: Login failed:", err);
-      let errorMessage = 'Login failed. Please check your credentials or try again later.'; // Default message
-       if (err instanceof ApiError) {
-         // Use specific error message from API if available and meaningful
-         errorMessage = err.message || errorMessage;
-         // Optionally handle specific statuses differently
-         if (err.status === 401) {
-             errorMessage = "Invalid email or password.";
-         } else if (err.status === 0) {
-             errorMessage = "Cannot connect to the server. Please check your connection.";
-         } else if (err.status >= 500) {
-              errorMessage = "Server error during login. Please try again later.";
-         }
-       } else if (err instanceof Error) {
-           // Catch unexpected errors during the process
-           errorMessage = err.message || errorMessage;
-       }
-      setError(errorMessage); // Display the error message to the user
-      setIsLoading(false); // Stop loading indicator on error
+      console.error("Login failed:", err);
+      let errorMessage = 'Login failed. Please check your credentials.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1711,19 +1737,20 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
       </Button>
-       <div className="mt-4 text-center text-sm">
-         Don't have an account?{" "}
-         <Link href="/register" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
-           Register
-         </Link>
-       </div>
+      <div className="mt-4 text-center text-sm">
+        Don't have an account?{" "}
+        <Link href="/register" className="underline text-primary hover:text-primary/80">
+          Register
+        </Link>
+      </div>
     </form>
   );
 }
 ```
 
-## File: `components\auth\register-form.tsx`
+## File: `components/auth/register-form.tsx`
 ```tsx
+// File: components/auth/register-form.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -1737,22 +1764,22 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { registerUser, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
+import { AuthApiError } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  // confirmPassword: z.string(), // Add if needed
-// }).refine(data => data.password === data.confirmPassword, {
-//   message: "Passwords don't match",
-//   path: ["confirmPassword"], // path of error
+  // (+) AÑADIR company_id
+  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const { login } = useAuth(); // Use login from auth context to set token after registration
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -1763,6 +1790,8 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
+      // (+) AÑADIR company_id
+      companyId: 'd7387dc8-0312-4b1c-97a5-f96f7995f36c', // Valor por defecto - cambiar en PROD
     },
   });
 
@@ -1772,28 +1801,51 @@ export function RegisterForm() {
     setSuccess(false);
     try {
       console.log("Attempting registration with:", data.email);
-      const response = await registerUser(data);
-      console.log("Registration successful:", response);
-      setSuccess(true);
-       // Automatically log in the user after successful registration
-       if (response.access_token) {
-         login(response.access_token);
-         // Redirect happens inside useAuth's login
-       } else {
-          setError("Registration successful, but failed to automatically log in.");
-           setIsLoading(false);
-       }
 
-    } catch (err) {
-        console.error("Registration failed:", err);
-        let errorMessage = 'Registration failed. Please try again.';
-        if (err instanceof ApiError) {
-          errorMessage = err.message || errorMessage;
-        } else if (err instanceof Error) {
-           errorMessage = err.message || errorMessage;
-        }
-        setError(errorMessage);
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
         setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+     console.log("Supabase client created."); // Add this
+
+     // Try signing up the user
+     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+           data: {
+              name: data.name || null,
+           },
+        },
+     });
+     console.log("signUp response:", authResponse, authError); // Add this
+
+     if (authError) {
+        console.error("Supabase registration failed:", authError);
+        setError(authError.message || 'Registration failed. Please try again.');
+        setIsLoading(false);
+     } else {
+        setSuccess(true); // Registration successful, set success state
+     }
+    } catch (err: any) {
+      console.error("Registration failed:", err);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1806,12 +1858,11 @@ export function RegisterForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && !error && ( // Show success only if no subsequent error occurred
+      {success && !error && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          {/* <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" /> */}
           <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Redirecting...
+            Account created successfully! Please check your email to verify your account.
           </AlertDescription>
         </Alert>
       )}
@@ -1824,7 +1875,7 @@ export function RegisterForm() {
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
-         {form.formState.errors.name && (
+        {form.formState.errors.name && (
           <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
         )}
       </div>
@@ -1855,8 +1906,21 @@ export function RegisterForm() {
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
       </div>
-      {/* Add Confirm Password if needed */}
-      <Button type="submit" className="w-full" disabled={isLoading || success}>
+      {/* (+) AÑADIR company_id */}
+      <div className="space-y-1">
+        <Label htmlFor="companyId">Company ID (Optional)</Label>
+        <Input
+          id="companyId"
+          type="text"
+          placeholder="Company ID"
+          {...form.register('companyId')}
+          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
+        />
+        {form.formState.errors.companyId && (
+          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
+        )}
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
       <div className="mt-4 text-center text-sm">
@@ -1870,7 +1934,7 @@ export function RegisterForm() {
 }
 ```
 
-## File: `components\chat\chat-history.tsx`
+## File: `components/chat/chat-history.tsx`
 ```tsx
 // File: components/chat/chat-history.tsx
 "use client";
@@ -1888,17 +1952,16 @@ import { useAuth } from '@/lib/hooks/useAuth'; // To ensure user is logged in
 import { toast } from "sonner";
 // Correct import path for AlertDialog
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"; // Corrected import path
-
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function ChatHistory() {
   const pathname = usePathname();
@@ -2093,7 +2156,7 @@ export function ChatHistory() {
 }
 ```
 
-## File: `components\chat\chat-input.tsx`
+## File: `components/chat/chat-input.tsx`
 ```tsx
 "use client";
 
@@ -2170,175 +2233,197 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 }
 ```
 
-## File: `components\chat\chat-interface.tsx`
+## File: `components/chat/chat-interface.tsx`
 ```tsx
-// File: components/chat/chat-interface.tsx
-"use client";
+    // File: components/chat/chat-interface.tsx
+    "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChatInput } from './chat-input';
-import { ChatMessage, Message } from './chat-message';
-import { RetrievedDocumentsPanel } from './retrieved-documents-panel';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
-// (+) AÑADIR ESTA LÍNEA:
-import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react'; // Mantuve FileText aunque no se use directamente, por si acaso.
-import { Skeleton } from '@/components/ui/skeleton';
+    import React, { useState, useEffect, useRef, useCallback } from 'react';
+    import { Button } from '@/components/ui/button';
+    import { ScrollArea } from '@/components/ui/scroll-area';
+    import { ChatInput } from './chat-input';
+    import { ChatMessage, Message } from './chat-message';
+    import { RetrievedDocumentsPanel } from './retrieved-documents-panel';
+    import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+    import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
+    // (-) QUITAR ESTA LÍNEA: import { useToast } from "@/components/ui/use-toast";
+    // (+) AÑADIR ESTA LÍNEA:
+    import { toast } from "sonner";
+    import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react'; // Mantuve FileText aunque no se use directamente, por si acaso.
+    import { Skeleton } from '@/components/ui/skeleton';
 
-interface ChatInterfaceProps {
-  chatId?: string; // Receive chatId from the page
-}
-
-const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
-];
-
-export function ChatInterface({ chatId }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(true); // State for the right panel
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  // (-) QUITAR ESTA LÍNEA: const { toast } = useToast(); // Ya no se usa el hook, se importa 'toast' directamente.
-
-  // Load chat history based on chatId (placeholder)
-  useEffect(() => {
-    // Reset state for new/different chat
-    setMessages(initialMessages);
-    setRetrievedDocs([]);
-    setIsLoading(false);
-
-    if (chatId) {
-      console.log(`Loading history for chat: ${chatId}`);
-      // TODO: Fetch messages for the specific chatId from backend/localStorage
-      // setMessages(fetchedMessages);
-      setMessages([ // Dummy loading
-           { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
-      ]);
-    } else {
-      // New chat
-      setMessages(initialMessages);
+    interface ChatInterfaceProps {
+      chatId?: string; // Receive chatId from the page
     }
-  }, [chatId]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-        // Added timeout to ensure DOM updates are flushed before scrolling
-        setTimeout(() => {
-            if (scrollAreaRef.current) {
-                scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    const initialMessages: Message[] = [
+        { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
+    ];
+
+    export function ChatInterface({ chatId }: ChatInterfaceProps) {
+      const [messages, setMessages] = useState<Message[]>(initialMessages);
+      const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
+      const [isLoading, setIsLoading] = useState(false);
+      const [isPanelOpen, setIsPanelOpen] = useState(true); // State for the right panel
+      const scrollAreaRef = useRef<HTMLDivElement>(null);
+      // (-) QUITAR ESTA LÍNEA: const { toast } = useToast(); // Ya no se usa el hook, se importa 'toast' directamente.
+
+      // Load chat history based on chatId (placeholder)
+      useEffect(() => {
+        // Reset state for new/different chat
+        setMessages(initialMessages);
+        setRetrievedDocs([]);
+        setIsLoading(false);
+
+        if (chatId) {
+          console.log(`Loading history for chat: ${chatId}`);
+          // Load messages from local storage
+          const storedMessages = localStorage.getItem(`chat-${chatId}`);
+          if (storedMessages) {
+            try {
+              const parsedMessages: Message[] = JSON.parse(storedMessages);
+              setMessages(parsedMessages);
+            } catch (error) {
+              console.error("Error parsing chat history from local storage:", error);
+              // Handle error (e.g., clear local storage or show an error message)
             }
-        }, 100);
-    }
-  }, [messages]);
+          } else {
+              setMessages([ // Dummy loading
+                { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
+              ]);
+          }
+        } else {
+          // New chat
+          setMessages(initialMessages);
+        }
+      }, [chatId]);
 
-  const handleSendMessage = useCallback(async (query: string) => {
-    if (!query.trim() || isLoading) return;
+      // Save chat history to localStorage
+      useEffect(() => {
+        if (chatId) {
+          try {
+            localStorage.setItem(`chat-${chatId}`, JSON.stringify(messages));
+          } catch (error) {
+            console.error("Error saving chat history to local storage:", error);
+            // Handle error (e.g., show an error message)
+          }
+        }
+      }, [chatId, messages]);
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    setRetrievedDocs([]); // Clear previous docs
+      // Scroll to bottom when messages change
+      useEffect(() => {
+        if (scrollAreaRef.current) {
+            // Added timeout to ensure DOM updates are flushed before scrolling
+            setTimeout(() => {
+                if (scrollAreaRef.current) {
+                    scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+                }
+            }, 100);
+        }
+      }, [messages]);
 
-    try {
-      const response = await postQuery({ query });
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: response.answer,
-        sources: response.retrieved_documents // Attach sources to the message
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-      setRetrievedDocs(response.retrieved_documents || []);
-      if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isPanelOpen) {
-         setIsPanelOpen(true); // Auto-open panel if closed and docs were retrieved
-      }
-    } catch (error) {
-      console.error("Query failed:", error);
-      let errorMessage = "Sorry, I encountered an error trying to answer your question.";
-       if (error instanceof ApiError && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       } else if (error instanceof Error && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       }
+      const handleSendMessage = useCallback(async (query: string) => {
+        if (!query.trim() || isLoading) return;
 
-      const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
-      setMessages(prev => [...prev, errorMessageObj]);
+        const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
+        setMessages(prev => [...prev, userMessage]);
+        setIsLoading(true);
+        setRetrievedDocs([]); // Clear previous docs
 
-      // (*) MODIFICAR ESTA LLAMADA PARA USAR 'sonner'
-      toast.error("Query Failed", {
-        description: errorMessage,
-      });
+        try {
+          const response = await postQuery({ query });
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: response.answer,
+            sources: response.retrieved_documents // Attach sources to the message
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+          setRetrievedDocs(response.retrieved_documents || []);
+          if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isPanelOpen) {
+             setIsPanelOpen(true); // Auto-open panel if closed and docs were retrieved
+          }
+        } catch (error) {
+          console.error("Query failed:", error);
+          let errorMessage = "Sorry, I encountered an error trying to answer your question.";
+           if (error instanceof ApiError && error.message) {
+               errorMessage = `Error: ${error.message}`;
+           } else if (error instanceof Error && error.message) {
+               errorMessage = `Error: ${error.message}`;
+           }
 
-    } finally {
-      setIsLoading(false);
-    }
-  // (*) QUITAR 'toast' de las dependencias si estaba, ya que 'toast' de sonner es una función estable importada.
-  }, [isLoading, isPanelOpen]); // Add isPanelOpen dependency
+          const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
+          setMessages(prev => [...prev, errorMessageObj]);
 
-  const handlePanelToggle = () => {
-        setIsPanelOpen(!isPanelOpen);
-    };
+          // (*) MODIFICAR ESTA LLAMADA PARA USAR 'sonner'
+          toast.error("Query Failed", {
+            description: errorMessage,
+          });
 
-  return (
-     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Adjust height based on header */}
-            <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
-                <div className="flex h-full flex-col">
-                    {/* Button to toggle panel */}
-                    <div className="absolute top-2 right-2 z-10">
-                        <Button onClick={handlePanelToggle} variant="ghost" size="icon">
-                            {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                            <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
-                        </Button>
-                    </div>
+        } finally {
+          setIsLoading(false);
+        }
+      // (*) QUITAR 'toast' de las dependencias si estaba, ya que 'toast' de sonner es una función estable importada.
+      }, [isLoading, isPanelOpen]); // Add isPanelOpen dependency
 
-                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-                        <div className="space-y-4 pr-4"> {/* Add padding right */}
-                            {messages.map((message) => (
-                                <ChatMessage key={message.id} message={message} />
-                            ))}
-                            {/* (*) Modificado para mostrar Skeleton solo cuando el último mensaje es del usuario */}
-                            {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                                <div className="flex items-start space-x-3">
-                                     <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                          <BrainCircuit className="h-5 w-5 text-primary"/>
-                                     </Skeleton>
-                                    <div className="space-y-2 flex-1">
-                                        <Skeleton className="h-4 w-3/4" />
-                                        <Skeleton className="h-4 w-1/2" />
-                                    </div>
-                                </div>
-                            )}
+      const handlePanelToggle = () => {
+            setIsPanelOpen(!isPanelOpen);
+        };
+
+      return (
+         <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Adjust height based on header */}
+                <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
+                    <div className="flex h-full flex-col">
+                        {/* Button to toggle panel */}
+                        <div className="absolute top-2 right-2 z-10">
+                            <Button onClick={handlePanelToggle} variant="ghost" size="icon">
+                                {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+                                <span className="sr-only">{isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}</span>
+                            </Button>
                         </div>
-                    </ScrollArea>
 
-                    <div className="border-t p-4 bg-muted/30">
-                        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+                            <div className="space-y-4 pr-4"> {/* Add padding right */}
+                                {messages.map((message) => (
+                                    <ChatMessage key={message.id} message={message} />
+                                ))}
+                                {/* (*) Modificado para mostrar Skeleton solo cuando el último mensaje es del usuario */}
+                                {isLoading && messages[messages.length - 1]?.role === 'user' && (
+                                    <div className="flex items-start space-x-3">
+                                         <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                              <BrainCircuit className="h-5 w-5 text-primary"/>
+                                         </Skeleton>
+                                        <div className="space-y-2 flex-1">
+                                            <Skeleton className="h-4 w-3/4" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
+
+                        <div className="border-t p-4 bg-muted/30">
+                            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                        </div>
                     </div>
-                </div>
-            </ResizablePanel>
+                </ResizablePanel>
 
-            {/* Conditionally render the panel based on isPanelOpen */}
-            {isPanelOpen && (
-                <>
-                    <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        {/* (*) Modificado para pasar el estado de carga correcto al panel de documentos */}
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
-                    </ResizablePanel>
-                </>
-            )}
-        </ResizablePanelGroup>
-  );
-}
+                {/* Conditionally render the panel based on isPanelOpen */}
+                {isPanelOpen && (
+                    <>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+                            {/* (*) Modificado para pasar el estado de carga correcto al panel de documentos */}
+                            <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
+                        </ResizablePanel>
+                    </>
+                )}
+            </ResizablePanelGroup>
+      );
+    }
 ```
 
-## File: `components\chat\chat-message.tsx`
+## File: `components/chat/chat-message.tsx`
 ```tsx
 // File: components/chat/chat-message.tsx
 import React from 'react';
@@ -2442,16 +2527,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
 }
 ```
 
-## File: `components\chat\retrieved-documents-panel.tsx`
+## File: `components/chat/retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-"use client";
-
+// File: components/chat/retrieved-documents-panel.tsx
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
-import { RetrievedDoc } from '@/lib/api';
+import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
+import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -2475,13 +2559,53 @@ interface RetrievedDocumentsPanelProps {
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [docContent, setDocContent] = useState<string | null>(null); // State to store document content
+    const [viewingError, setViewingError] = useState<string | null>(null); // Error when viewing doc
 
-    const handleViewDocument = (doc: RetrievedDoc) => {
-        console.log("Viewing document details:", doc.document_id || doc.id);
+
+    const handleViewDocument = async (doc: RetrievedDoc) => {
+        console.log("Viewing document:", doc.document_id || doc.id);
         setSelectedDoc(doc);
-        setIsDialogOpen(true);
+        setViewingError(null); // Clear any previous errors
+        setDocContent(null); // Clear previous content
+
+        try {
+             if (!doc.document_id) {
+                 throw new Error("Missing document_id for viewing");
+             }
+             const content = await fetchDocumentContent(doc.document_id);
+             setDocContent(content); // Set the content if fetch is successful
+             setOpen(true); // Open the Dialog after fetching content
+        } catch (error) {
+            console.error("Error fetching document content:", error);
+            let errorMessage = "Failed to load document content.";
+            if (error instanceof ApiError && error.message) {
+                errorMessage = error.message;
+            } else if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+            setViewingError(errorMessage); // Set the error message
+            setDocContent(null); // Ensure content is cleared on error
+            setOpen(true); // Still open the dialog to display the error
+
+        }
     };
+
+
+     const fetchDocumentContent = async (documentId: string): Promise<string> => {
+        try {
+            const response = await request<string>(`/api/v1/ingest/document/${documentId}/content`, {
+                method: 'GET',
+            });
+            return response;
+
+        } catch (error) {
+            console.error("Error fetching document content:", error);
+            throw error;
+        }
+    };
+
+
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
         const message = `Download requested for: ${doc.file_name || doc.id}`;
@@ -2557,20 +2681,29 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 
             {/* Dialog Content - Rendered conditionally when selectedDoc is not null */}
             {selectedDoc && (
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}>
-                            {selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Details of the retrieved document chunk.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-3 text-sm">
-                        {/* Details content */}
-                        <div className="flex justify-between">
-                            <span className="font-medium text-muted-foreground">Document ID:</span>
-                            <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
+                <DialogContent className="sm:max-w-[425px]">
+                        <div className="px-6 pb-4 text-center sm:text-left">
+                            <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
+                            <DialogDescription>
+                                {viewingError && (
+                                    <div className="text-red-500">
+                                        Error loading document: {viewingError}
+                                    </div>
+                                )}
+                                {/* Display loading state while fetching */}
+                                 {!docContent && !viewingError && (
+                                    <div className="flex justify-center items-center h-32">
+                                        <Loader2 className="animate-spin h-6 w-6" />
+                                    </div>
+                                 )}
+
+                                {/* Display loaded content */}
+                                {docContent && (
+                                    <ScrollArea className="max-h-[300px]">
+                                        <p>{docContent}</p>
+                                    </ScrollArea>
+                                )}
+                            </DialogDescription>
                         </div>
                         <div className="flex justify-between">
                             <span className="font-medium text-muted-foreground">Chunk ID:</span>
@@ -2614,7 +2747,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 }
 ```
 
-## File: `components\knowledge\document-status-list.tsx`
+## File: `components/knowledge/document-status-list.tsx`
 ```tsx
 // File: components/knowledge/document-status-list.tsx
 "use client";
@@ -2665,6 +2798,7 @@ export function DocumentStatusList() {
         } finally {
             setIsLoading(false);
         }
+    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     useEffect(() => {
@@ -2819,7 +2953,7 @@ export function DocumentStatusList() {
 }
 ```
 
-## File: `components\knowledge\file-uploader.tsx`
+## File: `components/knowledge/file-uploader.tsx`
 ```tsx
 // File: components/knowledge/file-uploader.tsx
 "use client";
@@ -2994,7 +3128,7 @@ export function FileUploader() {
 }
 ```
 
-## File: `components\layout\header.tsx`
+## File: `components/layout/header.tsx`
 ```tsx
     // File: components/layout/header.tsx
     "use client";
@@ -3082,7 +3216,7 @@ export function FileUploader() {
       }
 ```
 
-## File: `components\layout\sidebar.tsx`
+## File: `components/layout/sidebar.tsx`
 ```tsx
 "use client";
 
@@ -3169,7 +3303,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 }
 ```
 
-## File: `components\theme-palette-button.tsx`
+## File: `components/theme-palette-button.tsx`
 ```tsx
 // File: components/theme-palette-button.tsx
 "use client";
@@ -3228,7 +3362,7 @@ export function ThemePaletteButton() {
 }
 ```
 
-## File: `components\theme-provider.tsx`
+## File: `components/theme-provider.tsx`
 ```tsx
 // File: components/theme-provider.tsx
 "use client";
@@ -3241,12 +3375,12 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 ```
 
-## File: `components\theme-toggle.tsx`
+## File: `components/theme-toggle.tsx`
 ```tsx
 
 ```
 
-## File: `components\ui\alert-dialog.tsx`
+## File: `components/ui/alert-dialog.tsx`
 ```tsx
 "use client"
 
@@ -3408,7 +3542,7 @@ export {
 
 ```
 
-## File: `components\ui\alert.tsx`
+## File: `components/ui/alert.tsx`
 ```tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -3479,7 +3613,7 @@ export { Alert, AlertTitle, AlertDescription }
 
 ```
 
-## File: `components\ui\avatar.tsx`
+## File: `components/ui/avatar.tsx`
 ```tsx
 "use client"
 
@@ -3537,7 +3671,7 @@ export { Avatar, AvatarImage, AvatarFallback }
 
 ```
 
-## File: `components\ui\badge.tsx`
+## File: `components/ui/badge.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3588,7 +3722,7 @@ export { Badge, badgeVariants }
 
 ```
 
-## File: `components\ui\button.tsx`
+## File: `components/ui/button.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3652,7 +3786,7 @@ export { Button, buttonVariants }
 
 ```
 
-## File: `components\ui\card.tsx`
+## File: `components/ui/card.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3749,7 +3883,7 @@ export {
 
 ```
 
-## File: `components\ui\dialog.tsx`
+## File: `components/ui/dialog.tsx`
 ```tsx
 "use client"
 
@@ -3889,7 +4023,7 @@ export {
 
 ```
 
-## File: `components\ui\dropdown-menu.tsx`
+## File: `components/ui/dropdown-menu.tsx`
 ```tsx
 "use client"
 
@@ -4151,7 +4285,7 @@ export {
 
 ```
 
-## File: `components\ui\input.tsx`
+## File: `components/ui/input.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4177,7 +4311,7 @@ export { Input }
 
 ```
 
-## File: `components\ui\label.tsx`
+## File: `components/ui/label.tsx`
 ```tsx
 "use client"
 
@@ -4206,7 +4340,7 @@ export { Label }
 
 ```
 
-## File: `components\ui\progress.tsx`
+## File: `components/ui/progress.tsx`
 ```tsx
 "use client"
 
@@ -4242,7 +4376,7 @@ export { Progress }
 
 ```
 
-## File: `components\ui\resizable.tsx`
+## File: `components/ui/resizable.tsx`
 ```tsx
 "use client"
 
@@ -4303,7 +4437,7 @@ export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
 
 ```
 
-## File: `components\ui\scroll-area.tsx`
+## File: `components/ui/scroll-area.tsx`
 ```tsx
 "use client"
 
@@ -4366,7 +4500,7 @@ export { ScrollArea, ScrollBar }
 
 ```
 
-## File: `components\ui\separator.tsx`
+## File: `components/ui/separator.tsx`
 ```tsx
 "use client"
 
@@ -4399,7 +4533,7 @@ export { Separator }
 
 ```
 
-## File: `components\ui\skeleton.tsx`
+## File: `components/ui/skeleton.tsx`
 ```tsx
 import { cn } from "@/lib/utils"
 
@@ -4417,7 +4551,7 @@ export { Skeleton }
 
 ```
 
-## File: `components\ui\sonner.tsx`
+## File: `components/ui/sonner.tsx`
 ```tsx
 "use client"
 
@@ -4447,7 +4581,7 @@ export { Toaster }
 
 ```
 
-## File: `components\ui\table.tsx`
+## File: `components/ui/table.tsx`
 ```tsx
 "use client"
 
@@ -4568,7 +4702,7 @@ export {
 
 ```
 
-## File: `components\ui\textarea.tsx`
+## File: `components/ui/textarea.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4591,7 +4725,7 @@ export { Textarea }
 
 ```
 
-## File: `components\ui\tooltip.tsx`
+## File: `components/ui/tooltip.tsx`
 ```tsx
 "use client"
 
@@ -4797,7 +4931,7 @@ if __name__ == "__main__":
     generate_codebase_markdown()
 ```
 
-## File: `lib\api.ts`
+## File: `lib/api.ts`
 ```ts
 // File: lib/api.ts
 import { getToken, getUserFromToken, User } from './auth/helpers';
@@ -5156,56 +5290,56 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
 });
 ```
 
-## File: `lib\auth\helpers.ts`
+## File: `lib/auth/helpers.ts`
 ```ts
-// lib/auth/helpers.ts
+// File: lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-import { jwtDecode, InvalidTokenError } from 'jwt-decode'; // Importar error específico
+import { jwtDecode } from 'jwt-decode';
 
-// ... (getToken, setToken, removeToken - sin cambios) ...
-export const getToken = (): string | null => { /* ... */ };
-export const setToken = (token: string): void => { /* ... */ };
-export const removeToken = (): void => { /* ... */ };
+// Basic token handling for client-side
+export const getToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  }
+  return null;
+};
 
-// Frontend User interface
+export const setToken = (token: string): void => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+  }
+};
+
+export const removeToken = (): void => {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
+};
+
+// Frontend User interface - needs to align with JWT claims
 export interface User {
-    userId: string;    // Mapeado desde 'sub' del JWT
-    email: string;     // Mapeado desde 'email'
-    name?: string;     // Mapeado desde 'user_metadata.full_name' o similar (opcional)
-    companyId: string; // Mapeado desde 'app_metadata.company_id' (o donde esté)
-    roles?: string[];  // Mapeado desde 'app_metadata.roles' (opcional)
-    // Añade otros campos necesarios
+    userId: string;    // Expecting 'user_id' claim in JWT
+    email: string;     // Expecting 'email' claim in JWT
+    name?: string;     // Expecting optional 'name' claim in JWT
+    companyId: string; // Expecting 'company_id' claim in JWT
+    // Add other fields if needed, e.g., roles
 }
 
-// Interface for the ACTUAL Supabase JWT payload structure
-// ¡¡¡ VERIFICA ESTO CON UN TOKEN REAL DE TU PROYECTO !!!
-interface SupabaseJwtPayload {
-    sub: string;       // User ID (Subject) - ¡MUY PROBABLE!
-    aud: string;       // Audience (e.g., 'authenticated') - ¡MUY PROBABLE!
-    exp: number;       // Expiration time (seconds since epoch) - ¡SEGURO!
-    iat?: number;      // Issued at time (optional)
-    email?: string;     // Email - ¡MUY PROBABLE!
-    phone?: string;    // Phone (optional)
-    role?: string;     // Rol asignado por Supabase Auth (e.g., 'authenticated') - ¡PROBABLE!
-
-    // --- Metadatos ---
-    app_metadata?: {
-        provider?: string;
-        providers?: string[];
-        // --- ¡POSIBLE UBICACIÓN DE COMPANY_ID Y ROLES! ---
-        company_id?: string | number; // Verifica el tipo real
-        roles?: string[];
-        // Otros datos específicos de la aplicación
-        [key: string]: any;
-    };
-    user_metadata?: {
-        // Datos que el usuario puede gestionar (o tú vía admin)
-        full_name?: string;
-        avatar_url?: string;
-        // Otros datos específicos del usuario
-         [key: string]: any;
-    };
-    // Otros claims posibles: session_id (sid), amr, etc.
+// Interface for the expected JWT payload structure from your REAL Auth Service
+interface JwtPayload {
+    // *** AJUSTA ESTOS NOMBRES DE CLAIMS para que coincidan EXACTAMENTE ***
+    // *** con lo que tu backend (Auth Service / Supabase) pone en el token ***
+    user_id: string;    // Ejemplo: claim para User ID (o podría ser 'sub')
+    company_id: string; // Ejemplo: claim para Company ID
+    email: string;      // Claim para Email
+    name?: string;     // Claim opcional para Name
+    role?: string;     // Claim opcional para Role
+    exp: number;       // Standard expiry timestamp (seconds since epoch) REQUIRED
+    iat?: number;      // Standard issued at timestamp (optional)
+    // 'sub' (subject) es un claim estándar, a menudo contiene el user ID.
+    // Si tu backend usa 'sub' para el ID de usuario, usa 'sub' aquí en lugar de 'user_id'.
+    sub?: string;      // Ejemplo: Si el backend usa 'sub' para user ID
+    // Agrega cualquier otro claim que tu backend incluya y necesites en el frontend
 }
 
 // Function to get user details from the JWT token
@@ -5213,71 +5347,62 @@ export const getUserFromToken = (token: string | null): User | null => {
   if (!token) return null;
   try {
     // Decode the JWT
-    const decoded = jwtDecode<SupabaseJwtPayload>(token);
-    // console.debug("getUserFromToken - Raw Decoded JWT:", decoded); // Log para depuración intensa
+    const decoded = jwtDecode<JwtPayload>(token);
+    console.log("getUserFromToken - Decoded JWT Payload:", decoded); // <-- Log para depuración
 
     // --- Validation ---
-    const now = Date.now() / 1000;
+    // 1. Check expiry
+    const now = Date.now() / 1000; // Current time in seconds
     if (decoded.exp < now) {
-      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Removing.`);
-      removeToken();
+      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Current time: ${new Date()}.`);
+      removeToken(); // Clear expired token
       return null;
     }
 
-    // --- Claim Extraction and Mapping ---
-    const userId = decoded.sub; // Usar 'sub' como User ID
+    // 2. Check for essential claims required by the frontend
+    // *** VERIFICA que estos claims existen en tu payload decodificado ***
+    //    Ajusta los nombres ('user_id', 'company_id') si tu backend usa otros (ej. 'sub')
+    const userId = decoded.user_id || decoded.sub; // Usa user_id o sub como fallback
+    const companyId = decoded.company_id;
     const email = decoded.email;
-    // Extraer company_id de app_metadata (¡AJUSTA SI ES NECESARIO!)
-    const companyIdRaw = decoded.app_metadata?.company_id;
-    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Convertir a string si existe
 
-    // Validar claims esenciales para el frontend
-    if (!userId || !email || !companyId) {
-        console.error("Decoded token missing essential claims:", {
-            hasUserId: !!userId,
-            hasEmail: !!email,
-            hasCompanyId: !!companyId,
-            appMetadata: decoded.app_metadata // Log para ver qué hay
-        });
-        removeToken();
+    if (!userId || !companyId || !email) {
+        console.error("Decoded token is missing essential claims (userId/sub, companyId, email). Actual Payload:", decoded);
+        removeToken(); // Clear invalid token
         return null;
     }
 
-    // Mapear a la interfaz User del frontend
+    // --- Map decoded payload to User interface ---
     const user: User = {
-      userId: userId,
+      userId: userId,                 // Map from 'user_id' or 'sub' claim
       email: email,
-      companyId: companyId, // Ya es string o undefined (y validamos que no sea undefined)
-      // Mapear opcionales (ejemplos)
-      name: decoded.user_metadata?.full_name,
-      roles: decoded.app_metadata?.roles,
+      companyId: companyId,           // Map from 'company_id' claim
+      name: decoded.name,             // Map optional 'name' claim
+      // Add other mappings if needed, e.g., role: decoded.role
     };
 
-    // console.debug("getUserFromToken - Mapped User:", user);
+    console.log("getUserFromToken - Mapped User object:", user); // <-- Log para depuración
     return user;
 
   } catch (error) {
-     // Manejar errores específicos de jwt-decode
-     if (error instanceof InvalidTokenError) {
-         console.error("Failed to decode token (Invalid):", error.message);
-     } else {
-         console.error("Failed to decode or validate token (Unknown Error):", error);
-     }
-    removeToken();
+    // Handle various decoding errors (invalid token format, etc.)
+    console.error("Failed to decode or validate token:", error);
+    removeToken(); // Clear invalid token
     return null;
   }
 };
 
 ```
 
-## File: `lib\constants.ts`
+## File: `lib/constants.ts`
 ```ts
 export const APP_NAME = "Atenex";
 export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ```
 
-## File: `lib\hooks\useAuth.tsx`
+## File: `lib/hooks/useAuth.tsx`
 ```tsx
+// File: lib/hooks/useAuth.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -5392,7 +5517,7 @@ export const useAuth = (): AuthContextType => {
 };
 ```
 
-## File: `lib\utils.ts`
+## File: `lib/utils.ts`
 ```ts
 // File: lib/utils.ts
 import { clsx, type ClassValue } from "clsx"
@@ -5431,4 +5556,14 @@ export function getApiGatewayUrl(): string {
     return apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 }
 // FIN DE LA FUNCIÓN AÑADIDA
+```
+
+## File: `next-env.d.ts`
+```ts
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
 ```

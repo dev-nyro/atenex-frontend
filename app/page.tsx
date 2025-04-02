@@ -1,11 +1,12 @@
-// app/page.tsx
+// File: app/page.tsx
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 export default function HomePage() {
@@ -70,6 +71,7 @@ export default function HomePage() {
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
           <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
+           <EmailConfirmationHandler />
       </main>
 
       {/* Footer */}
@@ -100,7 +102,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({ title, description }: { title: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border"> {/* Added border */}
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>

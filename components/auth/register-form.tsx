@@ -1,3 +1,4 @@
+// File: components/auth/register-form.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -11,22 +12,22 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { registerUser, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { createClient } from '@supabase/supabase-js';
+import { AuthApiError } from '@supabase/supabase-js';
 
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  // confirmPassword: z.string(), // Add if needed
-// }).refine(data => data.password === data.confirmPassword, {
-//   message: "Passwords don't match",
-//   path: ["confirmPassword"], // path of error
+  // (+) AÑADIR company_id
+  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const { login } = useAuth(); // Use login from auth context to set token after registration
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -37,6 +38,8 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
+      // (+) AÑADIR company_id
+      companyId: 'd7387dc8-0312-4b1c-97a5-f96f7995f36c', // Valor por defecto - cambiar en PROD
     },
   });
 
@@ -46,28 +49,51 @@ export function RegisterForm() {
     setSuccess(false);
     try {
       console.log("Attempting registration with:", data.email);
-      const response = await registerUser(data);
-      console.log("Registration successful:", response);
-      setSuccess(true);
-       // Automatically log in the user after successful registration
-       if (response.access_token) {
-         login(response.access_token);
-         // Redirect happens inside useAuth's login
-       } else {
-          setError("Registration successful, but failed to automatically log in.");
-           setIsLoading(false);
-       }
 
-    } catch (err) {
-        console.error("Registration failed:", err);
-        let errorMessage = 'Registration failed. Please try again.';
-        if (err instanceof ApiError) {
-          errorMessage = err.message || errorMessage;
-        } else if (err instanceof Error) {
-           errorMessage = err.message || errorMessage;
-        }
-        setError(errorMessage);
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
         setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+
+     console.log("Supabase client created."); // Add this
+
+     // Try signing up the user
+     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+           data: {
+              name: data.name || null,
+           },
+        },
+     });
+     console.log("signUp response:", authResponse, authError); // Add this
+
+     if (authError) {
+        console.error("Supabase registration failed:", authError);
+        setError(authError.message || 'Registration failed. Please try again.');
+        setIsLoading(false);
+     } else {
+        setSuccess(true); // Registration successful, set success state
+     }
+    } catch (err: any) {
+      console.error("Registration failed:", err);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (err instanceof ApiError) {
+        errorMessage = err.message || errorMessage;
+      } else if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      }
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -80,12 +106,11 @@ export function RegisterForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && !error && ( // Show success only if no subsequent error occurred
+      {success && !error && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          {/* <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" /> */}
           <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Redirecting...
+            Account created successfully! Please check your email to verify your account.
           </AlertDescription>
         </Alert>
       )}
@@ -98,7 +123,7 @@ export function RegisterForm() {
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
-         {form.formState.errors.name && (
+        {form.formState.errors.name && (
           <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
         )}
       </div>
@@ -129,8 +154,21 @@ export function RegisterForm() {
           <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
       </div>
-      {/* Add Confirm Password if needed */}
-      <Button type="submit" className="w-full" disabled={isLoading || success}>
+      {/* (+) AÑADIR company_id */}
+      <div className="space-y-1">
+        <Label htmlFor="companyId">Company ID (Optional)</Label>
+        <Input
+          id="companyId"
+          type="text"
+          placeholder="Company ID"
+          {...form.register('companyId')}
+          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
+        />
+        {form.formState.errors.companyId && (
+          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
+        )}
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
       <div className="mt-4 text-center text-sm">
