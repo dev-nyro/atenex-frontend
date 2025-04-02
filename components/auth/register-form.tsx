@@ -14,8 +14,7 @@ import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { AuthError } from '@supabase/supabase-js';
 
-// --- Esquema Zod SIMPLIFICADO ---
-// Ya no necesitamos companyId aquí, el backend lo asignará.
+// --- Esquema Zod (Simplificado, sin companyId) ---
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
@@ -32,7 +31,7 @@ export function RegisterForm() {
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', password: '' }, // Sin companyId
+    defaultValues: { name: '', email: '', password: '' },
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
@@ -40,31 +39,41 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
 
-    // --- Preparar metadata SOLO con nombre ---
+    // Preparar credenciales (email, password)
+    const credentials = {
+        email: data.email,
+        password: data.password,
+    };
+
+    // Preparar opciones (metadata y redirección)
+    const options: { data?: object; emailRedirectTo?: string } = {};
     const userMetaDataForSignUp: { [key: string]: any } = {};
     if (data.name) {
         userMetaDataForSignUp.full_name = data.name;
     }
-    // ------------------------------------------
+    // Solo añadir 'data' a options si tiene contenido
+    if (Object.keys(userMetaDataForSignUp).length > 0) {
+        options.data = userMetaDataForSignUp;
+    }
+    // Añadir redirección
+    if (typeof window !== 'undefined') {
+        options.emailRedirectTo = window.location.origin;
+    }
 
     try {
-      console.log("RegisterForm: Attempting Supabase signUp for:", data.email);
+      console.log("RegisterForm: Calling signUp hook for:", data.email);
 
-      const { error: signUpError } = await signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: userMetaDataForSignUp,
-          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-        },
-      });
+      // --- MODIFICACIÓN: Llamar a signUp con argumentos separados ---
+      const { error: signUpError } = await signUp(credentials, options);
+      // -----------------------------------------------------------
 
       if (signUpError) {
         setError(signUpError.message || 'Registration failed.');
-        setIsLoading(false);
+        setIsLoading(false); // Detener carga en error
         return;
       }
 
+      // El hook ya mostró el toast, solo actualizar estado local
       setSuccess(true);
       setError(null);
       // form.reset(); // Opcional
@@ -73,7 +82,10 @@ export function RegisterForm() {
       console.error("RegisterForm: Unexpected error during registration:", err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
-      if (!success) setIsLoading(false); // Solo detener si no fue éxito
+      // No detener isLoading si fue éxito para mantener el mensaje visible
+      if (!success) {
+          setIsLoading(false);
+      }
     }
   };
 
@@ -112,8 +124,6 @@ export function RegisterForm() {
         <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
         {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
       </div>
-
-      {/* --- CAMPO Company ID ELIMINADO --- */}
 
       <Button type="submit" className="w-full" disabled={isLoading || success}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
