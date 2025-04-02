@@ -44,7 +44,7 @@ export default function EmailConfirmationHandler() {
                         return; // Stop further execution if session setup fails
                      }
                     
-                    if (session) {
+                    if (session && user) {
                         try {
                             const { error: insertError } = await supabaseClient
                                 .from('users')
