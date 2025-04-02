@@ -51,14 +51,17 @@ export function LoginForm() {
         process.env.NEXT_PUBLIC_SUPABASE_URL,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword(data);
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
 
       if (authError) {
         console.error("Supabase login failed:", authError);
         setError(authError.message || 'Login failed. Please check your credentials.');
       } else if (authResponse.session) {
         console.log("Supabase login successful:", authResponse);
-        login(authResponse.session);
+        login(authResponse.session.access_token);
       } else {
         console.error("Supabase login: No session returned");
         setError('Login failed. Please check your credentials.');
