@@ -39,50 +39,49 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
 
-    // Preparar credenciales (email, password)
-    const credentials = {
-        email: data.email,
-        password: data.password,
-    };
-
-    // Preparar opciones (metadata y redirección)
-    const options: { data?: object; emailRedirectTo?: string } = {};
+    // Prepare user metadata
     const userMetaDataForSignUp: { [key: string]: any } = {};
     if (data.name) {
         userMetaDataForSignUp.full_name = data.name;
     }
-    // Solo añadir 'data' a options si tiene contenido
-    if (Object.keys(userMetaDataForSignUp).length > 0) {
-        options.data = userMetaDataForSignUp;
-    }
-    // Añadir redirección
+
+    // Prepare redirect URL
+    let emailRedirectTo: string | undefined;
     if (typeof window !== 'undefined') {
-        options.emailRedirectTo = window.location.origin;
+        emailRedirectTo = window.location.origin;
     }
 
     try {
       console.log("RegisterForm: Calling signUp hook for:", data.email);
 
-      // --- MODIFICACIÓN: Llamar a signUp con argumentos separados ---
-      const { error: signUpError } = await signUp(credentials, options);
-      // -----------------------------------------------------------
+      // Combine all data into a single object parameter
+      const signUpParams = {
+        email: data.email,
+        password: data.password,
+        options: {
+          data: Object.keys(userMetaDataForSignUp).length > 0 ? userMetaDataForSignUp : undefined,
+          emailRedirectTo
+        }
+      };
+
+      const { error: signUpError } = await signUp(signUpParams);
 
       if (signUpError) {
         setError(signUpError.message || 'Registration failed.');
-        setIsLoading(false); // Detener carga en error
+        setIsLoading(false); // Stop loading on error
         return;
       }
 
-      // El hook ya mostró el toast, solo actualizar estado local
+      // Update local state on success
       setSuccess(true);
       setError(null);
-      // form.reset(); // Opcional
+      // form.reset(); // Optional
 
     } catch (err) {
       console.error("RegisterForm: Unexpected error during registration:", err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
-      // No detener isLoading si fue éxito para mantener el mensaje visible
+      // Do not stop isLoading if success to keep the message visible
       if (!success) {
           setIsLoading(false);
       }
