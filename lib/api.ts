@@ -106,6 +106,24 @@ export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]>
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => request<QueryApiResponse>('/api/v1/query', { method: 'POST', body: JSON.stringify({...payload, chat_id: payload.chat_id || null}) });
 export const deleteChat = async (chatId: string): Promise<void> => { await request<null>(`/api/v1/chats/${chatId}`, { method: 'DELETE' }); };
 
-// --- Type Mapping Helpers (sin cambios) ---
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => { /* ... */ };
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ };
+// --- Type Mapping Helpers ---
+
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
+    if (!apiSources) return undefined;
+    return apiSources.map(source => ({
+        id: source.id,
+        score: source.score,
+        content_preview: source.content_preview,
+        metadata: source.metadata,
+        document_id: source.document_id,
+        file_name: source.file_name,
+    }));
+};
+
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
+    id: apiMessage.id,
+    role: apiMessage.role,
+    content: apiMessage.content,
+    sources: mapApiSourcesToFrontend(apiMessage.sources),
+    isError: false,
+});

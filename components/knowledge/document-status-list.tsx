@@ -31,9 +31,10 @@ export function DocumentStatusList() {
             const data = await listDocumentStatuses();
             setStatuses(data);
             if (showToast) {
-                 toast.success("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
+                toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
+            } else if (data.length === 0) {
+                console.log("No document statuses found.");
             }
-            console.log(`Fetched ${data.length} document statuses.`);
         } catch (err) {
             console.error("Failed to fetch document statuses:", err);
             let message = "Could not load document statuses.";
@@ -58,7 +59,7 @@ export function DocumentStatusList() {
     };
 
     const getStatusBadge = (status: DocumentStatus['status']) => {
-       switch (status) {
+        switch (status) {
             case 'uploaded':
                 return <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"><Clock className="mr-1 h-3 w-3" />Uploaded</Badge>;
             case 'processing':
@@ -75,7 +76,7 @@ export function DocumentStatusList() {
     };
 
     const formatDateTime = (dateString?: string) => {
-      if (!dateString) return 'N/A';
+        if (!dateString) return 'N/A';
         try {
             return new Date(dateString).toLocaleString(undefined, {
                 year: 'numeric', month: 'short', day: 'numeric',
@@ -86,9 +87,9 @@ export function DocumentStatusList() {
         }
     };
 
-     const renderContent = () => {
-        if (isLoading && statuses.length === 0) {
-            return Array.from({ length: 5 }).map((_, index) => (
+    const renderContent = () => {
+        if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
+            return Array.from({ length: 5 }).map((_, index) => ( // Render more skeleton rows
                 <TableRow key={`skel-${index}`}>
                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20" /></TableCell>
@@ -122,10 +123,7 @@ export function DocumentStatusList() {
 
         return statuses.map((doc) => (
             <TableRow key={doc.document_id}>
-                {/* (*) CORRECTED LINE: Use nullish coalescing operator */}
-                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name ?? undefined}>
-                    {doc.file_name || 'N/A'}
-                </TableCell>
+                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name || 'N/A'}>{doc.file_name || 'N/A'}</TableCell>
                 <TableCell>{getStatusBadge(doc.status)}</TableCell>
                 <TableCell className="text-muted-foreground text-xs max-w-sm">
                     {doc.status === 'error' ? (
@@ -192,10 +190,10 @@ export function DocumentStatusList() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                       {renderContent()}
+                        {renderContent()}
                     </TableBody>
                 </Table>
             </ScrollArea>
-       </div>
+        </div>
     );
 }

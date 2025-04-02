@@ -14,65 +14,75 @@ export default function EmailConfirmationHandler() {
     const processedRef = useRef(false);
 
     useEffect(() => {
-        // Solo procesar una vez
-        if (processedRef.current) return;
+        if (hasConfirmed) {
+            return;
+        }
 
-        console.log("EmailConfirmationHandler mounted. Listening for auth changes.");
+        const handleEmailConfirmation = async () => {
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const expiresIn = params.get('expires_in');
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log(`EmailConfirmationHandler: Auth event received: ${event}`);
+                if (accessToken && refreshToken && expiresIn) {
+                    console.log("Found access token in URL hash:", accessToken);
+                    console.log("Attempting to set session and log in.");
 
-            // El evento clave después de la confirmación es SIGNED_IN (o USER_UPDATED si ya estaba logueado)
-            // Y la sesión debería contener el usuario confirmado.
-            if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user && !processedRef.current) {
-                 // Verificar si el email está confirmado (puede que el evento salte antes de que el flag esté 100% actualizado)
-                 // Es mejor confiar en que si hay sesión después del flujo de confirmación, está bien.
-                 // const { data: { user } } = await supabase.auth.getUser(); // Opcional: Refrescar datos del usuario
+                     // Create the supabaseClient
+                     const supabaseClient = createClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                     );
+                    
+                     // Use the access token to get the user and full session
+                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
+                         access_token: accessToken!,
+                         refresh_token: refreshToken!,
+                     })
 
-                 console.log("Email confirmed or user updated successfully! Session established:", session);
-                 toast.success("Account Confirmed!", {
-                    description: "You have successfully confirmed your email address.",
-                 });
+                     if (error) {
+                        console.error("Error setting session:", error);
+                        return; // Stop further execution if session setup fails
+                     }
+                    
+                    if (session && user) {
+                        try {
+                            const { error: insertError } = await supabaseClient
+                                .from('users')
+                                .insert([
+                                    {
+                                        id: user.id, // Use user.id from the session
+                                        email: user.email,
+                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
+                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
+                                        role: 'user',
+                                        is_active: true,
+                                    }
+                                ]);
 
-                 processedRef.current = true; // Marcar como procesado
+                            if (insertError) {
+                                console.error("Error inserting user into 'users' table:", insertError);
+                                if (insertError.code === '23505') {
+                                    console.warn("Duplicate user insertion attempted. Ignoring.");
+                                }
+                            } else {
+                                console.log("User inserted into 'users' table successfully.");
+                            }
+                        } catch (insertErr: any) {
+                            console.error("Error during user insertion:", insertErr);
+                        }
 
-                 // --- Lógica Opcional Post-Confirmación ---
-                 // Aquí es donde idealmente llamarías a una Edge Function para asegurarte
-                 // de que el usuario existe en tu tabla pública `users` con los metadatos correctos.
-                 // Ejemplo (si tuvieras una función 'ensure-user-profile'):
-                 // try {
-                 //   const { error: funcError } = await supabase.functions.invoke('ensure-user-profile');
-                 //   if (funcError) throw funcError;
-                 //   console.log("User profile ensured via Edge Function.");
-                 // } catch (funcError) {
-                 //   console.error("Error calling Edge Function to ensure profile:", funcError);
-                 //   toast.error("Profile Sync Error", { description: "Could not sync profile data." });
-                 // }
-                 // ------------------------------------------
-
-                 // Redirigir al usuario a la página principal o al chat
-                 // Usamos replace para que el usuario no pueda volver a la URL con el hash
-                 router.replace('/chat'); // O a '/'
-            } else if (event === 'PASSWORD_RECOVERY') {
-                 // Supabase también dispara este evento si el hash era para reseteo de contraseña
-                 console.log("Password recovery flow detected.");
-                 // Aquí podrías redirigir a una página específica para cambiar la contraseña
-                 // router.replace('/reset-password');
-                 toast.info("Password Recovery", { description: "Please set your new password." });
-                 processedRef.current = true; // Marcar como procesado
+                        setHasConfirmed(true);
+                        await signIn(session);
+                        router.replace('/');
+                    }
+                }
             }
-
-            // Considera manejar otros eventos si son relevantes (SIGNED_OUT, TOKEN_REFRESHED, etc.)
-        });
-
-        // Limpiar suscripción al desmontar
-        return () => {
-            console.log("EmailConfirmationHandler unmounting. Unsubscribing from auth changes.");
-            subscription?.unsubscribe();
         };
 
-    }, [router]); // Dependencia del router para la redirección
+        handleEmailConfirmation();
+    }, [signIn, router, hasConfirmed]);
 
-    // Este componente no renderiza nada visible
     return null;
 }

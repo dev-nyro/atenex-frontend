@@ -34,11 +34,34 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("LoginForm: Calling signIn with:", data.email);
-      await signIn(data); // <-- Llamar a la función signIn del hook
-      // La redirección ocurrirá dentro del hook si tiene éxito
-      // No necesitas hacer nada más aquí en caso de éxito
-      console.log("LoginForm: signIn initiated successfully.");
+      console.log("Attempting login with:", data.email);
+
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (authError) {
+        console.error("Supabase login failed:", authError);
+        setError(authError.message || 'Login failed. Please check your credentials.');
+      } else if (authResponse.session) {
+        console.log("Supabase login successful:", authResponse);
+        login(authResponse.session.access_token);
+      } else {
+        console.error("Supabase login: No session returned");
+        setError('Login failed. Please check your credentials.');
+      }
     } catch (err) {
       // El hook signIn debería lanzar un error en caso de fallo
       console.error("LoginForm: signIn failed:", err);

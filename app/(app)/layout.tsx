@@ -12,8 +12,7 @@ import { cn } from '@/lib/utils';
 // import { removeToken } from '@/lib/auth/helpers';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  // Usar session y user del hook actualizado
-  const { user, session, isLoading, signOut } = useAuth();
+  const { user, isLoading, token, logout } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';

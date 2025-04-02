@@ -335,18 +335,16 @@ module.exports = {
 ```local
 # Environment variables for local development
 
-# Base URL of your API Gateway (expuesto con ngrok o similar)
-NEXT_PUBLIC_API_GATEWAY_URL=https://TU_URL_DE_NGROK_O_GATEWAY.io # <-- ¡REEMPLAZA ESTO!
-
-# Supabase Credentials (Required for Supabase JS Client)
-NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co # <-- Tu URL de Supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk # <-- Tu Anon Key de Supabase
-
-# Opcional: Para saltar la verificación de autenticación durante el desarrollo
-# Poner a 'true' para bypass, cualquier otro valor o ausente para requerir auth.
-NEXT_PUBLIC_BYPASS_AUTH=false
-
-# JWT_SECRET=... # <-- YA NO ES NECESARIO AQUÍ
+# Base URL of your deployed API Gateway (REQUIRED for API calls to work)
+# Example: http://localhost:8080 if running gateway locally
+# Example: https://your-gateway-dev.example.com if deployed
+NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:9999  # Una URL falsa
+NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
+# Add other environment variables needed by your app here
+# Example: NEXT_PUBLIC_SOME_CONFIG=value
+JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
+NEXT_PUBLIC_BYPASS_AUTH=true
 ```
 
 ## File: `.gitignore`
@@ -470,9 +468,7 @@ export default function ChatPage() {
   const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fetchedChatIdRef = useRef<string | undefined>(undefined);
@@ -723,30 +719,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, session, isLoading, signOut } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // NEW: Check if we should bypass auth based on env variable
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   useEffect(() => {
     if (bypassAuth) {
-      console.warn("AppLayout: Auth checks bypassed.");
-      return; // No hacer nada si el bypass está activo
+      console.warn("AppLayout: Authentication BYPASSED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
+      return; // Skip auth check if bypass is enabled
     }
 
-    // Si no está cargando y NO hay sesión válida, redirigir a login (o a '/')
-    if (!isLoading && !session) {
-      console.log("AppLayout: No active session found, redirecting to login page.");
-      router.push('/'); // Redirigir a la página principal/pública
+    if (!isLoading && !token) {
+      console.log("AppLayout: No token found, redirecting to login.");
+      router.push('/'); // Cambiado a '/'
     }
-    // Opcional: Si hay sesión pero el mapeo a 'user' falló (ej. falta companyId)
-    // podrías forzar un logout o mostrar un error específico aquí.
-    // else if (!isLoading && session && !user) {
-    //   console.error("AppLayout: Session exists but user mapping failed (missing required data?). Forcing logout.");
-    //   signOut(); // Forzar logout si el estado del usuario no es válido
-    // }
+  }, [isLoading, token, router, bypassAuth]);
 
-  }, [isLoading, session, user, router, bypassAuth, signOut]); // Añadir signOut a dependencias si se usa
-
-  // Mostrar spinner mientras carga Y no estamos en modo bypass
-  if (isLoading && !bypassAuth) {
+  // Muestra un spinner mientras se verifica la autenticación
+  if (isLoading || (!token && !isLoading)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -2451,9 +2441,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-"use client";
-
-import React, { useState } from 'react';
+// File: components/chat/retrieved-documents-panel.tsx
+      
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 // --- CORRECCIÓN: Importar iconos en una sola línea ---
@@ -2462,19 +2451,10 @@ import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
 import { RetrievedDoc } from '@/lib/api'; // Mantener esta importación
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogFooter,
-    DialogClose
-} from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { Button } from '@/components/ui/button'; // Import Button component
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
 
+    
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean;
@@ -4738,8 +4718,8 @@ export class ApiError extends Error {
   }
 }
 
-// --- Core Request Function (Catch block corregido) ---
-async function request<T>(
+// --- Core Request Function ---
+export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -4911,17 +4891,30 @@ interface AuthContextType {
   user: AppUser | null; // Nuestra interfaz User
   session: Session | null; // La sesión completa de Supabase
   isLoading: boolean;
-  signIn: (credentials: { email: string; password: string }) => Promise<void>; // Cambiado de 'login'
-  signOut: () => Promise<void>; // Cambiado de 'logout'
-  // Podrías añadir otras funciones como signUp si las necesitas centralizadas aquí
+  // (+) AÑADIR 'signIn' a la definición de AuthContextType
+  signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
+  logout: () => void;
 }
 
 const defaultAuthContextValue: AuthContextType = {
     user: null,
-    session: null,
-    isLoading: true,
-    signIn: async () => { console.error("signIn function called outside of AuthProvider context"); },
-    signOut: async () => { console.error("signOut function called outside of AuthProvider context"); },
+    token: null,
+    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
+    signIn: (session: any) => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("signIn function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
+    },
+    login: (token: string) => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("Login function called outside of AuthProvider context");
+        // throw new Error("Login function called outside AuthProvider");
+    },
+    logout: () => {
+        // Función vacía o lanza error si se llama fuera del provider
+        console.error("Logout function called outside of AuthProvider context");
+        // throw new Error("Logout function called outside AuthProvider");
+    },
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
@@ -4966,57 +4959,49 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   useEffect(() => {
-    if (bypassAuth) {
-      console.warn("AuthProvider: Bypassing authentication checks.");
-      setIsLoading(false);
-      // Podrías establecer un usuario/sesión dummy si es necesario para desarrollo
-      // setUser({ userId: 'bypass-user', email: 'bypass@example.com', companyId: 'bypass-company' });
-      // setSession({} as Session); // Dummy session
-      return; // No suscribirse a cambios de auth
+    const storedToken = getToken();
+    if (storedToken) {
+      const userData = getUserFromToken(storedToken);
+      if (userData) {
+        setUser(userData);
+        setAuthStateToken(storedToken);
+      } else {
+        // Invalid token found
+        removeToken();
+      }
     }
+    setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
 
-    // Obtener sesión inicial
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      console.log("AuthProvider: Initial session fetch complete.", initialSession);
-      setSession(initialSession);
-      setUser(mapSupabaseUserToAppUser(initialSession?.user));
-      setIsLoading(false); // Terminar carga inicial después de obtener la sesión
-    }).catch(error => {
-       console.error("AuthProvider: Error fetching initial session:", error);
-       setIsLoading(false); // Terminar carga incluso si hay error
-    });
+  const login = useCallback((newToken: string) => {
+    setToken(newToken);
+    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+    setUser(userData);
+    setAuthStateToken(newToken);
+    // (+) Cambiado a '/' para ir a la página principal después del login
+    router.push('/');
+    console.log("User logged in, token set.");
+  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
 
-    // Escuchar cambios en el estado de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      console.log(`AuthProvider: Auth state changed. Event: ${_event}`, newSession);
-      setSession(newSession);
-      setUser(mapSupabaseUserToAppUser(newSession?.user));
-       // Ya no necesitamos isLoading aquí porque la carga inicial ya se hizo
-       // setIsLoading(false); // <-- Quitar esto de aquí
-    });
+  const signIn = useCallback((session: any) => {
+        // (+) Implementa la lógica de signIn (ej: guardar info de session)
+        const newToken = session.access_token; // Asume que session tiene access_token
+        setToken(newToken);
+        const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+        setUser(userData);
+        setAuthStateToken(newToken);
+        router.push('/');
+        console.log("User signed in (via setSession), token set.");
 
-    // Limpiar suscripción al desmontar
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [bypassAuth]); // Ejecutar solo una vez o si cambia bypassAuth
+  }, [router]);
 
-  const signIn = useCallback(async (credentials: { email: string; password: string }) => {
-    setIsLoading(true); // Indicar carga durante el inicio de sesión
-    try {
-      const { error } = await supabase.auth.signInWithPassword(credentials);
-      if (error) throw error;
-      // onAuthStateChange actualizará el estado user/session automáticamente
-      console.log("SignIn successful, waiting for auth state change...");
-      router.push('/'); // Redirigir a la página principal tras login exitoso
-    } catch (error: any) {
-      console.error("Error during signIn:", error);
-      // Lanzar el error para que el formulario lo capture
-      throw new ApiError(error.message || "Sign in failed", error.status || 500);
-    } finally {
-        // No establecer isLoading(false) aquí, onAuthStateChange lo hará indirectamente
-        // setIsLoading(false);
-    }
+  const logout = useCallback(() => {
+    removeToken();
+    setUser(null);
+    setAuthStateToken(null);
+    router.push('/login');
+    console.log("User logged out.");
   }, [router]);
 
   const signOut = useCallback(async () => {
@@ -5038,10 +5023,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const providerValue = {
       user,
-      session, // Exponer la sesión completa de Supabase
-      isLoading: isLoading && !bypassAuth, // Solo estar cargando si no estamos en modo bypass
+      token,
+      isLoading,
+      // (+) Asegúrate de que 'signIn' está incluido en el valor del provider
       signIn,
-      signOut
+      login,
+      logout
   };
 
   return (
