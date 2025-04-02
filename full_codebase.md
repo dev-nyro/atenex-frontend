@@ -434,6 +434,7 @@ ehthumbs_vista.db
 ## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx
+// Purpose: Main chat interface page, using useAuth for state and API calls via lib/api.
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -447,338 +448,377 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import {
     postQuery,
     getChatMessages,
-    RetrievedDoc, // Usar tipo frontend
+    deleteChat, // Import deleteChat
+    RetrievedDoc,
     ApiError,
     mapApiMessageToFrontend,
-    mapApiSourcesToFrontend
-} from '@/lib/api';
-import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle } from 'lucide-react';
+    mapApiSourcesToFrontend,
+    ChatSummary, // Import ChatSummary for potential use
+} from '@/lib/api'; // Use functions from centralized API module
+import { toast } from "sonner"; // Use sonner for notifications
+import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, PlusCircle } from 'lucide-react'; // Added PlusCircle
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook useAuth refactorizado
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED auth hook
 
-// Mensaje inicial de bienvenida
+// Initial welcome message for new chats
 const welcomeMessage: Message = {
     id: 'initial-welcome',
     role: 'assistant',
-    content: '¡Hola! ¿Cómo puedo ayudarte a consultar tu base de conocimientos hoy?',
-    created_at: new Date().toISOString(), // Usar fecha actual
+    content: '¡Hola! Soy Atenex. Pregúntame cualquier cosa sobre tus documentos.',
+    created_at: new Date().toISOString(),
 };
 
 export default function ChatPage() {
-  const params = useParams();
-  const router = useRouter();
-  // --- CORRECCIÓN: Usar session, user, isLoading, signOut del hook useAuth ---
-  const { session, user, isLoading: isAuthLoading, signOut } = useAuth();
-  // ---------------------------------------------------------------------
-  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+    const params = useParams();
+    const router = useRouter();
+    const { session, user, isLoading: isAuthLoading, signOut } = useAuth(); // Get auth state
 
-  // Obtener chatId de los parámetros de la ruta
-  const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
-  const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
+    // Extract chatId from dynamic route parameters
+    const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
+    const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
 
-  // Estados del componente
-  const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
-  const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isSending, setIsSending] = useState(false); // Enviando un nuevo mensaje
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false); // Cargando historial
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(true); // Panel derecho de fuentes
+    // Component State
+    const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
+    const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
+    const [isSending, setIsSending] = useState(false); // Is a new message being sent?
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false); // Is chat history loading?
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [isPanelOpen, setIsPanelOpen] = useState(true); // Sources panel visibility
 
-  // Refs
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const fetchedChatIdRef = useRef<string | undefined>(undefined); // Para evitar fetches duplicados
+    // Refs
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+    // Ref to track the last chatId for which history was fetched to prevent redundant fetches
+    const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
-  // Sincronizar chatId del estado con el parámetro de la ruta
-  useEffect(() => {
-    setChatId(chatIdParam);
-  }, [chatIdParam]);
+    // Effect to sync state chatId with route param chatId
+    useEffect(() => {
+        setChatId(chatIdParam);
+    }, [chatIdParam]);
 
-  // --- Efecto para Cargar Historial de Chat ---
-  useEffect(() => {
-    const isAuthenticated = !!session || bypassAuth; // Determinar si está autenticado
+    // --- Effect to Load Chat History ---
+    useEffect(() => {
+        const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+        const currentFetchTarget = chatId || 'welcome'; // Target 'welcome' if no chatId
 
-    // Si estamos esperando que la autenticación termine (y no estamos en bypass), mostrar carga
-    if (!bypassAuth && isAuthLoading) {
-        console.log("ChatPage: Waiting for auth state...");
-        setIsLoadingHistory(true); // Reutilizar estado de carga de historial
-        setMessages([welcomeMessage]); // Mostrar bienvenida mientras carga auth
-        setHistoryError(null);
-        fetchedChatIdRef.current = undefined; // Resetear ref
-        return;
-    }
-
-    // Si está autenticado, hay un chatId, y es diferente al último que buscamos...
-    if (isAuthenticated && chatId && fetchedChatIdRef.current !== chatId) {
-      console.log(`ChatPage: Auth ready. Fetching history for chat ${chatId}...`);
-      setIsLoadingHistory(true);
-      setHistoryError(null);
-      fetchedChatIdRef.current = chatId; // Marcar como buscado
-
-      getChatMessages(chatId)
-        .then(apiMessages => {
-           // Ordenar mensajes por fecha (por si acaso la API no los devuelve ordenados)
-           apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-           // Mapear mensajes de la API al formato del frontend
-           const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
-           // Establecer mensajes (o bienvenida si el historial está vacío)
-           setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
-           console.log(`ChatPage: History loaded for ${chatId}, ${mappedMessages.length} messages.`);
-        })
-        .catch(error => {
-          // Manejo de errores al cargar historial
-          let message = "Error loading chat history.";
-          console.error(`ChatPage: Error loading history for ${chatId}:`, error);
-          if (error instanceof ApiError) {
-              message = error.message || message;
-              // Si no se encuentra el chat, redirigir a /chat (nuevo chat)
-              if (error.status === 404) {
-                  toast.error("Chat Not Found", { description: `The chat with ID ${chatId} could not be found.` });
-                  router.replace('/chat');
-                  return; // Detener ejecución
-              }
-              // Si hay error de autenticación (401) o autorización (403), desloguear
-              if (error.status === 401 || error.status === 403) {
-                  toast.error("Authentication Error", { description: "Your session may have expired. Please log in again." });
-                  signOut(); // Usar signOut del contexto
-              }
-          } else if (error instanceof Error) {
-              message = error.message;
-          }
-          setHistoryError(message);
-          setMessages([welcomeMessage]); // Mostrar bienvenida en caso de error
-          toast.error("Failed to Load Chat", { description: message });
-        })
-        .finally(() => {
-          setIsLoadingHistory(false); // Terminar carga de historial
-        });
-
-    } else if (!chatId) {
-      // Si no hay chatId (estamos en /chat), resetear a estado inicial
-      console.log("ChatPage: No chat ID provided, showing welcome message.");
-      setMessages([welcomeMessage]);
-      setRetrievedDocs([]);
-      setIsLoadingHistory(false);
-      setHistoryError(null);
-      fetchedChatIdRef.current = undefined; // Resetear ref
-    } else if (!isAuthenticated && !isAuthLoading) {
-         // Si no está autenticado (y auth ya cargó), mostrar mensaje de login
-         console.log("ChatPage: Not authenticated, showing login prompt.");
-         setIsLoadingHistory(false);
-         setHistoryError("Please log in to view chat history.");
-         setMessages([welcomeMessage]);
-         fetchedChatIdRef.current = undefined; // Resetear ref
-    } else {
-        // Caso residual: ya se cargó este chat o no se cumplen condiciones. Asegurar que no quede cargando.
-        if (isLoadingHistory) setIsLoadingHistory(false);
-    }
-  // --- CORRECCIÓN: Dependencias del useEffect ---
-  }, [chatId, session, isAuthLoading, bypassAuth, router, signOut, isLoadingHistory]); // Incluir isLoadingHistory para evitar bucles si cambia rápido
-  // -------------------------------------------
-
-  // --- Efecto para Scroll al Final ---
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-        // Usar un pequeño timeout para asegurar que el DOM se actualice antes de hacer scroll
-        const timer = setTimeout(() => {
-             if (scrollAreaRef.current) {
-                 scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
-             }
-        }, 100); // 100ms suele ser suficiente
-        return () => clearTimeout(timer); // Limpiar timeout al desmontar o si las dependencias cambian
-    }
-  }, [messages, isSending, isLoadingHistory]); // Depender de mensajes, envío y carga de historial
-
-  // --- Función para Enviar Mensaje ---
-  const handleSendMessage = useCallback(async (query: string) => {
-    const isAuthenticated = !!session || bypassAuth;
-    if (!query.trim() || isSending || !isAuthenticated) {
-        if (!isAuthenticated) {
-             toast.error("Authentication Error", { description: "Please log in to send messages." });
-        } else if (isSending) {
-             console.warn("ChatPage: Message sending already in progress.");
-        } else {
-             console.warn("ChatPage: Cannot send empty message.");
+        // 1. Skip if auth is still loading (and not bypassing)
+        if (!bypassAuth && isAuthLoading) {
+            console.log("ChatPage: Waiting for auth state...");
+            // Optionally set loading state here, or rely on the main loading display
+            // setIsLoadingHistory(true); // Can show loading specifically for history area
+            return;
         }
-        return;
-    }
 
-    // Crear mensaje del usuario y añadirlo al estado
-    const userMessage: Message = {
-        id: `client-user-${Date.now()}`, // ID temporal del cliente
-        role: 'user',
-        content: query,
-        created_at: new Date().toISOString()
+        // 2. Skip if not authenticated (and auth has loaded)
+        if (!bypassAuth && !session) {
+            console.log("ChatPage: Not authenticated, cannot load history.");
+            setMessages([welcomeMessage]);
+            setHistoryError("Please log in to view or start chats.");
+            fetchedChatIdRef.current = undefined; // Reset fetch ref
+            setIsLoadingHistory(false);
+            return;
+        }
+
+        // 3. Skip if this chatId (or welcome state) has already been fetched
+        if (fetchedChatIdRef.current === currentFetchTarget) {
+             console.log(`ChatPage: History for ${currentFetchTarget} already loaded or being loaded.`);
+             // Ensure loading state is false if we skip
+             if (isLoadingHistory) setIsLoadingHistory(false);
+             return;
+        }
+
+        // 4. Fetch History or Reset for New Chat
+        console.log(`ChatPage: Auth ready. Target: ${currentFetchTarget}. Fetching history or resetting...`);
+        setIsLoadingHistory(true);
+        setHistoryError(null);
+        fetchedChatIdRef.current = currentFetchTarget; // Mark as being fetched
+
+        if (chatId) {
+            // Fetch history for existing chat
+            getChatMessages(chatId)
+                .then(apiMessages => {
+                    // Sort messages by creation time (belt-and-suspenders)
+                    apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+                    const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
+                    setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]); // Show welcome if history is empty
+                    console.log(`ChatPage: History loaded for ${chatId}, ${mappedMessages.length} messages.`);
+                })
+                .catch(error => {
+                    console.error(`ChatPage: Error loading history for ${chatId}:`, error);
+                    let message = "Error loading chat history.";
+                    if (error instanceof ApiError) {
+                        message = error.message || message;
+                        if (error.status === 404) {
+                            toast.error("Chat Not Found", { description: `Chat ${chatId} not found. Starting a new chat.` });
+                            router.replace('/chat'); // Redirect to new chat page
+                            return; // Stop processing
+                        }
+                        if (error.status === 401 || error.status === 403) {
+                            toast.error("Authentication Error", { description: "Session expired. Please log in again." });
+                            signOut(); // Force logout on auth errors
+                        }
+                    } else if (error instanceof Error) { message = error.message; }
+                    setHistoryError(message);
+                    setMessages([welcomeMessage]); // Show welcome on error
+                    toast.error("Failed to Load Chat", { description: message });
+                })
+                .finally(() => {
+                    setIsLoadingHistory(false);
+                });
+        } else {
+            // No chatId, reset to welcome state for a new chat
+            console.log("ChatPage: No chat ID, setting welcome message.");
+            setMessages([welcomeMessage]);
+            setRetrievedDocs([]);
+            setIsLoadingHistory(false); // Finished "loading" the welcome state
+        }
+
+    // Dependencies: Re-run when chatId, session, or auth loading state changes.
+    }, [chatId, session, isAuthLoading, router, signOut, isLoadingHistory]); // Added isLoadingHistory to deps
+
+    // --- Effect for Scrolling to Bottom ---
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            const scrollElement = scrollAreaRef.current;
+            // Use requestAnimationFrame for smoother scrolling after render
+            requestAnimationFrame(() => {
+                 // Scroll only if the user isn't manually scrolled up significantly
+                 // (e.g., allow scrolling up by more than 100px without forcing down)
+                 const isScrolledUp = scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight > 100;
+                 if (!isScrolledUp) {
+                    scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
+                 }
+            });
+        }
+    // Dependency: Run whenever messages array changes length or content, or when sending state changes.
+    }, [messages, isSending]);
+
+    // --- Function to Send a Message ---
+    const handleSendMessage = useCallback(async (query: string) => {
+        const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+        const isAuthenticated = !!session || bypassAuth;
+
+        // Basic validation
+        if (!query.trim()) {
+            toast.warning("Cannot send empty message.");
+            return;
+        }
+        if (isSending) {
+            toast.warning("Please wait for the previous response.", { id: 'sending-throttle'});
+            return;
+        }
+         if (!isAuthenticated) {
+             toast.error("Authentication Error", { description: "Please log in to send messages." });
+             return;
+         }
+
+        // Add user message immediately to UI
+        const userMessage: Message = {
+            id: `client-user-${Date.now()}`, // Temporary client-side ID
+            role: 'user',
+            content: query,
+            created_at: new Date().toISOString()
+        };
+        // Use functional update to ensure we're working with the latest state
+        setMessages(prev => [...prev, userMessage]);
+        setIsSending(true);
+        setRetrievedDocs([]); // Clear previous documents
+
+        const currentChatIdForApi = chatId || null; // Send null for new chats
+
+        console.log(`ChatPage: Sending query to API (Chat ID: ${currentChatIdForApi || 'New'})...`);
+
+        try {
+            // Call the API
+            const response = await postQuery({ query, chat_id: currentChatIdForApi });
+            const returnedChatId = response.chat_id; // API MUST return the chat_id
+
+            // Map sources and create assistant message
+            const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents);
+            const assistantMessage: Message = {
+                id: `client-assistant-${Date.now()}`, // Temporary client-side ID
+                role: 'assistant',
+                content: response.answer,
+                sources: mappedSources,
+                created_at: new Date().toISOString() // Use current time for assistant msg
+            };
+
+            // Add assistant message to state
+            setMessages(prev => [...prev, assistantMessage]);
+            setRetrievedDocs(mappedSources || []);
+
+            // If it was a new chat, update URL and state without full page reload
+            if (!currentChatIdForApi && returnedChatId) {
+                console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL.`);
+                setChatId(returnedChatId); // Update state
+                fetchedChatIdRef.current = returnedChatId; // Update fetch ref to prevent immediate reload
+                // Use router.replace to update URL without adding to history
+                router.replace(`/chat/${returnedChatId}`, { scroll: false });
+            }
+
+            // Auto-open sources panel if closed and sources were found
+            if (mappedSources && mappedSources.length > 0 && !isPanelOpen) {
+                setIsPanelOpen(true);
+            }
+             console.log(`ChatPage: Query successful. Answer received for chat ${returnedChatId}.`);
+
+        } catch (error) {
+            console.error("ChatPage: Query failed:", error);
+            let errorMessage = "Sorry, an error occurred while processing your request.";
+            if (error instanceof ApiError) {
+                 errorMessage = error.message || `API Error (${error.status})`;
+                 if (error.status === 401 || error.status === 403) {
+                     errorMessage = "Authentication error. Please log in again.";
+                     signOut(); // Force logout
+                 }
+             } else if (error instanceof Error) {
+                 errorMessage = `Error: ${error.message}`;
+             }
+
+            // Add error message to chat
+            const errorMsgObj: Message = {
+                id: `error-${Date.now()}`,
+                role: 'assistant',
+                content: errorMessage,
+                isError: true,
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, errorMsgObj]);
+            toast.error("Query Failed", { description: errorMessage });
+
+        } finally {
+            setIsSending(false); // Reset sending state
+        }
+    // Dependencies: Include all state and functions used
+    }, [chatId, isSending, session, router, isPanelOpen, signOut]);
+
+    // Toggle for the sources panel
+    const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
+
+    // Navigate to start a new chat
+    const handleNewChat = () => {
+        console.log("ChatPage: Starting new chat.");
+        // Check if already on the new chat page to avoid redundant navigation
+        if (pathname !== '/chat') {
+             router.push('/chat');
+        } else {
+            // If already on /chat, just reset the state manually
+            setChatId(undefined);
+            setMessages([welcomeMessage]);
+            setRetrievedDocs([]);
+            setHistoryError(null);
+            fetchedChatIdRef.current = 'welcome'; // Mark welcome state as "loaded"
+            setIsLoadingHistory(false);
+            console.log("ChatPage: Already on /chat, resetting state.");
+        }
     };
-    // Usar callback de setState para asegurar que usamos el estado más reciente
-    setMessages(prev => [...prev, userMessage]);
-    setIsSending(true);
-    setRetrievedDocs([]); // Limpiar documentos anteriores
-    const currentChatIdForApi = chatId || null; // Enviar null si es un chat nuevo
 
-    console.log(`ChatPage: Sending query to API (Chat ID: ${currentChatIdForApi || 'New'})...`);
 
-    try {
-      // Llamar a la API para obtener la respuesta
-      const response = await postQuery({ query, chat_id: currentChatIdForApi });
-      const returnedChatId = response.chat_id; // La API debe devolver el ID del chat
-
-      // Mapear fuentes/documentos recuperados
-      const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents);
-
-      // Crear mensaje del asistente
-      const assistantMessage: Message = {
-        id: `client-assistant-${Date.now()}`, // ID temporal del cliente
-        role: 'assistant',
-        content: response.answer,
-        sources: mappedSources, // Adjuntar fuentes mapeadas
-        created_at: new Date().toISOString() // Usar fecha actual
-      };
-
-      // Añadir mensaje del asistente al estado
-      setMessages(prev => [...prev, assistantMessage]);
-      setRetrievedDocs(mappedSources || []); // Actualizar panel de documentos
-
-      // Si era un chat nuevo y la API devolvió un ID, actualizar la URL y el estado
-      if (!currentChatIdForApi && returnedChatId) {
-        console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL.`);
-        setChatId(returnedChatId);
-        fetchedChatIdRef.current = returnedChatId; // Actualizar ref para evitar recarga
-        // Usar replace para no añadir al historial del navegador, scroll: false para evitar saltos
-        router.replace(`/chat/${returnedChatId}`, { scroll: false });
-      }
-
-      // Si se recuperaron documentos y el panel estaba cerrado, abrirlo
-      if (mappedSources && mappedSources.length > 0 && !isPanelOpen) {
-          setIsPanelOpen(true);
-      }
-      console.log(`ChatPage: Query successful. Answer received.`);
-
-    } catch (error) {
-      // Manejo de errores al enviar query
-      let errorMessage = "Sorry, I encountered an error trying to answer.";
-      console.error("ChatPage: Query failed:", error);
-      if (error instanceof ApiError) {
-           errorMessage = error.message || `API Error (${error.status})`;
-           // Si es error de autenticación/autorización, desloguear
-           if (error.status === 401 || error.status === 403) {
-               errorMessage = "Authentication error. Please log in again.";
-               signOut(); // Usar signOut del contexto
-           }
-       } else if (error instanceof Error) {
-           errorMessage = `Error: ${error.message}`;
-       }
-
-      // Crear y añadir mensaje de error al chat
-      const errorMsgObj: Message = {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: errorMessage,
-          isError: true,
-          created_at: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, errorMsgObj]);
-      toast.error("Fallo en la consulta", { description: errorMessage });
-
-    } finally {
-      setIsSending(false); // Terminar estado de envío
-    }
-  // --- CORRECCIÓN: Dependencias del useCallback ---
-  }, [isSending, chatId, router, session, bypassAuth, isPanelOpen, signOut]);
-  // -------------------------------------------
-
-  // Toggle para el panel derecho
-  const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
-
-  // --- Componentes de Renderizado Internos ---
-  const renderHistoryLoading = () => (
-       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Loading chat history...</p>
-            {isAuthLoading && <p className="text-xs text-muted-foreground/70 mt-1">(Waiting for authentication...)</p>}
-        </div>
-  );
-
-  const renderHistoryError = () => (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <AlertCircle className="h-8 w-8 text-destructive mb-4" />
-          <p className="text-destructive font-medium mb-2">Error Loading History</p>
-          <p className="text-sm text-muted-foreground mb-4">{historyError}</p>
-          {/* Podrías añadir un botón de reintento si historyError no es por auth */}
-          {/* <Button variant="outline" size="sm" onClick={retryFetchHistory}>Retry</Button> */}
-      </div>
-  );
-
-  const renderMessages = () => {
-      // Filtrar el mensaje de bienvenida inicial si ya hay otros mensajes cargados
-      const messagesToRender = messages.filter(m => !(m.id === 'initial-welcome' && messages.length > 1));
-
-      return messagesToRender.map((message) => (
-          <ChatMessage key={message.id} message={message} />
-      ));
-  };
-  // --- Fin Componentes de Renderizado ---
-
-  // Determinar si mostrar el estado de carga principal
-  const showLoading = (isLoadingHistory || (isAuthLoading && !bypassAuth && !chatId)); // Mostrar carga si historial carga, o si auth carga y no estamos en bypass y no hay chat ID aún
-
-  return (
-     <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]"> {/* Ajustar altura */}
-            <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
-                <div className="flex h-full flex-col relative">
-                    {/* Botón para ocultar/mostrar panel derecho */}
-                    <div className="absolute top-2 right-2 z-10">
-                        <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
-                            {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                        </Button>
-                    </div>
-
-                    {/* Área de Mensajes del Chat */}
-                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-                         {showLoading ? (
-                            renderHistoryLoading() // Mostrar spinner de carga
-                         ) : historyError ? (
-                             renderHistoryError() // Mostrar mensaje de error
-                         ) : (
-                            <div className="space-y-4 pr-4"> {/* Añadir padding para que no se pegue al borde */}
-                                {renderMessages()} {/* Mostrar mensajes */}
-                                {/* Skeleton de "pensando" mientras se envía */}
-                                {isSending && (
-                                    <div className="flex items-start space-x-3">
-                                        <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0"><BrainCircuit className="h-5 w-5 text-primary"/></Skeleton>
-                                        <div className="space-y-2 flex-1 pt-1"><Skeleton className="h-4 w-16" /></div>
-                                    </div>
-                                )}
-                            </div>
-                         )}
-                    </ScrollArea>
-
-                    {/* Área de Input */}
-                    <div className="border-t p-4 bg-muted/30">
-                        <ChatInput
-                            onSendMessage={handleSendMessage}
-                            // Deshabilitar input si está cargando historial, enviando, o si auth está cargando y no bypass
-                            isLoading={isSending || showLoading}
-                        />
-                    </div>
+    // --- Rendering Logic ---
+    const renderChatContent = () => {
+        // 1. Show loading indicator if auth is loading OR history is loading
+        if (isAuthLoading || isLoadingHistory) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                         {isAuthLoading ? "Authenticating..." : "Loading chat history..."}
+                    </p>
                 </div>
-            </ResizablePanel>
+            );
+        }
 
-            {/* Panel de Documentos Recuperados (condicional) */}
-            {isPanelOpen && (
-                <>
-                    <ResizableHandle withHandle />
-                    <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
-                        <RetrievedDocumentsPanel
-                            documents={retrievedDocs}
-                            // Mostrar carga en el panel solo mientras se está enviando la respuesta
-                            isLoading={isSending}
-                        />
-                    </ResizablePanel>
-                </>
-            )}
-        </ResizablePanelGroup>
-  );
+        // 2. Show error message if history loading failed
+        if (historyError) {
+             return (
+                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                     <AlertCircle className="h-8 w-8 text-destructive mb-4" />
+                     <p className="text-destructive font-medium mb-2">Error Loading Chat</p>
+                     <p className="text-sm text-muted-foreground mb-4">{historyError}</p>
+                     {/* Optionally add a retry button if error is not auth-related */}
+                     {/* <Button variant="outline" size="sm" onClick={retryFetch}>Retry</Button> */}
+                 </div>
+             );
+         }
+
+        // 3. Render messages
+        // Filter out the initial welcome message if other messages exist
+        const messagesToRender = messages.filter(m => !(m.id === 'initial-welcome' && messages.length > 1));
+        return (
+             <div className="space-y-4 pr-4 pb-4"> {/* Padding for scrollbar and input area */}
+                 {messagesToRender.map((message) => (
+                     <ChatMessage key={message.id} message={message} />
+                 ))}
+                 {/* Skeleton "thinking" indicator while waiting for response */}
+                 {isSending && (
+                     <div className="flex items-start space-x-3">
+                         <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                             <BrainCircuit className="h-5 w-5 text-primary"/>
+                         </Skeleton>
+                         <div className="space-y-2 flex-1 pt-1">
+                              <Skeleton className="h-4 w-16" />
+                         </div>
+                     </div>
+                 )}
+             </div>
+        );
+    };
+
+    return (
+        <div className="flex flex-col h-full"> {/* Ensure outer div takes full height */}
+            {/* Button to start a new chat */}
+            <div className="absolute top-2 left-2 z-10">
+                 <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNewChat}
+                    disabled={isSending || isLoadingHistory || isAuthLoading} // Disable during critical operations
+                    title="Start a new chat"
+                 >
+                     <PlusCircle className="h-4 w-4 mr-2" />
+                     New Chat
+                 </Button>
+             </div>
+
+            <ResizablePanelGroup direction="horizontal" className="flex-1"> {/* Panel group takes remaining height */}
+                <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={30}>
+                    <div className="flex h-full flex-col relative">
+                        {/* Button to toggle sources panel */}
+                        <div className="absolute top-2 right-2 z-10">
+                            <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
+                                {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+                            </Button>
+                        </div>
+
+                        {/* Chat Messages Area */}
+                        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+                            {renderChatContent()}
+                        </ScrollArea>
+
+                        {/* Chat Input Area */}
+                        <div className="border-t p-4 bg-muted/30 shrink-0">
+                            <ChatInput
+                                onSendMessage={handleSendMessage}
+                                isLoading={isSending || isLoadingHistory || isAuthLoading} // Disable input comprehensively
+                            />
+                        </div>
+                    </div>
+                </ResizablePanel>
+
+                {/* Sources Panel (Conditional) */}
+                {isPanelOpen && (
+                    <>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+                            <RetrievedDocumentsPanel
+                                documents={retrievedDocs}
+                                isLoading={isSending} // Show loading in panel only when actively waiting for response
+                            />
+                        </ResizablePanel>
+                    </>
+                )}
+            </ResizablePanelGroup>
+        </div>
+    );
 }
 ```
 
@@ -828,107 +868,130 @@ export default function KnowledgePage() {
 ## File: `app\(app)\layout.tsx`
 ```tsx
 // File: app/(app)/layout.tsx
+// Purpose: Layout for authenticated sections, handling route protection.
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook actualizado
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react'; // Para el spinner
+import { Loader2 } from 'lucide-react'; // For loading spinner
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  // --- CORRECCIÓN: Usar session, user, isLoading, signOut del hook useAuth ---
+  // Get auth state from the hook
   const { session, user, isLoading, signOut } = useAuth();
-  // ----------------------------------------------------------------------
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Determine if authentication bypass is enabled (for local dev)
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   useEffect(() => {
-    // Si el bypass está activo, no hacer nada (permitir acceso)
+    // 1. Handle Bypass: If bypass is active, log it and do nothing else.
     if (bypassAuth) {
-      console.warn("AppLayout: Autenticación OMITIDA debido a NEXT_PUBLIC_BYPASS_AUTH=true.");
+      console.warn("AppLayout: Auth check SKIPPED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
       return;
     }
 
-    // Si NO estamos cargando y NO hay sesión válida, redirigir a la página principal/pública
-    if (!isLoading && !session) {
-      console.log("AppLayout: No se encontró token, redirigiendo a login.");
-      router.replace('/'); // Redirigir a la página principal (o '/login')
-      return; // Detener ejecución del efecto
+    // 2. Handle Loading: If auth state is still loading, do nothing yet.
+    if (isLoading) {
+      console.log("AppLayout: Waiting for auth state to load...");
+      return;
     }
 
-    // --- CORRECCIÓN: Chequeo adicional si companyId es obligatorio ---
-    // Si hay sesión pero el usuario mapeado es null (posiblemente por falta de companyId
-    // u otro dato requerido en app_metadata), forzar logout.
-    // Descomenta y ajusta si `companyId` es estrictamente necesario para acceder al app.
-    // if (!isLoading && session && !user) {
-    //   console.error("AppLayout: Session exists but user mapping failed (missing required data like companyId?). Forcing logout.");
-    //   signOut(); // Forzar logout si el estado del usuario no es válido
-    //   // No necesitas redirigir aquí, el signOut provocará un cambio de estado que
-    //   // llevará a la condición !session en la próxima ejecución del efecto.
-    //   return;
-    // }
-    // -------------------------------------------------------------
+    // 3. Handle No Session: If auth has loaded and there's NO session, redirect to login/home.
+    if (!session) {
+      console.log("AppLayout: No session found after loading, redirecting to /");
+      router.replace('/'); // Use replace to avoid adding to browser history
+      return;
+    }
 
-  // --- CORRECCIÓN: Dependencias del useEffect ---
-  // Incluir todas las variables usadas: isLoading, session, user, router, bypassAuth, signOut
-  }, [isLoading, session, user, router, bypassAuth, signOut]);
-  // -------------------------------------------
+    // 4. Handle Session OK, but Missing Critical User Data (e.g., companyId):
+    // If a session exists, but the mapped 'user' object is null or lacks essential data
+    // (like companyId, if it's strictly required *after* the ensure-company flow),
+    // it might indicate an incomplete setup or inconsistent state.
+    // The API Gateway requires companyId for most backend calls.
+    // The ensure-company flow in useAuth should handle adding it, but if something
+    // goes wrong or the user state is invalid, we might need to force a logout.
+    if (session && (!user || !user.companyId)) {
+        // This condition checks if we have a session, but the user mapping failed OR
+        // the user is mapped but explicitly lacks a companyId AFTER the initial auth flow.
+        console.error(`AppLayout: Session exists but user data is incomplete (User: ${!!user}, CompanyID: ${user?.companyId}). Forcing logout.`);
+        toast.error("Incomplete Account Setup", {
+            description: "Your account setup seems incomplete (missing company association). Please log in again.",
+            duration: 7000,
+        });
+        signOut(); // Force sign out
+        // No need to redirect here, signOut will trigger an auth state change,
+        // leading to the !session condition above in the next effect run.
+        return;
+    }
 
-  // --- Estado de Carga ---
-  // Mostrar spinner mientras isLoading es true Y no estamos en modo bypass
-  if (isLoading && !bypassAuth) {
+    // 5. Authenticated and Valid: If we reach here, isLoading is false, session exists,
+    // and the user object (with companyId) is valid. Allow rendering.
+    console.log("AppLayout: Auth check passed. User is authenticated and valid.");
+
+  // Dependencies: Trigger effect when loading state, session, user, or bypass status changes.
+  // Include router and signOut as they are used within the effect.
+  }, [isLoading, session, user, bypassAuth, router, signOut]);
+
+  // --- Render Loading State ---
+  // Show a full-screen loader ONLY if bypass is OFF AND auth is loading.
+  if (!bypassAuth && isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        {/* Opcional: Añadir texto */}
-        {/* <p className="mt-4 text-muted-foreground">Loading session...</p> */}
+        {/* Optional: Add loading text */}
+         <p className="mt-4 text-muted-foreground">Loading session...</p>
       </div>
     );
   }
-  // --- Fin Estado de Carga ---
 
-  // --- Guardia de Autenticación ---
-  // Si NO estamos en bypass Y (aún estamos cargando O no hay sesión O no hay usuario mapeado),
-  // no renderizar el layout protegido. Esto evita flashes de contenido.
-  // El useEffect se encargará de la redirección si es necesario.
-  if (!bypassAuth && (isLoading || !session /* || !user */)) {
-     // Descomenta `|| !user` si el chequeo de usuario mapeado es estricto
-     console.log("AppLayout: Not rendering protected layout (isLoading, no session, or no valid user). Waiting for redirect or state update.");
-     // Renderizar null o un spinner mínimo mientras se redirige o el estado cambia.
-     // Usar el mismo spinner que arriba puede ser buena idea para consistencia.
+  // --- Render Auth Wall ---
+  // Prevent rendering the protected layout if bypass is OFF AND
+  // (auth is still loading OR there's no session OR user data is invalid)
+  // This prevents content flashing before redirection or state resolution.
+  if (!bypassAuth && (isLoading || !session || !user || !user.companyId)) {
+     // We already handle redirection in useEffect. Render null or a minimal loader
+     // while waiting for the redirect or state update. Using the same loader
+     // as above provides consistency.
+     console.log("AppLayout: Auth guard preventing render (isLoading, no session, or invalid user).");
      return (
        <div className="flex h-screen items-center justify-center bg-background">
          <Loader2 className="h-12 w-12 animate-spin text-primary" />
        </div>
      );
   }
-  // --- Fin Guardia de Autenticación ---
 
-  // Si llegamos aquí, o estamos en bypass, o estamos autenticados y autorizados.
-  console.log("AppLayout: Rendering protected layout.");
+  // --- Render Protected Layout ---
+  // If we reach here, user is authenticated (or bypass is on).
+  console.log("AppLayout: Rendering protected layout...");
   return (
-    <div className="flex h-screen bg-secondary/30 dark:bg-muted/30">
+    <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
           <ResizablePanel
               collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={20}
               onCollapse={() => setIsSidebarCollapsed(true)}
               onExpand={() => setIsSidebarCollapsed(false)}
-              className={cn("transition-all duration-300 ease-in-out", isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]")}
+              className={cn(
+                  "transition-all duration-300 ease-in-out bg-background dark:bg-card", // Added background color
+                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]"
+              )}
+              order={1} // Ensure sidebar comes first visually
           >
-              {/* Pasar user al Sidebar si necesita mostrar info del usuario */}
+              {/* Pass isCollapsed state to Sidebar */}
               <Sidebar isCollapsed={isSidebarCollapsed} />
           </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={80} minSize={30}>
+          <ResizableHandle withHandle className="bg-border" />
+          <ResizablePanel defaultSize={80} minSize={30} order={2}>
               <div className="flex h-full flex-col">
-                   {/* Pasar user y signOut al Header */}
+                  {/* Header component - No need to pass props if Header uses useAuth directly */}
                   <Header />
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
+                      {/* Render the specific page content */}
                       {children}
                   </main>
               </div>
@@ -1215,39 +1278,58 @@ export default function AboutPage() {
 ## File: `app\contact\page.tsx`
 ```tsx
 // File: app/contact/page.tsx
+// Purpose: Contact page, fixing the original error by using 'session' instead of 'token'.
 "use client";
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LucideIcon, Mail, Phone, Linkedin, MessageCircle } from 'lucide-react'; // Changed Whatsapp to MessageCircle
+import { Mail, Phone, Linkedin, MessageCircle, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 export default function ContactPage() {
   const router = useRouter();
-  const { token } = useAuth();
+  // --- CORRECTION: Use 'session' and 'isLoading' from useAuth ---
+  // The 'token' is inside session?.access_token if needed,
+  // but usually checking for session existence is enough.
+  const { session, isLoading: isAuthLoading } = useAuth();
+  // -----------------------------------------------------------
+
+  // Determine authentication status based on loading state and session presence
+  const isAuthenticated = !isAuthLoading && !!session;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Header/Navigation (replicated from app/page.tsx) */}
+      {/* Header/Navigation (similar to app/page.tsx) */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4">
-          <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
-          <nav className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8">
-            <LinkButton href="/">Inicio</LinkButton>
-            <LinkButton href="/about">Nosotros</LinkButton>
-            <LinkButton href="/contact">Contacto</LinkButton>
-            {token ?
-              <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
-                Ir a la App
-              </Button>
-              :
-              <Button onClick={() => router.push('/login')}>
-                Iniciar sesión
-              </Button>
-            }
+        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6">
+          {/* Use button with onClick for SPA navigation */}
+          <button onClick={() => router.push('/')} className="font-bold text-2xl text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+            {APP_NAME}
+          </button>
+          <nav className="flex items-center space-x-2 sm:space-x-4">
+            <LinkButton href="/">Home</LinkButton>
+            <LinkButton href="/about">About</LinkButton>
+            <LinkButton href="/contact" isActive={true}>Contact</LinkButton> {/* Mark Contact as active */}
+             <div className="ml-2"> {/* Container for Login/App button */}
+                {/* Show loading spinner or appropriate button */}
+                {isAuthLoading ? (
+                    <Button variant="secondary" disabled={true} size="sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    </Button>
+                ) : isAuthenticated ? (
+                    <Button variant="secondary" onClick={() => router.push('/chat')} size="sm">
+                        Go to App
+                    </Button>
+                ) : (
+                    <Button onClick={() => router.push('/login')} size="sm" className="transition-colors duration-150 hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                        Login
+                    </Button>
+                )}
+            </div>
           </nav>
         </div>
       </header>
@@ -1256,140 +1338,137 @@ export default function ContactPage() {
       <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
         <section className="text-center">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Contáctanos
+            Contact Us
           </h1>
-          <p className="text-lg text-muted-foreground mb-8">
-            ¡Nos encantaría saber de ti! Por favor, utiliza el formulario a continuación para ponerte en contacto.
+          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
+            Have questions or feedback? We'd love to hear from you! Reach out using the form below or through our contact channels.
           </p>
         </section>
 
         <section className="max-w-lg mx-auto">
-          <Card>
+          <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Envíanos un mensaje</CardTitle>
+              <CardTitle>Send us a Message</CardTitle>
               <CardDescription>
-                Te responderemos lo antes posible.
+                We typically respond within 1-2 business days.
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* ContactForm component remains unchanged */}
               <ContactForm />
             </CardContent>
           </Card>
         </section>
       </main>
 
-      {/* Footer (replicated from app/page.tsx) */}
-      <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground">
-          © {new Date().getFullYear()} Atenex. Todos los derechos reservados.
+      {/* Footer (similar to app/page.tsx) */}
+      <footer className="bg-muted/10 border-t py-8 mt-16">
+        <div className="container text-center text-muted-foreground text-sm">
+          © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
         </div>
       </footer>
     </div>
   );
 }
 
-// Reusable Button Component (defined inside ContactPage)
-function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+// Reusable Link Button Component (add isActive prop)
+function LinkButton({ href, children, isActive = false }: { href: string; children: React.ReactNode; isActive?: boolean }) {
   const router = useRouter();
   return (
-    <Button variant="link" onClick={() => router.push(href)}>
+    <Button
+        variant="link"
+        onClick={() => router.push(href)}
+        className={cn(
+            "text-sm sm:text-base hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm px-1 sm:px-2",
+            isActive ? "text-primary font-medium underline underline-offset-4" : "text-muted-foreground" // Style active link
+        )}
+     >
       {children}
     </Button>
   );
 }
 
-// Contact Form Component (separate component for better organization)
+// Contact Form Component (remains the same, extracted for clarity)
 function ContactForm() {
+  // Basic form structure - add state management and submission logic as needed
+  const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      console.log("Contact form submitted (implement submission logic)");
+      toast.info("Form Submitted (Placeholder)", { description: "Contact form submission logic needs implementation."});
+  }
+
   return (
     <div className="space-y-6">
-      <form className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Nombre:
+          <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
+            Name:
           </label>
           <input
             type="text"
             id="name"
-            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-            placeholder="Tu Nombre"
+            required
+            className="block w-full rounded-md border-input bg-background shadow-sm focus:border-ring focus:ring-ring/50 sm:text-sm p-2" // Use UI component styles
+            placeholder="Your Name"
           />
         </div>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Correo electrónico:
+          <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
+            Email:
           </label>
           <input
             type="email"
             id="email"
-            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-            placeholder="Tu Correo electrónico"
+            required
+             className="block w-full rounded-md border-input bg-background shadow-sm focus:border-ring focus:ring-ring/50 sm:text-sm p-2"
+            placeholder="you@example.com"
           />
         </div>
         <div>
-          <label htmlFor="message" className="block text-sm font-medium text-gray-700">
-            Mensaje:
+          <label htmlFor="message" className="block text-sm font-medium text-foreground mb-1">
+            Message:
           </label>
           <textarea
             id="message"
             rows={4}
-            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-            placeholder="Tu Mensaje"
+            required
+            className="block w-full rounded-md border-input bg-background shadow-sm focus:border-ring focus:ring-ring/50 sm:text-sm p-2 min-h-[100px]"
+            placeholder="Your Message"
           />
         </div>
         <Button type="submit" className="w-full">
-          Enviar Mensaje
+          Send Message
         </Button>
       </form>
 
-      <div className="space-y-3 mt-8">
-        <div className="flex items-center space-x-2">
-          <Mail className="h-5 w-5 text-muted-foreground" />
-          <span>Contacto:</span>
-          <a
-            href="mailto:info@example.com"
-            className="text-primary hover:underline"
-          >
-            info@example.com
-          </a>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Phone className="h-5 w-5 text-muted-foreground" />
-          <span>Contacto:</span>
-          <a
-            href="tel:+15551234567"
-            className="text-primary hover:underline"
-          >
-            +15551234567
-          </a>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Linkedin className="h-5 w-5 text-muted-foreground" />
-          <a
-            href="https://www.linkedin.com/company/example"
-            className="text-primary hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            LinkedIn
-          </a>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <MessageCircle className="h-5 w-5 text-muted-foreground" />
-          <a
-            href="https://wa.me/15551234567"
-            className="text-primary hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp
-          </a>
-        </div>
+      {/* Contact Info Section */}
+      <div className="space-y-3 pt-6 border-t">
+         <h3 className="text-sm font-medium text-muted-foreground mb-2">Other ways to reach us:</h3>
+        <ContactInfoItem Icon={Mail} label="Email:" href="mailto:info@atenex.ai" text="info@atenex.ai" />
+        <ContactInfoItem Icon={Phone} label="Phone:" href="tel:+15551234567" text="+1 (555) 123-4567" />
+        <ContactInfoItem Icon={Linkedin} label="LinkedIn:" href="https://linkedin.com/company/atenex" text="Atenex on LinkedIn" targetBlank={true} />
+        <ContactInfoItem Icon={MessageCircle} label="WhatsApp:" href="https://wa.me/15551234567" text="Chat on WhatsApp" targetBlank={true}/>
       </div>
     </div>
   );
+}
+
+// Helper component for contact info items
+function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ElementType, label: string, href: string, text: string, targetBlank?: boolean }) {
+    return (
+        <div className="flex items-center space-x-2 text-sm">
+          <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-muted-foreground">{label}</span>
+          <a
+            href={href}
+            className="text-primary hover:underline truncate"
+            target={targetBlank ? "_blank" : undefined}
+            rel={targetBlank ? "noopener noreferrer" : undefined}
+          >
+            {text}
+          </a>
+        </div>
+    );
 }
 ```
 
@@ -1540,19 +1619,23 @@ function ContactForm() {
 ## File: `app\layout.tsx`
 ```tsx
 // File: app/layout.tsx
+// Purpose: Root layout, sets up global providers (Theme, Auth) and Toaster.
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css";
+import "./globals.css"; // Import global styles
 import { cn } from "@/lib/utils";
-import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/lib/hooks/useAuth";
-import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider"; // Theme context
+import { AuthProvider } from "@/lib/hooks/useAuth"; // CORRECTED Auth context
+import { Toaster } from "@/components/ui/sonner"; // Sonner for notifications
 
+// Setup Inter font
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
+// Metadata for the application
 export const metadata: Metadata = {
-  title: "Atenex - Consulta de Conocimiento Empresarial",
-  description: "Consulta tu base de conocimiento empresarial usando lenguaje natural.",
+  title: "Atenex - AI Knowledge Assistant", // Updated title
+  description: "Query your enterprise knowledge base using natural language with Atenex.",
+  // Add more metadata: icons, open graph tags, etc.
 };
 
 export default function RootLayout({
@@ -1561,23 +1644,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning> {/* Set language, suppress hydration warning */}
       <body
         className={cn(
-          "min-h-screen bg-background font-sans antialiased",
-          inter.variable
+          "min-h-screen bg-background font-sans antialiased", // Base styles
+          inter.variable // Apply Inter font variable
         )}
       >
+        {/* Wrap entire application in AuthProvider */}
         <AuthProvider>
+          {/* ThemeProvider for light/dark/custom themes */}
           <ThemeProvider
-            attribute="class"
-            defaultTheme="system" // Or your preferred default
-            enableSystem
-            disableTransitionOnChange
+            attribute="class" // Use class strategy for theming
+            defaultTheme="system" // Default to system preference
+            enableSystem // Allow system preference detection
+            disableTransitionOnChange // Prevent transitions on theme change
           >
+            {/* Render the application content */}
             {children}
-            {/* (*) Ensure this Toaster component is rendered */}
-            <Toaster richColors position="top-right" /> {/* Added richColors and position */}
+
+            {/* Global Toaster component for notifications */}
+            <Toaster richColors position="top-right" closeButton />
           </ThemeProvider>
         </AuthProvider>
       </body>
@@ -1589,142 +1676,184 @@ export default function RootLayout({
 ## File: `app\page.tsx`
 ```tsx
 // File: app/page.tsx
+// Purpose: Public home page, shows login/register or go to app based on auth state.
 "use client";
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
-import { useAuth } from '@/lib/hooks/useAuth'; // Hook actualizado
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // Handles email confirm links
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react'; // Para estado de carga
+import { Loader2, Home as HomeIcon, Info, Mail } from 'lucide-react'; // Added icons
 
 export default function HomePage() {
   const router = useRouter();
-  // --- CORRECCIÓN: Usar 'session' e 'isLoading' del hook useAuth ---
+  // Get session and loading state from the auth hook
   const { session, isLoading: isAuthLoading } = useAuth();
-  // ---------------------------------------------------------------
 
-  // Determinar si el usuario está autenticado basado en la sesión
-  // Solo consideramos autenticado si NO está cargando Y hay sesión
+  // Determine authentication status (only true if not loading AND session exists)
   const isAuthenticated = !isAuthLoading && !!session;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
       {/* Header/Navigation */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6">
-          {/* --- CORRECCIÓN: Usar Link de Next o router.push para navegación SPA --- */}
-          <button onClick={() => router.push('/')} className="font-bold text-2xl text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
-            {APP_NAME}
+      <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b border-border/50">
+        <div className="container flex items-center justify-between h-16 px-4 md:px-6">
+          {/* App Logo/Name */}
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm"
+          >
+             {/* <img src="/logo.svg" alt={`${APP_NAME} logo`} className="h-6 w-6" /> Optional Logo */}
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                 <path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.5a.75.75 0 0 0 .5.707A9.716 9.716 0 0 0 6 21a9.707 9.707 0 0 0 5.25-1.533.75.75 0 0 0 .5-.68V5.213a.75.75 0 0 0-.5-.68ZM12.75 4.533A9.707 9.707 0 0 1 18 3a9.735 9.735 0 0 1 3.25.555.75.75 0 0 1 .5.707v14.5a.75.75 0 0 1-.5.707A9.716 9.716 0 0 1 18 21a9.707 9.707 0 0 1-5.25-1.533.75.75 0 0 1-.5-.68V5.213a.75.75 0 0 1 .5-.68Z" />
+             </svg>
+            <span>{APP_NAME}</span>
           </button>
-          {/* -------------------------------------------------------------------- */}
-          <nav className="flex items-center space-x-2 sm:space-x-4">
-            <LinkButton href="/">Home</LinkButton>
-            <LinkButton href="/about">About</LinkButton>
-            <LinkButton href="/contact">Contact</LinkButton>
-            <div className="ml-2"> {/* Contenedor para botón de Login/App */}
-                {/* --- CORRECCIÓN: Mostrar estado de carga o botón correspondiente --- */}
+
+          {/* Navigation Links */}
+          <nav className="flex items-center space-x-1 sm:space-x-2">
+            <LinkButton href="/" Icon={HomeIcon} isActive={true}>Home</LinkButton>
+            <LinkButton href="/about" Icon={Info}>About</LinkButton>
+            <LinkButton href="/contact" Icon={Mail}>Contact</LinkButton>
+
+            {/* Auth Button Container */}
+            <div className="pl-2 sm:pl-4">
                 {isAuthLoading ? (
-                    <Button variant="secondary" disabled={true} size="sm">
+                    // Show loading spinner while checking auth state
+                    <Button variant="secondary" disabled={true} size="sm" className="w-[90px]"> {/* Fixed width */}
                         <Loader2 className="h-4 w-4 animate-spin" />
                     </Button>
                 ) : isAuthenticated ? (
-                    <Button variant="secondary" onClick={() => router.push('/chat')} size="sm">
+                    // Show "Go to App" button if logged in
+                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[90px]">
                         Go to App
                     </Button>
                 ) : (
+                    // Show "Login" button if logged out
                     <Button
+                        variant="outline" // Use outline for login button on homepage
                         onClick={() => router.push('/login')}
-                        size="sm" // Hacerlo consistente con el botón "Go to App"
-                        className={cn(
-                            "transition-colors duration-150",
-                            "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        )}
+                        size="sm"
+                        className="w-[90px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                         Login
                     </Button>
                 )}
-                {/* --------------------------------------------------------------- */}
             </div>
           </nav>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
-        <section className="text-center">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
-          </h1>
-          <p className="text-lg text-muted-foreground mb-8">
-            Haz preguntas en lenguaje natural y obtén respuestas instantáneas basadas en el conocimiento colectivo de tu organización.
-          </p>
-          {/* --- CORRECCIÓN: Botón principal también debe considerar isLoading --- */}
-          {isAuthLoading ? (
-               <Button size="lg" disabled={true}>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading...
-               </Button>
-          ) : (
-            <Button
-                size="lg"
-                onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
-                className={cn(
-                    "transition-colors duration-150",
-                    "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                )}
-            >
-                {isAuthenticated ? 'Go to Chat' : 'Get Started'}
-            </Button>
-          )}
-          {/* --------------------------------------------------------------- */}
-        </section>
+      <main className="container mx-auto px-4 py-16 md:py-24 flex-1 flex flex-col items-center justify-center text-center">
+         {/* Hero Section */}
+         <section>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6 leading-tight">
+                Unlock Your Company's Knowledge with <span className="text-primary">{APP_NAME}</span>
+            </h1>
+            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-3xl mx-auto">
+                Ask questions in natural language and get instant, accurate answers sourced directly from your organization's documents and data.
+            </p>
+            {/* Call to Action Button */}
+            {isAuthLoading ? (
+                 <Button size="lg" disabled={true} className="w-48">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading...
+                 </Button>
+            ) : (
+              <Button
+                  size="lg"
+                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
+                  className={cn(
+                      "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
+                  )}
+              >
+                  {isAuthenticated ? 'Go to Chat' : 'Get Started Free'}
+              </Button>
+            )}
+            {!isAuthenticated && !isAuthLoading && (
+                 <p className="text-xs text-muted-foreground mt-3">
+                     Already have an account? <Link href="/login" className="text-primary hover:underline">Log In</Link>
+                 </p>
+            )}
+         </section>
 
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Feature Cards - replace with actual feature descriptions */}
-          <FeatureCard title="Búsqueda Inteligente" description="Encuentra la información que necesitas rápida y fácilmente usando consultas en lenguaje natural." />
-          <FeatureCard title="Conocimiento Centralizado" description="Accede a todo el conocimiento colectivo de tu organización en un solo lugar, eliminando los silos de información." />
-          <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo para tomar mejores decisiones con un acceso más rápido a información relevante." />
-        </section>
+         {/* Feature Section (Optional) */}
+         <section className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl w-full">
+             <FeatureCard
+                 title="Intelligent Search"
+                 description="Find the exact information you need instantly using natural language queries. No more keyword guessing."
+                 icon="Search"
+              />
+             <FeatureCard
+                 title="Centralized Knowledge"
+                 description="Break down information silos. Access your entire organization's collective knowledge in one secure place."
+                 icon="Library"
+             />
+             <FeatureCard
+                 title="Enhanced Productivity"
+                 description="Empower your team with faster access to relevant information, enabling quicker, data-driven decisions."
+                  icon="Zap"
+             />
+         </section>
 
-        {/* Handler para confirmación de email (se mantiene igual en su lógica interna) */}
+        {/* Handler for email confirmation links (invisible component) */}
         <EmailConfirmationHandler />
       </main>
 
-      {/* Footer (sin cambios) */}
-      <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground">
-          © {new Date().getFullYear()} Atenex. Todos los derechos reservados.
+      {/* Footer */}
+      <footer className="bg-muted/10 border-t py-8 mt-16">
+        <div className="container text-center text-muted-foreground text-sm">
+          © {new Date().getFullYear()} {APP_NAME}. All rights reserved. | <Link href="/privacy" className="hover:text-primary">Privacy Policy</Link> | <Link href="/terms" className="hover:text-primary">Terms of Service</Link>
         </div>
       </footer>
     </div>
   );
 }
 
-// Reusable Link Button Component (sin cambios)
-function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
+// Reusable Link Button Component for Header
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
-        variant="link"
+        variant="ghost" // Use ghost variant for nav links
         onClick={() => router.push(href)}
-        className={cn("text-sm sm:text-base", "hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm")}
+        className={cn(
+            "text-sm px-2 sm:px-3 py-1 h-8", // Adjust padding/height
+            "hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring rounded",
+            isActive ? "text-primary font-medium bg-accent/50" : "text-muted-foreground hover:text-foreground"
+        )}
      >
+       <Icon className="h-4 w-4 mr-1 hidden sm:inline-block" /> {/* Show icon on larger screens */}
       {children}
     </Button>
   );
 }
 
-// Reusable Feature Card Component (sin cambios)
-function FeatureCard({ title, description }: { title: string; description: string }) {
+// Reusable Feature Card Component
+function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
+   // Basic icon mapping - replace with actual icons or a library like Lucide
+   const IconComponent = ({ name, ...props }: { name: string } & React.SVGProps<SVGSVGElement>) => {
+        switch (name) {
+            case 'Search': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>;
+            case 'Library': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>;
+            case 'Zap': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>;
+            default: return <div className="w-6 h-6 bg-muted rounded" />; // Placeholder
+        }
+   };
+
   return (
-    <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border">
-      <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-muted-foreground">{description}</p>
+    <div className="p-6 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:shadow-lg transition-all duration-200 text-left">
+       <IconComponent name={icon} className="w-8 h-8 mb-3 text-primary" />
+      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }
+
 ```
 
 ## File: `components\auth\email-confirmation-handler.tsx`
@@ -1800,6 +1929,8 @@ export default function EmailConfirmationHandler() {
 
 ## File: `components\auth\login-form.tsx`
 ```tsx
+// File: components/auth/login-form.tsx
+// Purpose: Handles user login using email and password via the useAuth hook.
 "use client";
 
 import React, { useState } from 'react';
@@ -1812,78 +1943,88 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth refactorizado
-// import { ApiError } from '@/lib/api'; // Ya no es necesario para errores de login específicos de Supabase
-import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error de Supabase
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
+import { AuthError } from '@supabase/supabase-js'; // Import Supabase error type
 
+// Zod schema for login form validation
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }),
-  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters long.' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  // --- CORRECCIÓN: Usar signInWithPassword del contexto useAuth ---
+  // Get the signInWithPassword function from the auth context
   const { signInWithPassword } = useAuth();
-  // ----------------------------------------------------------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
+    mode: 'onChange', // Validate on change for better UX
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("LoginForm: Attempting login with:", data.email);
-      // Llamar a la función del contexto que encapsula supabase.auth.signInWithPassword
+      console.log("LoginForm: Attempting login for:", data.email);
+      // Call the signIn function from the context
       await signInWithPassword({
         email: data.email,
         password: data.password,
       });
-      // Si la función signInWithPassword tiene éxito, la redirección
-      // o actualización de estado será manejada por el AuthProvider o AppLayout.
-      // No es necesario hacer nada más aquí en caso de éxito.
-      console.log("LoginForm: signInWithPassword call succeeded (further actions handled by AuthProvider).");
-      // No detener isLoading aquí, dejar que el cambio de estado lo haga.
+      // **Success Handling**: If signInWithPassword succeeds, the AuthProvider's
+      // onAuthStateChange listener will detect the SIGNED_IN event, update the
+      // session/user state, and AppLayout will handle redirection or allow access.
+      // No explicit navigation needed here upon success.
+      console.log("LoginForm: signInWithPassword call succeeded. AuthProvider will handle state update.");
+      // Keep isLoading true briefly to allow state update and potential redirect.
+      // It will be reset by the AuthProvider or if an error occurs below.
 
     } catch (err) {
-      // El hook signInWithPassword debería haber lanzado un error en caso de fallo
+      // Catch errors thrown by the signInWithPassword context function
       console.error("LoginForm: signInWithPassword failed:", err);
-      let errorMessage = 'Login failed. Please check your credentials.';
-       // Usar AuthError de Supabase para mensajes específicos
+      let errorMessage = 'Login failed. Please check your credentials and try again.'; // Default error
+
+       // Check if it's a Supabase AuthError for more specific messages
        if (err instanceof AuthError) {
-           errorMessage = err.message || errorMessage;
-           // Puedes añadir lógica específica para códigos de error si es necesario
-           if (err.message.includes("Invalid login credentials")) {
+           errorMessage = err.message; // Use Supabase's message
+           // Provide more user-friendly messages for common errors
+           if (err.message.toLowerCase().includes("invalid login credentials")) {
                errorMessage = "Invalid email or password.";
-           } else if (err.message.includes("Email not confirmed")) {
-               errorMessage = "Please confirm your email address first.";
+           } else if (err.message.toLowerCase().includes("email not confirmed")) {
+               errorMessage = "Your email address is not confirmed. Please check your inbox.";
            }
+           // Add more specific checks if needed (e.g., rate limits)
        } else if (err instanceof Error) {
-           // Otros errores (poco probables aquí si el hook maneja bien)
+           // Handle other unexpected errors
            errorMessage = err.message;
        }
+
       setError(errorMessage);
-      setIsLoading(false); // Detener carga solo en caso de error
+      setIsLoading(false); // Stop loading indicator on error
     }
+     // Removed finally block - isLoading should only be false on error here.
+     // On success, let the page transition handle the visual change.
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      {/* Error Alert */}
       {error && (
-        <Alert variant="destructive" role="alert">
+        <Alert variant="destructive" role="alert" aria-live="assertive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Login Failed</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      {/* Email Input */}
       <div className="space-y-1">
-        <Label htmlFor="email">Correo electrónico</Label>
+        <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           type="email"
@@ -1891,37 +2032,53 @@ export function LoginForm() {
           autoComplete="email"
           required
           disabled={isLoading}
+          aria-required="true"
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
         />
         {form.formState.errors.email && (
-          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+          <p className="text-sm text-destructive" role="alert">{form.formState.errors.email.message}</p>
         )}
       </div>
+
+      {/* Password Input */}
       <div className="space-y-1">
-        <Label htmlFor="password">Contraseña</Label>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           type="password"
           autoComplete="current-password"
           required
           disabled={isLoading}
+          aria-required="true"
           {...form.register('password')}
           aria-invalid={form.formState.errors.password ? 'true' : 'false'}
         />
         {form.formState.errors.password && (
-          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+          <p className="text-sm text-destructive" role="alert">{form.formState.errors.password.message}</p>
         )}
       </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Iniciar sesión'}
+
+      {/* Submit Button */}
+      <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Log In'}
       </Button>
+
+      {/* Link to Register */}
       <div className="mt-4 text-center text-sm">
-        ¿No tienes una cuenta?{" "}
-        <Link href="/register" className="underline text-primary hover:text-primary/80">
-          Registrarse
+        Don't have an account?{" "}
+        <Link href="/register" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-1 focus:ring-ring rounded-sm">
+          Sign Up
         </Link>
       </div>
+       {/* Optional: Forgot Password Link */}
+       {/*
+       <div className="text-center text-sm mt-2">
+         <Link href="/forgot-password" className="underline text-muted-foreground hover:text-primary/90 text-xs">
+           Forgot Password?
+         </Link>
+       </div>
+       */}
     </form>
   );
 }
@@ -1930,6 +2087,7 @@ export function LoginForm() {
 ## File: `components\auth\register-form.tsx`
 ```tsx
 // File: components/auth/register-form.tsx
+// Purpose: Handles user registration using the useAuth hook.
 "use client";
 
 import React, { useState } from 'react';
@@ -1942,168 +2100,190 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { AuthError } from '@supabase/supabase-js';
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
+import { AuthError } from '@supabase/supabase-js'; // Import Supabase error type
 
-// --- Esquema Zod (Simplificado, sin companyId) ---
+// Zod schema for registration form validation
+// REMOVED companyId - it will be handled by the ensure-company flow after login
 const registerSchema = z.object({
-  name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }).optional(), // El nombre debe tener al menos 2 caracteres
-  email: z.string().email({ message: 'Dirección de correo electrónico no válida' }), // Dirección de correo electrónico no válida
-  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }), // La contraseña debe tener al menos 6 caracteres
-  // (+) AÑADIR company_id
-  companyId: z.string().uuid({message: 'ID de empresa no válido'}).optional(), // ID de empresa no válido
+  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional(), // Make name optional but validated if provided
+  email: z.string().email({ message: 'Please enter a valid email address.' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters long.' }) // Increased minimum length
+    // Optional: Add password complexity requirements if desired
+    // .regex(/[a-z]/, { message: "Password must contain a lowercase letter." })
+    // .regex(/[A-Z]/, { message: "Password must contain an uppercase letter." })
+    // .regex(/[0-9]/, { message: "Password must contain a number." })
+    // .regex(/[^a-zA-Z0-9]/, { message: "Password must contain a special character." }),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
+  // Get the signUp function from the auth context
   const { signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false); // State to show success message
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { name: '', email: '', password: '' },
+    mode: 'onChange', // Validate on change
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
     setError(null);
-    setSuccess(false);
+    setSuccess(false); // Reset success state on new submission
     try {
-      console.log("Attempting registration with:", data.email);
+      console.log("RegisterForm: Attempting registration for:", data.email);
 
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Error de configuración de Supabase. Por favor, comprueba tus variables de entorno.");
-        setIsLoading(false);
-        return;
-      }
-
-      const supabaseClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-
-     console.log("Supabase client created."); // Add this
-
-     // Try signing up the user
-     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+      // Call the signUp function from the context
+      // Pass the name in the options.data field for user_metadata
+      const { data: responseData, error: responseError } = await signUp({
         email: data.email,
         password: data.password,
         options: {
-           data: {
-              name: data.name || null,
-           },
+          data: {
+            // Include name in user_metadata if provided
+            // Use 'full_name' or 'name' depending on your Supabase setup preference
+            ...(data.name && { name: data.name }),
+          },
+          // Optional: Specify where the confirmation email should redirect the user
+          // emailRedirectTo: `${window.location.origin}/confirm-email`, // Example redirect
         },
-     });
-     console.log("signUp response:", authResponse, authError); // Add this
+      });
 
-     if (authError) {
-        console.error("Supabase registration failed:", authError);
-        setError(authError.message || 'Error al registrarse. Por favor, inténtalo de nuevo.'); // Error al registrarse. Por favor, inténtalo de nuevo.
+      // Check the response from the signUp function
+      if (responseError) {
+        // Error occurred during signup
+        setError(responseError.message || 'Registration failed. Please try again.');
         setIsLoading(false);
-     } else {
-        setSuccess(true); // Registration successful, set success state
-     }
-    } catch (err: any) {
-      console.error("Registration failed:", err);
-      let errorMessage = 'Error al registrarse. Por favor, inténtalo de nuevo.'; // Error al registrarse. Por favor, inténtalo de nuevo.
-      if (err instanceof ApiError) {
-        errorMessage = err.message || errorMessage;
-      } else if (err instanceof Error) {
-        errorMessage = err.message || errorMessage;
+      } else if (responseData.user && !responseData.session) {
+        // Success: User created, needs email confirmation
+        setSuccess(true);
+        // Keep isLoading=true to prevent form resubmission while success message is shown
+      } else if (responseData.user && responseData.session) {
+         // Success: User created AND logged in (e.g., auto-confirm enabled)
+         // AuthProvider will handle the session update and redirect/access.
+         console.log("RegisterForm: Sign up successful and session created.");
+         // You might want to show a brief success message before redirect,
+         // but often the redirect itself is sufficient indication.
+         // setSuccess(true); // Optionally show success message briefly
+         setIsLoading(false); // Allow potential redirect to happen
+      } else {
+         // Unexpected outcome
+         setError("An unexpected issue occurred during registration. Please try again.");
+         setIsLoading(false);
+      }
+
+    } catch (err) {
+      // Catch unexpected errors during the process
+      console.error("RegisterForm: Unexpected error during submission:", err);
+      let errorMessage = 'An unexpected error occurred. Please try again later.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
       }
       setError(errorMessage);
-    } finally {
-      // Do not stop isLoading if success to keep the message visible
-      if (!success) {
-          setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   };
 
+  // If registration was successful, show the confirmation message and hide the form
+  if (success) {
+    return (
+       <Alert variant="default" className="border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/30">
+          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+          <AlertTitle className="text-green-800 dark:text-green-200">Account Created!</AlertTitle>
+          <AlertDescription className="text-green-700 dark:text-green-300">
+             Success! Please check your email (<span className="font-medium">{form.getValues('email')}</span>) for a confirmation link to activate your account.
+          </AlertDescription>
+           <div className="mt-4 text-center">
+              <Link href="/login" className={cn(buttonVariants({ variant: "link" }), "text-sm")}>
+                 Go to Login
+              </Link>
+           </div>
+       </Alert>
+    );
+  }
+
+  // Render the form if not successful yet
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {error && !success && (
-        <Alert variant="destructive">
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive" role="alert" aria-live="assertive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle> {/* Error */}
+          <AlertTitle>Registration Failed</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && (
-        <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          <AlertTitle className="text-green-800 dark:text-green-200">Éxito</AlertTitle> {/* Éxito */}
-          <AlertDescription className="text-green-700 dark:text-green-300">
-            ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta.
-          </AlertDescription> {/* ¡Cuenta creada con éxito! Por favor, revisa tu correo electrónico para verificar tu cuenta. */}
-        </Alert>
-      )}
 
-      {/* Campos del Formulario */}
+      {/* Name Input (Optional) */}
       <div className="space-y-1">
-        <Label htmlFor="name">Nombre (Opcional)</Label> {/* Nombre (Opcional) */}
+        <Label htmlFor="name">Full Name (Optional)</Label>
         <Input
           id="name"
           type="text"
-          placeholder="Tu Nombre"
+          placeholder="Your Name"
+          autoComplete="name"
+          disabled={isLoading}
           {...form.register('name')}
           aria-invalid={form.formState.errors.name ? 'true' : 'false'}
         />
         {form.formState.errors.name && (
-          <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
+          <p className="text-sm text-destructive" role="alert">{form.formState.errors.name.message}</p>
         )}
       </div>
+
+      {/* Email Input */}
       <div className="space-y-1">
-        <Label htmlFor="email">Correo electrónico</Label> {/* Correo electrónico */}
+        <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           type="email"
-          placeholder="nombre@ejemplo.com"
+          placeholder="name@example.com"
+          autoComplete="email"
           required
+          disabled={isLoading}
+          aria-required="true"
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
         />
         {form.formState.errors.email && (
-          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+          <p className="text-sm text-destructive" role="alert">{form.formState.errors.email.message}</p>
         )}
       </div>
+
+      {/* Password Input */}
       <div className="space-y-1">
-        <Label htmlFor="password">Contraseña</Label> {/* Contraseña */}
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           type="password"
+          placeholder="••••••••"
+          autoComplete="new-password"
           required
+          disabled={isLoading}
+          aria-required="true"
           {...form.register('password')}
           aria-invalid={form.formState.errors.password ? 'true' : 'false'}
         />
         {form.formState.errors.password && (
-          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+          <p className="text-sm text-destructive" role="alert">{form.formState.errors.password.message}</p>
         )}
       </div>
-      {/* (+) AÑADIR company_id */}
-      <div className="space-y-1">
-        <Label htmlFor="companyId">ID de empresa (Opcional)</Label> {/* ID de empresa (Opcional) */}
-        <Input
-          id="companyId"
-          type="text"
-          placeholder="ID de la empresa"
-          {...form.register('companyId')}
-          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
-        />
-        {form.formState.errors.companyId && (
-          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
-        )}
-      </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Crear cuenta'} {/* Crear cuenta */}
+
+      {/* Submit Button */}
+      <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
+
+      {/* Link to Login */}
       <div className="mt-4 text-center text-sm">
-        ¿Ya tienes una cuenta?{" "} {/* ¿Ya tienes una cuenta? */}
-        <Link href="/login" className="underline text-primary hover:text-primary/80">
-          Iniciar sesión
+        Already have an account?{" "}
+        <Link href="/login" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-1 focus:ring-ring rounded-sm">
+          Log In
         </Link>
       </div>
     </form>
@@ -2114,6 +2294,7 @@ export function RegisterForm() {
 ## File: `components\chat\chat-history.tsx`
 ```tsx
 // File: components/chat/chat-history.tsx
+// Purpose: Displays the list of past chats in the sidebar.
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -2123,9 +2304,9 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook actualizado
-import { toast } from "sonner";
+import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api'; // Use API functions
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED auth hook
+import { toast } from "sonner"; // Use sonner
 import {
     AlertDialog,
     AlertDialogAction,
@@ -2137,253 +2318,264 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 export function ChatHistory() {
-  const pathname = usePathname();
-  const router = useRouter();
-  // --- CORRECCIÓN: Usar session, isLoading, signOut del hook useAuth ---
-  const { session, isLoading: isAuthLoading, signOut } = useAuth();
-  // ------------------------------------------------------------------
-  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+    const pathname = usePathname();
+    const router = useRouter();
+    // Get auth state from the hook
+    const { session, isLoading: isAuthLoading, signOut } = useAuth();
 
-  const [chats, setChats] = useState<ChatSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // Carga específica de esta lista
-  const [error, setError] = useState<string | null>(null);
-  const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isAlertOpen, setIsAlertOpen] = useState(false);
+    // Component State
+    const [chats, setChats] = useState<ChatSummary[]>([]);
+    const [isLoading, setIsLoading] = useState(false); // Loading state specific to this component
+    const [error, setError] = useState<string | null>(null);
+    const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
 
-  // --- Función para buscar el historial ---
-  const fetchChatHistory = useCallback(async (showToast = false) => {
-    const isAuthenticated = !!session || bypassAuth;
+    // --- Function to Fetch Chat History ---
+    const fetchChatHistory = useCallback(async (showToast = false) => {
+         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+         const isAuthenticated = !!session || bypassAuth;
 
-    // Esperar a que auth cargue si es necesario (y no bypass)
-    if (!bypassAuth && isAuthLoading) {
-        console.log("ChatHistory: Waiting for auth state...");
-        // No establecer isLoading aquí, dejar que el renderContent lo maneje
-        return; // Salir temprano si auth está cargando
-    }
-
-    // Si no está autenticado (y auth ya cargó), no hacer nada
-    if (!isAuthenticated) {
-        console.log("ChatHistory: Not authenticated, skipping fetch.");
-        setChats([]);
-        setError(null); // Limpiar errores previos
-        // No mostrar error de login aquí, renderContent lo hará
-        return;
-    }
-
-    // Si está autenticado, proceder a buscar
-    console.log("ChatHistory: Auth ready or bypassed. Fetching chat list...");
-    setIsLoading(true); // Iniciar carga de la lista
-    setError(null);
-    try {
-      const fetchedChats = await getChats();
-      // Ordenar por fecha de actualización descendente
-      fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-      setChats(fetchedChats);
-      console.log(`ChatHistory: Fetched ${fetchedChats.length} chats.`);
-      if (showToast) toast.success("Chat History Refreshed");
-    } catch (err) {
-      console.error("ChatHistory: Failed to fetch chat history:", err);
-      let message = "Could not load chat history.";
-      if (err instanceof ApiError) {
-        message = err.message || message;
-        // Si es error de auth/forbidden, desloguear
-        if (err.status === 401 || err.status === 403) {
-          message = "Session expired or invalid. Please log in again.";
-          signOut(); // Usar signOut del contexto
+        // Skip if not authenticated (and auth check is complete)
+        if (!isAuthLoading && !isAuthenticated) {
+            console.log("ChatHistory: Not authenticated, clearing history.");
+            setChats([]);
+            setError(null); // Clear previous errors
+            setIsLoading(false); // Ensure loading is false
+            return;
         }
-      } else if (err instanceof Error) { message = err.message; }
-      setError(message);
-      setChats([]); // Limpiar chats en caso de error
-      toast.error("Error Loading Chats", { description: message });
-    } finally {
-      setIsLoading(false); // Terminar carga de la lista
-    }
-  // --- CORRECCIÓN: Dependencias del useCallback ---
-  }, [session, isAuthLoading, bypassAuth, signOut]); // Depender del estado de auth
-  // -------------------------------------------
 
-  // --- Efecto para buscar al montar o cuando cambie el estado de auth ---
-  useEffect(() => {
-    // Solo buscar si no estamos en bypass O si la carga de auth ha terminado
-    if (bypassAuth || !isAuthLoading) {
-        fetchChatHistory(false); // Buscar sin toast al inicio
-    }
-    // El efecto se re-ejecutará si isAuthLoading o session cambian gracias a las dependencias de fetchChatHistory
-  }, [fetchChatHistory, isAuthLoading, bypassAuth]); // Depender de la función y estado de carga
-
-  // --- Funciones de Manejo de Borrado ---
-  const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
-     event.stopPropagation(); // Evitar navegar al chat
-     event.preventDefault();
-     setChatToDelete(chat);
-     setIsAlertOpen(true);
-  };
-
-  const handleDeleteConfirmed = async () => {
-    if (!chatToDelete) return;
-    setIsDeleting(true);
-    try {
-        await deleteChat(chatToDelete.id);
-        // Actualizar estado local para reflejar el borrado
-        setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
-        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
-        // Si el chat borrado era el activo, navegar a /chat (nuevo chat)
-        const currentChatId = pathname.split('/').pop();
-        if (currentChatId === chatToDelete.id) {
-            router.push('/chat');
+        // Skip if auth is still loading (and not bypassing)
+        if (!bypassAuth && isAuthLoading) {
+             console.log("ChatHistory: Waiting for auth state...");
+             // Set loading true here to show skeleton while waiting for auth
+             setIsLoading(true);
+             return;
         }
-    } catch (err) {
-        console.error("ChatHistory: Failed to delete chat:", err);
-        let message = "Could not delete chat.";
-        if (err instanceof ApiError) {
-            message = err.message || message;
-            if (err.status === 401 || err.status === 403) signOut(); // Desloguear si falla por auth
-        } else if (err instanceof Error) { message = err.message; }
-        toast.error("Deletion Failed", { description: message });
-    } finally {
-        setIsDeleting(false);
-        setIsAlertOpen(false);
-        setChatToDelete(null);
-    }
-  };
-  // --- Fin Funciones de Borrado ---
 
-  // --- Lógica de Renderizado ---
-  const renderContent = () => {
-    const isAuthenticated = !!session || bypassAuth;
+        console.log("ChatHistory: Auth ready. Fetching chat list...");
+        setIsLoading(true); // Start loading history list
+        setError(null);
 
-    // 1. Estado de Carga de Autenticación (si no bypass)
-    if (!bypassAuth && isAuthLoading) {
-        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-    }
+        try {
+            const fetchedChats = await getChats();
+            // Sort by most recently updated
+            fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+            setChats(fetchedChats);
+            console.log(`ChatHistory: Fetched ${fetchedChats.length} chats.`);
+            if (showToast) toast.success("Chat History Refreshed");
+        } catch (err) {
+            console.error("ChatHistory: Failed to fetch chat history:", err);
+            let message = "Could not load chat history.";
+            if (err instanceof ApiError) {
+                message = err.message || message;
+                if (err.status === 401 || err.status === 403) {
+                    message = "Session expired or invalid. Please log in again.";
+                    signOut(); // Force logout on auth error
+                }
+            } else if (err instanceof Error) { message = err.message; }
+            setError(message);
+            setChats([]); // Clear chats on error
+            if (showToast) toast.error("Error Loading Chats", { description: message });
+        } finally {
+            setIsLoading(false); // Finish loading history list
+        }
+    // Dependencies: Re-run if session or auth loading state changes. Include signOut.
+    }, [session, isAuthLoading, signOut]);
 
-    // 2. No Autenticado (y auth ya cargó)
-    if (!isAuthenticated) {
-         return (
-             <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Log in to see your chat history.</p>
-                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
-             </div>
-         );
-     }
+    // --- Effect to Fetch on Mount and Auth Change ---
+    useEffect(() => {
+        // Fetch history immediately if auth is ready or bypassed,
+        // or wait for auth loading to finish.
+        fetchChatHistory(false); // Fetch without toast on initial load/auth change
+    }, [fetchChatHistory]); // Depend only on the memoized fetch function
 
-    // 3. Cargando Historial (ya autenticado)
-    if (isLoading) {
-        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-    }
+    // --- Delete Confirmation Handlers ---
+    const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
+        event.stopPropagation(); // Prevent link navigation
+        event.preventDefault();
+        setChatToDelete(chat);
+        setIsAlertOpen(true);
+    };
 
-    // 4. Error al Cargar Historial
-    if (error) {
-        return (
-            <div className="px-2 py-4 text-center text-destructive">
-                <AlertCircle className="mx-auto h-6 w-6 mb-1" />
-                <p className="text-sm mb-2">{error}</p>
-                <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
-                    <RefreshCw className="mr-1 h-3 w-3"/> Reintentar
-                </Button>
-            </div>
-        );
-    }
+    const handleDeleteConfirmed = async () => {
+        if (!chatToDelete) return;
+        setIsDeleting(true);
+        try {
+            await deleteChat(chatToDelete.id);
+            // Optimistically update UI
+            setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
+            toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0, 8)}" removed.` });
 
-    // 5. Historial Vacío
-    if (chats.length === 0) {
-        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
-    }
+            // If the currently viewed chat was deleted, navigate to new chat page
+            const currentChatId = pathname.split('/').pop();
+            if (currentChatId === chatToDelete.id) {
+                router.push('/chat');
+            }
+        } catch (err) {
+            console.error("ChatHistory: Failed to delete chat:", err);
+            let message = "Could not delete chat.";
+            if (err instanceof ApiError) {
+                message = err.message || message;
+                if (err.status === 401 || err.status === 403) signOut(); // Logout on auth error
+            } else if (err instanceof Error) { message = err.message; }
+            toast.error("Deletion Failed", { description: message });
+            // Optional: Re-fetch history on error to ensure consistency, or rely on user refresh
+            // fetchChatHistory(false);
+        } finally {
+            setIsDeleting(false);
+            setIsAlertOpen(false);
+            setChatToDelete(null);
+        }
+    };
+    // --- End Delete Handlers ---
 
-    // 6. Renderizar Lista de Chats
-    return chats.map((chat) => {
-        const isActive = pathname === `/chat/${chat.id}`;
-        // Usar título o ID corto como fallback
-        const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
-        const displayDate = new Date(chat.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    // --- Render Logic Helper ---
+    const renderContent = () => {
+        const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+        const isAuthenticated = !!session || bypassAuth;
 
-        return (
-            <div key={chat.id} className="relative group w-full pr-8"> {/* Añadir padding para botón */}
-                <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
-                    <a
-                        className={cn(
-                            buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }), // Usar size="sm"
-                            "w-full justify-start h-auto py-1.5 px-2 overflow-hidden text-left", // Ajustar padding/altura
-                            isActive ? "bg-muted hover:bg-muted font-medium" : "hover:bg-muted/50"
-                        )}
-                        title={displayTitle}
-                    >
-                        <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span className="truncate flex-1 text-sm">{displayTitle}</span>
-                        <span className="text-xs text-muted-foreground/70 ml-2 flex-shrink-0">{displayDate}</span>
-                    </a>
-                </Link>
-                {/* Botón de borrado (aparece al hacer hover) */}
-                <AlertDialogTrigger asChild>
-                    <Button
-                        variant="ghost" size="icon"
-                        className={cn(
-                            "absolute right-0 top-1/2 -translate-y-1/2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100",
-                            isDeleting && chatToDelete?.id === chat.id ? "opacity-50" : "" // Atenuar si se está borrando este
-                        )}
-                        onClick={(e) => openDeleteConfirmation(chat, e)}
-                        aria-label={`Delete chat: ${displayTitle}`}
-                        disabled={isDeleting && chatToDelete?.id === chat.id} // Deshabilitar mientras borra
-                    >
-                         {isDeleting && chatToDelete?.id === chat.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                         ) : (
-                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                         )}
-                    </Button>
-                </AlertDialogTrigger>
-            </div>
-        );
-    });
-  };
-  // --- Fin Lógica de Renderizado ---
+        // 1. Loading State (Auth or History)
+        if (isLoading || (!bypassAuth && isAuthLoading)) {
+            return (
+                <div className="space-y-1 p-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                         <Skeleton key={i} className="h-8 w-full rounded" />
+                    ))}
+                 </div>
+            );
+        }
 
-  return (
-     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        {/* Contenedor principal con botón de refrescar arriba */}
-        <div className="flex flex-col h-full">
-            <div className="flex justify-between items-center p-2 border-b">
-                 <h3 className="px-1 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
-                     Chat History
-                 </h3>
-                 <Button variant="ghost" size="sm" onClick={() => fetchChatHistory(true)} disabled={isLoading || (!bypassAuth && isAuthLoading)}>
-                     <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || (!bypassAuth && isAuthLoading)) && "animate-spin")} />
-                     <span className="sr-only">Refresh History</span>
-                 </Button>
-            </div>
-            <ScrollArea className="flex-1">
-                <div className="flex flex-col gap-0.5 p-2"> {/* Reducir gap */}
-                    {renderContent()}
+        // 2. Not Authenticated
+        if (!isAuthenticated) {
+            return (
+                <div className="px-2 py-4 text-center text-muted-foreground">
+                    <p className="text-xs mb-2">Log in to view chat history.</p>
+                    {/* <Button size="xs" variant="outline" onClick={() => router.push('/login')}>Login</Button> */}
                 </div>
-            </ScrollArea>
-        </div>
+            );
+        }
 
-        {/* Contenido del Diálogo de Confirmación (se renderiza en portal) */}
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Esta acción no se puede deshacer. Se eliminará permanentemente el chat
-                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> y todos sus mensajes.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                    onClick={handleDeleteConfirmed}
-                    disabled={isDeleting}
-                    className={buttonVariants({ variant: "destructive" })} // Aplicar variante destructiva
-                >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Delete
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-  );
+        // 3. Error State
+        if (error) {
+            return (
+                <div className="px-2 py-4 text-center text-destructive">
+                    <AlertCircle className="mx-auto h-5 w-5 mb-1" />
+                    <p className="text-xs mb-2">{error}</p>
+                    <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
+                        <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                    </Button>
+                </div>
+            );
+        }
+
+        // 4. Empty State
+        if (chats.length === 0) {
+            return <p className="text-xs text-muted-foreground px-2 py-4 text-center">No previous chats found.</p>;
+        }
+
+        // 5. Chat List
+        return chats.map((chat) => {
+            const isActive = pathname === `/chat/${chat.id}`;
+            const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+            const displayDate = new Date(chat.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+            return (
+                <div key={chat.id} className="relative group w-full pr-8"> {/* Space for delete button */}
+                    <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
+                        <a
+                            className={cn(
+                                buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }),
+                                "w-full justify-start h-auto py-1.5 px-2 overflow-hidden text-left rounded", // Ensure rounded corners
+                                isActive ? "bg-muted hover:bg-muted font-medium" : "hover:bg-muted/50"
+                            )}
+                            title={displayTitle}
+                        >
+                            <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate flex-1 text-sm">{displayTitle}</span>
+                            <span className="text-xs text-muted-foreground/70 ml-2 flex-shrink-0">{displayDate}</span>
+                        </a>
+                    </Link>
+                    {/* Delete Button Trigger */}
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost" size="icon"
+                            className={cn(
+                                "absolute right-0 top-1/2 -translate-y-1/2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100",
+                                isDeleting && chatToDelete?.id === chat.id ? "opacity-50 cursor-not-allowed" : ""
+                            )}
+                            onClick={(e) => openDeleteConfirmation(chat, e)}
+                            aria-label={`Delete chat: ${displayTitle}`}
+                            disabled={isDeleting && chatToDelete?.id === chat.id}
+                        >
+                            {isDeleting && chatToDelete?.id === chat.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                            )}
+                        </Button>
+                    </AlertDialogTrigger>
+                </div>
+            );
+        });
+    };
+    // --- End Render Logic Helper ---
+
+    return (
+        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+            {/* Main container for history list */}
+            <div className="flex flex-col h-full">
+                 {/* Header with Title and Refresh Button */}
+                 <div className="flex justify-between items-center p-2 border-b shrink-0">
+                     <h3 className="px-1 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+                         Chat History
+                     </h3>
+                     <Button
+                         variant="ghost"
+                         size="sm" // Make button smaller
+                         className="p-1 h-6 w-6" // Adjust padding and size
+                         onClick={() => fetchChatHistory(true)}
+                         disabled={isLoading || isAuthLoading}
+                         title="Refresh chat history"
+                     >
+                         <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isAuthLoading) && "animate-spin")} />
+                         <span className="sr-only">Refresh History</span>
+                     </Button>
+                 </div>
+                 {/* Scrollable Area for Chat List */}
+                 <ScrollArea className="flex-1">
+                     <div className="flex flex-col gap-0.5 p-2">
+                         {renderContent()}
+                     </div>
+                 </ScrollArea>
+            </div>
+
+            {/* Alert Dialog Content (Rendered in a portal) */}
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the chat
+                        <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0, 8)}"</span> and all its messages.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDeleteConfirmed}
+                        disabled={isDeleting}
+                        className={buttonVariants({ variant: "destructive" })} // Use destructive variant
+                    >
+                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Delete Permanently
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
 }
 ```
 
@@ -3292,113 +3484,152 @@ export function FileUploader() {
 ## File: `components\layout\header.tsx`
 ```tsx
 // File: components/layout/header.tsx
-"use client";
-// File: components/layout/header.tsx
+// Purpose: Displays the top header bar with theme toggle and user menu.
 "use client";
 
 import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback /*, AvatarImage */ } from "@/components/ui/avatar"; // Image commented out if not used
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, User as UserIcon, Home } from "lucide-react"; // Quitado Menu, añadido Home
-import { useAuth } from '@/lib/hooks/useAuth'; // Hook refactorizado
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { LogOut, Settings, /* User as UserIcon, */ Home, HelpCircle } from "lucide-react"; // Added Home, HelpCircle
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { APP_NAME } from '@/lib/constants';
-import { ThemePaletteButton } from '@/components/theme-palette-button';
+import { ThemePaletteButton } from '@/components/theme-palette-button'; // Use the palette button
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner'; // For logout feedback
 
 export function Header() {
-  // --- CORRECCIÓN: Usar user y signOut del hook useAuth ---
+  // Get user and signOut function directly from the hook
   const { user, signOut } = useAuth();
-  // -----------------------------------------------------
   const router = useRouter();
 
-  // Helper para obtener iniciales (sin cambios)
-  const getInitials = (name?: string | null) => { // Permitir null
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  // Helper to get initials from name
+  const getInitials = (name?: string | null): string => {
+    if (!name) return '?'; // Handle null or empty name
+    // Basic initials logic (e.g., "John Doe" -> "JD")
+    const parts = name.split(' ').filter(Boolean); // Split by space and remove empty parts
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   };
 
+  // Logout handler using the signOut function from context
   const handleLogout = async () => {
       console.log("Header: Initiating logout...");
-      await signOut(); // Llamar a signOut del contexto
-      // La redirección será manejada por el AuthProvider o AppLayout al detectar el cambio de estado
-      console.log("Header: signOut called.");
+      try {
+          await signOut();
+          // Redirection is handled by AuthProvider/AppLayout observing the state change
+          toast.success("Logged Out", { description: "You have been successfully logged out." });
+      } catch (error) {
+          // Error handling is likely within signOut itself, but catch here just in case
+          console.error("Header: Logout failed unexpectedly.", error);
+          toast.error("Logout Failed", { description: "Could not log you out." });
+      }
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:px-6">
-      {/* Lado Izquierdo - Enlace a Home y Título (opcional) */}
-      <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')} aria-label="Go to Homepage">
-              <Home className="h-5 w-5" />
-          </Button>
-          {/* Opcional: Mostrar nombre de la app o título de la página actual */}
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shrink-0">
+      {/* Left Side - Optional: Breadcrumbs or Title could go here */}
+       <div className="flex items-center gap-2">
+         {/* Example: Link back to the main app page or dashboard */}
+         <Button variant="ghost" size="icon" onClick={() => router.push('/chat')} aria-label="Go to Chat">
+             <Home className="h-5 w-5" />
+         </Button>
           {/* <span className="text-lg font-semibold hidden md:inline">{APP_NAME}</span> */}
       </div>
 
-      {/* Lado Derecho - Controles (Tema y Menú de Usuario) */}
+
+      {/* Right Side - Controls */}
       <div className="flex items-center space-x-2 md:space-x-4">
+        {/* Theme Palette Button */}
         <ThemePaletteButton />
 
-        {/* Menú de Usuario (solo si hay usuario) */}
-        {user && (
+         {/* Help Button (Example) */}
+         <Button variant="ghost" size="icon" onClick={() => router.push('/help')} aria-label="Help & Support">
+             <HelpCircle className="h-5 w-5" />
+         </Button>
+
+        {/* User Menu Dropdown (only shown if user exists) */}
+        {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <Avatar className="h-9 w-9 border">
-                  {/* <AvatarImage src="/path/to/user-image.jpg" alt={user.name || 'User Avatar'} /> */}
-                  <AvatarFallback className="bg-secondary text-secondary-foreground font-medium">
+                  {/* Add AvatarImage if you have user profile pictures */}
+                  {/* <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User Avatar'} /> */}
+                  <AvatarFallback className="bg-secondary text-secondary-foreground font-medium text-sm">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Open user menu</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              {/* Información del Usuario */}
+            <DropdownMenuContent className="w-60" align="end" forceMount>
+              {/* User Info Section */}
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none truncate" title={user.name || 'User'}>
-                    {user.name || 'User'}
+                    {user.name || 'User'} {/* Display name or 'User' */}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground truncate" title={user.email}>
                     {user.email}
                   </p>
-                  {/* Mostrar Company ID si existe */}
+                  {/* Display Company ID if available */}
                   {user.companyId && (
-                    <p className="text-xs leading-none text-muted-foreground/80 mt-1" title={`Company ID: ${user.companyId}`}>
-                      Company: {user.companyId.substring(0,8)}...
+                    <p className="text-xs leading-none text-muted-foreground/80 mt-1 flex items-center gap-1" title={`Company ID: ${user.companyId}`}>
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                           <path fillRule="evenodd" d="M4 1.75A2.25 2.25 0 0 0 1.75 4v1.5a.75.75 0 0 0 1.5 0V4c0-.414.336-.75.75-.75h8.5c.414 0 .75.336.75.75v1.5a.75.75 0 0 0 1.5 0V4A2.25 2.25 0 0 0 12 1.75H4ZM1.75 8.5A.75.75 0 0 0 1 9.25v2.25A2.25 2.25 0 0 0 3.25 14h9.5A2.25 2.25 0 0 0 15 11.5V9.25a.75.75 0 0 0-1.5 0v2.25c0 .414-.336.75-.75.75h-9.5c-.414 0-.75-.336-.75-.75V9.25a.75.75 0 0 0-.75-.75Z" clipRule="evenodd" />
+                       </svg>
+                      <span className="truncate">Company: {user.companyId.substring(0, 8)}...</span>
                     </p>
                   )}
+                   {/* Display Roles if available */}
+                   {user.roles && user.roles.length > 0 && (
+                     <p className="text-xs leading-none text-muted-foreground/80 mt-1" title={`Roles: ${user.roles.join(', ')}`}>
+                       Role(s): {user.roles.join(', ')}
+                     </p>
+                   )}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {/* Opciones del Menú */}
+              {/* Menu Items */}
               <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
-              {/* Podrías añadir más items aquí (ej. Profile, Billing, etc.) */}
+              {/* Add other items like Profile, Billing etc. if needed */}
               {/*
               <DropdownMenuItem onClick={() => router.push('/profile')} className="cursor-pointer">
-                <UserIcon className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                 <UserIcon className="mr-2 h-4 w-4" />
+                 <span>Profile</span>
               </DropdownMenuItem>
               */}
               <DropdownMenuSeparator />
-              {/* Logout */}
+              {/* Logout Item */}
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : (
+           // Optional: Show Login button if user is not logged in (though usually handled elsewhere)
+           // <Button variant="outline" size="sm" onClick={() => router.push('/login')}>Login</Button>
+           null // Usually header assumes user is logged in within AppLayout
         )}
-        {/* Fin Menú de Usuario */}
+        {/* End User Menu Dropdown */}
       </div>
     </header>
   );
 }
+
 ```
 
 ## File: `components\layout\sidebar.tsx`
@@ -5119,171 +5350,408 @@ if __name__ == "__main__":
 ## File: `lib\api.ts`
 ```ts
 // File: lib/api.ts
+// Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
-import type { Message } from '@/components/chat/chat-message'; // Asegúrate que la interfaz Message se exporte desde aquí
-import { supabase } from './supabaseClient';
+import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
+import { supabase } from './supabaseClient'; // Import the initialized Supabase client
 
-// --- ApiError Class (sin cambios) ---
+// --- ApiError Class ---
+interface ApiErrorDataDetail {
+    msg: string;
+    type: string;
+    loc?: (string | number)[]; // Location can be string or number indices
+}
 interface ApiErrorData {
-    detail?: string | { msg: string; type: string; loc?: string[] }[] | any;
-    message?: string;
+    detail?: string | ApiErrorDataDetail[] | any; // FastAPI often uses 'detail'
+    message?: string; // General message fallback
 }
 export class ApiError extends Error {
-  status: number;
-  data?: ApiErrorData;
-  constructor(message: string, status: number, data?: ApiErrorData) {
-    super(message); this.name = 'ApiError'; this.status = status; this.data = data;
-    Object.setPrototypeOf(this, ApiError.prototype);
-  }
+    status: number;
+    data?: ApiErrorData;
+
+    constructor(message: string, status: number, data?: ApiErrorData) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.data = data;
+        // Ensure the prototype chain is correct for instanceof checks
+        Object.setPrototypeOf(this, ApiError.prototype);
+    }
 }
 
-// --- Core Request Function (exportada, sin cambios internos) ---
+// --- Core Request Function ---
 export async function request<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
-    let url: string;
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+
+    // Validate endpoint structure (optional but good practice)
     if (!cleanEndpoint.startsWith('/api/v1/')) {
-      throw new Error(`Invalid API endpoint: ${cleanEndpoint}. Must start with /api/v1/`);
+        console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
+        throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
-    const gatewayUrl = getApiGatewayUrl();
-    url = `${gatewayUrl}${cleanEndpoint}`;
+
+    let apiUrl: string;
+    try {
+        const gatewayUrl = getApiGatewayUrl(); // Fetch base URL using the utility
+        apiUrl = `${gatewayUrl}${cleanEndpoint}`;
+    } catch (err) {
+        // If getApiGatewayUrl throws (e.g., in production missing env var)
+        console.error("API Request failed: Could not get API Gateway URL.", err);
+        throw new ApiError("API Gateway URL configuration error.", 500);
+    }
+
+
     let token: string | null = null;
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) { console.error("API Request: Error getting Supabase session:", sessionError); }
-      token = sessionData?.session?.access_token || null;
-      if (!token) { console.warn(`API Request: No Supabase access token found for ${cleanEndpoint}.`); }
-    } catch (e) { console.error("API Request: Unexpected error fetching Supabase session:", e); }
+        // Get the current session token from Supabase *before* making the request
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+            // Log the error but proceed, maybe it's a public endpoint
+            console.warn(`API Request: Error getting Supabase session for ${cleanEndpoint}:`, sessionError.message);
+        }
+        token = sessionData?.session?.access_token || null;
+        // Log token presence for debugging (optional: remove in production)
+        // console.log(`API Request to ${cleanEndpoint}: Token ${token ? 'Present' : 'Absent'}`);
+
+    } catch (e) {
+        console.error(`API Request: Unexpected error fetching Supabase session for ${cleanEndpoint}:`, e);
+        // Decide if you want to proceed without a token or throw an error
+        // throw new ApiError("Failed to retrieve authentication token.", 500);
+    }
+
     const headers = new Headers(options.headers || {});
     headers.set('Accept', 'application/json');
-    if (!(options.body instanceof FormData)) { headers.set('Content-Type', 'application/json'); }
-    if (token) { headers.set('Authorization', `Bearer ${token}`); }
-    const config: RequestInit = { ...options, headers };
-    console.log(`API Request: ${config.method || 'GET'} ${url} (Token ${token ? 'Present' : 'Absent'})`);
+
+    // Set Content-Type unless it's FormData
+    if (!(options.body instanceof FormData)) {
+        // Default to JSON if not set and not FormData
+        if (!headers.has('Content-Type')) {
+             headers.set('Content-Type', 'application/json');
+        }
+    }
+
+    // Add Authorization header if token exists
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+    } else {
+        // Optional: Decide if you want to disallow requests without tokens for protected routes
+        // This check might be better handled by the API Gateway itself, but you could add a frontend check
+        // if (!isPublicEndpoint(cleanEndpoint)) { // You'd need a helper function isPublicEndpoint
+        //    console.error(`API Request Error: Attempted to call protected endpoint ${cleanEndpoint} without a token.`);
+        //    throw new ApiError("Authentication token is missing.", 401);
+        // }
+        console.warn(`API Request: Making request to ${cleanEndpoint} without Authorization header.`);
+    }
+
+
+    const config: RequestInit = {
+        ...options,
+        headers,
+    };
+
+    console.log(`API Request: ${config.method || 'GET'} ${apiUrl}`);
+
     try {
-      const response = await fetch(url, config);
-      if (!response.ok) {
-        let errorData: ApiErrorData | null = null; let errorText = ''; const contentType = response.headers.get('content-type');
-        try { if (contentType && contentType.includes('application/json')) { errorData = await response.json(); } else { errorText = await response.text(); } } catch (e) { console.warn(`API Request: Could not parse error response body for ${response.status} from ${url}`, e); try { errorText = await response.text(); } catch {} }
-        let errorMessage = `API Error (${response.status})`;
-        if (errorData?.detail && typeof errorData.detail === 'string') { errorMessage = errorData.detail; } else if (errorData?.detail && Array.isArray(errorData.detail) && errorData.detail.length > 0) { errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error'; } else if (errorData?.message && typeof errorData.message === 'string') { errorMessage = errorData.message; } else if (errorText) { errorMessage = errorText.substring(0, 200); } else { switch (response.status) { case 400: errorMessage = 'Bad Request'; break; case 401: errorMessage = 'Authentication required or token invalid.'; break; case 403: errorMessage = 'Forbidden. Missing permissions or required data (like Company ID).'; break; case 404: errorMessage = 'Resource not found.'; break; case 500: errorMessage = 'Internal Server Error'; break; default: errorMessage = `HTTP error ${response.status}`; } }
-        console.error(`API Error Response: ${response.status} ${errorMessage}`, { url, status: response.status, errorData, errorText });
-        throw new ApiError(errorMessage, response.status, errorData || undefined);
-      }
-      if (response.status === 204 || response.headers.get('content-length') === '0') { return null as T; }
-      try { const data: T = await response.json(); return data; } catch (jsonError) { console.error(`API Request: Invalid JSON response for successful request from ${url}`, jsonError); throw new ApiError(`Invalid JSON response received from server.`, response.status); }
+        const response = await fetch(apiUrl, config);
+
+        // --- Improved Error Handling ---
+        if (!response.ok) {
+            let errorData: ApiErrorData | null = null;
+            let errorText = '';
+            const contentType = response.headers.get('content-type');
+
+            try {
+                if (contentType && contentType.includes('application/json')) {
+                    errorData = await response.json();
+                } else {
+                    // Read as text if not JSON or if JSON parsing fails
+                    errorText = await response.text();
+                }
+            } catch (parseError) {
+                console.warn(`API Request: Could not parse error response body (status ${response.status}) from ${apiUrl}. Content-Type: ${contentType}`, parseError);
+                // Attempt to read as text as a fallback if JSON parsing failed
+                if (!errorText) {
+                    try { errorText = await response.text(); } catch {}
+                }
+            }
+
+            // Construct a meaningful error message
+            let errorMessage = `API Error (${response.status})`; // Default message
+
+            if (errorData?.detail) {
+                if (typeof errorData.detail === 'string') {
+                    errorMessage = errorData.detail;
+                } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0] === 'object') {
+                    // Handle FastAPI validation errors {loc: [...], msg: ..., type: ...}
+                    errorMessage = errorData.detail
+                        .map((e: ApiErrorDataDetail) => `${e.loc?.join('.')} - ${e.msg}`)
+                        .join('; ') || 'Validation Error';
+                } else {
+                     // Handle other shapes of 'detail' if necessary
+                     try { errorMessage = JSON.stringify(errorData.detail).substring(0, 200); } catch {}
+                }
+            } else if (errorData?.message && typeof errorData.message === 'string') {
+                errorMessage = errorData.message; // Use 'message' field if available
+            } else if (errorText) {
+                errorMessage = errorText.substring(0, 200); // Use text content if no structured error
+            } else {
+                // Fallback messages based on status code
+                switch (response.status) {
+                    case 400: errorMessage = 'Bad Request. Please check your input.'; break;
+                    case 401: errorMessage = 'Authentication failed. Please log in again.'; break;
+                    case 403: errorMessage = 'Permission denied. You might lack necessary roles or company association.'; break;
+                    case 404: errorMessage = 'The requested resource was not found.'; break;
+                    case 429: errorMessage = 'Too many requests. Please try again later.'; break;
+                    case 500: errorMessage = 'Internal Server Error. Please try again later or contact support.'; break;
+                    case 502: errorMessage = 'Bad Gateway. The server received an invalid response.'; break;
+                    case 503: errorMessage = 'Service Unavailable. The server is temporarily down.'; break;
+                    case 504: errorMessage = 'Gateway Timeout. The request took too long.'; break;
+                    default: errorMessage = `Request failed with status code ${response.status}.`;
+                }
+            }
+
+            console.error(`API Error Response: ${response.status} ${response.statusText} from ${apiUrl}`, {
+                status: response.status,
+                message: errorMessage, // Log the derived message
+                responseData: errorData, // Log parsed data if available
+                responseText: errorText, // Log text if available or parsing failed
+            });
+
+            // Throw the custom ApiError
+            throw new ApiError(errorMessage, response.status, errorData || undefined);
+        }
+
+        // Handle successful responses
+        // Check for No Content response
+        if (response.status === 204 || response.headers.get('content-length') === '0') {
+            return null as T; // Return null for 204 No Content
+        }
+
+        // Try to parse JSON for other successful responses
+        try {
+            const data: T = await response.json();
+            return data;
+        } catch (jsonError) {
+            console.error(`API Request: Invalid JSON in successful response (status ${response.status}) from ${apiUrl}`, jsonError);
+            throw new ApiError(`Invalid JSON response received from the server.`, response.status);
+        }
+
     } catch (error) {
-      if (error instanceof ApiError) { throw error; } else if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) { const networkErrorMessage = `Network error connecting to API Gateway at ${gatewayUrl}. Check connection/gateway status.`; console.error('API Request Network Error:', { url, gatewayUrl, error: error.message }); throw new ApiError(networkErrorMessage, 0); } else { console.error('API Request Unexpected Error:', { url, error }); const message = error instanceof Error ? error.message : 'An unexpected error occurred during the API request.'; throw new ApiError(message, 500); }
+        // Handle different types of errors (ApiError, Network errors, others)
+        if (error instanceof ApiError) {
+            // Re-throw known API errors
+            throw error;
+        } else if (error instanceof TypeError && (
+            error.message.includes('fetch') || // Generic fetch error
+            error.message.includes('NetworkError') || // Firefox network error
+            error.message.includes('Failed to fetch') // Common browser network error
+        )) {
+            const networkErrorMessage = `Network Error: Could not connect to the API Gateway at ${getApiGatewayUrl()}. Please check your network connection and the gateway status.`;
+            console.error('API Request Network Error:', { url: apiUrl, gatewayUrl: getApiGatewayUrl(), error: error.message });
+            throw new ApiError(networkErrorMessage, 0); // Use status 0 for network errors
+        } else {
+            // Handle other unexpected errors
+            console.error('API Request Unexpected Error:', { url: apiUrl, error });
+            const message = error instanceof Error ? error.message : 'An unexpected error occurred during the API request.';
+            throw new ApiError(message, 500); // Assume 500 for unexpected errors
+        }
     }
 }
 
-// --- Funciones Específicas de API ---
-export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
-export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => request<IngestResponse>('/api/v1/ingest/documents', { method: 'POST', body: formData });
-export interface DocumentStatusResponse { document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; last_updated?: string; message?: string | null; }
-export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => request<DocumentStatusResponse[]>('/api/v1/ingest/documents/status');
-export interface RetrievedDocApi { id: string; score?: number | null; content_preview?: string | null; metadata?: Record<string, any> | null; document_id?: string | null; file_name?: string | null; }
-export type RetrievedDoc = RetrievedDocApi;
-export interface ChatSummary { id: string; title: string | null; updated_at: string; created_at: string;}
-export interface ChatMessageApi { id: string; chat_id: string; role: 'user' | 'assistant'; content: string; sources: RetrievedDocApi[] | null; created_at: string; }
-export interface QueryPayload { query: string; retriever_top_k?: number; chat_id?: string | null; }
-export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id?: string | null; chat_id: string; }
-export const getChats = async (): Promise<ChatSummary[]> => request<ChatSummary[]>('/api/v1/query/chats');
-export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`);
-export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => request<QueryApiResponse>('/api/v1/query/ask', { method: 'POST', body: JSON.stringify({...payload, chat_id: payload.chat_id || null}) });
-export const deleteChat = async (chatId: string): Promise<void> => { await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' }); };
-interface EnsureCompanyResponse { message: string; company_id?: string; }
-export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
+// --- API Function Definitions ---
 
-// --- Type Mapping Helpers (IMPLEMENTACIONES RESTAURADAS) ---
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
-    // Si la entrada es null, devuelve undefined (coincide con el tipo de retorno)
+// Ingest Service
+export interface IngestResponse {
+    document_id: string;
+    task_id: string; // Celery task ID maybe?
+    status: string;
+    message: string;
+}
+export const uploadDocument = async (
+    formData: FormData,
+    metadata: Record<string, any> = {} // Metadata might not be used if embedded in FormData logic server-side
+): Promise<IngestResponse> => {
+    // Note: Sending metadata alongside FormData might require specific backend handling
+    // or embedding metadata within the FormData itself if the backend expects it.
+    // Adjust if your backend expects metadata differently (e.g., query params, separate JSON part).
+    console.log("Uploading document via API..."); // Added log
+    return request<IngestResponse>('/api/v1/ingest/upload', { // Adjusted endpoint based on typical naming
+        method: 'POST',
+        body: formData,
+        // If metadata needs to be sent separately (less common with FormData):
+        // headers: { 'X-Upload-Metadata': JSON.stringify(metadata) }
+    });
+};
+
+export interface DocumentStatusResponse {
+    document_id: string;
+    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string; // Allow other strings for flexibility
+    file_name?: string | null;
+    file_type?: string | null;
+    chunk_count?: number | null; // How many chunks were created
+    error_message?: string | null; // Details if status is 'error'
+    last_updated?: string; // ISO timestamp string
+    message?: string | null; // General status message
+    metadata?: Record<string, any> | null; // Original metadata if stored
+}
+export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
+    console.log("Fetching document statuses via API..."); // Added log
+    return request<DocumentStatusResponse[]>('/api/v1/ingest/status'); // Adjusted endpoint
+};
+
+
+// Query Service
+export interface RetrievedDocApi {
+    id: string; // Often the chunk ID
+    score?: number | null;
+    content_preview?: string | null;
+    metadata?: Record<string, any> | null;
+    document_id?: string | null; // ID of the parent document
+    file_name?: string | null; // Filename of the parent document
+}
+// Frontend type can be the same if no transformation is needed initially
+export type RetrievedDoc = RetrievedDocApi;
+
+export interface ChatSummary {
+    id: string; // Chat ID (UUID)
+    title: string | null; // Optional title, might be first user message or generated
+    updated_at: string; // ISO timestamp
+    created_at: string; // ISO timestamp
+}
+
+export interface ChatMessageApi {
+    id: string; // Message ID
+    chat_id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    sources: RetrievedDocApi[] | null; // Sources used for assistant message
+    created_at: string; // ISO timestamp
+    // Potentially add other fields like model used, latency, etc.
+}
+
+export interface QueryPayload {
+    query: string;
+    retriever_top_k?: number; // Optional: How many docs to retrieve
+    chat_id?: string | null; // Provide if continuing a conversation
+    // Potentially add other params: filters, generation config, etc.
+}
+
+export interface QueryApiResponse {
+    answer: string; // The generated answer
+    retrieved_documents: RetrievedDocApi[]; // The documents used
+    query_log_id?: string | null; // ID for logging/tracing
+    chat_id: string; // ID of the chat (new or existing)
+}
+
+export const getChats = async (): Promise<ChatSummary[]> => {
+     console.log("Fetching chat list via API..."); // Added log
+     return request<ChatSummary[]>('/api/v1/query/chats');
+};
+
+export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
+     console.log(`Fetching messages for chat ${chatId} via API...`); // Added log
+     return request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`);
+};
+
+export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
+     console.log(`Sending query to API (Chat ID: ${payload.chat_id || 'New'})...`); // Added log
+     // Ensure chat_id is explicitly null if undefined/empty, as backend might expect null for new chat
+     const body = { ...payload, chat_id: payload.chat_id || null };
+     return request<QueryApiResponse>('/api/v1/query/ask', {
+        method: 'POST',
+        body: JSON.stringify(body),
+     });
+};
+
+export const deleteChat = async (chatId: string): Promise<void> => {
+     console.log(`Deleting chat ${chatId} via API...`); // Added log
+     // Expecting 204 No Content on successful deletion
+     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
+};
+
+
+// User/Company Association (API Gateway Endpoint)
+interface EnsureCompanyResponse {
+    message: string; // e.g., "Company association successful." or "Company association already exists."
+    company_id?: string; // The company ID that was ensured/found
+}
+export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
+     console.log("Calling ensure-company association endpoint..."); // Added log
+     return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
+};
+
+
+// --- Type Mapping Helpers ---
+
+// Maps sources from the API structure to the structure needed by the frontend Message component.
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null | undefined): RetrievedDoc[] | undefined => {
     if (!apiSources) {
-        return undefined;
+        return undefined; // Return undefined if sources are null/undefined
     }
-    // Si es un array (incluso vacío), mapea cada elemento
+    // If it's an array (even empty), map each source.
+    // Currently, API and Frontend types are the same (RetrievedDoc = RetrievedDocApi),
+    // so this is mostly a pass-through, but good practice for future changes.
     return apiSources.map(source => ({
-        // Copia todas las propiedades esperadas
         id: source.id,
         score: source.score,
         content_preview: source.content_preview,
         metadata: source.metadata,
         document_id: source.document_id,
         file_name: source.file_name,
-    })); // Esta función ahora siempre devuelve RetrievedDoc[] o undefined
+    }));
 };
 
+// Maps a full message object from the API to the frontend Message interface.
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
-    // Llama a la función de mapeo de fuentes
+    // Use the helper to map the sources array within the message
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
 
-    // Construye y devuelve el objeto Message del frontend
+    // Construct the frontend Message object
     return {
         id: apiMessage.id,
         role: apiMessage.role,
         content: apiMessage.content,
-        sources: mappedSources, // Usa las fuentes mapeadas
-        isError: false, // Asume que no hay error al mapear una respuesta exitosa de la API
-        created_at: apiMessage.created_at, // Conserva el timestamp
-    }; // Esta función ahora siempre devuelve un objeto Message
+        sources: mappedSources, // Use the potentially transformed sources
+        isError: false, // Assume success when mapping API response
+        created_at: apiMessage.created_at, // Preserve timestamp
+    };
 };
 ```
 
 ## File: `lib\auth\helpers.ts`
 ```ts
-// lib/auth/helpers.ts
-// import { AUTH_TOKEN_KEY } from "@/lib/constants"; // Ya no es necesario para el token principal
+// File: lib/auth/helpers.ts
+// Purpose: Define shared authentication types/interfaces. Remove outdated manual token helpers.
 
-// --- Funciones manuales de localStorage (OBSOLETAS para el token de sesión) ---
-// Estas funciones ya no deben usarse para gestionar el token de sesión de Supabase.
-// El cliente Supabase JS maneja esto internamente. Se dejan aquí comentadas
-// o con advertencias por si se usan para otros fines, pero idealmente deberían eliminarse.
-
+// --- Manual localStorage functions (OBSOLETE for Supabase session token) ---
+// These functions should no longer be used for managing the main Supabase session token.
+// Supabase JS client handles this internally. They are removed to avoid confusion.
 /*
-export const getToken = (): string | null => {
-  if (typeof window !== "undefined") {
-    console.warn("getToken() manual llamado. Supabase maneja la sesión. Considera eliminar esta función.");
-    // return localStorage.getItem(AUTH_TOKEN_KEY); // Evitar leer directamente
-    return null; // Devolver null para evitar conflictos
-  }
-  return null;
-};
-
-export const setToken = (token: string): void => {
-   if (typeof window !== "undefined") {
-     console.warn("setToken() manual llamado. Supabase maneja la sesión. Considera eliminar esta función.");
-     // localStorage.setItem(AUTH_TOKEN_KEY, token); // Evitar escribir directamente
-   }
-};
-
-export const removeToken = (): void => {
-   if (typeof window !== "undefined") {
-     console.warn("removeToken() manual llamado. Usa supabase.auth.signOut(). Considera eliminar esta función.");
-     // localStorage.removeItem(AUTH_TOKEN_KEY); // Evitar eliminar directamente
-   }
-};
+export const getToken = (): string | null => { ... };
+export const setToken = (token: string): void => { ... };
+export const removeToken = (): void => { ... };
 */
-// --- FIN Funciones localStorage obsoletas ---
+// --- END Obsolete localStorage functions ---
 
 
-// --- Interfaz User del Frontend (sin cambios) ---
-// Define la estructura del usuario que usaremos en el frontend.
-// Esta interfaz se poblará con datos de la sesión de Supabase via useAuth.
+// --- Frontend User Interface ---
+// Defines the structure of the user object used within the frontend application.
+// This will be populated from the Supabase session data via the useAuth hook.
 export interface User {
-  userId: string;    // Mapeado desde Supabase User ID (user.id)
-  email?: string;    // Mapeado desde Supabase User Email (user.email)
-  name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name o name)
-  companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
-  roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
-  // Añade otros campos necesarios del objeto User de Supabase si los necesitas en el frontend
+  userId: string;    // Mapped from Supabase User ID (user.id)
+  email?: string;    // Mapped from Supabase User Email (user.email)
+  name?: string | null; // Mapped from Supabase User Metadata (user.user_metadata.full_name or name) - Allow null
+  companyId?: string; // Mapped from Supabase App Metadata (user.app_metadata.company_id)
+  roles?: string[];  // Mapped from Supabase App Metadata (user.app_metadata.roles)
+  // Add any other fields from the Supabase User object needed in the frontend
 }
 
-// --- getUserFromToken ELIMINADO ---
-// Ya no necesitamos decodificar el token manualmente en el frontend.
-// La información del usuario vendrá directamente del objeto User/Session de Supabase
-// gestionado por el hook useAuth.
+// --- getUserFromToken REMOVED ---
+// Manual token decoding is not needed; user info comes from Supabase session object.
+
 ```
 
 ## File: `lib\constants.ts`
@@ -5295,201 +5763,401 @@ export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ## File: `lib\hooks\useAuth.tsx`
 ```tsx
 // File: lib/hooks/useAuth.tsx
+// Purpose: Provides authentication state and actions using React Context and Supabase.
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+    createContext,
+    useContext,
+    useState,
+    useEffect,
+    useCallback,
+    useRef, // Added useRef
+    ReactNode,
+} from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { User as AppUser } from '@/lib/auth/helpers';
-import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials } from '@supabase/supabase-js';
+import { User as AppUser } from '@/lib/auth/helpers'; // Use our defined frontend User type
+import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 import { toast } from "sonner";
-import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api';
+import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api'; // Import API function and specific error type
 
+// --- Types ---
 interface AuthContextType {
-  user: AppUser | null;
-  session: Session | null;
-  isLoading: boolean;
-  signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>;
-  signUp: (params: {
-    email: string;
-    password: string;
-    options?: {
-      data?: object;
-      emailRedirectTo?: string;
-    };
-  }) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
-  signOut: () => Promise<void>;
+    user: AppUser | null; // Use our application-specific User type
+    session: Session | null; // Keep the full Supabase session if needed elsewhere
+    isLoading: boolean; // Tracks if auth state is being determined
+    signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>;
+    signUp: (params: SignUpWithPasswordCredentials) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
+    signOut: () => Promise<void>;
+    // No 'token' here - access via session.access_token if needed directly
 }
 
+// --- Initial Context State ---
 const defaultAuthContextValue: AuthContextType = {
-  user: null,
-  session: null,
-  isLoading: true,
-  signInWithPassword: async () => { console.error("signInWithPassword called outside of AuthProvider"); throw new Error("Not initialized"); },
-  signUp: async () => { console.error("signUp called outside of AuthProvider"); return { data: { user: null, session: null }, error: new Error("Not initialized") as AuthError }; },
-  signOut: async () => { console.error("signOut called outside of AuthProvider"); },
+    user: null,
+    session: null,
+    isLoading: true, // Start as true until initial check completes
+    signInWithPassword: async () => {
+        console.error("AuthProvider: signInWithPassword called outside of AuthProvider");
+        throw new Error("Auth context not initialized");
+    },
+    signUp: async () => {
+        console.error("AuthProvider: signUp called outside of AuthProvider");
+        return { data: { user: null, session: null }, error: new AuthError("Auth context not initialized") };
+    },
+    signOut: async () => {
+        console.error("AuthProvider: signOut called outside of AuthProvider");
+    },
 };
 
+// --- Context Definition ---
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
+// --- Props for Provider ---
 interface AuthProviderProps {
-  children: React.ReactNode;
+    children: ReactNode;
 }
 
+// --- Helper to Map Supabase User to App User ---
 const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
-    if (!supabaseUser) return null;
-    const companyIdRaw = supabaseUser.app_metadata?.company_id;
-    const companyId = companyIdRaw ? String(companyIdRaw) : undefined;
-    const roles = supabaseUser.app_metadata?.roles as string[] | undefined;
-    return {
-        userId: supabaseUser.id, email: supabaseUser.email,
-        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
-        companyId: companyId, roles: roles,
-    };
-};
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
-  const ensureCompanyCallPending = useRef(false);
-
-  const signOut = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) { toast.error("Logout Failed", { description: error.message }); }
-      else { console.log("AuthProvider: signOut successful."); }
-    } catch (error) { toast.error("Logout Failed", { description: "An unexpected error occurred." }); }
-    finally { /* Dejar que onAuthStateChange maneje isLoading */ }
-  }, []);
-
-  useEffect(() => {
-    console.log("AuthProvider: Setting up auth state listener.");
-    setIsLoading(true);
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-        setSession(initialSession);
-        const mappedUser = mapSupabaseUserToAppUser(initialSession?.user);
-        setUser(mappedUser);
-        if (initialSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
-            ensureCompanyCallPending.current = true;
-            try {
-                await ensureCompanyAssociation(); await supabase.auth.refreshSession();
-            } catch (error) { toast.error("Company Setup Failed", { description: error instanceof EnsureCompanyApiError ? error.message : "Could not associate company." }); }
-            finally { ensureCompanyCallPending.current = false; }
-        }
-        setIsLoading(false);
-    }).catch(error => { console.error("AuthProvider: Error fetching initial session:", error); setIsLoading(false); });
-    const { data: authListener } = supabase.auth.onAuthStateChange( async (event, newSession) => {
-        setSession(newSession); const mappedUser = mapSupabaseUserToAppUser(newSession?.user); setUser(mappedUser);
-        if (event === 'SIGNED_IN' && newSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
-            ensureCompanyCallPending.current = true;
-            try {
-                await ensureCompanyAssociation(); await supabase.auth.refreshSession();
-            } catch (error) { toast.error("Company Setup Failed", { description: error instanceof EnsureCompanyApiError ? error.message : "Could not associate company." }); }
-            finally { ensureCompanyCallPending.current = false; }
-        }
-        if (event === 'SIGNED_OUT') { if (pathname?.startsWith('/chat') || pathname?.startsWith('/knowledge') || pathname?.startsWith('/settings')) { router.push('/'); } }
-        if (isLoading) setIsLoading(false);
-    });
-    return () => { authListener?.subscription.unsubscribe(); };
-  }, [isLoading, router, pathname, signOut]);
-
-  const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword(credentials);
-      if (error) { throw error; }
-    } finally { setIsLoading(false); }
-  }, []);
-
-  const signUp = useCallback(async (params: {
-    email: string;
-    password: string;
-    options?: {
-      data?: object;
-      emailRedirectTo?: string;
-    };
-  }) => {
-    setIsLoading(true);
-    try {
-      const { email, password, options } = params;
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        ...options,
-      });
-      if (error) {
-        toast.error("Registration Failed", { description: error.message || "Could not create account." });
-      } else if (data.user && data.user.identities?.length === 0) {
-        toast.success("Registration Submitted", { description: `Please check your email (${email}) to confirm.` });
-      } else if (data.user) {
-        toast.success("Registration Successful");
-      } else {
-        toast.warning("Registration Status Unknown");
-      }
-      return { data, error };
-    } catch (error) {
-      toast.error("Registration Failed", { description: "An unexpected error occurred." });
-      return { data: { user: null, session: null }, error: error as AuthError };
-    } finally {
-      setIsLoading(false);
+    if (!supabaseUser) {
+        return null;
     }
-  }, []);
 
-  const providerValue: AuthContextType = {
-    user, session, isLoading, signInWithPassword, signUp, signOut,
-  };
+    // Extract data safely, checking for undefined/null
+    const companyIdRaw = supabaseUser.app_metadata?.company_id;
+    // Ensure companyId is a string if it exists, otherwise undefined
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined;
 
-  return (
-    <AuthContext.Provider value={providerValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+    // Extract roles, ensuring it's an array of strings or undefined
+    const rolesRaw = supabaseUser.app_metadata?.roles;
+    const roles = Array.isArray(rolesRaw) && rolesRaw.every(r => typeof r === 'string')
+        ? rolesRaw as string[]
+        : undefined;
+
+    // Extract name from user_metadata (common places: 'name' or 'full_name')
+    const name = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || null;
+
+    return {
+        userId: supabaseUser.id,
+        email: supabaseUser.email,
+        name: name, // Will be string or null
+        companyId: companyId, // Will be string or undefined
+        roles: roles, // Will be string[] or undefined
+    };
 };
 
+
+// --- AuthProvider Component ---
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+    const [user, setUser] = useState<AppUser | null>(null);
+    const [session, setSession] = useState<Session | null>(null);
+    const [isLoading, setIsLoading] = useState(true); // Start loading until first check
+    const router = useRouter();
+    const pathname = usePathname();
+    // Ref to prevent multiple ensureCompany calls running concurrently
+    const ensureCompanyCallPending = useRef(false);
+    // Ref to store the initial session check promise
+    const initialCheckPromise = useRef<Promise<void> | null>(null);
+
+    // --- Sign Out Logic ---
+    const signOut = useCallback(async () => {
+        console.log("AuthProvider: Initiating sign out...");
+        // Don't set isLoading true here immediately, let onAuthStateChange handle it
+        // to avoid UI flicker if sign out is very fast.
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                console.error("AuthProvider: Sign out error:", error);
+                toast.error("Logout Failed", { description: error.message });
+            } else {
+                console.log("AuthProvider: Sign out successful via Supabase.");
+                // Clear local state immediately for faster UI response
+                setUser(null);
+                setSession(null);
+                // Redirect happens via useEffect watching session state change to null
+            }
+        } catch (error) {
+            console.error("AuthProvider: Unexpected sign out error:", error);
+            toast.error("Logout Failed", { description: "An unexpected error occurred during sign out." });
+            // Still clear local state in case of unexpected error
+            setUser(null);
+            setSession(null);
+        } finally {
+             // Ensure loading is false after attempt, though onAuthStateChange might set it again briefly
+             setIsLoading(false);
+        }
+    }, []); // No dependencies needed for signOut itself
+
+    // --- Core Effect for Auth State Changes & Initial Load ---
+    useEffect(() => {
+        console.log("AuthProvider: useEffect setup running.");
+
+        // Function to handle session updates and potential company association
+        const handleSessionUpdate = async (currentSession: Session | null) => {
+            console.log("AuthProvider: Handling session update. Session present:", !!currentSession);
+            setSession(currentSession);
+            const mappedUser = mapSupabaseUserToAppUser(currentSession?.user);
+            setUser(mappedUser);
+
+            // --- Ensure Company Association Logic ---
+            // Check only if we have a session, a mapped user, but NO companyId,
+            // and no call is already pending.
+            if (currentSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
+                console.log(`AuthProvider: User ${mappedUser.userId} lacks companyId. Attempting association.`);
+                ensureCompanyCallPending.current = true; // Mark as pending
+                try {
+                    const result = await ensureCompanyAssociation();
+                    console.log("AuthProvider: ensureCompanyAssociation API call successful:", result.message);
+                    toast.info("Company Association", { description: result.message });
+                    // IMPORTANT: Refresh the Supabase session to get the updated token with the new app_metadata
+                    console.log("AuthProvider: Refreshing Supabase session after company association...");
+                    const { error: refreshError } = await supabase.auth.refreshSession();
+                    if (refreshError) {
+                        console.error("AuthProvider: Failed to refresh session after company association:", refreshError);
+                        toast.error("Session Refresh Failed", { description: "Could not update session after company setup. Please log in again." });
+                        // Consider signing out if refresh fails critically
+                        // await signOut();
+                    } else {
+                        console.log("AuthProvider: Session refreshed successfully.");
+                        // The onAuthStateChange listener will fire again with the *new* session,
+                        // updating user/session state automatically. No need to manually set user/session here.
+                    }
+                } catch (error) {
+                    console.error("AuthProvider: ensureCompanyAssociation API call failed:", error);
+                    let errorDesc = "Could not automatically associate your account with a company.";
+                    if (error instanceof EnsureCompanyApiError) {
+                        errorDesc = error.message || errorDesc;
+                         // If the error is 401/403 from the ensure-company endpoint, it implies token issues.
+                         if (error.status === 401 || error.status === 403) {
+                            errorDesc = "Authentication error during company setup. Please log in again.";
+                            await signOut(); // Force sign out on critical auth error
+                         }
+                    } else if (error instanceof Error) {
+                        errorDesc = error.message;
+                    }
+                    toast.error("Company Setup Failed", { description: errorDesc });
+                } finally {
+                    ensureCompanyCallPending.current = false; // Mark as no longer pending
+                }
+            }
+             // --- End Ensure Company Logic ---
+
+             // Regardless of company check, ensure loading is false after handling
+             setIsLoading(false);
+             console.log("AuthProvider: Session update handling complete. isLoading set to false.");
+        };
+
+
+        // 1. Initial Session Check (Only once on mount)
+        if (!initialCheckPromise.current) {
+            console.log("AuthProvider: Performing initial session check...");
+            setIsLoading(true); // Ensure loading is true during initial check
+            initialCheckPromise.current = supabase.auth.getSession()
+                .then(async ({ data: { session: initialSession }, error: initialError }) => {
+                    if (initialError) {
+                        console.error("AuthProvider: Error fetching initial session:", initialError);
+                        toast.error("Session Load Error", { description: "Could not load your session." });
+                    }
+                    console.log("AuthProvider: Initial session check complete. Session found:", !!initialSession);
+                    await handleSessionUpdate(initialSession); // Handle the initial session
+                })
+                .catch(error => {
+                    console.error("AuthProvider: Unexpected error during initial session check:", error);
+                    toast.error("Session Load Error", { description: "An unexpected error occurred." });
+                    setIsLoading(false); // Ensure loading stops on unexpected error
+                });
+        }
+
+
+        // 2. Auth State Change Listener
+        console.log("AuthProvider: Setting up onAuthStateChange listener.");
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            async (event, newSession) => {
+                console.log(`AuthProvider: onAuthStateChange event: ${event}`, { hasSession: !!newSession });
+
+                // Wait for initial check to complete before processing listener events fully
+                if (initialCheckPromise.current) {
+                    await initialCheckPromise.current;
+                }
+
+                 // Always update state based on the event, but handle company logic specifically on SIGNED_IN
+                 // The handleSessionUpdate function now contains the company check logic.
+                 await handleSessionUpdate(newSession);
+
+                // Handle redirection on SIGNED_OUT
+                if (event === 'SIGNED_OUT') {
+                    // Redirect to home if user was in a protected area
+                    const protectedPaths = ['/chat', '/knowledge', '/settings'];
+                    if (protectedPaths.some(p => pathname?.startsWith(p))) {
+                        console.log("AuthProvider: Signed out from protected route, redirecting to /");
+                        router.push('/'); // Use push for clearer navigation history
+                    }
+                }
+                // Note: Redirection on SIGNED_IN is usually handled by the login form
+                // or components observing the session becoming non-null.
+            }
+        );
+
+        // Cleanup listener on component unmount
+        return () => {
+            console.log("AuthProvider: Unmounting, unsubscribing listener.");
+            authListener?.subscription.unsubscribe();
+            initialCheckPromise.current = null; // Clear the promise ref on unmount
+        };
+    // Dependencies: router and pathname are needed for redirection logic on signout.
+    // signOut is included as it's used within the effect's error handling.
+    }, [router, pathname, signOut]); // Rerun if router or pathname changes (for redirection logic)
+
+    // --- Sign In Action ---
+    const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
+        console.log("AuthProvider: Attempting sign in...");
+        setIsLoading(true); // Indicate loading during sign-in attempt
+        try {
+            const { error } = await supabase.auth.signInWithPassword(credentials);
+            if (error) {
+                console.error("AuthProvider: Sign in error:", error);
+                // Throw the error so the form can catch it and display specifics
+                throw error;
+            }
+            console.log("AuthProvider: signInWithPassword successful. Waiting for onAuthStateChange.");
+            // Don't set loading false here; let onAuthStateChange handle it when the session updates.
+        } catch (error) {
+            // Ensure loading is set to false if an error is thrown *before* Supabase call returns
+            // or if the thrown error needs to be handled immediately.
+             setIsLoading(false);
+             // Re-throw the error for the form
+             throw error;
+        }
+    }, []);
+
+    // --- Sign Up Action ---
+    const signUp = useCallback(async (params: SignUpWithPasswordCredentials) => {
+        console.log("AuthProvider: Attempting sign up...");
+        setIsLoading(true);
+        try {
+            // Ensure email and password are provided
+            if (!params.email || !params.password) {
+                throw new AuthError("Email and password are required for sign up.");
+            }
+
+            const { data, error } = await supabase.auth.signUp(params); // Pass params directly
+
+            // Handle Supabase-specific responses
+            if (error) {
+                 console.error("AuthProvider: Sign up error:", error);
+                 toast.error("Registration Failed", { description: error.message || "Could not create account." });
+            } else if (data.user && data.session) {
+                 // User created AND session started (e.g., auto-confirm enabled)
+                 console.log("AuthProvider: Sign up successful and user logged in.");
+                 toast.success("Registration Successful!", { description: "You are now logged in." });
+                 // onAuthStateChange will handle the session update and company check
+            } else if (data.user && !data.session) {
+                 // User created but requires confirmation (common case)
+                 console.log("AuthProvider: Sign up successful, confirmation required.");
+                 toast.success("Registration Submitted", {
+                    description: `Please check your email (${params.email}) to confirm your account.`,
+                    duration: 10000, // Longer duration for this message
+                 });
+            } else {
+                 // Unexpected case
+                 console.warn("AuthProvider: Sign up status unknown.", { data });
+                 toast.warning("Registration Status Unknown", { description: "Please try logging in or check your email." });
+            }
+            setIsLoading(false); // Set loading false after handling response
+            return { data, error }; // Return the result for the form
+
+        } catch (error) {
+            console.error("AuthProvider: Unexpected sign up error:", error);
+            let errorMsg = "An unexpected error occurred during registration.";
+            if (error instanceof Error) errorMsg = error.message;
+            toast.error("Registration Failed", { description: errorMsg });
+            setIsLoading(false);
+            // Return an error structure consistent with Supabase response
+            return { data: { user: null, session: null }, error: error instanceof AuthError ? error : new AuthError(errorMsg) };
+        }
+    }, []);
+
+    // --- Context Value ---
+    const providerValue: AuthContextType = {
+        user,
+        session,
+        isLoading,
+        signInWithPassword,
+        signUp,
+        signOut,
+    };
+
+    // --- Render Provider ---
+    return (
+        <AuthContext.Provider value={providerValue}>
+            {/* Optionally render children only after initial load, or show a global loader */}
+            {/* {isLoading ? <GlobalLoader /> : children} */}
+            {children}
+        </AuthContext.Provider>
+    );
+};
+
+// --- Hook to Use Auth Context ---
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
-    if (context === undefined) { throw new Error('useAuth must be used within an AuthProvider'); }
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') { console.warn("useAuth hook used possibly outside of AuthProvider or before initialization."); }
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    // Optional: Add a check if the context is still the default value,
+    // which might indicate usage outside the provider or before initialization.
+    // This check might be noisy during initial renders.
+    // if (context === defaultAuthContextValue && typeof window !== 'undefined') {
+    //    console.warn("useAuth hook used possibly outside of AuthProvider or before initialization finished.");
+    // }
     return context;
 };
 ```
 
 ## File: `lib\supabaseClient.ts`
 ```ts
-// lib/supabaseClient.ts
+// File: lib/supabaseClient.ts
+// Purpose: Initialize and export the Supabase client instance.
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl) {
+  console.error("CRITICAL: Missing environment variable NEXT_PUBLIC_SUPABASE_URL");
   throw new Error("Missing environment variable NEXT_PUBLIC_SUPABASE_URL");
 }
 if (!supabaseAnonKey) {
+  console.error("CRITICAL: Missing environment variable NEXT_PUBLIC_SUPABASE_ANON_KEY");
   throw new Error("Missing environment variable NEXT_PUBLIC_SUPABASE_ANON_KEY");
 }
 
-// Crear una única instancia del cliente Supabase para ser usada en toda la app
-// Nota: El cliente Supabase maneja la sesión internamente.
+// Create a single Supabase client instance to be used throughout the app.
+// The Supabase JS client handles session management (storage, refresh) internally.
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        // Supabase JS client maneja el almacenamiento del token automáticamente (localStorage por defecto)
-        // autoRefreshToken: true, // Habilitado por defecto
-        // persistSession: true, // Habilitado por defecto
-        // detectSessionInUrl: true, // Habilitado por defecto (para OAuth y Magic Links/Confirmación)
-    }
+        // Supabase JS client handles token storage automatically (localStorage by default)
+        autoRefreshToken: true, // Default: true
+        persistSession: true, // Default: true
+        detectSessionInUrl: true, // Default: true (handles OAuth, Magic Links, Email Confirm)
+    },
+    // Optional: Add global fetch options if needed, e.g., for specific headers
+    // global: {
+    //   fetch: (input, init) => {
+    //     // Add custom logic if needed before fetch executes
+    //     return fetch(input, init);
+    //   },
+    // },
 });
 
-console.log("Supabase client initialized.");
+console.log("Supabase client initialized successfully.");
 ```
 
 ## File: `lib\utils.ts`
 ```ts
 // File: lib/utils.ts
+// Purpose: General utility functions, including CN for classnames and API URL retrieval.
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -5497,35 +6165,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// (+) AÑADIR ESTA FUNCIÓN COMPLETA
 /**
  * Retrieves the API Gateway URL from environment variables.
- * Throws an error if the environment variable is not set during runtime.
- * @returns {string} The API Gateway URL.
+ * Throws an error if the environment variable is not set during runtime in production/staging.
+ * Provides a default and warning in development.
+ * @returns {string} The API Gateway URL without a trailing slash.
  */
 export function getApiGatewayUrl(): string {
     const apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL;
 
     if (!apiUrl) {
-        // En el lado del cliente o si la variable simplemente no está definida,
-        // podríamos querer lanzar un error o retornar un valor por defecto/vacío
-        // dependiendo de cómo queremos manejar este caso. Lanzar un error es más seguro
-        // para detectar problemas de configuración temprano.
-        console.error("Error: NEXT_PUBLIC_API_GATEWAY_URL environment variable is not set.");
-        // Puedes decidir lanzar un error en producción/staging
-        if (process.env.NODE_ENV !== 'development') {
-             throw new Error("API Gateway URL is not configured. Please set NEXT_PUBLIC_API_GATEWAY_URL.");
+        const errorMessage = "CRITICAL: NEXT_PUBLIC_API_GATEWAY_URL environment variable is not set.";
+        console.error(errorMessage);
+
+        // Throw error in production/staging environments
+        if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
+             throw new Error("API Gateway URL is not configured. Please set NEXT_PUBLIC_API_GATEWAY_URL in Vercel environment variables.");
         } else {
-            // En desarrollo, podrías retornar una URL por defecto o un string vacío
-            // para evitar bloquear el desarrollo, pero con una advertencia clara.
-            console.warn("Returning default/empty URL for API Gateway in development.");
-            return "http://localhost:8080"; // O un string vacío "" si prefieres
+            // Provide a default for local development ONLY, with a clear warning.
+            // Adjust the default URL if your local gateway runs elsewhere.
+            const defaultDevUrl = "http://localhost:8080"; // Default for local FastAPI gateway
+            console.warn(`⚠️ ${errorMessage} Using default development URL: ${defaultDevUrl}`);
+            return defaultDevUrl;
         }
     }
-     // Eliminar la barra diagonal final si existe para evitar dobles barras
+     // Remove trailing slash if exists to prevent double slashes in requests
     return apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 }
-// FIN DE LA FUNCIÓN AÑADIDA
 ```
 
 ## File: `next-env.d.ts`
