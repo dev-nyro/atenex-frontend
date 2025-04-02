@@ -2,10 +2,28 @@
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
 import { jwtDecode, InvalidTokenError } from 'jwt-decode'; // Importar error específico
 
-// ... (getToken, setToken, removeToken - sin cambios) ...
-export const getToken = (): string | null => { /* ... */ };
-export const setToken = (token: string): void => { /* ... */ };
-export const removeToken = (): void => { /* ... */ };
+// --- IMPLEMENTACIONES RESTAURADAS ---
+export const getToken = (): string | null => {
+  // Asegúrate de que esto solo se ejecute en el cliente
+  if (typeof window !== "undefined") {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  }
+  return null; // Retorna null si no está en el navegador
+};
+
+export const setToken = (token: string): void => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+  }
+};
+
+export const removeToken = (): void => {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
+};
+// --- FIN DE IMPLEMENTACIONES RESTAURADAS ---
+
 
 // Frontend User interface
 export interface User {

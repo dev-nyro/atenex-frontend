@@ -24,11 +24,7 @@ atenex-frontend/
 │   │   └── page.tsx
 │   ├── api
 │   │   └── auth
-│   │       ├── login
-│   │       │   └── route.ts
-│   │       ├── logout
-│   │       │   └── route.ts
-│   │       └── register
+│   │       └── logout
 │   │           └── route.ts
 │   ├── contact
 │   │   └── page.tsx
@@ -1154,50 +1150,6 @@ export default function AboutPage() {
 }
 ```
 
-## File: `app\api\auth\login\route.ts`
-```ts
-// File: app/api/auth/login/route.ts
-// *** DESACTIVADO: Ya no usaremos esta ruta simulada. ***
-// *** La autenticación real se hará llamando a /api/v1/auth/login del gateway ***
-
-import { NextResponse } from 'next/server';
-// import jwt from 'jsonwebtoken';
-
-export async function POST(request: Request) {
-    console.error("ERROR: Attempted to use the SIMULATED /api/auth/login route. This route should be disabled or removed. Configure the frontend to call the real API Gateway endpoint (/api/v1/auth/login).");
-    return NextResponse.json(
-        { detail: 'This simulated login route is disabled. Use the real API Gateway endpoint.' },
-        { status: 500 } // Return an error status to indicate misconfiguration
-    );
-
-/* // --- CÓDIGO SIMULADO COMENTADO ---
-  try {
-    const { email, password } = await request.json();
-    console.log(`SIMULATED API Route: Login attempt for ${email}`);
-    if (email === 'user@example.com' && password === 'password') {
-      const DUMMY_SECRET = process.env.JWT_SECRET || 'your-very-strong-secret-key-keep-safe';
-      const payload = {
-        // *** ESTE PAYLOAD ES INCORRECTO - Faltan user_id, company_id ***
-        userId: 'dummy-user-id-from-route', // Nombre incorrecto del claim
-        email: email,
-        companyId: 'dummy-company-id-from-route', // Nombre incorrecto del claim
-        exp: Math.floor(Date.now() / 1000) + (60 * 60),
-      };
-      const token = jwt.sign(payload, DUMMY_SECRET);
-      console.log(`SIMULATED API Route: Login successful for ${email}`);
-      return NextResponse.json({ access_token: token });
-    } else {
-      console.log(`SIMULATED API Route: Login failed for ${email}`);
-      return NextResponse.json({ detail: 'Invalid credentials (Simulated)' }, { status: 401 });
-    }
-  } catch (error) {
-    console.error("SIMULATED API Route Login Error:", error);
-    return NextResponse.json({ detail: 'An error occurred during simulated login' }, { status: 500 });
-  }
-*/ // --- FIN CÓDIGO SIMULADO COMENTADO ---
-}
-```
-
 ## File: `app\api\auth\logout\route.ts`
 ```ts
 // Example Backend Route for Logout (Optional)
@@ -1225,54 +1177,6 @@ export async function POST(request: Request) {
 
 // Note: You might also need a GET route or similar to check auth status
 // e.g., /api/auth/session which verifies the token and returns user info.
-```
-
-## File: `app\api\auth\register\route.ts`
-```ts
-// File: app/api/auth/register/route.ts
-// *** DESACTIVADO: Ya no usaremos esta ruta simulada. ***
-// *** El registro real se hará llamando a /api/v1/auth/register del gateway ***
-
-import { NextResponse } from 'next/server';
-// import jwt from 'jsonwebtoken';
-
-export async function POST(request: Request) {
-     console.error("ERROR: Attempted to use the SIMULATED /api/auth/register route. This route should be disabled or removed. Configure the frontend to call the real API Gateway endpoint (/api/v1/auth/register).");
-     return NextResponse.json(
-         { detail: 'This simulated register route is disabled. Use the real API Gateway endpoint.' },
-         { status: 500 } // Return an error status to indicate misconfiguration
-     );
-
-/* // --- CÓDIGO SIMULADO COMENTADO ---
-  try {
-    const { email, password, name } = await request.json();
-    console.log(`SIMULATED API Route: Registration attempt for ${email}`);
-    if (!email || !password) {
-        return NextResponse.json({ detail: 'Email and password are required (Simulated)' }, { status: 400 });
-    }
-     const newUser = {
-        id: `dummy-user-${Date.now()}`,
-        email: email,
-        name: name || `User ${Date.now()}`,
-        companyId: `dummy-company-${Date.now()}`
-     }
-    const DUMMY_SECRET = process.env.JWT_SECRET || 'your-very-strong-secret-key-keep-safe';
-    const payload = {
-        // *** ESTE PAYLOAD ES INCORRECTO - Faltan user_id, company_id ***
-        userId: newUser.id, // Nombre incorrecto del claim
-        email: newUser.email,
-        companyId: newUser.companyId, // Nombre incorrecto del claim
-        exp: Math.floor(Date.now() / 1000) + (60 * 60),
-    };
-    const token = jwt.sign(payload, DUMMY_SECRET);
-    console.log(`SIMULATED API Route: Registration successful for ${email}`);
-    return NextResponse.json({ access_token: token, user: { id: newUser.id, email: newUser.email, name: newUser.name, companyId: newUser.companyId } });
-  } catch (error) {
-    console.error("SIMULATED API Route Register Error:", error);
-    return NextResponse.json({ detail: 'An error occurred during simulated registration' }, { status: 500 });
-  }
-*/ // --- FIN CÓDIGO SIMULADO COMENTADO ---
-}
 ```
 
 ## File: `app\contact\page.tsx`
@@ -5254,54 +5158,54 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
 
 ## File: `lib\auth\helpers.ts`
 ```ts
-// File: lib/auth/helpers.ts
+// lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-import { jwtDecode } from 'jwt-decode';
+import { jwtDecode, InvalidTokenError } from 'jwt-decode'; // Importar error específico
 
-// Basic token handling for client-side
-export const getToken = (): string | null => {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem(AUTH_TOKEN_KEY);
-  }
-  return null;
-};
+// ... (getToken, setToken, removeToken - sin cambios) ...
+export const getToken = (): string | null => { /* ... */ };
+export const setToken = (token: string): void => { /* ... */ };
+export const removeToken = (): void => { /* ... */ };
 
-export const setToken = (token: string): void => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-  }
-};
-
-export const removeToken = (): void => {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-  }
-};
-
-// Frontend User interface - needs to align with JWT claims
+// Frontend User interface
 export interface User {
-    userId: string;    // Expecting 'user_id' claim in JWT
-    email: string;     // Expecting 'email' claim in JWT
-    name?: string;     // Expecting optional 'name' claim in JWT
-    companyId: string; // Expecting 'company_id' claim in JWT
-    // Add other fields if needed, e.g., roles
+    userId: string;    // Mapeado desde 'sub' del JWT
+    email: string;     // Mapeado desde 'email'
+    name?: string;     // Mapeado desde 'user_metadata.full_name' o similar (opcional)
+    companyId: string; // Mapeado desde 'app_metadata.company_id' (o donde esté)
+    roles?: string[];  // Mapeado desde 'app_metadata.roles' (opcional)
+    // Añade otros campos necesarios
 }
 
-// Interface for the expected JWT payload structure from your REAL Auth Service
-interface JwtPayload {
-    // *** AJUSTA ESTOS NOMBRES DE CLAIMS para que coincidan EXACTAMENTE ***
-    // *** con lo que tu backend (Auth Service / Supabase) pone en el token ***
-    user_id: string;    // Ejemplo: claim para User ID (o podría ser 'sub')
-    company_id: string; // Ejemplo: claim para Company ID
-    email: string;      // Claim para Email
-    name?: string;     // Claim opcional para Name
-    role?: string;     // Claim opcional para Role
-    exp: number;       // Standard expiry timestamp (seconds since epoch) REQUIRED
-    iat?: number;      // Standard issued at timestamp (optional)
-    // 'sub' (subject) es un claim estándar, a menudo contiene el user ID.
-    // Si tu backend usa 'sub' para el ID de usuario, usa 'sub' aquí en lugar de 'user_id'.
-    sub?: string;      // Ejemplo: Si el backend usa 'sub' para user ID
-    // Agrega cualquier otro claim que tu backend incluya y necesites en el frontend
+// Interface for the ACTUAL Supabase JWT payload structure
+// ¡¡¡ VERIFICA ESTO CON UN TOKEN REAL DE TU PROYECTO !!!
+interface SupabaseJwtPayload {
+    sub: string;       // User ID (Subject) - ¡MUY PROBABLE!
+    aud: string;       // Audience (e.g., 'authenticated') - ¡MUY PROBABLE!
+    exp: number;       // Expiration time (seconds since epoch) - ¡SEGURO!
+    iat?: number;      // Issued at time (optional)
+    email?: string;     // Email - ¡MUY PROBABLE!
+    phone?: string;    // Phone (optional)
+    role?: string;     // Rol asignado por Supabase Auth (e.g., 'authenticated') - ¡PROBABLE!
+
+    // --- Metadatos ---
+    app_metadata?: {
+        provider?: string;
+        providers?: string[];
+        // --- ¡POSIBLE UBICACIÓN DE COMPANY_ID Y ROLES! ---
+        company_id?: string | number; // Verifica el tipo real
+        roles?: string[];
+        // Otros datos específicos de la aplicación
+        [key: string]: any;
+    };
+    user_metadata?: {
+        // Datos que el usuario puede gestionar (o tú vía admin)
+        full_name?: string;
+        avatar_url?: string;
+        // Otros datos específicos del usuario
+         [key: string]: any;
+    };
+    // Otros claims posibles: session_id (sid), amr, etc.
 }
 
 // Function to get user details from the JWT token
@@ -5309,50 +5213,61 @@ export const getUserFromToken = (token: string | null): User | null => {
   if (!token) return null;
   try {
     // Decode the JWT
-    const decoded = jwtDecode<JwtPayload>(token);
-    console.log("getUserFromToken - Decoded JWT Payload:", decoded); // <-- Log para depuración
+    const decoded = jwtDecode<SupabaseJwtPayload>(token);
+    // console.debug("getUserFromToken - Raw Decoded JWT:", decoded); // Log para depuración intensa
 
     // --- Validation ---
-    // 1. Check expiry
-    const now = Date.now() / 1000; // Current time in seconds
+    const now = Date.now() / 1000;
     if (decoded.exp < now) {
-      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Current time: ${new Date()}.`);
-      removeToken(); // Clear expired token
+      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Removing.`);
+      removeToken();
       return null;
     }
 
-    // 2. Check for essential claims required by the frontend
-    // *** VERIFICA que estos claims existen en tu payload decodificado ***
-    //    Ajusta los nombres ('user_id', 'company_id') si tu backend usa otros (ej. 'sub')
-    const userId = decoded.user_id || decoded.sub; // Usa user_id o sub como fallback
-    const companyId = decoded.company_id;
+    // --- Claim Extraction and Mapping ---
+    const userId = decoded.sub; // Usar 'sub' como User ID
     const email = decoded.email;
+    // Extraer company_id de app_metadata (¡AJUSTA SI ES NECESARIO!)
+    const companyIdRaw = decoded.app_metadata?.company_id;
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Convertir a string si existe
 
-    if (!userId || !companyId || !email) {
-        console.error("Decoded token is missing essential claims (userId/sub, companyId, email). Actual Payload:", decoded);
-        removeToken(); // Clear invalid token
+    // Validar claims esenciales para el frontend
+    if (!userId || !email || !companyId) {
+        console.error("Decoded token missing essential claims:", {
+            hasUserId: !!userId,
+            hasEmail: !!email,
+            hasCompanyId: !!companyId,
+            appMetadata: decoded.app_metadata // Log para ver qué hay
+        });
+        removeToken();
         return null;
     }
 
-    // --- Map decoded payload to User interface ---
+    // Mapear a la interfaz User del frontend
     const user: User = {
-      userId: userId,                 // Map from 'user_id' or 'sub' claim
+      userId: userId,
       email: email,
-      companyId: companyId,           // Map from 'company_id' claim
-      name: decoded.name,             // Map optional 'name' claim
-      // Add other mappings if needed, e.g., role: decoded.role
+      companyId: companyId, // Ya es string o undefined (y validamos que no sea undefined)
+      // Mapear opcionales (ejemplos)
+      name: decoded.user_metadata?.full_name,
+      roles: decoded.app_metadata?.roles,
     };
 
-    console.log("getUserFromToken - Mapped User object:", user); // <-- Log para depuración
+    // console.debug("getUserFromToken - Mapped User:", user);
     return user;
 
   } catch (error) {
-    // Handle various decoding errors (invalid token format, etc.)
-    console.error("Failed to decode or validate token:", error);
-    removeToken(); // Clear invalid token
+     // Manejar errores específicos de jwt-decode
+     if (error instanceof InvalidTokenError) {
+         console.error("Failed to decode token (Invalid):", error.message);
+     } else {
+         console.error("Failed to decode or validate token (Unknown Error):", error);
+     }
+    removeToken();
     return null;
   }
 };
+
 ```
 
 ## File: `lib\constants.ts`
