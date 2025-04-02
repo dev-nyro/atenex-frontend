@@ -23,7 +23,7 @@ export class ApiError extends Error {
 }
 
 // --- Core Request Function (Modificada para obtener token de Supabase) ---
-async function request<T>(
+export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {

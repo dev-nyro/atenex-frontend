@@ -1873,40 +1873,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-// import { supabase } from '@/lib/supabaseClient'; // Ya no se usa directamente
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook refactorizado
-import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error
+import { useAuth } from '@/lib/hooks/useAuth';
+import { AuthError } from '@supabase/supabase-js';
 
-// Esquema Zod (sin cambios, companyId sigue siendo opcional aquí)
+// --- Esquema Zod SIMPLIFICADO ---
+// Ya no necesitamos companyId aquí, el backend lo asignará.
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  companyId: z.string().uuid({ message: "Invalid Company ID format (UUID expected)" }).optional(),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-// Valor por defecto para Company ID (Desarrollo)
-const DEFAULT_DEV_COMPANY_ID = process.env.NEXT_PUBLIC_DEV_COMPANY_ID || '';
-
 export function RegisterForm() {
-  // --- CORRECCIÓN: Usar signUp del contexto useAuth ---
   const { signUp } = useAuth();
-  // -------------------------------------------------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false); // Para mostrar mensaje de confirmación
+  const [success, setSuccess] = useState<boolean>(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      // Pre-rellenar companyId en desarrollo si está disponible
-      companyId: process.env.NODE_ENV === 'development' && DEFAULT_DEV_COMPANY_ID ? DEFAULT_DEV_COMPANY_ID : '',
-    },
+    defaultValues: { name: '', email: '', password: '' }, // Sin companyId
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
@@ -1914,73 +1902,53 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
 
-    // --- Preparar metadata para user_metadata ---
-    // Incluir nombre y, si se proporciona, el companyId como referencia (signup_company_id_ref)
-    // Un trigger/función backend en Supabase DEBERÍA leer 'signup_company_id_ref' de user_metadata
-    // y copiarlo a app_metadata.company_id de forma segura.
+    // --- Preparar metadata SOLO con nombre ---
     const userMetaDataForSignUp: { [key: string]: any } = {};
     if (data.name) {
         userMetaDataForSignUp.full_name = data.name;
-    }
-    if (data.companyId) {
-        // ¡Importante! Esto solo sirve como referencia para el backend.
-        // NO otorga acceso basado en companyId directamente.
-        userMetaDataForSignUp.signup_company_id_ref = data.companyId;
-        console.warn(`RegisterForm: Sending companyId (${data.companyId}) in user_metadata.signup_company_id_ref. Ensure backend logic moves it to app_metadata.`);
     }
     // ------------------------------------------
 
     try {
       console.log("RegisterForm: Attempting Supabase signUp for:", data.email);
 
-      // Llamar a la función signUp del contexto
-      const { data: signUpData, error: signUpError } = await signUp({
+      const { error: signUpError } = await signUp({
         email: data.email,
         password: data.password,
         options: {
-          // Pasar metadata preparada a user_metadata
           data: userMetaDataForSignUp,
-          // Redirección para confirmación de email (si aplica)
           emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       });
 
-      // El hook useAuth ya maneja las notificaciones (toast)
       if (signUpError) {
-        // El hook ya mostró el toast, solo actualizamos el estado local de error
         setError(signUpError.message || 'Registration failed.');
-        setIsLoading(false); // Detener carga en error
+        setIsLoading(false);
         return;
       }
 
-      // Si no hubo error, asumimos éxito (requiere confirmación o no)
-      // El hook useAuth ya mostró el toast de éxito/confirmación
-      setSuccess(true); // Mostrar mensaje de éxito/revisar email en el formulario
+      setSuccess(true);
       setError(null);
-      // form.reset(); // Opcional: Limpiar formulario en éxito
+      // form.reset(); // Opcional
 
     } catch (err) {
-      // Capturar errores inesperados si el hook no los maneja completamente
       console.error("RegisterForm: Unexpected error during registration:", err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
-      // Asegurar que el toast de error se muestre (aunque el hook debería hacerlo)
-      // toast.error("Registration Failed", { description: error || 'An unexpected error occurred.' });
     } finally {
-      // Detener carga solo si no fue exitoso (para mantener el mensaje de éxito visible)
-      if (!success) setIsLoading(false);
+      if (!success) setIsLoading(false); // Solo detener si no fue éxito
     }
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {error && !success && ( // Mostrar error solo si no hay éxito
+      {error && !success && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Registration Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && ( // Mostrar mensaje de éxito/confirmación
+       {success && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
            <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" />
           <AlertTitle className="text-green-800 dark:text-green-200">Registration Submitted</AlertTitle>
@@ -1990,7 +1958,7 @@ export function RegisterForm() {
         </Alert>
       )}
 
-      {/* Campos del Formulario (deshabilitados en éxito o carga) */}
+      {/* Campos del Formulario */}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
         <Input id="name" type="text" placeholder="Your Name" {...form.register('name')} disabled={isLoading || success}/>
@@ -2006,28 +1974,12 @@ export function RegisterForm() {
         <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
         {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
       </div>
-       {/* Campo Company ID (opcional, principalmente para desarrollo/triggers) */}
-       <div className="space-y-1">
-         <Label htmlFor="companyId">Company ID (Optional)</Label>
-         <Input
-            id="companyId"
-            type="text"
-            placeholder="Enter Company UUID (if provided)"
-            {...form.register('companyId')}
-            disabled={isLoading || success}
-         />
-         {form.formState.errors.companyId && <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>}
-         <p className="text-xs text-muted-foreground pt-1">
-            Usually assigned automatically. Only fill if instructed.
-         </p>
-       </div>
 
-      {/* Botón de Envío */}
+      {/* --- CAMPO Company ID ELIMINADO --- */}
+
       <Button type="submit" className="w-full" disabled={isLoading || success}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
-
-      {/* Enlace a Login */}
       <div className="mt-4 text-center text-sm">
         Already have an account?{" "}
         <Link href="/login" className="underline text-primary hover:text-primary/80">
@@ -5320,6 +5272,26 @@ export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> 
     return request<DocumentStatusResponse[]>('/api/v1/ingest/documents/status');
 };
 
+// --- NUEVA FUNCIÓN: Ensure Company Association ---
+interface EnsureCompanyResponse {
+  message: string;
+  company_id?: string; // El ID que se asoció (opcional, pero útil)
+}
+/**
+ * Llama al endpoint del gateway para asegurar que el usuario autenticado
+ * tenga una compañía asociada en sus metadatos.
+ * Esta función DEBE llamarse con el token JWT del usuario.
+ */
+export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
+  console.log("Calling API to ensure company association for the current user...");
+  // No se envía body, el backend determina el company ID
+  return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', {
+      method: 'POST',
+      // No body needed if backend uses default or derives companyId
+  });
+};
+// --- FIN NUEVA FUNCIÓN ---
+
 // --- Type Mapping Helpers (sin cambios, ya parecen correctos) ---
 export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => { /* ... */ };
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ };
@@ -5391,12 +5363,13 @@ export const AUTH_TOKEN_KEY = "atenex_auth_token";
 // File: lib/hooks/useAuth.tsx
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; // Import usePathname
 import { supabase } from '@/lib/supabaseClient';
 import { User as AppUser } from '@/lib/auth/helpers'; // Nuestra interfaz User frontend
 import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpOptions } from '@supabase/supabase-js'; // Tipos de Supabase
 import { toast } from "sonner"; // Para notificaciones
+import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api'; // Renombrar ApiError para evitar colisión
 
 // --- Interfaz del Contexto de Autenticación ---
 interface AuthContextType {
@@ -5406,11 +5379,9 @@ interface AuthContextType {
   signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>;
   signUp: (options: SignUpOptions) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
   signOut: () => Promise<void>;
-  // login y signIn ya no son necesarios como funciones separadas
 }
 
 // --- Valor por defecto para el contexto ---
-// Usado si se intenta acceder fuera del Provider o antes de la inicialización
 const defaultAuthContextValue: AuthContextType = {
   user: null,
   session: null,
@@ -5432,29 +5403,15 @@ interface AuthProviderProps {
 const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
     if (!supabaseUser) return null;
 
-    // --- CORRECCIÓN: Extraer companyId y roles de app_metadata ---
-    // El README del Gateway especifica que company_id está en app_metadata
     const companyIdRaw = supabaseUser.app_metadata?.company_id;
     const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Asegurar que es string
-    const roles = supabaseUser.app_metadata?.roles as string[] | undefined; // Asumir que roles también está en app_metadata
-    // -----------------------------------------------------------
-
-    // --- Validación Opcional de companyId ---
-    // Descomenta esto si un usuario SIN companyId NO debe considerarse válido en el frontend
-    // if (!companyId) {
-    //     console.warn("AuthProvider: Supabase user is missing required 'company_id' in app_metadata. User considered invalid.", supabaseUser.id, supabaseUser.app_metadata);
-    //     // Podrías forzar un logout aquí o simplemente devolver null
-    //     // supabase.auth.signOut().catch(console.error); // Ejemplo: Forzar logout
-    //     return null; // Considerar usuario inválido
-    // }
-    // ----------------------------------------
+    const roles = supabaseUser.app_metadata?.roles as string[] | undefined;
 
     return {
         userId: supabaseUser.id,
         email: supabaseUser.email,
-        // Intentar obtener nombre de user_metadata (full_name o name)
         name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name,
-        companyId: companyId, // Usar el companyId extraído de app_metadata
+        companyId: companyId,
         roles: roles,
     };
 };
@@ -5466,6 +5423,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true); // Empieza cargando
   const router = useRouter();
   const pathname = usePathname(); // Obtener la ruta actual
+  const ensureCompanyCallPending = useRef(false);
+
+  // --- Función signOut ---
+  const signOut = useCallback(async () => {
+    setIsLoading(true); // Opcional: mostrar carga durante logout
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("AuthProvider: signOut error:", error);
+        toast.error("Logout Failed", { description: error.message || "Could not sign out." });
+      } else {
+        console.log("AuthProvider: signOut successful (state update via listener).");
+      }
+    } catch (error) {
+       console.error("AuthProvider: Unexpected signOut error:", error);
+       toast.error("Logout Failed", { description: "An unexpected error occurred during sign out." });
+    } finally {
+        setIsLoading(false);
+    }
+  }, []);
 
   // --- Efecto para manejar cambios de autenticación ---
   useEffect(() => {
@@ -5473,10 +5450,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true); // Marcar como cargando al inicio del efecto
 
     // 1. Intenta obtener la sesión inicial
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
         console.log("AuthProvider: Initial session fetched.", initialSession ? `User: ${initialSession.user.id}` : "No initial session");
         setSession(initialSession);
-        setUser(mapSupabaseUserToAppUser(initialSession?.user));
+        const mappedUser = mapSupabaseUserToAppUser(initialSession?.user);
+        setUser(mappedUser);
+
+        // --- NUEVO: Chequeo inicial de companyId ---
+        if (initialSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
+            console.log("AuthProvider: Initial session lacks companyId. Triggering ensureCompanyAssociation.");
+            ensureCompanyCallPending.current = true; // Marcar que la llamada está en curso
+            try {
+                await ensureCompanyAssociation();
+                console.log("AuthProvider: ensureCompanyAssociation successful. Refreshing session...");
+                const { error: refreshError } = await supabase.auth.refreshSession();
+                if (refreshError) {
+                     console.error("AuthProvider: Error refreshing session after company association:", refreshError);
+                     toast.error("Session Refresh Failed", { description: "Could not refresh session after company setup. Please log in again."});
+                     await signOut();
+                } else {
+                    console.log("AuthProvider: Session refreshed. onAuthStateChange should update state soon.");
+                }
+            } catch (error) {
+                 console.error("AuthProvider: ensureCompanyAssociation failed during initial check:", error);
+                 toast.error("Company Setup Failed", { description: error instanceof EnsureCompanyApiError ? error.message : "Could not associate company." });
+            } finally {
+                 ensureCompanyCallPending.current = false; // Marcar que la llamada terminó
+            }
+        }
+
         setIsLoading(false); // Terminar carga después de obtener sesión inicial
     }).catch(error => {
         console.error("AuthProvider: Error fetching initial session:", error);
@@ -5491,35 +5493,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const mappedUser = mapSupabaseUserToAppUser(newSession?.user);
         setUser(mappedUser);
 
-        // Si el usuario ya no es válido (ej. falta companyId después de mapear), forzar logout
-        // if (newSession && !mappedUser) {
-        //    console.warn("AuthProvider: User became invalid after auth change, forcing sign out.");
-        //    await signOut();
-        // }
-
-        // Manejar redirecciones post-evento si es necesario
-        if (event === 'SIGNED_IN') {
-            // No redirigir automáticamente aquí, dejar que AppLayout maneje la protección
-            // o que la página específica (ej. login) redirija.
-            // router.push('/chat'); // Evitar redirección automática general
-        } else if (event === 'SIGNED_OUT') {
-             // Redirigir a la página de inicio o login solo si estamos en una ruta protegida
-             if (pathname?.startsWith('/chat') || pathname?.startsWith('/knowledge') || pathname?.startsWith('/settings')) {
-                 router.push('/'); // O '/login' si prefieres
+        // --- NUEVO: Chequeo de companyId en SIGNED_IN ---
+        if (event === 'SIGNED_IN' && newSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
+             console.log("AuthProvider: SIGNED_IN event lacks companyId. Triggering ensureCompanyAssociation.");
+             ensureCompanyCallPending.current = true; // Marcar llamada en curso
+             try {
+                await ensureCompanyAssociation();
+                console.log("AuthProvider: ensureCompanyAssociation successful after SIGNED_IN. Refreshing session...");
+                const { error: refreshError } = await supabase.auth.refreshSession();
+                 if (refreshError) {
+                      console.error("AuthProvider: Error refreshing session after company association (SIGNED_IN):", refreshError);
+                      toast.error("Session Refresh Failed", { description: "Could not refresh session after company setup. Please log in again."});
+                      await signOut();
+                 } else {
+                     console.log("AuthProvider: Session refreshed after SIGNED_IN association.");
+                 }
+             } catch (error) {
+                  console.error("AuthProvider: ensureCompanyAssociation failed after SIGNED_IN:", error);
+                  toast.error("Company Setup Failed", { description: error instanceof EnsureCompanyApiError ? error.message : "Could not associate company." });
+             } finally {
+                  ensureCompanyCallPending.current = false; // Marcar llamada terminada
              }
         }
 
-        // Asegurar que isLoading sea false después del primer evento recibido
+        if (event === 'SIGNED_OUT') {
+             if (pathname?.startsWith('/chat') || pathname?.startsWith('/knowledge') || pathname?.startsWith('/settings')) {
+                 router.push('/');
+             }
+        }
+
         if (isLoading) setIsLoading(false);
       }
     );
 
-    // Limpieza del listener al desmontar
     return () => {
       console.log("AuthProvider: Cleaning up auth state listener.");
       authListener?.subscription.unsubscribe();
     };
-  }, [isLoading, router, pathname]); // Añadir pathname a dependencias
+  }, [isLoading, router, pathname, signOut]);
 
   // --- Función signInWithPassword ---
   const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
@@ -5529,14 +5540,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) {
         console.error("AuthProvider: signInWithPassword error:", error);
         toast.error("Login Failed", { description: error.message || "Invalid credentials." });
-        throw error; // Re-lanzar para que el form lo maneje
+        throw error;
       }
-      // El onAuthStateChange se encargará de actualizar el estado y redirigir si es necesario
       console.log("AuthProvider: signInWithPassword successful (state update via listener).");
-      // No necesitas redirigir aquí, AppLayout o la página de origen lo harán.
-      // router.push('/chat');
-    } catch (error) {
-       // El error ya fue notificado, solo asegurar que isLoading se detenga
     } finally {
       setIsLoading(false); // Detener carga
     }
@@ -5546,55 +5552,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signUp = useCallback(async (options: SignUpOptions) => {
     setIsLoading(true); // Opcional: mostrar carga durante el registro
     try {
-        // Nota: app_metadata NO se puede pasar aquí directamente desde el cliente.
-        // Debe configurarse mediante triggers/funciones en Supabase.
         const { data, error } = await supabase.auth.signUp(options);
 
         if (error) {
             console.error("AuthProvider: signUp error:", error);
             toast.error("Registration Failed", { description: error.message || "Could not create account." });
         } else if (data.user && data.user.identities?.length === 0) {
-            // Caso común: requiere confirmación por email
             toast.success("Registration Submitted", { description: `Please check your email (${options.email}) to confirm your account.` });
             console.log("AuthProvider: signUp successful, email confirmation required.");
         } else if (data.user) {
-            // Caso menos común: usuario creado y sesión iniciada (ej. email/pass deshabilitado)
              toast.success("Registration Successful", { description: "Account created successfully." });
              console.log("AuthProvider: signUp successful, user created and potentially signed in.");
-             // El onAuthStateChange manejará la actualización del estado si hay sesión
         } else {
              toast.warning("Registration Status Unknown", { description: "Account may have been created, but status is unclear. Please try logging in or checking your email." });
              console.warn("AuthProvider: signUp completed with unexpected response data:", data);
         }
-        return { data, error }; // Devolver resultado para el form
+        return { data, error };
     } catch (error) {
         console.error("AuthProvider: Unexpected signUp error:", error);
         toast.error("Registration Failed", { description: "An unexpected error occurred." });
         return { data: { user: null, session: null }, error: error as AuthError };
     } finally {
         setIsLoading(false); // Detener carga
-    }
-  }, []);
-
-  // --- Función signOut ---
-  const signOut = useCallback(async () => {
-    setIsLoading(true); // Opcional: mostrar carga durante logout
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("AuthProvider: signOut error:", error);
-        toast.error("Logout Failed", { description: error.message || "Could not sign out." });
-      } else {
-        console.log("AuthProvider: signOut successful (state update via listener).");
-        // El onAuthStateChange limpiará user/session y redirigirá si es necesario
-        // router.push('/'); // Redirección manejada por listener o AppLayout
-      }
-    } catch (error) {
-       // Manejar errores inesperados si los hubiera
-       console.error("AuthProvider: Unexpected signOut error:", error);
-       toast.error("Logout Failed", { description: "An unexpected error occurred during sign out." });
-    } finally {
-        setIsLoading(false);
     }
   }, []);
 
@@ -5608,7 +5587,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut,
   };
 
-  // Renderizar Provider con el valor calculado
   return (
     <AuthContext.Provider value={providerValue}>
       {children}
@@ -5619,11 +5597,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 // --- Hook para consumir el contexto ---
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  // Comprobación para asegurar que se usa dentro del Provider
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  // Advertencia si se usa el valor por defecto (podría indicar uso fuera o antes de inicializar)
   if (context === defaultAuthContextValue && typeof window !== 'undefined') {
      console.warn("useAuth hook used possibly outside of AuthProvider or before initialization.");
   }
