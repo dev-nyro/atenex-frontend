@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Phone, Linkedin, MessageCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils'; // Import cn for conditional classes
+import { toast } from 'sonner';
 
 export default function ContactPage() {
   const router = useRouter();
