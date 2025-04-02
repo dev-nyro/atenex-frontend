@@ -1,17 +1,23 @@
 // File: app/page.tsx
 "use client";
 
-import React from 'react'; // Quitar useState si no se usa
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
-import { useAuth } from '@/lib/hooks/useAuth';
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // <-- IMPORTAR
+import { useAuth } from '@/lib/hooks/useAuth'; // Hook actualizado
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 import { cn } from '@/lib/utils';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token } = useAuth(); // O usa `session` si lo prefieres: const { session } = useAuth();
+  // --- CORRECCIÓN: Usar 'session' en lugar de 'token' ---
+  // 'session' será null si no hay sesión activa, o un objeto si la hay.
+  const { session, user } = useAuth(); // Obtener 'session' y 'user' del hook
+  // -----------------------------------------------------
+
+  // Determinar si el usuario está autenticado basado en la sesión
+  const isAuthenticated = !!session; // Es true si session no es null
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -23,7 +29,8 @@ export default function HomePage() {
             <LinkButton href="/">Home</LinkButton>
             <LinkButton href="/about">About</LinkButton>
             <LinkButton href="/contact">Contact</LinkButton>
-            {token ? ( // O `session`
+            {/* --- CORRECCIÓN: Usar 'isAuthenticated' --- */}
+            {isAuthenticated ? (
               <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
                 Go to App
               </Button>
@@ -38,6 +45,7 @@ export default function HomePage() {
                 Login
               </Button>
             )}
+            {/* ------------------------------------- */}
           </nav>
         </div>
       </header>
@@ -51,16 +59,18 @@ export default function HomePage() {
           <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
             Ask questions in natural language and get instant answers based on your organization's collective knowledge.
           </p>
+          {/* --- CORRECCIÓN: Usar 'isAuthenticated' --- */}
           <Button
             size="lg"
-            onClick={() => token ? router.push('/chat') : router.push('/register')} // O `session`
+            onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
             className={cn(
                  "transition-colors duration-150",
                  "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
              )}
           >
-            {token ? 'Go to Chat' : 'Get Started'} {/* O `session` */}
+            {isAuthenticated ? 'Go to Chat' : 'Get Started'}
           </Button>
+          {/* ------------------------------------- */}
         </section>
 
         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -68,10 +78,8 @@ export default function HomePage() {
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
           <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
-        {/* --- AÑADIR EL HANDLER AQUÍ --- */}
-        {/* Este componente escuchará los cambios de auth y manejará el hash de confirmación */}
+        {/* Handler para confirmación de email (se mantiene igual) */}
         <EmailConfirmationHandler />
-        {/* ------------------------------ */}
       </main>
 
       {/* Footer */}
@@ -84,7 +92,7 @@ export default function HomePage() {
   );
 }
 
-// Reusable Link Button Component
+// Reusable Link Button Component (sin cambios)
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   const router = useRouter();
   return (
@@ -98,7 +106,7 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-// Reusable Feature Card Component
+// Reusable Feature Card Component (sin cambios)
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border">
