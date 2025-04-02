@@ -1,9 +1,9 @@
 // File: components/chat/retrieved-documents-panel.tsx
-// File: components/chat/retrieved-documents-panel.tsx
       
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
+import { FileText, AlertCircle, Download, Loader2 } from 'lucide-react'; // Import Download icon
 import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ interface RetrievedDocumentsPanelProps {
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
-    const [open, setOpen] = React.useState(false)
+    const [open, setOpen] = useState(false)
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [docContent, setDocContent] = useState<string | null>(null); // State to store document content
     const [viewingError, setViewingError] = useState<string | null>(null); // Error when viewing doc
