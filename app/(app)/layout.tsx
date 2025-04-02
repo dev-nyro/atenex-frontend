@@ -10,6 +10,9 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react'; // For loading spinner
+// --- CORRECTION: Import toast from sonner ---
+import { toast } from 'sonner';
+// ------------------------------------------
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Get auth state from the hook
@@ -51,10 +54,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         // This condition checks if we have a session, but the user mapping failed OR
         // the user is mapped but explicitly lacks a companyId AFTER the initial auth flow.
         console.error(`AppLayout: Session exists but user data is incomplete (User: ${!!user}, CompanyID: ${user?.companyId}). Forcing logout.`);
+        // --- CORRECTION: 'toast' is now defined via import ---
         toast.error("Incomplete Account Setup", {
             description: "Your account setup seems incomplete (missing company association). Please log in again.",
             duration: 7000,
         });
+        // ----------------------------------------------------
         signOut(); // Force sign out
         // No need to redirect here, signOut will trigger an auth state change,
         // leading to the !session condition above in the next effect run.

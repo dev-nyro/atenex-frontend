@@ -438,7 +438,9 @@ ehthumbs_vista.db
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+// --- CORRECTION: Import usePathname ---
+import { useParams, useRouter, usePathname } from 'next/navigation';
+// ---------------------------------------
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatInput } from '@/components/chat/chat-input';
@@ -471,6 +473,9 @@ const welcomeMessage: Message = {
 export default function ChatPage() {
     const params = useParams();
     const router = useRouter();
+    // --- CORRECTION: Instantiate usePathname ---
+    const pathname = usePathname();
+    // ------------------------------------------
     const { session, user, isLoading: isAuthLoading, signOut } = useAuth(); // Get auth state
 
     // Extract chatId from dynamic route parameters
@@ -697,10 +702,11 @@ export default function ChatPage() {
     // Navigate to start a new chat
     const handleNewChat = () => {
         console.log("ChatPage: Starting new chat.");
-        // Check if already on the new chat page to avoid redundant navigation
+        // --- CORRECTION: Use the 'pathname' variable from the hook ---
         if (pathname !== '/chat') {
              router.push('/chat');
         } else {
+        // ------------------------------------------------------------
             // If already on /chat, just reset the state manually
             setChatId(undefined);
             setMessages([welcomeMessage]);
