@@ -106,6 +106,6 @@ def generate_codebase_markdown(base_path: str = ".", output_file: str = "full_co
     except Exception as e:
         print(f"❌ Error writing output file: {e}")
 
-# If the script is run directly
+# If the script is run directly 
 if __name__ == "__main__":
     generate_codebase_markdown()

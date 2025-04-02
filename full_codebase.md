@@ -885,6 +885,9 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react'; // For loading spinner
+// --- CORRECTION: Import toast from sonner ---
+import { toast } from 'sonner';
+// ------------------------------------------
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Get auth state from the hook
@@ -926,10 +929,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         // This condition checks if we have a session, but the user mapping failed OR
         // the user is mapped but explicitly lacks a companyId AFTER the initial auth flow.
         console.error(`AppLayout: Session exists but user data is incomplete (User: ${!!user}, CompanyID: ${user?.companyId}). Forcing logout.`);
+        // --- CORRECTION: 'toast' is now defined via import ---
         toast.error("Incomplete Account Setup", {
             description: "Your account setup seems incomplete (missing company association). Please log in again.",
             duration: 7000,
         });
+        // ----------------------------------------------------
         signOut(); // Force sign out
         // No need to redirect here, signOut will trigger an auth state change,
         // leading to the !session condition above in the next effect run.
@@ -1295,6 +1300,7 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Phone, Linkedin, MessageCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils'; // Import cn for conditional classes
+import { toast } from 'sonner';
 
 export default function ContactPage() {
   const router = useRouter();
@@ -1693,6 +1699,7 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // Handles email confirm links
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail } from 'lucide-react'; // Added icons
+import Link from 'next/link'; // Import the Link component
 
 export default function HomePage() {
   const router = useRouter();
@@ -2101,13 +2108,14 @@ import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { AuthError } from '@supabase/supabase-js'; // Import Supabase error type
+import { cn } from '@/lib/utils'; // Import cn utility
 
 // Zod schema for registration form validation
 // REMOVED companyId - it will be handled by the ensure-company flow after login
@@ -2295,6 +2303,7 @@ export function RegisterForm() {
     </form>
   );
 }
+
 ```
 
 ## File: `components\chat\chat-history.tsx`
@@ -5784,7 +5793,8 @@ import React, {
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User as AppUser } from '@/lib/auth/helpers'; // Use our defined frontend User type
-import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
+// Import AuthError directly, not just as a type
+import { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 import { toast } from "sonner";
 import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api'; // Import API function and specific error type
 
@@ -5810,6 +5820,7 @@ const defaultAuthContextValue: AuthContextType = {
     },
     signUp: async () => {
         console.error("AuthProvider: signUp called outside of AuthProvider");
+        // Use AuthError constructor directly
         return { data: { user: null, session: null }, error: new AuthError("Auth context not initialized") };
     },
     signOut: async () => {
@@ -6043,9 +6054,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log("AuthProvider: Attempting sign up...");
         setIsLoading(true);
         try {
-            // Ensure email and password are provided
-            if (!params.email || !params.password) {
-                throw new AuthError("Email and password are required for sign up.");
+            // Ensure password is provided and either email or phone is provided
+            const hasEmail = 'email' in params && params.email;
+            const hasPhone = 'phone' in params && params.phone;
+            if (!params.password || (!hasEmail && !hasPhone)) {
+                throw new AuthError("Password and either Email or Phone are required for sign up.");
             }
 
             const { data, error } = await supabase.auth.signUp(params); // Pass params directly
@@ -6062,8 +6075,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } else if (data.user && !data.session) {
                  // User created but requires confirmation (common case)
                  console.log("AuthProvider: Sign up successful, confirmation required.");
+                 // Safely determine which contact method was used for the message
+                 const contactMethod = 'email' in params && params.email
+                    ? `email (${params.email})`
+                    : ('phone' in params && params.phone ? 'phone' : 'provided contact method');
                  toast.success("Registration Submitted", {
-                    description: `Please check your email (${params.email}) to confirm your account.`,
+                    description: `Please check your ${contactMethod} to confirm your account.`,
                     duration: 10000, // Longer duration for this message
                  });
             } else {
@@ -6081,6 +6098,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.error("Registration Failed", { description: errorMsg });
             setIsLoading(false);
             // Return an error structure consistent with Supabase response
+            // Use AuthError constructor directly
             return { data: { user: null, session: null }, error: error instanceof AuthError ? error : new AuthError(errorMsg) };
         }
     }, []);
@@ -6119,6 +6137,7 @@ export const useAuth = (): AuthContextType => {
     // }
     return context;
 };
+
 ```
 
 ## File: `lib\supabaseClient.ts`
