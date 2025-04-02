@@ -350,6 +350,5 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
     role: apiMessage.role,
     content: apiMessage.content,
     sources: mapApiSourcesToFrontend(apiMessage.sources),
-    created_at: apiMessage.created_at,
     isError: false,
 });
