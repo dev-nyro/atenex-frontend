@@ -4,14 +4,13 @@
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
-import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
+// --- CORRECCIÓN: Importar iconos en una sola línea ---
 import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
-import { RetrievedDoc } from '@/lib/api';
+// ---------------------------------------------------
+import { RetrievedDoc } from '@/lib/api'; // Mantener esta importación
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-// (*) CORRECT IMPORT PATH (Ensure components/ui/dialog.tsx exists after running `npx shadcn-ui@latest add dialog`)
 import {
     Dialog,
     DialogContent,
@@ -21,7 +20,7 @@ import {
     DialogTrigger,
     DialogFooter,
     DialogClose
-} from "@/components/ui/dialog"; // <--- This path causes the error if the file is missing
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface RetrievedDocumentsPanelProps {
@@ -40,19 +39,16 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     };
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
+        // TODO: Implementar llamada real al backend si existe un endpoint de descarga
         const message = `Download requested for: ${doc.file_name || doc.id}`;
         console.log(message);
         toast.info("Download Not Implemented", {
              description: `Backend endpoint for downloading '${doc.file_name || doc.id}' is not yet available.`,
-             action: {
-                label: "Close",
-                onClick: () => {},
-             },
+             action: { label: "Close", onClick: () => {} },
         });
     };
 
   return (
-    // Wrap the entire panel content potentially triggering the dialog
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
@@ -79,11 +75,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     </div>
                 )}
                 {documents.map((doc, index) => (
-                    // Use DialogTrigger around the Card to make it clickable
                     <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                          <Card
                             className="cursor-pointer hover:shadow-md transition-shadow duration-150"
-                            onClick={() => handleViewDocument(doc)} // Set selected doc on click
+                            onClick={() => handleViewDocument(doc)}
                             title={`Click to view details for ${doc.file_name || 'document'}`}
                         >
                             <CardContent className="p-3 space-y-1 text-sm">
@@ -111,7 +106,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Dialog Content - Rendered conditionally when selectedDoc is not null */}
             {selectedDoc && (
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
@@ -123,7 +117,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3 text-sm">
-                        {/* Details content */}
                         <div className="flex justify-between">
                             <span className="font-medium text-muted-foreground">Document ID:</span>
                             <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
@@ -165,6 +158,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </DialogContent>
             )}
         </div>
-    </Dialog> // Close the main Dialog wrapper
+    </Dialog>
   );
 }

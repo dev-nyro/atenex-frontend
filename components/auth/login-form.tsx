@@ -10,56 +10,56 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { ApiError } from '@/lib/api';
-import { createClient } from '@supabase/supabase-js';
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth
+import { ApiError } from '@/lib/api'; // ApiError sigue siendo útil para errores generales
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }), // Updated min to 6 for better security
+  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login } = useAuth();
+  const { signIn } = useAuth(); // <-- Usar signIn del contexto
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    setError(null); // Clear previous errors
+    setError(null);
     try {
-      console.log("Attempting login with:", data.email);
-      const token = await loginUser(data);
-      console.log("Login successful, received token.");
-      setAuthToken(token); // Update auth state and redirect
-      // Redirect happens inside useAuth's login function
+      console.log("LoginForm: Calling signIn with:", data.email);
+      await signIn(data); // <-- Llamar a la función signIn del hook
+      // La redirección ocurrirá dentro del hook si tiene éxito
+      // No necesitas hacer nada más aquí en caso de éxito
+      console.log("LoginForm: signIn initiated successfully.");
     } catch (err) {
-      console.error("Login failed:", err);
+      // El hook signIn debería lanzar un error en caso de fallo
+      console.error("LoginForm: signIn failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
-      if (err instanceof ApiError) {
-        errorMessage = err.message || errorMessage;
-      } else if (err instanceof Error) {
-        errorMessage = err.message || errorMessage;
-      }
+       // Usar ApiError para mostrar el mensaje específico si viene del hook
+       if (err instanceof ApiError) {
+         errorMessage = err.message || errorMessage;
+         if (err.status === 400) { // Supabase suele usar 400 para credenciales inválidas
+             errorMessage = "Invalid email or password.";
+         }
+       } else if (err instanceof Error) {
+         errorMessage = err.message;
+       }
       setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Detener carga solo en caso de error
     }
+    // No poner setIsLoading(false) aquí, el estado de carga se maneja en el hook/página
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {/* *** MEJORADO: Mostrar error de forma más prominente *** */}
       {error && (
         <Alert variant="destructive" role="alert">
           <AlertCircle className="h-4 w-4" />
@@ -73,15 +73,14 @@ export function LoginForm() {
           id="email"
           type="email"
           placeholder="name@example.com"
-          autoComplete="email" // Added autocomplete
+          autoComplete="email"
           required
-          disabled={isLoading} // Disable input while loading
+          disabled={isLoading}
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
-          aria-describedby={form.formState.errors.email ? 'email-error' : undefined}
         />
         {form.formState.errors.email && (
-          <p id="email-error" className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
         )}
       </div>
       <div className="space-y-1">
@@ -89,15 +88,14 @@ export function LoginForm() {
         <Input
           id="password"
           type="password"
-          autoComplete="current-password" // Added autocomplete
+          autoComplete="current-password"
           required
-          disabled={isLoading} // Disable input while loading
+          disabled={isLoading}
           {...form.register('password')}
           aria-invalid={form.formState.errors.password ? 'true' : 'false'}
-          aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
         />
         {form.formState.errors.password && (
-          <p id="password-error" className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
@@ -105,7 +103,7 @@ export function LoginForm() {
       </Button>
        <div className="mt-4 text-center text-sm">
          Don't have an account?{" "}
-         <Link href="/register" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+         <Link href="/register" className="underline text-primary hover:text-primary/80">
            Register
          </Link>
        </div>

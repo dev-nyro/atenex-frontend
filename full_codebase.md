@@ -81,6 +81,8 @@ atenex-frontend/
 ├── next.config.mjs
 ├── package.json
 ├── postcss.config.js
+├── public
+│   └── icons
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -429,7 +431,7 @@ ehthumbs_vista.db
 .history/
 ```
 
-## File: `app/(app)/chat/[[...chatId]]/page.tsx`
+## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx
 "use client";
@@ -475,7 +477,9 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
+  const [isSending, setIsSending] = useState(false); // Renamed from isLoading for clarity
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   // Ref to track if the current URL's chatId has already been fetched
@@ -483,25 +487,81 @@ export default function ChatPage() {
 
   // Update chatId state if the param changes (e.g., navigation)
   useEffect(() => {
-    // Reset state for new/different chat
-    setMessages(initialMessages);
-    setRetrievedDocs([]);
-    setIsLoading(false); // Ensure loading is reset
+    setChatId(chatIdParam);
+  }, [chatIdParam]);
 
-    if (chatId) {
-      console.log(`Loading history for chat: ${chatId}`);
-      // --- TODO: Fetch actual messages ---
-      // .catch(err => {
-      //     // (+) Adaptar toast si se usa aquí
-      //     toast.error("Failed to load chat history", { description: err.message });
-      //  })
-      setMessages([
-           { id: 'initial-1', role: 'assistant', content: `Welcome back to chat ${chatId}. Ask me anything!` }
-      ]);
-    } else {
-      setMessages(initialMessages);
+  // Load chat history from API based on chatId
+  useEffect(() => {
+    // Only fetch if:
+    // 1. User is logged in (token exists)
+    // 2. A chatId is present in the state
+    // 3. We haven't already fetched for this specific chatId
+    if (token && chatId && fetchedChatIdRef.current !== chatId) {
+      console.log(`ChatPage: Fetching history for chat ID: ${chatId}`);
+      setIsLoadingHistory(true);
+      setHistoryError(null);
+      fetchedChatIdRef.current = chatId; // Mark this ID as being fetched
+
+      getChatMessages(chatId)
+        .then(apiMessages => {
+            // Sort messages by creation time ascending (oldest first)
+           apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+           const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
+
+           if (mappedMessages.length > 0) {
+                setMessages(mappedMessages);
+                console.log(`ChatPage: Loaded ${mappedMessages.length} messages for chat ${chatId}.`);
+           } else {
+                // Chat exists but has no messages (or API returned empty)
+                setMessages([welcomeMessage]); // Start with welcome message
+                console.log(`ChatPage: Chat ${chatId} has no messages. Displaying welcome message.`);
+           }
+        })
+        .catch(error => {
+          console.error(`ChatPage: Failed to load chat history for ${chatId}:`, error);
+          let message = "Error loading chat history.";
+          if (error instanceof ApiError) {
+              message = error.message || message;
+              if (error.status === 404) {
+                  message = "Chat not found or you don't have access.";
+                  // Redirect to base chat page if not found
+                  toast.error("Chat Not Found", { description: message });
+                  router.replace('/chat');
+                  return; // Stop further processing in this effect
+              } else if (error.status === 401) {
+                   message = "Authentication error. Please log in again.";
+                   // Optionally trigger logout or redirect to login
+                   router.push('/login'); // Example redirect
+              }
+          } else if (error instanceof Error) {
+              message = error.message;
+          }
+          setHistoryError(message);
+          setMessages([welcomeMessage]); // Show welcome message on error
+          toast.error("Failed to Load Chat", { description: message });
+        })
+        .finally(() => {
+          setIsLoadingHistory(false);
+        });
+
+    } else if (!chatId) {
+      // Reset for the '/chat' page (new chat state)
+      console.log("ChatPage: No chatId, preparing for new chat.");
+      setMessages([welcomeMessage]);
+      setRetrievedDocs([]);
+      setIsLoadingHistory(false);
+      setHistoryError(null);
+      fetchedChatIdRef.current = undefined; // Reset fetch flag
+    } else if (!token) {
+         console.log("ChatPage: User not authenticated, cannot load history.");
+         setIsLoadingHistory(false);
+         setHistoryError("Please log in to view chat history.");
+         setMessages([welcomeMessage]); // Show welcome message
+         fetchedChatIdRef.current = undefined;
     }
-  }, [chatId]);
+
+  // Depend on chatId (state) and token
+  }, [chatId, token, router]); // Add router to dependencies
 
   // Scroll to bottom when messages change or loading starts/stops
   useEffect(() => {
@@ -606,8 +666,7 @@ export default function ChatPage() {
     } finally {
       setIsSending(false);
     }
-  // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
-  }, [isLoading, isPanelOpen]);
+  }, [isSending, chatId, router, token, isPanelOpen]); // Include dependencies
 
   const handlePanelToggle = () => {
         setIsPanelOpen(!isPanelOpen);
@@ -699,7 +758,7 @@ export default function ChatPage() {
 }
 ```
 
-## File: `app/(app)/knowledge/page.tsx`
+## File: `app\(app)\knowledge\page.tsx`
 ```tsx
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
@@ -742,7 +801,7 @@ export default function KnowledgePage() {
 }
 ```
 
-## File: `app/(app)/layout.tsx`
+## File: `app\(app)\layout.tsx`
 ```tsx
 // File: app/(app)/layout.tsx
 "use client";
@@ -831,7 +890,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-## File: `app/(app)/settings/page.tsx`
+## File: `app\(app)\settings\page.tsx`
 ```tsx
 // app/(app)/settings/page.tsx
 "use client";
@@ -919,7 +978,7 @@ export default function SettingsPage() {
 }
 ```
 
-## File: `app/(auth)/layout.tsx`
+## File: `app\(auth)\layout.tsx`
 ```tsx
 import React from 'react';
 import Image from 'next/image';
@@ -943,7 +1002,7 @@ export default function AuthLayout({
 }
 ```
 
-## File: `app/(auth)/login/page.tsx`
+## File: `app\(auth)\login\page.tsx`
 ```tsx
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -963,7 +1022,7 @@ export default function LoginPage() {
 }
 ```
 
-## File: `app/(auth)/register/page.tsx`
+## File: `app\(auth)\register\page.tsx`
 ```tsx
 import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -983,7 +1042,7 @@ export default function RegisterPage() {
 }
 ```
 
-## File: `app/about/page.tsx`
+## File: `app\about\page.tsx`
 ```tsx
 // app/about/page.tsx
 "use client"; // Add this line
@@ -1108,7 +1167,7 @@ export default function AboutPage() {
 }
 ```
 
-## File: `app/contact/page.tsx`
+## File: `app\contact\page.tsx`
 ```tsx
 // app/contact/page.tsx
 "use client"; // Add this line
@@ -1216,7 +1275,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app/globals.css`
+## File: `app\globals.css`
 ```css
 /* File: atenex-frontend/app/globals.css */
 
@@ -1360,7 +1419,7 @@ export default function ContactPage() {
 }
 ```
 
-## File: `app/layout.tsx`
+## File: `app\layout.tsx`
 ```tsx
 // File: app/layout.tsx
 import type { Metadata } from "next";
@@ -1369,7 +1428,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/hooks/useAuth";
-// (+) DESCOMENTAR ESTA LÍNEA:
+// (*) Ensure this import points to sonner's Toaster
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -1400,8 +1459,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             {children}
-            {/* (+) Asegúrate de que esta línea esté activa y use el Toaster importado */}
-            <Toaster />
+            {/* (*) Ensure this Toaster component is rendered */}
+            <Toaster richColors position="top-right" /> {/* Added richColors and position */}
           </ThemeProvider>
         </AuthProvider>
       </body>
@@ -1410,7 +1469,7 @@ export default function RootLayout({
 }
 ```
 
-## File: `app/page.tsx`
+## File: `app\page.tsx`
 ```tsx
 // File: app/page.tsx
 "use client";
@@ -1421,6 +1480,7 @@ import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
+import { cn } from '@/lib/utils'; // Import cn for conditional classes
 
 export default function HomePage() {
   const router = useRouter();
@@ -1430,7 +1490,7 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4">
+        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6"> {/* Adjusted padding */}
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
           <nav className="flex items-center space-x-2 sm:space-x-4"> {/* Reduced base spacing */}
             <LinkButton href="/">Home</LinkButton>
@@ -1478,19 +1538,19 @@ export default function HomePage() {
           </Button>
         </section>
 
-        <section className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* Feature Cards - replace with actual feature descriptions */}
-          <FeatureCard title="Intelligent Search" description="Find the information you need quickly and easily using natural language queries." />
-          <FeatureCard title="Centralized Knowledge" description="Access all your organization's collective knowledge in one place, eliminating information silos." />
-          <FeatureCard title="Improved Productivity" description="Empower your team to make better decisions with faster access to relevant insights." />
+        <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Feature Cards */}
+          <FeatureCard title="Intelligent Search" description="Find information quickly using natural language queries." />
+          <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
+          <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
-           <EmailConfirmationHandler />
+         <EmailConfirmationHandler />
       </main>
 
       {/* Footer */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground">
-          © {new Date().getFullYear()} Atenex. All rights reserved.
+        <div className="container text-center text-muted-foreground text-sm"> {/* Adjusted size */}
+          © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
         </div>
       </footer>
     </div>
@@ -1515,7 +1575,8 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-function FeatureCard({ title, description }: { title: string }) {
+// (+) ACTUALIZAR ESTA DEFINICIÓN PARA ACEPTAR 'description'
+function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border"> {/* Added border */}
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
@@ -1525,7 +1586,7 @@ function FeatureCard({ title, description }: { title: string }) {
 }
 ```
 
-## File: `components/auth/email-confirmation-handler.tsx`
+## File: `components\auth\email-confirmation-handler.tsx`
 ```tsx
 // File: components/auth/email-confirmation-handler.tsx
 "use client";
@@ -1615,7 +1676,7 @@ export default function EmailConfirmationHandler() {
 }
 ```
 
-## File: `components/auth/login-form.tsx`
+## File: `components\auth\login-form.tsx`
 ```tsx
 "use client";
 
@@ -1658,30 +1719,10 @@ export function LoginForm() {
     setError(null); // Clear previous errors
     try {
       console.log("Attempting login with:", data.email);
-
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
-        setIsLoading(false);
-        return;
-      }
-
-      const supabaseClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword(data);
-
-      if (authError) {
-        console.error("Supabase login failed:", authError);
-        setError(authError.message || 'Login failed. Please check your credentials.');
-      } else if (authResponse.session) {
-        console.log("Supabase login successful:", authResponse);
-        login(authResponse.session);
-      } else {
-        console.error("Supabase login: No session returned");
-        setError('Login failed. Please check your credentials.');
-      }
+      const token = await loginUser(data);
+      console.log("Login successful, received token.");
+      setAuthToken(token); // Update auth state and redirect
+      // Redirect happens inside useAuth's login function
     } catch (err) {
       console.error("Login failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
@@ -1742,18 +1783,18 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Login'}
       </Button>
-      <div className="mt-4 text-center text-sm">
-        Don't have an account?{" "}
-        <Link href="/register" className="underline text-primary hover:text-primary/80">
-          Register
-        </Link>
-      </div>
+       <div className="mt-4 text-center text-sm">
+         Don't have an account?{" "}
+         <Link href="/register" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+           Register
+         </Link>
+       </div>
     </form>
   );
 }
 ```
 
-## File: `components/auth/register-form.tsx`
+## File: `components\auth\register-form.tsx`
 ```tsx
 // File: components/auth/register-form.tsx
 "use client";
@@ -1939,17 +1980,19 @@ export function RegisterForm() {
 }
 ```
 
-## File: `components/chat/chat-history.tsx`
+## File: `components\chat\chat-history.tsx`
 ```tsx
+// File: components/chat/chat-history.tsx
 // File: components/chat/chat-history.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
-// *** CORREGIDO: Importar Button Y buttonVariants ***
-import { Button, buttonVariants } from '@/components/ui/button';
+import { usePathname } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
@@ -1957,19 +2000,73 @@ import { useAuth } from '@/lib/hooks/useAuth'; // To ensure user is logged in
 import { toast } from "sonner";
 // Correct import path for AlertDialog
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"; // Corrected import path
+
 
 export function ChatHistory() {
   const pathname = usePathname();
+  const router = useRouter(); // Initialize router
+  const { token } = useAuth(); // Get token to know if user is authenticated
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isAlertOpen, setIsAlertOpen] = useState(false); // Control alert dialog visibility
+
+  const fetchChatHistory = useCallback(async (showToast = false) => {
+    if (!token) {
+        console.log("ChatHistory: No token, skipping fetch.");
+        setChats([]); // Clear chats if not logged in
+        setIsLoading(false);
+        setError("Please log in to view chat history."); // Inform user
+        return;
+    }
+    console.log("ChatHistory: Fetching chat list...");
+    setIsLoading(true);
+    setError(null); // Clear previous errors
+    try {
+      const fetchedChats = await getChats();
+      // Sort chats by updated_at descending (newest first)
+      fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      setChats(fetchedChats);
+       if (showToast) {
+           toast.success("Chat History Refreshed");
+       }
+    } catch (err) {
+      console.error("Failed to fetch chat history:", err);
+      let message = "Could not load chat history.";
+       if (err instanceof ApiError) {
+         message = err.message || message;
+         if (err.status === 401) { // Handle unauthorized specifically
+             message = "Session expired or invalid. Please log in again.";
+             // Optionally trigger logout here
+         }
+       } else if (err instanceof Error) {
+         message = err.message;
+       }
+      setError(message);
+      toast.error("Error Loading Chats", { description: message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]); // Depend only on token
+
+  useEffect(() => {
+    fetchChatHistory(false);
+  }, [fetchChatHistory]); // Fetch when component mounts or token changes
+
+  const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
+     event.stopPropagation();
   const router = useRouter(); // Initialize router
   const { token } = useAuth(); // Get token to know if user is authenticated
   const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -2106,7 +2203,139 @@ export function ChatHistory() {
                         )}
                         title={displayTitle}
                     >
+     setChatToDelete(chat);
+     setIsAlertOpen(true); // Open the dialog
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!chatToDelete) return;
+
+    console.log("Deleting chat:", chatToDelete.id);
+    setIsDeleting(true);
+    try {
+        await deleteChat(chatToDelete.id);
+        // Optimistically update UI or refetch
+        setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
+        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
+
+        // If the currently active chat is deleted, navigate to the base chat page
+        const currentChatId = pathname.split('/').pop();
+        if (currentChatId === chatToDelete.id) {
+             console.log("Active chat deleted, navigating to /chat");
+             router.push('/chat'); // Use Next.js router for navigation
+        }
+    } catch (err) {
+        console.error("Failed to delete chat:", err);
+        let message = "Could not delete chat.";
+        if (err instanceof ApiError) {
+            message = err.message || message;
+        } else if (err instanceof Error) {
+            message = err.message;
+        }
+        toast.error("Deletion Failed", { description: message });
+    } finally {
+        setIsDeleting(false);
+        setIsAlertOpen(false); // Close the dialog
+        setChatToDelete(null); // Clear the chat to delete
+    }
+  };
+
+  const renderContent = () => {
+    if (!token && !isLoading) { // Show login prompt if not logged in and not loading
+         return (
+             <div className="px-2 py-4 text-center text-muted-foreground">
+                 <p className="text-sm mb-2">Please log in to view or start chats.</p>
+                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
+             </div>
+         );
+     }
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    }
+    if (error && !isLoading) { // Show error only if not loading
+        return (
+            <div className="px-2 py-4 text-center text-destructive">
+                <AlertCircle className="mx-auto h-6 w-6 mb-1" />
+                <p className="text-sm mb-2">{error}</p>
+                <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
+                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
+                </Button>
+            </div>
+        );
+    }
+    if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
+        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
+    }
+
+    // Render chat list
+    return chats.map((chat) => {
+        const isActive = pathname === `/chat/${chat.id}`;
+        const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+        return (
+            // Use AlertDialogTrigger on the delete button, not the whole Link
+            <div key={chat.id} className="flex items-center group">
+                <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
+                    <a
+                        className={cn(
+                            // *** CORREGIDO: Ahora buttonVariants está importado y se puede usar ***
+                            buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
+                            "w-full justify-start h-10 flex-1 overflow-hidden mr-1", // Adjust styling
+                            isActive ? "bg-muted hover:bg-muted" : ""
+                        )}
+                        title={displayTitle}
+                    >
                         <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span className="truncate flex-1 text-sm">{displayTitle}</span>
+                    </a>
+                </Link>
+                <AlertDialogTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
+                        onClick={(e) => openDeleteConfirmation(chat, e)}
+                        aria-label={`Delete chat: ${displayTitle}`}
+                    >
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                    </Button>
+                </AlertDialogTrigger>
+            </div>
+        );
+    });
+  };
+
+  return (
+     // Wrap with AlertDialog component, controlled by isAlertOpen state
+     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <ScrollArea className="h-full flex-1"> {/* Let parent control height */}
+            <div className="flex flex-col gap-1 p-2">
+                {renderContent()}
+            </div>
+        </ScrollArea>
+
+        {/* Dialog Content - Placed outside the loop */}
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the chat
+                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleDeleteConfirmed} // Changed to trigger confirmed delete
+                    disabled={isDeleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
                         <span className="truncate flex-1 text-sm">{displayTitle}</span>
                     </a>
                 </Link>
@@ -2161,7 +2390,7 @@ export function ChatHistory() {
 }
 ```
 
-## File: `components/chat/chat-input.tsx`
+## File: `components\chat\chat-input.tsx`
 ```tsx
 "use client";
 
@@ -2238,7 +2467,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 }
 ```
 
-## File: `components/chat/chat-interface.tsx`
+## File: `components\chat\chat-interface.tsx`
 ```tsx
     // File: components/chat/chat-interface.tsx
     "use client";
@@ -2428,7 +2657,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
     }
 ```
 
-## File: `components/chat/chat-message.tsx`
+## File: `components\chat\chat-message.tsx`
 ```tsx
 // File: components/chat/chat-message.tsx
 import React from 'react';
@@ -2532,21 +2761,34 @@ export function ChatMessage({ message }: ChatMessageProps) {
 }
 ```
 
-## File: `components/chat/retrieved-documents-panel.tsx`
+## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-// File: components/chat/retrieved-documents-panel.tsx
-      
+"use client";
+
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
 import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
+import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
+import { RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button'; // Import Button component
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
+import { Button } from '@/components/ui/button';
+// (*) CORRECT IMPORT PATH (Ensure components/ui/dialog.tsx exists after running `npx shadcn-ui@latest add dialog`)
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+    DialogClose
+} from "@/components/ui/dialog"; // <--- This path causes the error if the file is missing
+import { toast } from "sonner";
 
-    
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean;
@@ -2554,53 +2796,13 @@ interface RetrievedDocumentsPanelProps {
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
-    const [docContent, setDocContent] = useState<string | null>(null); // State to store document content
-    const [viewingError, setViewingError] = useState<string | null>(null); // Error when viewing doc
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-
-    const handleViewDocument = async (doc: RetrievedDoc) => {
-        console.log("Viewing document:", doc.document_id || doc.id);
+    const handleViewDocument = (doc: RetrievedDoc) => {
+        console.log("Viewing document details:", doc.document_id || doc.id);
         setSelectedDoc(doc);
-        setViewingError(null); // Clear any previous errors
-        setDocContent(null); // Clear previous content
-
-        try {
-             if (!doc.document_id) {
-                 throw new Error("Missing document_id for viewing");
-             }
-             const content = await fetchDocumentContent(doc.document_id);
-             setDocContent(content); // Set the content if fetch is successful
-             setOpen(true); // Open the Dialog after fetching content
-        } catch (error) {
-            console.error("Error fetching document content:", error);
-            let errorMessage = "Failed to load document content.";
-            if (error instanceof ApiError && error.message) {
-                errorMessage = error.message;
-            } else if (error instanceof Error) {
-                errorMessage = error.message;
-            }
-            setViewingError(errorMessage); // Set the error message
-            setDocContent(null); // Ensure content is cleared on error
-            setOpen(true); // Still open the dialog to display the error
-
-        }
+        setIsDialogOpen(true);
     };
-
-
-     const fetchDocumentContent = async (documentId: string): Promise<string> => {
-        try {
-            const response = await request<string>(`/api/v1/ingest/document/${documentId}/content`, {
-                method: 'GET',
-            });
-            return response;
-
-        } catch (error) {
-            console.error("Error fetching document content:", error);
-            throw error;
-        }
-    };
-
-
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
         const message = `Download requested for: ${doc.file_name || doc.id}`;
@@ -2676,29 +2878,20 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 
             {/* Dialog Content - Rendered conditionally when selectedDoc is not null */}
             {selectedDoc && (
-                <DialogContent className="sm:max-w-[425px]">
-                        <div className="px-6 pb-4 text-center sm:text-left">
-                            <DialogTitle>{selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}</DialogTitle>
-                            <DialogDescription>
-                                {viewingError && (
-                                    <div className="text-red-500">
-                                        Error loading document: {viewingError}
-                                    </div>
-                                )}
-                                {/* Display loading state while fetching */}
-                                 {!docContent && !viewingError && (
-                                    <div className="flex justify-center items-center h-32">
-                                        <Loader2 className="animate-spin h-6 w-6" />
-                                    </div>
-                                 )}
-
-                                {/* Display loaded content */}
-                                {docContent && (
-                                    <ScrollArea className="max-h-[300px]">
-                                        <p>{docContent}</p>
-                                    </ScrollArea>
-                                )}
-                            </DialogDescription>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}>
+                            {selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Details of the retrieved document chunk.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3 text-sm">
+                        {/* Details content */}
+                        <div className="flex justify-between">
+                            <span className="font-medium text-muted-foreground">Document ID:</span>
+                            <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
                         </div>
                         <div className="flex justify-between">
                             <span className="font-medium text-muted-foreground">Chunk ID:</span>
@@ -2742,7 +2935,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 }
 ```
 
-## File: `components/knowledge/document-status-list.tsx`
+## File: `components\knowledge\document-status-list.tsx`
 ```tsx
 // File: components/knowledge/document-status-list.tsx
 "use client";
@@ -2793,7 +2986,6 @@ export function DocumentStatusList() {
         } finally {
             setIsLoading(false);
         }
-    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     useEffect(() => {
@@ -2948,7 +3140,7 @@ export function DocumentStatusList() {
 }
 ```
 
-## File: `components/knowledge/file-uploader.tsx`
+## File: `components\knowledge\file-uploader.tsx`
 ```tsx
 // File: components/knowledge/file-uploader.tsx
 "use client";
@@ -3123,7 +3315,7 @@ export function FileUploader() {
 }
 ```
 
-## File: `components/layout/header.tsx`
+## File: `components\layout\header.tsx`
 ```tsx
     // File: components/layout/header.tsx
     "use client";
@@ -3211,7 +3403,7 @@ export function FileUploader() {
       }
 ```
 
-## File: `components/layout/sidebar.tsx`
+## File: `components\layout\sidebar.tsx`
 ```tsx
 "use client";
 
@@ -3298,7 +3490,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 }
 ```
 
-## File: `components/theme-palette-button.tsx`
+## File: `components\theme-palette-button.tsx`
 ```tsx
 // File: components/theme-palette-button.tsx
 "use client";
@@ -3357,7 +3549,7 @@ export function ThemePaletteButton() {
 }
 ```
 
-## File: `components/theme-provider.tsx`
+## File: `components\theme-provider.tsx`
 ```tsx
 // File: components/theme-provider.tsx
 "use client";
@@ -3370,12 +3562,12 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 ```
 
-## File: `components/theme-toggle.tsx`
+## File: `components\theme-toggle.tsx`
 ```tsx
 
 ```
 
-## File: `components/ui/alert-dialog.tsx`
+## File: `components\ui\alert-dialog.tsx`
 ```tsx
 "use client"
 
@@ -3537,7 +3729,7 @@ export {
 
 ```
 
-## File: `components/ui/alert.tsx`
+## File: `components\ui\alert.tsx`
 ```tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -3608,7 +3800,7 @@ export { Alert, AlertTitle, AlertDescription }
 
 ```
 
-## File: `components/ui/avatar.tsx`
+## File: `components\ui\avatar.tsx`
 ```tsx
 "use client"
 
@@ -3666,7 +3858,7 @@ export { Avatar, AvatarImage, AvatarFallback }
 
 ```
 
-## File: `components/ui/badge.tsx`
+## File: `components\ui\badge.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3717,7 +3909,7 @@ export { Badge, badgeVariants }
 
 ```
 
-## File: `components/ui/button.tsx`
+## File: `components\ui\button.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3781,7 +3973,7 @@ export { Button, buttonVariants }
 
 ```
 
-## File: `components/ui/card.tsx`
+## File: `components\ui\card.tsx`
 ```tsx
 import * as React from "react"
 
@@ -3878,7 +4070,7 @@ export {
 
 ```
 
-## File: `components/ui/dialog.tsx`
+## File: `components\ui\dialog.tsx`
 ```tsx
 "use client"
 
@@ -4018,7 +4210,7 @@ export {
 
 ```
 
-## File: `components/ui/dropdown-menu.tsx`
+## File: `components\ui\dropdown-menu.tsx`
 ```tsx
 "use client"
 
@@ -4280,7 +4472,7 @@ export {
 
 ```
 
-## File: `components/ui/input.tsx`
+## File: `components\ui\input.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4306,7 +4498,7 @@ export { Input }
 
 ```
 
-## File: `components/ui/label.tsx`
+## File: `components\ui\label.tsx`
 ```tsx
 "use client"
 
@@ -4335,7 +4527,7 @@ export { Label }
 
 ```
 
-## File: `components/ui/progress.tsx`
+## File: `components\ui\progress.tsx`
 ```tsx
 "use client"
 
@@ -4371,7 +4563,7 @@ export { Progress }
 
 ```
 
-## File: `components/ui/resizable.tsx`
+## File: `components\ui\resizable.tsx`
 ```tsx
 "use client"
 
@@ -4432,7 +4624,7 @@ export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
 
 ```
 
-## File: `components/ui/scroll-area.tsx`
+## File: `components\ui\scroll-area.tsx`
 ```tsx
 "use client"
 
@@ -4495,7 +4687,7 @@ export { ScrollArea, ScrollBar }
 
 ```
 
-## File: `components/ui/separator.tsx`
+## File: `components\ui\separator.tsx`
 ```tsx
 "use client"
 
@@ -4528,7 +4720,7 @@ export { Separator }
 
 ```
 
-## File: `components/ui/skeleton.tsx`
+## File: `components\ui\skeleton.tsx`
 ```tsx
 import { cn } from "@/lib/utils"
 
@@ -4546,7 +4738,7 @@ export { Skeleton }
 
 ```
 
-## File: `components/ui/sonner.tsx`
+## File: `components\ui\sonner.tsx`
 ```tsx
 "use client"
 
@@ -4576,7 +4768,7 @@ export { Toaster }
 
 ```
 
-## File: `components/ui/table.tsx`
+## File: `components\ui\table.tsx`
 ```tsx
 "use client"
 
@@ -4697,7 +4889,7 @@ export {
 
 ```
 
-## File: `components/ui/textarea.tsx`
+## File: `components\ui\textarea.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4720,7 +4912,7 @@ export { Textarea }
 
 ```
 
-## File: `components/ui/tooltip.tsx`
+## File: `components\ui\tooltip.tsx`
 ```tsx
 "use client"
 
@@ -4926,16 +5118,22 @@ if __name__ == "__main__":
     generate_codebase_markdown()
 ```
 
-## File: `lib/api.ts`
+## File: `lib\api.ts`
 ```ts
 // File: lib/api.ts
+import { getToken, getUserFromToken, User } from './auth/helpers';
 import { getToken, getUserFromToken, User } from './auth/helpers';
 import { getApiGatewayUrl } from './utils';
 // Import Message type from chat-message to align response mapping
 import type { Message } from '@/components/chat/chat-message'; // <-- Import Frontend Message type
+// Import Message type from chat-message to align response mapping
+import type { Message } from '@/components/chat/chat-message'; // <-- Import Frontend Message type
 
 // --- ApiError Class ---
+// --- ApiError Class ---
 interface ApiErrorData {
+    detail?: string | { msg: string; type: string; loc?: string[] }[] | any; // Added loc for FastAPI errors
+    message?: string;
     detail?: string | { msg: string; type: string; loc?: string[] }[] | any; // Added loc for FastAPI errors
     message?: string;
 }
@@ -4950,17 +5148,25 @@ export class ApiError extends Error {
     this.status = status;
     this.data = data;
     Object.setPrototypeOf(this, ApiError.prototype);
+    Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
 
 // --- Core Request Function ---
-export async function request<T>(
+async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
 
   let url: string;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  // *** Identificar rutas de gateway (v1) vs. internas (simuladas) ***
+  const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
+  const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
+
+  if (isGatewayRoute) {
+    // Use absolute API Gateway URL for external routes
+    const gatewayUrl = getApiGatewayUrl(); // Get URL from env var or default
   // *** Identificar rutas de gateway (v1) vs. internas (simuladas) ***
   const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
   const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
@@ -4980,10 +5186,22 @@ export async function request<T>(
      url = cleanEndpoint;
      console.debug(`Other Internal API Request Target: ${url}`);
   }
+    console.debug(`External API Request Target: ${url}`);
+  } else if (isInternalAuthRoute) {
+     // Use relative URL for internal simulated routes (IF USED FOR TESTING)
+     url = cleanEndpoint;
+     console.warn(`Using SIMULATED internal API route: ${url}`);
+     console.debug(`Internal API Request Target: ${url}`);
+  } else {
+     // Handle other potential internal routes if needed
+     url = cleanEndpoint;
+     console.debug(`Other Internal API Request Target: ${url}`);
+  }
 
 
   const token = getToken();
   const headers = new Headers(options.headers || {});
+  let companyId: string | null = null;
   let companyId: string | null = null;
 
   headers.set('Accept', 'application/json');
@@ -4993,7 +5211,26 @@ export async function request<T>(
 
   // Add Authorization and X-Company-ID (if applicable and available) only for Gateway routes
   if (isGatewayRoute && token) {
+  // Add Authorization and X-Company-ID (if applicable and available) only for Gateway routes
+  if (isGatewayRoute && token) {
     headers.set('Authorization', `Bearer ${token}`);
+    const user = getUserFromToken(token); // Decode token to get user info
+    if (user?.companyId) {
+        companyId = user.companyId;
+        headers.set('X-Company-ID', companyId); // Add Company ID header
+    } else {
+         console.warn(`Could not extract companyId from token for Gateway request to ${url}. Backend might reject.`);
+         // Depending on backend requirements, you might need to throw an error here
+         // if companyId is mandatory for all gateway requests.
+         // throw new ApiError("Company ID could not be determined from token.", 400);
+    }
+  } else if (isGatewayRoute && !token && !cleanEndpoint.includes('/auth/')) {
+      // Handle missing token for required gateway routes (excluding auth endpoints)
+      console.error(`Authentication token missing for Gateway request to ${url}.`);
+      // Throw an error to prevent the request if auth is mandatory
+      throw new ApiError("Authentication required. Please log in.", 401);
+  }
+
     const user = getUserFromToken(token); // Decode token to get user info
     if (user?.companyId) {
         companyId = user.companyId;
@@ -5033,6 +5270,7 @@ export async function request<T>(
         try {
            errorText = await response.text();
            console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
+           console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
         } catch (textErr) {
              console.warn(`Could not read API error response body (${response.status}).`);
         }
@@ -5071,16 +5309,22 @@ export async function request<T>(
 
     // Handle No Content response (e.g., for DELETE)
     if (response.status === 204 || response.headers.get('content-length') === '0') {
+    // Handle No Content response (e.g., for DELETE)
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
         console.log(`API Success: ${response.status} No Content`);
+        return null as T; // Return null for No Content
         return null as T; // Return null for No Content
     }
 
     // Parse successful JSON response
+    // Parse successful JSON response
     try {
         const data: T = await response.json();
         // console.debug(`API Success: ${response.status}`, { url, data });
+        // console.debug(`API Success: ${response.status}`, { url, data });
         return data;
     } catch (jsonError) {
+         console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
          console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
          throw new ApiError(`Invalid JSON response from server`, response.status);
     }
@@ -5088,7 +5332,17 @@ export async function request<T>(
   } catch (error) {
     if (error instanceof ApiError) {
       // Re-throw known API errors
+      // Re-throw known API errors
       throw error;
+    } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
+        // Handle Network errors specifically
+        console.error('Network Error:', { url, error });
+        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
+    }
+    else {
+      // Handle other unexpected errors (e.g., programming errors in this function)
+      console.error('Unexpected error during API request:', { url, error });
+      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred', 500);
     } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
         // Handle Network errors specifically
         console.error('Network Error:', { url, error });
@@ -5105,7 +5359,13 @@ export async function request<T>(
 // --- Auth Service ---
 // *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
 // Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
+// --- Auth Service ---
+// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
+// Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
 export const loginUser = async (credentials: { email: string; password: string }) => {
+  console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
+  // El backend real debe devolver una estructura como { "access_token": "..." }
+  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
   console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
   // El backend real debe devolver una estructura como { "access_token": "..." }
   const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
@@ -5117,7 +5377,13 @@ export const loginUser = async (credentials: { email: string; password: string }
 
 // *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
 // Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
+// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
+// Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
 export const registerUser = async (details: { email: string; password: string; name?: string }) => {
+    console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
+    // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
+    // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
+    const response = await request<{ access_token?: string; user?: Partial<User>; message?: string }>('/api/v1/auth/register', { // <-- RUTA GATEWAY REAL
     console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
     // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
     // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
@@ -5126,8 +5392,10 @@ export const registerUser = async (details: { email: string; password: string; n
         body: JSON.stringify(details),
     });
     return response; // Devuelve la respuesta completa del backend
+    return response; // Devuelve la respuesta completa del backend
 };
 
+// --- Ingest Service (External API Routes - /api/v1/ingest) ---
 // --- Ingest Service (External API Routes - /api/v1/ingest) ---
 export interface IngestResponse {
     document_id: string;
@@ -5135,6 +5403,7 @@ export interface IngestResponse {
     status: string;
     message: string;
 }
+
 
 export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => {
     formData.append('metadata_json', JSON.stringify(metadata));
@@ -5144,22 +5413,29 @@ export const uploadDocument = async (formData: FormData, metadata: Record<string
     });
 };
 
+
 export interface DocumentStatusResponse {
     document_id: string;
+    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
+    file_name?: string | null;
+    file_type?: string | null;
     status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
     file_name?: string | null;
     file_type?: string | null;
     chunk_count?: number | null;
     error_message?: string | null;
     last_updated?: string; // ISO 8601 date string
+    last_updated?: string; // ISO 8601 date string
     message?: string | null;
 }
+
 
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
   return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
     method: 'GET',
   });
 };
+
 
 export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
     return request<DocumentStatusResponse[]>('/api/v1/ingest/status', {
@@ -5181,7 +5457,21 @@ export interface RetrievedDocApi {
 }
 
 // Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
+// --- Query & Chat Service (External API Routes - /api/v1/*) ---
+
+// Type for retrieved documents within API responses (sent by Backend)
+export interface RetrievedDocApi {
+    id: string;             // Chunk ID from vector store (Milvus)
+    score?: number | null;
+    content_preview?: string | null; // Backend should provide this preview
+    metadata?: Record<string, any> | null;
+    document_id?: string | null; // Original document ID (from Supabase DOCUMENTS table)
+    file_name?: string | null;   // Original filename (from Supabase DOCUMENTS table)
+}
+
+// Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
 export interface RetrievedDoc {
+    id: string; // Chunk ID
     id: string; // Chunk ID
     score?: number | null;
     content_preview?: string | null;
@@ -5214,7 +5504,33 @@ export interface QueryPayload {
 
 // Response from POST /query
 export interface QueryApiResponse {
+
+// Types for Chat History API (Backend Responses)
+export interface ChatSummary {
+    id: string;          // Chat UUID
+    title: string | null; // Chat title
+    updated_at: string;  // ISO 8601 timestamp
+}
+
+export interface ChatMessageApi {
+    id: string;          // Message UUID
+    role: 'user' | 'assistant';
+    content: string;
+    sources: RetrievedDocApi[] | null; // Sources associated with assistant message
+    created_at: string;  // ISO 8601 timestamp
+}
+
+// Payload for POST /query
+export interface QueryPayload {
+    query: string;
+    retriever_top_k?: number;
+    chat_id?: string | null; // Send null or omit for a new chat
+}
+
+// Response from POST /query
+export interface QueryApiResponse {
     answer: string;
+    retrieved_documents: RetrievedDocApi[]; // Docs used for this specific answer
     retrieved_documents: RetrievedDocApi[]; // Docs used for this specific answer
     query_log_id?: string | null;
     chat_id: string; // Backend MUST return the chat_id (new or existing)
@@ -5242,10 +5558,37 @@ export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]>
 };
 
 // Function to send a query (which handles message saving and chat creation/continuation)
+    chat_id: string; // Backend MUST return the chat_id (new or existing)
+}
+
+
+// --- API Functions for Chat History ---
+
+// Function to list chats for the authenticated user
+export const getChats = async (): Promise<ChatSummary[]> => {
+    return request<ChatSummary[]>('/api/v1/chats', {
+        method: 'GET',
+    });
+};
+
+// Function to get messages for a specific chat
+export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
+    if (!chatId) {
+        console.warn("getChatMessages called with empty chatId");
+        return []; // Return empty array if no chatId provided
+    }
+    return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`, {
+        method: 'GET',
+    });
+};
+
+// Function to send a query (which handles message saving and chat creation/continuation)
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
+  const body = { ...payload, chat_id: payload.chat_id || null };
   const body = { ...payload, chat_id: payload.chat_id || null };
   return request<QueryApiResponse>('/api/v1/query', {
     method: 'POST',
+    body: JSON.stringify(body),
     body: JSON.stringify(body),
   });
 };
@@ -5283,20 +5626,55 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
     created_at: apiMessage.created_at,
     isError: false,
 });
+
+// Function to delete a chat
+export const deleteChat = async (chatId: string): Promise<void> => {
+    if (!chatId) {
+        throw new Error("Cannot delete chat with empty ID");
+    }
+    await request<null>(`/api/v1/chats/${chatId}`, {
+        method: 'DELETE',
+    });
+};
+
+
+// --- Type Mapping Helpers ---
+
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
+    if (!apiSources) return undefined;
+    return apiSources.map(source => ({
+        id: source.id,
+        score: source.score,
+        content_preview: source.content_preview,
+        metadata: source.metadata,
+        document_id: source.document_id,
+        file_name: source.file_name,
+    }));
+};
+
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
+    id: apiMessage.id,
+    role: apiMessage.role,
+    content: apiMessage.content,
+    sources: mapApiSourcesToFrontend(apiMessage.sources),
+    created_at: apiMessage.created_at,
+    isError: false,
+});
 ```
 
-## File: `lib/auth/helpers.ts`
+## File: `lib\auth\helpers.ts`
 ```ts
-// File: lib/auth/helpers.ts
+// lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-import { jwtDecode } from 'jwt-decode';
+import { jwtDecode, InvalidTokenError } from 'jwt-decode'; // Importar error específico
 
-// Basic token handling for client-side
+// --- IMPLEMENTACIONES RESTAURADAS ---
 export const getToken = (): string | null => {
+  // Asegúrate de que esto solo se ejecute en el cliente
   if (typeof window !== "undefined") {
     return localStorage.getItem(AUTH_TOKEN_KEY);
   }
-  return null;
+  return null; // Retorna null si no está en el navegador
 };
 
 export const setToken = (token: string): void => {
@@ -5310,31 +5688,48 @@ export const removeToken = (): void => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
   }
 };
+// --- FIN DE IMPLEMENTACIONES RESTAURADAS ---
 
-// Frontend User interface - needs to align with JWT claims
+
+// Frontend User interface
 export interface User {
-    userId: string;    // Expecting 'user_id' claim in JWT
-    email: string;     // Expecting 'email' claim in JWT
-    name?: string;     // Expecting optional 'name' claim in JWT
-    companyId: string; // Expecting 'company_id' claim in JWT
-    // Add other fields if needed, e.g., roles
+    userId: string;    // Mapeado desde 'sub' del JWT
+    email: string;     // Mapeado desde 'email'
+    name?: string;     // Mapeado desde 'user_metadata.full_name' o similar (opcional)
+    companyId: string; // Mapeado desde 'app_metadata.company_id' (o donde esté)
+    roles?: string[];  // Mapeado desde 'app_metadata.roles' (opcional)
+    // Añade otros campos necesarios
 }
 
-// Interface for the expected JWT payload structure from your REAL Auth Service
-interface JwtPayload {
-    // *** AJUSTA ESTOS NOMBRES DE CLAIMS para que coincidan EXACTAMENTE ***
-    // *** con lo que tu backend (Auth Service / Supabase) pone en el token ***
-    user_id: string;    // Ejemplo: claim para User ID (o podría ser 'sub')
-    company_id: string; // Ejemplo: claim para Company ID
-    email: string;      // Claim para Email
-    name?: string;     // Claim opcional para Name
-    role?: string;     // Claim opcional para Role
-    exp: number;       // Standard expiry timestamp (seconds since epoch) REQUIRED
-    iat?: number;      // Standard issued at timestamp (optional)
-    // 'sub' (subject) es un claim estándar, a menudo contiene el user ID.
-    // Si tu backend usa 'sub' para el ID de usuario, usa 'sub' aquí en lugar de 'user_id'.
-    sub?: string;      // Ejemplo: Si el backend usa 'sub' para user ID
-    // Agrega cualquier otro claim que tu backend incluya y necesites en el frontend
+// Interface for the ACTUAL Supabase JWT payload structure
+// ¡¡¡ VERIFICA ESTO CON UN TOKEN REAL DE TU PROYECTO !!!
+interface SupabaseJwtPayload {
+    sub: string;       // User ID (Subject) - ¡MUY PROBABLE!
+    aud: string;       // Audience (e.g., 'authenticated') - ¡MUY PROBABLE!
+    exp: number;       // Expiration time (seconds since epoch) - ¡SEGURO!
+    iat?: number;      // Issued at time (optional)
+    email?: string;     // Email - ¡MUY PROBABLE!
+    phone?: string;    // Phone (optional)
+    role?: string;     // Rol asignado por Supabase Auth (e.g., 'authenticated') - ¡PROBABLE!
+
+    // --- Metadatos ---
+    app_metadata?: {
+        provider?: string;
+        providers?: string[];
+        // --- ¡POSIBLE UBICACIÓN DE COMPANY_ID Y ROLES! ---
+        company_id?: string | number; // Verifica el tipo real
+        roles?: string[];
+        // Otros datos específicos de la aplicación
+        [key: string]: any;
+    };
+    user_metadata?: {
+        // Datos que el usuario puede gestionar (o tú vía admin)
+        full_name?: string;
+        avatar_url?: string;
+        // Otros datos específicos del usuario
+         [key: string]: any;
+    };
+    // Otros claims posibles: session_id (sid), amr, etc.
 }
 
 // Function to get user details from the JWT token
@@ -5342,60 +5737,69 @@ export const getUserFromToken = (token: string | null): User | null => {
   if (!token) return null;
   try {
     // Decode the JWT
-    const decoded = jwtDecode<JwtPayload>(token);
-    console.log("getUserFromToken - Decoded JWT Payload:", decoded); // <-- Log para depuración
+    const decoded = jwtDecode<SupabaseJwtPayload>(token);
+    // console.debug("getUserFromToken - Raw Decoded JWT:", decoded); // Log para depuración intensa
 
     // --- Validation ---
-    // 1. Check expiry
-    const now = Date.now() / 1000; // Current time in seconds
+    const now = Date.now() / 1000;
     if (decoded.exp < now) {
-      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Current time: ${new Date()}.`);
-      removeToken(); // Clear expired token
+      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Removing.`);
+      removeToken();
       return null;
     }
 
-    // 2. Check for essential claims required by the frontend
-    // *** VERIFICA que estos claims existen en tu payload decodificado ***
-    //    Ajusta los nombres ('user_id', 'company_id') si tu backend usa otros (ej. 'sub')
-    const userId = decoded.user_id || decoded.sub; // Usa user_id o sub como fallback
-    const companyId = decoded.company_id;
+    // --- Claim Extraction and Mapping ---
+    const userId = decoded.sub; // Usar 'sub' como User ID
     const email = decoded.email;
+    // Extraer company_id de app_metadata (¡AJUSTA SI ES NECESARIO!)
+    const companyIdRaw = decoded.app_metadata?.company_id;
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Convertir a string si existe
 
-    if (!userId || !companyId || !email) {
-        console.error("Decoded token is missing essential claims (userId/sub, companyId, email). Actual Payload:", decoded);
-        removeToken(); // Clear invalid token
+    // Validar claims esenciales para el frontend
+    if (!userId || !email || !companyId) {
+        console.error("Decoded token missing essential claims:", {
+            hasUserId: !!userId,
+            hasEmail: !!email,
+            hasCompanyId: !!companyId,
+            appMetadata: decoded.app_metadata // Log para ver qué hay
+        });
+        removeToken();
         return null;
     }
 
-    // --- Map decoded payload to User interface ---
+    // Mapear a la interfaz User del frontend
     const user: User = {
-      userId: userId,                 // Map from 'user_id' or 'sub' claim
+      userId: userId,
       email: email,
-      companyId: companyId,           // Map from 'company_id' claim
-      name: decoded.name,             // Map optional 'name' claim
-      // Add other mappings if needed, e.g., role: decoded.role
+      companyId: companyId, // Ya es string o undefined (y validamos que no sea undefined)
+      // Mapear opcionales (ejemplos)
+      name: decoded.user_metadata?.full_name,
+      roles: decoded.app_metadata?.roles,
     };
 
-    console.log("getUserFromToken - Mapped User object:", user); // <-- Log para depuración
+    // console.debug("getUserFromToken - Mapped User:", user);
     return user;
 
   } catch (error) {
-    // Handle various decoding errors (invalid token format, etc.)
-    console.error("Failed to decode or validate token:", error);
-    removeToken(); // Clear invalid token
+     // Manejar errores específicos de jwt-decode
+     if (error instanceof InvalidTokenError) {
+         console.error("Failed to decode token (Invalid):", error.message);
+     } else {
+         console.error("Failed to decode or validate token (Unknown Error):", error);
+     }
+    removeToken();
     return null;
   }
 };
-
 ```
 
-## File: `lib/constants.ts`
+## File: `lib\constants.ts`
 ```ts
 export const APP_NAME = "Atenex";
 export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ```
 
-## File: `lib/hooks/useAuth.tsx`
+## File: `lib\hooks\useAuth.tsx`
 ```tsx
 // File: lib/hooks/useAuth.tsx
 "use client";
@@ -5512,7 +5916,7 @@ export const useAuth = (): AuthContextType => {
 };
 ```
 
-## File: `lib/utils.ts`
+## File: `lib\utils.ts`
 ```ts
 // File: lib/utils.ts
 import { clsx, type ClassValue } from "clsx"

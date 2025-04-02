@@ -1,127 +1,53 @@
 // lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-import { jwtDecode, InvalidTokenError } from 'jwt-decode'; // Importar error específico
+// jwt-decode ya no es estrictamente necesario aquí si confiamos en Supabase
+// import { jwtDecode, InvalidTokenError } from 'jwt-decode';
 
-// --- IMPLEMENTACIONES RESTAURADAS ---
+// --- Funciones básicas de localStorage (pueden eliminarse si no se usan en otro lugar) ---
+// Supabase JS client maneja su propio almacenamiento de sesión, por lo que estas
+// funciones manuales para *el token de autenticación* ya no son la fuente principal.
+// Podrían mantenerse si necesitas almacenar OTROS tokens o datos relacionados con auth.
 export const getToken = (): string | null => {
-  // Asegúrate de que esto solo se ejecute en el cliente
   if (typeof window !== "undefined") {
-    return localStorage.getItem(AUTH_TOKEN_KEY);
+    // Podrías intentar obtener el token de Supabase aquí, pero es mejor usar getSession()
+    // return localStorage.getItem(AUTH_TOKEN_KEY); // <-- Evitar esto para el token de auth
+    console.warn("getToken() manual llamado, considera usar supabase.auth.getSession()");
+    return localStorage.getItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
   }
-  return null; // Retorna null si no está en el navegador
+  return null;
 };
 
 export const setToken = (token: string): void => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-  }
+   if (typeof window !== "undefined") {
+     // Evitar sobrescribir el manejo de sesión de Supabase
+     // localStorage.setItem(AUTH_TOKEN_KEY, token); // <-- Evitar esto
+     console.warn("setToken() manual llamado, Supabase maneja la sesión.");
+     localStorage.setItem(AUTH_TOKEN_KEY, token); // Mantener por si acaso, pero advertir
+   }
 };
 
 export const removeToken = (): void => {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-  }
+   if (typeof window !== "undefined") {
+     // Podría interferir con Supabase si borra su clave, es mejor usar supabase.auth.signOut()
+     // localStorage.removeItem(AUTH_TOKEN_KEY); // <-- Evitar esto
+     console.warn("removeToken() manual llamado, considera usar supabase.auth.signOut()");
+     localStorage.removeItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
+   }
 };
-// --- FIN DE IMPLEMENTACIONES RESTAURADAS ---
+// --- FIN Funciones localStorage ---
 
 
-// Frontend User interface
+// Frontend User interface - Definición de cómo queremos que luzca el usuario en el frontend
+// Esta interfaz se poblará con datos de la sesión de Supabase.
 export interface User {
-    userId: string;    // Mapeado desde 'sub' del JWT
-    email: string;     // Mapeado desde 'email'
-    name?: string;     // Mapeado desde 'user_metadata.full_name' o similar (opcional)
-    companyId: string; // Mapeado desde 'app_metadata.company_id' (o donde esté)
-    roles?: string[];  // Mapeado desde 'app_metadata.roles' (opcional)
-    // Añade otros campos necesarios
+    userId: string;    // Mapeado desde Supabase User ID (user.id)
+    email?: string;    // Mapeado desde Supabase User Email (user.email)
+    name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name)
+    companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
+    roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
+    // Añade otros campos necesarios del objeto User de Supabase
 }
 
-// Interface for the ACTUAL Supabase JWT payload structure
-// ¡¡¡ VERIFICA ESTO CON UN TOKEN REAL DE TU PROYECTO !!!
-interface SupabaseJwtPayload {
-    sub: string;       // User ID (Subject) - ¡MUY PROBABLE!
-    aud: string;       // Audience (e.g., 'authenticated') - ¡MUY PROBABLE!
-    exp: number;       // Expiration time (seconds since epoch) - ¡SEGURO!
-    iat?: number;      // Issued at time (optional)
-    email?: string;     // Email - ¡MUY PROBABLE!
-    phone?: string;    // Phone (optional)
-    role?: string;     // Rol asignado por Supabase Auth (e.g., 'authenticated') - ¡PROBABLE!
-
-    // --- Metadatos ---
-    app_metadata?: {
-        provider?: string;
-        providers?: string[];
-        // --- ¡POSIBLE UBICACIÓN DE COMPANY_ID Y ROLES! ---
-        company_id?: string | number; // Verifica el tipo real
-        roles?: string[];
-        // Otros datos específicos de la aplicación
-        [key: string]: any;
-    };
-    user_metadata?: {
-        // Datos que el usuario puede gestionar (o tú vía admin)
-        full_name?: string;
-        avatar_url?: string;
-        // Otros datos específicos del usuario
-         [key: string]: any;
-    };
-    // Otros claims posibles: session_id (sid), amr, etc.
-}
-
-// Function to get user details from the JWT token
-export const getUserFromToken = (token: string | null): User | null => {
-  if (!token) return null;
-  try {
-    // Decode the JWT
-    const decoded = jwtDecode<SupabaseJwtPayload>(token);
-    // console.debug("getUserFromToken - Raw Decoded JWT:", decoded); // Log para depuración intensa
-
-    // --- Validation ---
-    const now = Date.now() / 1000;
-    if (decoded.exp < now) {
-      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Removing.`);
-      removeToken();
-      return null;
-    }
-
-    // --- Claim Extraction and Mapping ---
-    const userId = decoded.sub; // Usar 'sub' como User ID
-    const email = decoded.email;
-    // Extraer company_id de app_metadata (¡AJUSTA SI ES NECESARIO!)
-    const companyIdRaw = decoded.app_metadata?.company_id;
-    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Convertir a string si existe
-
-    // Validar claims esenciales para el frontend
-    if (!userId || !email || !companyId) {
-        console.error("Decoded token missing essential claims:", {
-            hasUserId: !!userId,
-            hasEmail: !!email,
-            hasCompanyId: !!companyId,
-            appMetadata: decoded.app_metadata // Log para ver qué hay
-        });
-        removeToken();
-        return null;
-    }
-
-    // Mapear a la interfaz User del frontend
-    const user: User = {
-      userId: userId,
-      email: email,
-      companyId: companyId, // Ya es string o undefined (y validamos que no sea undefined)
-      // Mapear opcionales (ejemplos)
-      name: decoded.user_metadata?.full_name,
-      roles: decoded.app_metadata?.roles,
-    };
-
-    // console.debug("getUserFromToken - Mapped User:", user);
-    return user;
-
-  } catch (error) {
-     // Manejar errores específicos de jwt-decode
-     if (error instanceof InvalidTokenError) {
-         console.error("Failed to decode token (Invalid):", error.message);
-     } else {
-         console.error("Failed to decode or validate token (Unknown Error):", error);
-     }
-    removeToken();
-    return null;
-  }
-};
+// --- getUserFromToken ELIMINADO ---
+// Ya no decodificaremos manualmente el token. Usaremos los datos del usuario
+// proporcionados por el cliente Supabase (supabase.auth.getUser() o de la sesión).
