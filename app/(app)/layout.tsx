@@ -8,54 +8,80 @@ import { Header } from '@/components/layout/header';
 import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook actualizado
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
-// removeToken ya no se usa aquí directamente, signOut se encarga
-// import { removeToken } from '@/lib/auth/helpers';
+import { Loader2 } from 'lucide-react'; // Para el spinner
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, token, logout } = useAuth();
+  // --- CORRECCIÓN: Usar session, user, isLoading, signOut del hook useAuth ---
+  const { session, user, isLoading, signOut } = useAuth();
+  // ----------------------------------------------------------------------
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   useEffect(() => {
+    // Si el bypass está activo, no hacer nada (permitir acceso)
     if (bypassAuth) {
-      console.warn("AppLayout: Auth checks bypassed.");
-      return; // No hacer nada si el bypass está activo
+      console.warn("AppLayout: Auth checks bypassed via NEXT_PUBLIC_BYPASS_AUTH=true.");
+      return;
     }
 
-    // Si no está cargando y NO hay sesión válida, redirigir a login (o a '/')
+    // Si NO estamos cargando y NO hay sesión válida, redirigir a la página principal/pública
     if (!isLoading && !session) {
-      console.log("AppLayout: No active session found, redirecting to login page.");
-      router.push('/'); // Redirigir a la página principal/pública
+      console.log("AppLayout: No active session found, redirecting to home page.");
+      router.replace('/'); // Redirigir a la página principal (o '/login')
+      return; // Detener ejecución del efecto
     }
-    // Opcional: Si hay sesión pero el mapeo a 'user' falló (ej. falta companyId)
-    // podrías forzar un logout o mostrar un error específico aquí.
-    // else if (!isLoading && session && !user) {
-    //   console.error("AppLayout: Session exists but user mapping failed (missing required data?). Forcing logout.");
+
+    // --- CORRECCIÓN: Chequeo adicional si companyId es obligatorio ---
+    // Si hay sesión pero el usuario mapeado es null (posiblemente por falta de companyId
+    // u otro dato requerido en app_metadata), forzar logout.
+    // Descomenta y ajusta si `companyId` es estrictamente necesario para acceder al app.
+    // if (!isLoading && session && !user) {
+    //   console.error("AppLayout: Session exists but user mapping failed (missing required data like companyId?). Forcing logout.");
     //   signOut(); // Forzar logout si el estado del usuario no es válido
+    //   // No necesitas redirigir aquí, el signOut provocará un cambio de estado que
+    //   // llevará a la condición !session en la próxima ejecución del efecto.
+    //   return;
     // }
+    // -------------------------------------------------------------
 
-  }, [isLoading, session, user, router, bypassAuth, signOut]); // Añadir signOut a dependencias si se usa
+  // --- CORRECCIÓN: Dependencias del useEffect ---
+  // Incluir todas las variables usadas: isLoading, session, user, router, bypassAuth, signOut
+  }, [isLoading, session, user, router, bypassAuth, signOut]);
+  // -------------------------------------------
 
-  // Mostrar spinner mientras carga Y no estamos en modo bypass
+  // --- Estado de Carga ---
+  // Mostrar spinner mientras isLoading es true Y no estamos en modo bypass
   if (isLoading && !bypassAuth) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        {/* Opcional: Añadir texto */}
+        {/* <p className="mt-4 text-muted-foreground">Loading session...</p> */}
       </div>
     );
   }
+  // --- Fin Estado de Carga ---
 
-  // Si NO estamos en bypass Y (estamos cargando o no hay sesión o no hay usuario mapeado), no renderizar el layout protegido.
-  // Esto evita flashes de contenido protegido.
-  if (!bypassAuth && (isLoading || !session || !user)) {
-     // No renderizar nada mientras se redirige o si el estado no es válido
-     // El useEffect se encargará de la redirección.
-     console.log("AppLayout: Not rendering protected layout (isLoading, no session, or no mapped user).");
-     return null;
+  // --- Guardia de Autenticación ---
+  // Si NO estamos en bypass Y (aún estamos cargando O no hay sesión O no hay usuario mapeado),
+  // no renderizar el layout protegido. Esto evita flashes de contenido.
+  // El useEffect se encargará de la redirección si es necesario.
+  if (!bypassAuth && (isLoading || !session /* || !user */)) {
+     // Descomenta `|| !user` si el chequeo de usuario mapeado es estricto
+     console.log("AppLayout: Not rendering protected layout (isLoading, no session, or no valid user). Waiting for redirect or state update.");
+     // Renderizar null o un spinner mínimo mientras se redirige o el estado cambia.
+     // Usar el mismo spinner que arriba puede ser buena idea para consistencia.
+     return (
+       <div className="flex h-screen items-center justify-center bg-background">
+         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+       </div>
+     );
   }
+  // --- Fin Guardia de Autenticación ---
 
-  // Si llegamos aquí, o estamos en bypass, o estamos autenticados y autorizados (user mapeado existe)
+  // Si llegamos aquí, o estamos en bypass, o estamos autenticados y autorizados.
+  console.log("AppLayout: Rendering protected layout.");
   return (
     <div className="flex h-screen bg-secondary/30 dark:bg-muted/30">
       <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
@@ -65,11 +91,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onExpand={() => setIsSidebarCollapsed(false)}
               className={cn("transition-all duration-300 ease-in-out", isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]")}
           >
+              {/* Pasar user al Sidebar si necesita mostrar info del usuario */}
               <Sidebar isCollapsed={isSidebarCollapsed} />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={80} minSize={30}>
               <div className="flex h-full flex-col">
+                   {/* Pasar user y signOut al Header */}
                   <Header />
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
                       {children}

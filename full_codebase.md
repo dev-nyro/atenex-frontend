@@ -335,16 +335,18 @@ module.exports = {
 ```local
 # Environment variables for local development
 
-# Base URL of your deployed API Gateway (REQUIRED for API calls to work)
-# Example: http://localhost:8080 if running gateway locally
-# Example: https://your-gateway-dev.example.com if deployed
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:9999  # Una URL falsa
-NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
-# Add other environment variables needed by your app here
-# Example: NEXT_PUBLIC_SOME_CONFIG=value
-JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
-NEXT_PUBLIC_BYPASS_AUTH=true
+# Base URL of your API Gateway (expuesto con ngrok o similar)
+NEXT_PUBLIC_API_GATEWAY_URL=https://TU_URL_DE_NGROK_O_GATEWAY.io # <-- ¡REEMPLAZA ESTO!
+
+# Supabase Credentials (Required for Supabase JS Client)
+NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co # <-- Tu URL de Supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk # <-- Tu Anon Key de Supabase
+
+# Opcional: Para saltar la verificación de autenticación durante el desarrollo
+# Poner a 'true' para bypass, cualquier otro valor o ausente para requerir auth.
+NEXT_PUBLIC_BYPASS_AUTH=false
+
+# JWT_SECRET=... # <-- YA NO ES NECESARIO AQUÍ
 ```
 
 ## File: `.gitignore`
@@ -454,40 +456,45 @@ import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle } f
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import useAuth
 
-const welcomeMessage: Message = { /* ... */ };
+// Mensaje inicial
+const welcomeMessage: Message = {
+    id: 'initial-welcome',
+    role: 'assistant',
+    content: 'Hello! How can I help you query your knowledge base today?',
+    created_at: new Date().toISOString(),
+};
 
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
-  // --- CORRECCIÓN: Usar session o user en lugar de token ---
-  const { session, user, isLoading: isAuthLoading, signOut } = useAuth(); // Obtener sesión, usuario y estado de carga de auth
-  // -----------------------------------------------------
+  // --- CORRECCIÓN: Usar session y user en lugar de token ---
+  const { session, user, isLoading: isAuthLoading, signOut } = useAuth();
+  // -------------------------------------------------------
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
   const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
   const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
   const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // INITIAL STATE IS FALSE
+  const [isSending, setIsSending] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fetchedChatIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => { setChatId(chatIdParam); }, [chatIdParam]);
 
-  // Load chat history
+  // Cargar historial de chat
   useEffect(() => {
-    const isAuthenticated = session || bypassAuth; // Usuario autenticado si hay sesión o si estamos en bypass
+    const isAuthenticated = session || bypassAuth;
 
-    // Esperar a que la autenticación termine de cargar si no estamos en bypass
     if (!bypassAuth && isAuthLoading) {
-        console.log("ChatPage: Waiting for auth to load...");
         setIsLoadingHistory(true); // Mostrar carga mientras auth verifica
         return;
     }
 
     if (isAuthenticated && chatId && fetchedChatIdRef.current !== chatId) {
-      console.log(`ChatPage: Auth loaded. Fetching history for chat ID: ${chatId}`);
       setIsLoadingHistory(true);
       setHistoryError(null);
       fetchedChatIdRef.current = chatId;
@@ -497,57 +504,44 @@ export default function ChatPage() {
            apiMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
            const mappedMessages = apiMessages.map(mapApiMessageToFrontend);
            setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
-           console.log(`ChatPage: Loaded ${mappedMessages.length} messages for chat ${chatId}.`);
         })
         .catch(error => {
-          console.error(`ChatPage: Failed to load chat history for ${chatId}:`, error);
           let message = "Error loading chat history.";
           if (error instanceof ApiError) {
               message = error.message || message;
-              if (error.status === 404) {
-                  message = "Chat not found or you don't have access.";
-                  toast.error("Chat Not Found", { description: message });
-                  router.replace('/chat'); return;
-              } else if (error.status === 401) {
-                   message = "Authentication error. Please log in again.";
-                   signOut(); // Forzar logout si la API devuelve 401
-                   // La redirección ocurrirá en el layout
-              }
+              if (error.status === 404) { router.replace('/chat'); return; }
+              if (error.status === 401) { signOut(); } // Forzar logout en 401
           } else if (error instanceof Error) { message = error.message; }
-          setHistoryError(message);
-          setMessages([welcomeMessage]);
+          setHistoryError(message); setMessages([welcomeMessage]);
           toast.error("Failed to Load Chat", { description: message });
         })
         .finally(() => { setIsLoadingHistory(false); });
 
     } else if (!chatId) {
-      // Nueva página de chat
-      console.log("ChatPage: No chatId, preparing for new chat.");
-      setMessages([welcomeMessage]);
-      setRetrievedDocs([]);
-      setIsLoadingHistory(false); // No hay historial que cargar
-      setHistoryError(null);
+      setMessages([welcomeMessage]); setRetrievedDocs([]);
+      setIsLoadingHistory(false); setHistoryError(null);
       fetchedChatIdRef.current = undefined;
     } else if (!isAuthenticated && !isAuthLoading) {
-         // Si terminó de cargar auth y no está autenticado (y no bypass)
-         console.log("ChatPage: User not authenticated, cannot load history.");
-         setIsLoadingHistory(false);
-         setHistoryError("Please log in to view chat history.");
-         setMessages([welcomeMessage]);
-         fetchedChatIdRef.current = undefined;
-         // La redirección a login debería ocurrir en AppLayout
+         setIsLoadingHistory(false); setHistoryError("Please log in to view chat history.");
+         setMessages([welcomeMessage]); fetchedChatIdRef.current = undefined;
     }
-
-  // --- CORRECCIÓN: Dependencias actualizadas ---
   }, [chatId, session, isAuthLoading, bypassAuth, router, signOut]);
-  // -----------------------------------------
 
-  // Scroll to bottom
-  useEffect(() => { /* ... (sin cambios) ... */ }, [messages, isSending, isLoadingHistory]);
+  // Scroll al final
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        const timer = setTimeout(() => {
+             if (scrollAreaRef.current) {
+                 scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+             }
+        }, 100);
+        return () => clearTimeout(timer);
+    }
+  }, [messages, isSending, isLoadingHistory]);
 
-  // Send message
+  // Enviar mensaje
   const handleSendMessage = useCallback(async (query: string) => {
-    const isAuthenticated = session || bypassAuth; // Verificar auth al enviar
+    const isAuthenticated = session || bypassAuth;
     if (!query.trim() || isSending || !isAuthenticated) {
         if (!isAuthenticated) toast.error("Authentication Error", { description: "Please log in to send messages." });
         return;
@@ -555,16 +549,12 @@ export default function ChatPage() {
 
     const userMessage: Message = { id: `client-user-${Date.now()}`, role: 'user', content: query, created_at: new Date().toISOString() };
     setMessages(prev => [...prev, userMessage]);
-    setIsSending(true);
-    setRetrievedDocs([]);
+    setIsSending(true); setRetrievedDocs([]);
     const currentChatIdForApi = chatId || null;
 
     try {
-      console.log(`ChatPage: Sending query to chat ID: ${currentChatIdForApi}`);
       const response = await postQuery({ query, chat_id: currentChatIdForApi });
-      console.log("ChatPage: Received response:", response);
       const returnedChatId = response.chat_id;
-
       const assistantMessage: Message = {
         id: `client-assistant-${Date.now()}`, role: 'assistant', content: response.answer,
         sources: mapApiSourcesToFrontend(response.retrieved_documents),
@@ -573,77 +563,90 @@ export default function ChatPage() {
       setMessages(prev => [...prev, assistantMessage]);
       setRetrievedDocs(mapApiSourcesToFrontend(response.retrieved_documents) || []);
 
-      // Actualizar URL si es chat nuevo
       if (!currentChatIdForApi && returnedChatId) {
-        console.log(`ChatPage: New chat created: ${returnedChatId}. Updating URL.`);
-        setChatId(returnedChatId);
-        fetchedChatIdRef.current = returnedChatId;
+        setChatId(returnedChatId); fetchedChatIdRef.current = returnedChatId;
         router.replace(`/chat/${returnedChatId}`, { scroll: false });
-      } // ... (manejo de cambio inesperado de ID) ...
-
+      }
       if (response.retrieved_documents?.length && !isPanelOpen) setIsPanelOpen(true);
 
     } catch (error) {
-      console.error("ChatPage: Query failed:", error);
       let errorMessage = "Sorry, I encountered an error trying to answer.";
        if (error instanceof ApiError) {
            errorMessage = error.message || `API Error (${error.status})`;
-           if (error.status === 401) {
-                errorMessage = "Authentication error. Session may be invalid.";
-                signOut(); // Forzar logout
-           }
+           if (error.status === 401) { errorMessage = "Authentication error."; signOut(); }
        } else if (error instanceof Error) { errorMessage = `Error: ${error.message}`; }
-
-      const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true, created_at: new Date().toISOString() };
-      setMessages(prev => [...prev, errorMessageObj]);
+      const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true, created_at: new Date().toISOString() };
+      setMessages(prev => [...prev, errorMsgObj]);
       toast.error("Query Failed", { description: errorMessage });
     } finally {
       setIsSending(false);
     }
-  // --- CORRECCIÓN: Dependencias actualizadas ---
   }, [isSending, chatId, router, session, bypassAuth, isPanelOpen, signOut]);
-  // ------------------------------------------
 
   const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
 
-  // --- Render Functions (sin cambios internos) ---
-  const renderHistoryLoading = () => ( /* ... */ );
-  const renderHistoryError = () => ( /* ... */ );
-  const renderWelcomeOrMessages = () => { /* ... */ };
-  // -------------------------------------------
+  // --- CORRECCIÓN: Restaurar implementación de funciones de renderizado ---
+  const renderHistoryLoading = () => (
+       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Loading chat history...</p>
+        </div>
+  );
 
-  // --- Render Principal ---
-  // Mostrar carga si la autenticación o el historial están cargando
+  const renderHistoryError = () => (
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive mb-4" />
+          <p className="text-destructive font-medium mb-2">Error Loading History</p>
+          <p className="text-sm text-muted-foreground mb-4">{historyError}</p>
+          {/* <Button variant="outline" size="sm" onClick={retryFetchHistory}>Retry</Button> */}
+      </div>
+  );
+
+  const renderWelcomeOrMessages = () => {
+      // Renderizar mensajes existentes o el mensaje de bienvenida si es apropiado
+      if (messages.length === 0 || (messages.length === 1 && messages[0].id === 'initial-welcome' && !chatId)) {
+          return <ChatMessage key={welcomeMessage.id} message={welcomeMessage} />;
+      }
+      return messages.map((message) => (
+          <ChatMessage key={message.id} message={message} />
+      ));
+  };
+  // --- FIN CORRECCIÓN ---
+
   const showLoading = (isLoadingHistory || (isAuthLoading && !bypassAuth));
 
   return (
      <ResizablePanelGroup direction="horizontal" className="h-full max-h-[calc(100vh-theme(space.16))]">
             <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={50}>
                 <div className="flex h-full flex-col relative">
-                    <div className="absolute top-2 right-2 z-10">
+                    <div className="absolute top-2 right-2 z-10"> {/* Panel Toggle Button */}
                         <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
                             {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                         </Button>
                     </div>
-                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-                         {showLoading ? ( // Usar el flag combinado de carga
-                            renderHistoryLoading()
+                    <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}> {/* Chat Messages Area */}
+                         {showLoading ? (
+                            renderHistoryLoading() // Mostrar carga
                          ) : historyError ? (
-                             renderHistoryError()
+                             renderHistoryError() // Mostrar error
                          ) : (
                             <div className="space-y-4 pr-4">
-                                {renderWelcomeOrMessages()}
-                                {isSending && ( /* Skeleton de envío */ )}
+                                {renderWelcomeOrMessages()} {/* Mostrar mensajes */}
+                                {isSending && ( // Skeleton de envío
+                                    <div className="flex items-start space-x-3">
+                                        <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center"><BrainCircuit className="h-5 w-5 text-primary"/></Skeleton>
+                                        <div className="space-y-2 flex-1 pt-1"><Skeleton className="h-4 w-16" /></div>
+                                    </div>
+                                )}
                             </div>
                          )}
                     </ScrollArea>
-                    <div className="border-t p-4 bg-muted/30">
-                        {/* Deshabilitar input si está cargando auth o enviando */}
+                    <div className="border-t p-4 bg-muted/30"> {/* Input Area */}
                         <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || showLoading} />
                     </div>
                 </div>
             </ResizablePanel>
-            {isPanelOpen && (
+            {isPanelOpen && ( /* Retrieved Documents Panel */
                 <>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
@@ -715,28 +718,33 @@ import { cn } from '@/lib/utils';
 // import { removeToken } from '@/lib/auth/helpers';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  // Usar session y user del hook actualizado
-  const { user, session, isLoading, signOut } = useAuth();
+  const { user, isLoading, token, logout } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  // NEW: Check if we should bypass auth based on env variable
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
   useEffect(() => {
     if (bypassAuth) {
-      console.warn("AppLayout: Authentication BYPASSED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
-      return; // Skip auth check if bypass is enabled
+      console.warn("AppLayout: Auth checks bypassed.");
+      return; // No hacer nada si el bypass está activo
     }
 
-    if (!isLoading && !token) {
-      console.log("AppLayout: No token found, redirecting to login.");
-      router.push('/'); // Cambiado a '/'
+    // Si no está cargando y NO hay sesión válida, redirigir a login (o a '/')
+    if (!isLoading && !session) {
+      console.log("AppLayout: No active session found, redirecting to login page.");
+      router.push('/'); // Redirigir a la página principal/pública
     }
-  }, [isLoading, token, router, bypassAuth]);
+    // Opcional: Si hay sesión pero el mapeo a 'user' falló (ej. falta companyId)
+    // podrías forzar un logout o mostrar un error específico aquí.
+    // else if (!isLoading && session && !user) {
+    //   console.error("AppLayout: Session exists but user mapping failed (missing required data?). Forcing logout.");
+    //   signOut(); // Forzar logout si el estado del usuario no es válido
+    // }
 
-  // Muestra un spinner mientras se verifica la autenticación
-  if (isLoading || (!token && !isLoading)) {
+  }, [isLoading, session, user, router, bypassAuth, signOut]); // Añadir signOut a dependencias si se usa
+
+  // Mostrar spinner mientras carga Y no estamos en modo bypass
+  if (isLoading && !bypassAuth) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -1364,17 +1372,23 @@ export default function RootLayout({
 // File: app/page.tsx
 "use client";
 
-import React from 'react'; // Quitar useState si no se usa
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
-import { useAuth } from '@/lib/hooks/useAuth';
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // <-- IMPORTAR
+import { useAuth } from '@/lib/hooks/useAuth'; // Hook actualizado
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
 import { cn } from '@/lib/utils';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token } = useAuth(); // O usa `session` si lo prefieres: const { session } = useAuth();
+  // --- CORRECCIÓN: Usar 'session' en lugar de 'token' ---
+  // 'session' será null si no hay sesión activa, o un objeto si la hay.
+  const { session, user } = useAuth(); // Obtener 'session' y 'user' del hook
+  // -----------------------------------------------------
+
+  // Determinar si el usuario está autenticado basado en la sesión
+  const isAuthenticated = !!session; // Es true si session no es null
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -1386,7 +1400,8 @@ export default function HomePage() {
             <LinkButton href="/">Home</LinkButton>
             <LinkButton href="/about">About</LinkButton>
             <LinkButton href="/contact">Contact</LinkButton>
-            {token ? ( // O `session`
+            {/* --- CORRECCIÓN: Usar 'isAuthenticated' --- */}
+            {isAuthenticated ? (
               <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
                 Go to App
               </Button>
@@ -1401,6 +1416,7 @@ export default function HomePage() {
                 Login
               </Button>
             )}
+            {/* ------------------------------------- */}
           </nav>
         </div>
       </header>
@@ -1414,16 +1430,18 @@ export default function HomePage() {
           <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
             Ask questions in natural language and get instant answers based on your organization's collective knowledge.
           </p>
+          {/* --- CORRECCIÓN: Usar 'isAuthenticated' --- */}
           <Button
             size="lg"
-            onClick={() => token ? router.push('/chat') : router.push('/register')} // O `session`
+            onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
             className={cn(
                  "transition-colors duration-150",
                  "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
              )}
           >
-            {token ? 'Go to Chat' : 'Get Started'} {/* O `session` */}
+            {isAuthenticated ? 'Go to Chat' : 'Get Started'}
           </Button>
+          {/* ------------------------------------- */}
         </section>
 
         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -1431,10 +1449,8 @@ export default function HomePage() {
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
           <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
-        {/* --- AÑADIR EL HANDLER AQUÍ --- */}
-        {/* Este componente escuchará los cambios de auth y manejará el hash de confirmación */}
+        {/* Handler para confirmación de email (se mantiene igual) */}
         <EmailConfirmationHandler />
-        {/* ------------------------------ */}
       </main>
 
       {/* Footer */}
@@ -1447,7 +1463,7 @@ export default function HomePage() {
   );
 }
 
-// Reusable Link Button Component
+// Reusable Link Button Component (sin cambios)
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   const router = useRouter();
   return (
@@ -1490,66 +1506,76 @@ export default function EmailConfirmationHandler() {
     const processedRef = useRef(false);
 
     useEffect(() => {
-        // Solo procesar una vez
-        if (processedRef.current) return;
+        if (hasConfirmed) {
+            return;
+        }
 
-        console.log("EmailConfirmationHandler mounted. Listening for auth changes.");
+        const handleEmailConfirmation = async () => {
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const expiresIn = params.get('expires_in');
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log(`EmailConfirmationHandler: Auth event received: ${event}`);
+                if (accessToken && refreshToken && expiresIn) {
+                    console.log("Found access token in URL hash:", accessToken);
+                    console.log("Attempting to set session and log in.");
 
-            // El evento clave después de la confirmación es SIGNED_IN (o USER_UPDATED si ya estaba logueado)
-            // Y la sesión debería contener el usuario confirmado.
-            if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user && !processedRef.current) {
-                 // Verificar si el email está confirmado (puede que el evento salte antes de que el flag esté 100% actualizado)
-                 // Es mejor confiar en que si hay sesión después del flujo de confirmación, está bien.
-                 // const { data: { user } } = await supabase.auth.getUser(); // Opcional: Refrescar datos del usuario
+                     // Create the supabaseClient
+                     const supabaseClient = createClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                     );
+                    
+                     // Use the access token to get the user and full session
+                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
+                         access_token: accessToken!,
+                         refresh_token: refreshToken!,
+                     })
 
-                 console.log("Email confirmed or user updated successfully! Session established:", session);
-                 toast.success("Account Confirmed!", {
-                    description: "You have successfully confirmed your email address.",
-                 });
+                     if (error) {
+                        console.error("Error setting session:", error);
+                        return; // Stop further execution if session setup fails
+                     }
+                    
+                    if (session && user) {
+                        try {
+                            const { error: insertError } = await supabaseClient
+                                .from('users')
+                                .insert([
+                                    {
+                                        id: user.id, // Use user.id from the session
+                                        email: user.email,
+                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
+                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
+                                        role: 'user',
+                                        is_active: true,
+                                    }
+                                ]);
 
-                 processedRef.current = true; // Marcar como procesado
+                            if (insertError) {
+                                console.error("Error inserting user into 'users' table:", insertError);
+                                if (insertError.code === '23505') {
+                                    console.warn("Duplicate user insertion attempted. Ignoring.");
+                                }
+                            } else {
+                                console.log("User inserted into 'users' table successfully.");
+                            }
+                        } catch (insertErr: any) {
+                            console.error("Error during user insertion:", insertErr);
+                        }
 
-                 // --- Lógica Opcional Post-Confirmación ---
-                 // Aquí es donde idealmente llamarías a una Edge Function para asegurarte
-                 // de que el usuario existe en tu tabla pública `users` con los metadatos correctos.
-                 // Ejemplo (si tuvieras una función 'ensure-user-profile'):
-                 // try {
-                 //   const { error: funcError } = await supabase.functions.invoke('ensure-user-profile');
-                 //   if (funcError) throw funcError;
-                 //   console.log("User profile ensured via Edge Function.");
-                 // } catch (funcError) {
-                 //   console.error("Error calling Edge Function to ensure profile:", funcError);
-                 //   toast.error("Profile Sync Error", { description: "Could not sync profile data." });
-                 // }
-                 // ------------------------------------------
-
-                 // Redirigir al usuario a la página principal o al chat
-                 // Usamos replace para que el usuario no pueda volver a la URL con el hash
-                 router.replace('/chat'); // O a '/'
-            } else if (event === 'PASSWORD_RECOVERY') {
-                 // Supabase también dispara este evento si el hash era para reseteo de contraseña
-                 console.log("Password recovery flow detected.");
-                 // Aquí podrías redirigir a una página específica para cambiar la contraseña
-                 // router.replace('/reset-password');
-                 toast.info("Password Recovery", { description: "Please set your new password." });
-                 processedRef.current = true; // Marcar como procesado
+                        setHasConfirmed(true);
+                        await signIn(session);
+                        router.replace('/');
+                    }
+                }
             }
-
-            // Considera manejar otros eventos si son relevantes (SIGNED_OUT, TOKEN_REFRESHED, etc.)
-        });
-
-        // Limpiar suscripción al desmontar
-        return () => {
-            console.log("EmailConfirmationHandler unmounting. Unsubscribing from auth changes.");
-            subscription?.unsubscribe();
         };
 
-    }, [router]); // Dependencia del router para la redirección
+        handleEmailConfirmation();
+    }, [signIn, router, hasConfirmed]);
 
-    // Este componente no renderiza nada visible
     return null;
 }
 ```
@@ -1592,11 +1618,34 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("LoginForm: Calling signIn with:", data.email);
-      await signIn(data); // <-- Llamar a la función signIn del hook
-      // La redirección ocurrirá dentro del hook si tiene éxito
-      // No necesitas hacer nada más aquí en caso de éxito
-      console.log("LoginForm: signIn initiated successfully.");
+      console.log("Attempting login with:", data.email);
+
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error("Supabase URL or Anon Key not set in environment variables.");
+        setError("Supabase configuration error. Please check your environment variables.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabaseClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (authError) {
+        console.error("Supabase login failed:", authError);
+        setError(authError.message || 'Login failed. Please check your credentials.');
+      } else if (authResponse.session) {
+        console.log("Supabase login successful:", authResponse);
+        login(authResponse.session.access_token);
+      } else {
+        console.error("Supabase login: No session returned");
+        setError('Login failed. Please check your credentials.');
+      }
     } catch (err) {
       // El hook signIn debería lanzar un error en caso de fallo
       console.error("LoginForm: signIn failed:", err);
@@ -1684,34 +1733,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'; // Añadir CheckCircle
-import { supabase } from '@/lib/supabaseClient'; // Importar cliente Supabase
-import { AuthApiError } from '@supabase/supabase-js'; // Tipo de error específico de Supabase Auth
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { AuthApiError } from '@supabase/supabase-js';
 
-// Esquema Zod incluyendo companyId (opcional por ahora, pero recomendable hacerlo requerido si aplica)
+// Esquema Zod
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  // Hacer companyId requerido si siempre debe asociarse una compañía al registrarse
   companyId: z.string().uuid({ message: "Invalid Company ID format (UUID expected)" }).optional(),
-  // Podrías añadir confirmPassword si quieres validación en el frontend
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-// --- VALOR POR DEFECTO PARA COMPANY ID (SOLO PARA DESARROLLO/PRUEBAS) ---
-// ¡¡¡IMPORTANTE!!! En un entorno real, este ID debería venir de alguna parte
-// (ej. selección del usuario, invitación, URL específica, etc.)
-// NO deberías tener un ID fijo quemado aquí en producción.
+// Valor por defecto para Company ID (Desarrollo)
 const DEFAULT_DEV_COMPANY_ID = process.env.NEXT_PUBLIC_DEV_COMPANY_ID || '';
-// --------------------------------------------------------------------
 
 export function RegisterForm() {
-  // No necesitamos useAuth aquí directamente para el registro inicial
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false); // Para mensaje de confirmación
+  const [success, setSuccess] = useState<boolean>(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -1719,7 +1761,7 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
-      companyId: process.env.NODE_ENV === 'development' && DEFAULT_DEV_COMPANY_ID ? DEFAULT_DEV_COMPANY_ID : '', // Usar valor por defecto en dev
+      companyId: process.env.NODE_ENV === 'development' && DEFAULT_DEV_COMPANY_ID ? DEFAULT_DEV_COMPANY_ID : '',
     },
   });
 
@@ -1728,15 +1770,36 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
 
-    // Construir metadata para Supabase
+    // Metadata para user_metadata (lo que el usuario puede gestionar)
     const userMetaData = { full_name: data.name || null };
-    // ¡IMPORTANTE! Datos como company_id o roles van en app_metadata
-    const appMetaData = {
-        // Si companyId no se proporciona en el form (es opcional), no lo incluimos
-        ...(data.companyId && { company_id: data.companyId }),
-        // Podrías añadir roles por defecto aquí si aplica
-        // roles: ['user'],
+
+    // --- IMPORTANTE ---
+    // El companyId (y roles) idealmente van en app_metadata, pero NO se pueden
+    // establecer directamente desde el cliente con signUp.
+    // Se debe usar un TRIGGER en la base de datos Supabase (en la tabla auth.users)
+    // o una Edge Function llamada después para copiar esta información
+    // (posiblemente desde user_metadata o una tabla intermedia) a app_metadata
+    // o a tu tabla pública de perfiles.
+    //
+    // Por ahora, si recogemos companyId en el form, podríamos pasarlo en 'data'
+    // para que el trigger lo pueda leer desde user_metadata, o ignorarlo aquí
+    // si el trigger lo obtiene de otra fuente.
+    //
+    // Opción 1: Pasar companyId DENTRO de 'data' (user_metadata) para que un trigger lo lea
+    // const userMetaDataWithCompany = { ...userMetaData, dev_company_id_ref: data.companyId };
+
+    // Opción 2: No pasar companyId aquí y confiar en que el trigger/backend lo obtendrá
+    // (por ejemplo, si el usuario se registra a través de una URL de invitación específica de la compañía)
+
+    // Usaremos la Opción 1 por ahora como ejemplo, asumiendo un trigger leerá dev_company_id_ref
+    const userMetaDataForSignUp = {
+        ...userMetaData,
+        // Añadimos companyId aquí temporalmente para que un trigger lo pueda leer
+        // ¡CUIDADO! Esto es visible/editable por el usuario via updateUser.
+        // Una solución más segura es usar un endpoint backend o Edge Function post-registro.
+        company_id_signup_ref: data.companyId || null,
     };
+    // ------------------
 
     try {
       console.log("RegisterForm: Attempting Supabase signUp for:", data.email);
@@ -1745,26 +1808,18 @@ export function RegisterForm() {
         email: data.email,
         password: data.password,
         options: {
-          // Datos que el usuario puede ver/editar (a través de updateUser)
-          data: userMetaData,
-          // Datos que solo la app/backend debería gestionar (se añaden al token)
-          // ¡¡ASEGÚRATE QUE ESTO FUNCIONA!! Supabase puede requerir configuración adicional
-          // o que estos datos se añadan post-registro vía backend/trigger.
-          // La documentación indica que 'data' en signUp va a user_metadata.
-          // Para app_metadata, a menudo se necesita un paso adicional (trigger/función).
-          // Vamos a intentar pasarlo aquí, pero verifica que se guarde correctamente.
-           app_metadata: appMetaData, // <--- INTENTO de pasar app_metadata
+          // Pasar metadata a user_metadata
+          data: userMetaDataForSignUp, // <-- Usar los datos preparados
 
-           // --- IMPORTANTE: Redirección para Confirmación ---
-           // Especifica a dónde debe redirigir Supabase DESPUÉS de que el usuario
-           // haga clic en el enlace de confirmación en su correo.
-           // Debe ser una página en tu app que pueda manejar la sesión (usualmente la raíz o login).
-           emailRedirectTo: window.location.origin, // Redirige a la página actual (ej. https://tuapp.vercel.app/)
+          // --- NO SE PUEDE PASAR app_metadata DESDE EL CLIENTE ---
+          // app_metadata: appMetaData, // <-- ESTA LÍNEA CAUSABA EL ERROR Y SE ELIMINA
+
+          // Redirección para confirmación de email
+          emailRedirectTo: window.location.origin,
         },
       });
 
       if (signUpError) {
-        // Manejar errores específicos de Supabase
         console.error("Supabase signUp error:", signUpError);
         if (signUpError instanceof AuthApiError && signUpError.message.includes("User already registered")) {
              setError("This email is already registered. Try logging in.");
@@ -1772,30 +1827,21 @@ export function RegisterForm() {
             setError(signUpError.message || 'Registration failed. Please try again.');
         }
         setIsLoading(false);
-        return; // Detener si hay error
+        return;
       }
 
       console.log("Supabase signUp successful:", signUpData);
 
-      // Verificar si se requiere confirmación por correo (configuración por defecto en Supabase)
+      // Manejo de éxito y confirmación de email
       if (signUpData.user && signUpData.user.identities?.length === 0) {
-          // Esto indica que el usuario existe pero necesita confirmar su email
-          console.log("Registration requires email confirmation.");
-          setSuccess(true); // Mostrar mensaje de éxito/confirmación
-          setError(null);
+          setSuccess(true); setError(null);
       } else if (signUpData.user) {
-           // Si la confirmación no está habilitada (o es login con OAuth), el usuario ya está activo
-           console.log("User registered and automatically confirmed (or confirmation disabled).");
-           // Podrías intentar loguearlo aquí, pero es mejor esperar a onAuthStateChange
-           setSuccess(true); // Mostrar mensaje genérico de éxito
-           setError("Registration successful! You might be logged in automatically."); // Mensaje informativo
+           setSuccess(true); setError("Registration successful! You might be logged in automatically.");
       } else {
-           // Caso inesperado
-           console.warn("SignUp completed but no user data returned and no confirmation needed?");
            setError("Registration completed with unexpected status. Please try logging in.");
       }
 
-    } catch (err) { // Captura errores generales del proceso
+    } catch (err) {
       console.error("Unexpected error during registration:", err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
@@ -1812,7 +1858,7 @@ export function RegisterForm() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && ( // Mostrar mensaje de éxito/confirmación
+       {success && (
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
            <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" />
           <AlertTitle className="text-green-800 dark:text-green-200">Registration Submitted</AlertTitle>
@@ -1821,7 +1867,7 @@ export function RegisterForm() {
           </AlertDescription>
         </Alert>
       )}
-      {/* --- Campos del Formulario --- */}
+      {/* Campos del Formulario */}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
         <Input id="name" type="text" placeholder="Your Name" {...form.register('name')} disabled={isLoading || success}/>
@@ -1837,15 +1883,11 @@ export function RegisterForm() {
         <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
         {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
       </div>
-      {/* Campo Company ID (Opcional por defecto, basado en schema) */}
-      {/* Oculta este campo si no quieres que el usuario lo ingrese manualmente */}
-      {/* O hazlo visible y requerido si es necesario */}
        <div className="space-y-1">
          <Label htmlFor="companyId">Company ID (Optional - Dev Only)</Label>
          <Input id="companyId" type="text" placeholder="Enter Company UUID" {...form.register('companyId')} disabled={isLoading || success}/>
          {form.formState.errors.companyId && <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>}
        </div>
-      {/* ----------------------------- */}
       <Button type="submit" className="w-full" disabled={isLoading || success}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
@@ -2441,34 +2483,42 @@ export function ChatMessage({ message }: ChatMessageProps) {
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
-// File: components/chat/retrieved-documents-panel.tsx
       
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-// --- CORRECCIÓN: Importar iconos en una sola línea ---
-import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
-// ---------------------------------------------------
-import { RetrievedDoc } from '@/lib/api'; // Mantener esta importación
+import { FileText, AlertCircle, Download, Loader2 } from 'lucide-react'; // Import Download icon
+import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button'; // Import Button component
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@radix-ui/react-dialog"; // Import Dialog components
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+    DialogClose
+} from "@/components/ui/dialog"; // Importación correcta
+import { toast } from "sonner";
 
-    
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean;
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
+    const [open, setOpen] = useState(false)
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleViewDocument = (doc: RetrievedDoc) => {
         console.log("Viewing document details:", doc.document_id || doc.id);
         setSelectedDoc(doc);
-        setIsDialogOpen(true);
-    };
+        setIsDialogOpen(true); // Abre el diálogo
+    }; // <--- Asegúrate que esta llave de cierre esté presente
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
         const message = `Download requested for: ${doc.file_name || doc.id}`;
@@ -2477,11 +2527,13 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
              description: `Backend endpoint for downloading '${doc.file_name || doc.id}' is not yet available.`,
              action: { label: "Close", onClick: () => {} },
         });
-    };
+    }; // <--- Asegúrate que esta llave de cierre esté presente
 
+  // El return debe empezar aquí, directamente devolviendo el componente Dialog
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
+            {/* CardHeader */}
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
                 <CardTitle className="text-lg flex items-center">
                     <FileText className="mr-2 h-5 w-5" /> Retrieved Sources
@@ -2490,29 +2542,98 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     Documents used to generate the answer. Click to view details.
                 </CardDescription>
             </CardHeader>
+
+            {/* ScrollArea con contenido */}
             <ScrollArea className="flex-1">
                 <div className="p-4 space-y-3">
-                {isLoading && documents.length === 0 && ( /* Skeleton */ )}
-                {!isLoading && documents.length === 0 && ( /* No docs found */ )}
-                {documents.map((doc, index) => (
-                    <DialogTrigger asChild key={doc.id || `doc-${index}`}>
-                         <Card /* ... Card content ... */ >
-                            {/* ... */}
-                         </Card>
-                    </DialogTrigger>
-                ))}
+                    {/* Estado de Carga */}
+                    {isLoading && documents.length === 0 && (
+                        <>
+                            <Skeleton className="h-20 w-full rounded-md" />
+                            <Skeleton className="h-20 w-full rounded-md" />
+                            <Skeleton className="h-20 w-full rounded-md" />
+                        </>
+                    )}
+                    {/* Estado Vacío */}
+                    {!isLoading && documents.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground">
+                            <AlertCircle className="h-8 w-8 mb-2" />
+                            <p className="text-sm">No relevant documents found for the last query.</p>
+                        </div>
+                    )}
+                    {/* Lista de Documentos */}
+                    {documents.map((doc, index) => (
+                        // Cada Card es un Trigger para el Dialog
+                        <DialogTrigger asChild key={doc.id || `doc-${index}`}>
+                            <Card
+                                className="cursor-pointer hover:shadow-md transition-shadow duration-150"
+                                onClick={() => handleViewDocument(doc)} // Establece el doc seleccionado al hacer clic
+                                title={`Click to view details for ${doc.file_name || 'document'}`}
+                            >
+                                <CardContent className="p-3 space-y-1 text-sm">
+                                    <div className="flex justify-between items-start">
+                                        <p className="font-medium text-primary truncate pr-2">
+                                            {index + 1}. {doc.file_name || doc.document_id || `Chunk ${doc.id.substring(0, 8)}`}
+                                        </p>
+                                        {doc.score != null && (
+                                            <Badge variant="secondary" title={`Relevance Score: ${doc.score.toFixed(4)}`}>
+                                                {doc.score.toFixed(2)}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                        {doc.content_preview || 'No preview available.'}
+                                    </p>
+                                    <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
+                                        <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
+                                        <Eye className="h-3 w-3 text-muted-foreground/50" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </DialogTrigger>
+                    ))}
                 </div>
             </ScrollArea>
 
+            {/* Contenido del Dialog (se renderiza fuera del flujo normal gracias al Portal) */}
             {selectedDoc && (
                 <DialogContent className="sm:max-w-lg">
-                   {/* ... Dialog Content ... */}
+                    <DialogHeader>
+                        <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}>
+                            {selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Details of the retrieved document chunk.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3 text-sm">
+                        {/* Detalles del documento */}
+                        <div className="flex justify-between"><span className="font-medium text-muted-foreground">Document ID:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="font-medium text-muted-foreground">Chunk ID:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.id}</span></div>
+                        <div className="flex justify-between"><span className="font-medium text-muted-foreground">Relevance Score:</span><span>{selectedDoc.score?.toFixed(4) ?? 'N/A'}</span></div>
+                        <div>
+                            <span className="font-medium text-muted-foreground block mb-1">Content Preview:</span>
+                            <ScrollArea className="max-h-[250px] border rounded p-2 bg-muted/50 text-xs"><pre className="whitespace-pre-wrap break-words">{selectedDoc.content_preview || 'No content preview available.'}</pre></ScrollArea>
+                        </div>
+                        {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
+                             <div>
+                                <span className="font-medium text-muted-foreground block mb-1">Metadata:</span>
+                                <ScrollArea className="max-h-[100px] border rounded p-2 bg-muted/50 text-xs"><pre className="whitespace-pre-wrap break-words">{JSON.stringify(selectedDoc.metadata, null, 2)}</pre></ScrollArea>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
+                            <Download className="mr-2 h-4 w-4" />Download Original (N/A)
+                        </Button>
+                        <DialogClose asChild><Button variant="secondary">Close</Button></DialogClose>
+                    </DialogFooter>
                 </DialogContent>
             )}
         </div>
-    </Dialog>
-  );
-}
+    </Dialog> // Cierre del componente Dialog principal
+  ); // Cierre del return
+} // Cierre de la función del componente
 ```
 
 ## File: `components\knowledge\document-status-list.tsx`
@@ -2550,9 +2671,10 @@ export function DocumentStatusList() {
             const data = await listDocumentStatuses();
             setStatuses(data);
             if (showToast) {
-                 toast.success("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
+                toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
+            } else if (data.length === 0) {
+                console.log("No document statuses found.");
             }
-            console.log(`Fetched ${data.length} document statuses.`);
         } catch (err) {
             console.error("Failed to fetch document statuses:", err);
             let message = "Could not load document statuses.";
@@ -2577,7 +2699,7 @@ export function DocumentStatusList() {
     };
 
     const getStatusBadge = (status: DocumentStatus['status']) => {
-       switch (status) {
+        switch (status) {
             case 'uploaded':
                 return <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"><Clock className="mr-1 h-3 w-3" />Uploaded</Badge>;
             case 'processing':
@@ -2594,7 +2716,7 @@ export function DocumentStatusList() {
     };
 
     const formatDateTime = (dateString?: string) => {
-      if (!dateString) return 'N/A';
+        if (!dateString) return 'N/A';
         try {
             return new Date(dateString).toLocaleString(undefined, {
                 year: 'numeric', month: 'short', day: 'numeric',
@@ -2605,9 +2727,9 @@ export function DocumentStatusList() {
         }
     };
 
-     const renderContent = () => {
-        if (isLoading && statuses.length === 0) {
-            return Array.from({ length: 5 }).map((_, index) => (
+    const renderContent = () => {
+        if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
+            return Array.from({ length: 5 }).map((_, index) => ( // Render more skeleton rows
                 <TableRow key={`skel-${index}`}>
                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20" /></TableCell>
@@ -2641,10 +2763,7 @@ export function DocumentStatusList() {
 
         return statuses.map((doc) => (
             <TableRow key={doc.document_id}>
-                {/* (*) CORRECTED LINE: Use nullish coalescing operator */}
-                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name ?? undefined}>
-                    {doc.file_name || 'N/A'}
-                </TableCell>
+                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name || 'N/A'}>{doc.file_name || 'N/A'}</TableCell>
                 <TableCell>{getStatusBadge(doc.status)}</TableCell>
                 <TableCell className="text-muted-foreground text-xs max-w-sm">
                     {doc.status === 'error' ? (
@@ -2711,11 +2830,11 @@ export function DocumentStatusList() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                       {renderContent()}
+                        {renderContent()}
                     </TableBody>
                 </Table>
             </ScrollArea>
-       </div>
+        </div>
     );
 }
 ```
@@ -4718,8 +4837,8 @@ export class ApiError extends Error {
   }
 }
 
-// --- Core Request Function ---
-export async function request<T>(
+// --- Core Request Function (Catch block corregido) ---
+async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -4808,9 +4927,27 @@ export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]>
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => request<QueryApiResponse>('/api/v1/query', { method: 'POST', body: JSON.stringify({...payload, chat_id: payload.chat_id || null}) });
 export const deleteChat = async (chatId: string): Promise<void> => { await request<null>(`/api/v1/chats/${chatId}`, { method: 'DELETE' }); };
 
-// --- Type Mapping Helpers (sin cambios) ---
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => { /* ... */ };
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ };
+// --- Type Mapping Helpers ---
+
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
+    if (!apiSources) return undefined;
+    return apiSources.map(source => ({
+        id: source.id,
+        score: source.score,
+        content_preview: source.content_preview,
+        metadata: source.metadata,
+        document_id: source.document_id,
+        file_name: source.file_name,
+    }));
+};
+
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
+    id: apiMessage.id,
+    role: apiMessage.role,
+    content: apiMessage.content,
+    sources: mapApiSourcesToFrontend(apiMessage.sources),
+    isError: false,
+});
 ```
 
 ## File: `lib\auth\helpers.ts`
@@ -4891,8 +5028,8 @@ interface AuthContextType {
   user: AppUser | null; // Nuestra interfaz User
   session: Session | null; // La sesión completa de Supabase
   isLoading: boolean;
-  // (+) AÑADIR 'signIn' a la definición de AuthContextType
   signIn: (session: any) => void; // Tipo 'any' para la session, adáptalo si tienes un tipo específico
+  login: (token: string) => void;
   logout: () => void;
 }
 
@@ -4901,19 +5038,13 @@ const defaultAuthContextValue: AuthContextType = {
     token: null,
     isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
     signIn: (session: any) => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("signIn function called outside of AuthProvider context");
-        // throw new Error("Login function called outside AuthProvider");
     },
     login: (token: string) => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("Login function called outside of AuthProvider context");
-        // throw new Error("Login function called outside AuthProvider");
     },
     logout: () => {
-        // Función vacía o lanza error si se llama fuera del provider
         console.error("Logout function called outside of AuthProvider context");
-        // throw new Error("Logout function called outside AuthProvider");
     },
 };
 
@@ -4955,9 +5086,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // NEW: Check if we should bypass auth based on env variable
-  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-
   useEffect(() => {
     const storedToken = getToken();
     if (storedToken) {
@@ -4966,34 +5094,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(userData);
         setAuthStateToken(storedToken);
       } else {
-        // Invalid token found
         removeToken();
       }
     }
     setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
+  }, []);
 
   const login = useCallback((newToken: string) => {
     setToken(newToken);
-    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
+    const userData = getUserFromToken(newToken);
     setUser(userData);
     setAuthStateToken(newToken);
-    // (+) Cambiado a '/' para ir a la página principal después del login
     router.push('/');
     console.log("User logged in, token set.");
-  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
+  }, [router]);
 
   const signIn = useCallback((session: any) => {
-        // (+) Implementa la lógica de signIn (ej: guardar info de session)
-        const newToken = session.access_token; // Asume que session tiene access_token
-        setToken(newToken);
-        const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
-        setUser(userData);
-        setAuthStateToken(newToken);
-        router.push('/');
-        console.log("User signed in (via setSession), token set.");
-
+    const newToken = session.access_token;
+    setToken(newToken);
+    const userData = getUserFromToken(newToken);
+    setUser(userData);
+    setAuthStateToken(newToken);
+    router.push('/');
+    console.log("User signed in (via setSession), token set.");
   }, [router]);
 
   const logout = useCallback(() => {
@@ -5004,28 +5127,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log("User logged out.");
   }, [router]);
 
-  const signOut = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-        // onAuthStateChange actualizará user/session a null
-        console.log("SignOut successful, waiting for auth state change...");
-        router.push('/login'); // Redirigir a login tras cerrar sesión
-    } catch (error: any) {
-        console.error("Error during signOut:", error);
-        // Mostrar error al usuario si es necesario
-        // toast.error("Logout failed", { description: error.message });
-    } finally {
-        // setIsLoading(false); // onAuthStateChange se encargará
-    }
-  }, [router]);
-
   const providerValue = {
       user,
       token,
       isLoading,
-      // (+) Asegúrate de que 'signIn' está incluido en el valor del provider
       signIn,
       login,
       logout
@@ -5040,8 +5145,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (context === undefined || context === defaultAuthContextValue) {
+    if (context === defaultAuthContextValue && typeof window !== 'undefined') {
+       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
+    } else if (context === undefined) {
+       throw new Error('useAuth must be used within an AuthProvider');
+    }
   }
   return context;
 };

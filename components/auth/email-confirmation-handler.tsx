@@ -3,86 +3,65 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient'; // Usar el cliente global
 import { toast } from "sonner";
 
-// Este componente se monta en una página (ej. '/') y escucha el evento
-// SIGNED_IN que Supabase dispara después de procesar el hash de la URL.
+// Este componente se monta en una página pública (ej. '/')
+// y escucha el evento SIGNED_IN que Supabase dispara después
+// de procesar el hash de la URL de confirmación.
 export default function EmailConfirmationHandler() {
     const router = useRouter();
-    // Usamos una ref para evitar que el efecto se ejecute múltiples veces innecesariamente
-    const processedRef = useRef(false);
+    // Usamos una ref para evitar que el efecto se ejecute múltiples veces
+    // si el componente se re-renderiza por otras razones.
+    const processedAuthEvent = useRef(false);
 
     useEffect(() => {
-        if (hasConfirmed) {
+        // Si ya hemos procesado un evento, no hacer nada más.
+        if (processedAuthEvent.current) {
             return;
         }
 
-        const handleEmailConfirmation = async () => {
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const expiresIn = params.get('expires_in');
+        console.log("EmailConfirmationHandler: Mounted. Setting up listener.");
 
-                if (accessToken && refreshToken && expiresIn) {
-                    console.log("Found access token in URL hash:", accessToken);
-                    console.log("Attempting to set session and log in.");
+        // Escuchar cambios de autenticación. El evento clave es SIGNED_IN
+        // que ocurre después de que Supabase procesa el hash de la URL.
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            (event, session) => {
+                // Solo actuar en el evento SIGNED_IN y si no lo hemos procesado ya.
+                if (event === 'SIGNED_IN' && session && !processedAuthEvent.current) {
+                    console.log("EmailConfirmationHandler: Detected SIGNED_IN event after email confirmation.");
+                    processedAuthEvent.current = true; // Marcar como procesado
 
-                     // Create the supabaseClient
-                     const supabaseClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-                     );
-                    
-                     // Use the access token to get the user and full session
-                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
-                         access_token: accessToken!,
-                         refresh_token: refreshToken!,
-                     })
+                    // Mostrar notificación de éxito
+                    toast.success("Email Confirmed", {
+                        description: "Your email address has been successfully confirmed. You are now logged in.",
+                    });
 
-                     if (error) {
-                        console.error("Error setting session:", error);
-                        return; // Stop further execution if session setup fails
-                     }
-                    
-                    if (session && user) {
-                        try {
-                            const { error: insertError } = await supabaseClient
-                                .from('users')
-                                .insert([
-                                    {
-                                        id: user.id, // Use user.id from the session
-                                        email: user.email,
-                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
-                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
-                                        role: 'user',
-                                        is_active: true,
-                                    }
-                                ]);
+                    // Redirigir al usuario a la aplicación principal (ej. /chat)
+                    // Usamos replace para no añadir la URL de confirmación al historial
+                    router.replace('/chat');
 
-                            if (insertError) {
-                                console.error("Error inserting user into 'users' table:", insertError);
-                                if (insertError.code === '23505') {
-                                    console.warn("Duplicate user insertion attempted. Ignoring.");
-                                }
-                            } else {
-                                console.log("User inserted into 'users' table successfully.");
-                            }
-                        } catch (insertErr: any) {
-                            console.error("Error during user insertion:", insertErr);
-                        }
-
-                        setHasConfirmed(true);
-                        await signIn(session);
-                        router.replace('/');
-                    }
+                } else if (event === 'PASSWORD_RECOVERY') {
+                     // Manejar evento de recuperación de contraseña si es necesario
+                     console.log("EmailConfirmationHandler: Detected PASSWORD_RECOVERY event.");
+                     // Podrías redirigir a una página de cambio de contraseña o mostrar un mensaje.
+                     // Por ahora, solo lo logueamos.
+                     toast.info("Password Recovery", { description: "Please follow the instructions to set a new password." });
+                     // router.push('/update-password'); // Ejemplo de redirección
                 }
             }
+        );
+
+        // Limpieza del listener al desmontar el componente
+        return () => {
+            console.log("EmailConfirmationHandler: Unmounting. Unsubscribing listener.");
+            authListener?.subscription.unsubscribe();
         };
 
-        handleEmailConfirmation();
-    }, [signIn, router, hasConfirmed]);
+    // Solo ejecutar este efecto una vez al montar el componente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Dependencias vacías para ejecutar solo al montar
 
+    // Este componente no renderiza nada visible
     return null;
 }

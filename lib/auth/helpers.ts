@@ -1,53 +1,51 @@
 // lib/auth/helpers.ts
-import { AUTH_TOKEN_KEY } from "@/lib/constants";
-// jwt-decode ya no es estrictamente necesario aquí si confiamos en Supabase
-// import { jwtDecode, InvalidTokenError } from 'jwt-decode';
+// import { AUTH_TOKEN_KEY } from "@/lib/constants"; // Ya no es necesario para el token principal
 
-// --- Funciones básicas de localStorage (pueden eliminarse si no se usan en otro lugar) ---
-// Supabase JS client maneja su propio almacenamiento de sesión, por lo que estas
-// funciones manuales para *el token de autenticación* ya no son la fuente principal.
-// Podrían mantenerse si necesitas almacenar OTROS tokens o datos relacionados con auth.
+// --- Funciones manuales de localStorage (OBSOLETAS para el token de sesión) ---
+// Estas funciones ya no deben usarse para gestionar el token de sesión de Supabase.
+// El cliente Supabase JS maneja esto internamente. Se dejan aquí comentadas
+// o con advertencias por si se usan para otros fines, pero idealmente deberían eliminarse.
+
+/*
 export const getToken = (): string | null => {
   if (typeof window !== "undefined") {
-    // Podrías intentar obtener el token de Supabase aquí, pero es mejor usar getSession()
-    // return localStorage.getItem(AUTH_TOKEN_KEY); // <-- Evitar esto para el token de auth
-    console.warn("getToken() manual llamado, considera usar supabase.auth.getSession()");
-    return localStorage.getItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
+    console.warn("getToken() manual llamado. Supabase maneja la sesión. Considera eliminar esta función.");
+    // return localStorage.getItem(AUTH_TOKEN_KEY); // Evitar leer directamente
+    return null; // Devolver null para evitar conflictos
   }
   return null;
 };
 
 export const setToken = (token: string): void => {
    if (typeof window !== "undefined") {
-     // Evitar sobrescribir el manejo de sesión de Supabase
-     // localStorage.setItem(AUTH_TOKEN_KEY, token); // <-- Evitar esto
-     console.warn("setToken() manual llamado, Supabase maneja la sesión.");
-     localStorage.setItem(AUTH_TOKEN_KEY, token); // Mantener por si acaso, pero advertir
+     console.warn("setToken() manual llamado. Supabase maneja la sesión. Considera eliminar esta función.");
+     // localStorage.setItem(AUTH_TOKEN_KEY, token); // Evitar escribir directamente
    }
 };
 
 export const removeToken = (): void => {
    if (typeof window !== "undefined") {
-     // Podría interferir con Supabase si borra su clave, es mejor usar supabase.auth.signOut()
-     // localStorage.removeItem(AUTH_TOKEN_KEY); // <-- Evitar esto
-     console.warn("removeToken() manual llamado, considera usar supabase.auth.signOut()");
-     localStorage.removeItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
+     console.warn("removeToken() manual llamado. Usa supabase.auth.signOut(). Considera eliminar esta función.");
+     // localStorage.removeItem(AUTH_TOKEN_KEY); // Evitar eliminar directamente
    }
 };
-// --- FIN Funciones localStorage ---
+*/
+// --- FIN Funciones localStorage obsoletas ---
 
 
-// Frontend User interface - Definición de cómo queremos que luzca el usuario en el frontend
-// Esta interfaz se poblará con datos de la sesión de Supabase.
+// --- Interfaz User del Frontend (sin cambios) ---
+// Define la estructura del usuario que usaremos en el frontend.
+// Esta interfaz se poblará con datos de la sesión de Supabase via useAuth.
 export interface User {
-    userId: string;    // Mapeado desde Supabase User ID (user.id)
-    email?: string;    // Mapeado desde Supabase User Email (user.email)
-    name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name)
-    companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
-    roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
-    // Añade otros campos necesarios del objeto User de Supabase
+  userId: string;    // Mapeado desde Supabase User ID (user.id)
+  email?: string;    // Mapeado desde Supabase User Email (user.email)
+  name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name o name)
+  companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
+  roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
+  // Añade otros campos necesarios del objeto User de Supabase si los necesitas en el frontend
 }
 
 // --- getUserFromToken ELIMINADO ---
-// Ya no decodificaremos manualmente el token. Usaremos los datos del usuario
-// proporcionados por el cliente Supabase (supabase.auth.getUser() o de la sesión).
+// Ya no necesitamos decodificar el token manualmente en el frontend.
+// La información del usuario vendrá directamente del objeto User/Session de Supabase
+// gestionado por el hook useAuth.

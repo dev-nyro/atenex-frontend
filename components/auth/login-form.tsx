@@ -10,18 +10,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth
-import { ApiError } from '@/lib/api'; // ApiError sigue siendo útil para errores generales
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth refactorizado
+// import { ApiError } from '@/lib/api'; // Ya no es necesario para errores de login específicos de Supabase
+import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error de Supabase
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
+  password: z.string().min(1, { message: 'Password cannot be empty' }), // Mínimo 1 para evitar envío vacío
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { signIn } = useAuth(); // <-- Usar signIn del contexto
+  // --- CORRECCIÓN: Usar signInWithPassword del contexto useAuth ---
+  const { signInWithPassword } = useAuth();
+  // ----------------------------------------------------------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,51 +37,38 @@ export function LoginForm() {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting login with:", data.email);
-
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
-        setIsLoading(false);
-        return;
-      }
-
-      const supabaseClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-      const { data: authResponse, error: authError } = await supabaseClient.auth.signInWithPassword({
+      console.log("LoginForm: Attempting login with:", data.email);
+      // Llamar a la función del contexto que encapsula supabase.auth.signInWithPassword
+      await signInWithPassword({
         email: data.email,
         password: data.password,
       });
+      // Si la función signInWithPassword tiene éxito, la redirección
+      // o actualización de estado será manejada por el AuthProvider o AppLayout.
+      // No es necesario hacer nada más aquí en caso de éxito.
+      console.log("LoginForm: signInWithPassword call succeeded (further actions handled by AuthProvider).");
+      // No detener isLoading aquí, dejar que el cambio de estado lo haga.
 
-      if (authError) {
-        console.error("Supabase login failed:", authError);
-        setError(authError.message || 'Login failed. Please check your credentials.');
-      } else if (authResponse.session) {
-        console.log("Supabase login successful:", authResponse);
-        login(authResponse.session.access_token);
-      } else {
-        console.error("Supabase login: No session returned");
-        setError('Login failed. Please check your credentials.');
-      }
     } catch (err) {
-      // El hook signIn debería lanzar un error en caso de fallo
-      console.error("LoginForm: signIn failed:", err);
+      // El hook signInWithPassword debería haber lanzado un error en caso de fallo
+      console.error("LoginForm: signInWithPassword failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
-       // Usar ApiError para mostrar el mensaje específico si viene del hook
-       if (err instanceof ApiError) {
-         errorMessage = err.message || errorMessage;
-         if (err.status === 400) { // Supabase suele usar 400 para credenciales inválidas
-             errorMessage = "Invalid email or password.";
-         }
+       // Usar AuthError de Supabase para mensajes específicos
+       if (err instanceof AuthError) {
+           errorMessage = err.message || errorMessage;
+           // Puedes añadir lógica específica para códigos de error si es necesario
+           if (err.message.includes("Invalid login credentials")) {
+               errorMessage = "Invalid email or password.";
+           } else if (err.message.includes("Email not confirmed")) {
+               errorMessage = "Please confirm your email address first.";
+           }
        } else if (err instanceof Error) {
-         errorMessage = err.message;
+           // Otros errores (poco probables aquí si el hook maneja bien)
+           errorMessage = err.message;
        }
       setError(errorMessage);
       setIsLoading(false); // Detener carga solo en caso de error
     }
-    // No poner setIsLoading(false) aquí, el estado de carga se maneja en el hook/página
   };
 
   return (

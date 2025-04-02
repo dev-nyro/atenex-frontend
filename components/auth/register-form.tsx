@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
-import { AuthApiError } from '@supabase/supabase-js';
+// import { supabase } from '@/lib/supabaseClient'; // Ya no se usa directamente
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook refactorizado
+import { AuthError } from '@supabase/supabase-js'; // Importar tipo de error
 
-// Esquema Zod
+// Esquema Zod (sin cambios, companyId sigue siendo opcional aquí)
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
@@ -28,9 +29,12 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 const DEFAULT_DEV_COMPANY_ID = process.env.NEXT_PUBLIC_DEV_COMPANY_ID || '';
 
 export function RegisterForm() {
+  // --- CORRECCIÓN: Usar signUp del contexto useAuth ---
+  const { signUp } = useAuth();
+  // -------------------------------------------------
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false); // Para mostrar mensaje de confirmación
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -38,6 +42,7 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
+      // Pre-rellenar companyId en desarrollo si está disponible
       companyId: process.env.NODE_ENV === 'development' && DEFAULT_DEV_COMPANY_ID ? DEFAULT_DEV_COMPANY_ID : '',
     },
   });
@@ -47,95 +52,73 @@ export function RegisterForm() {
     setError(null);
     setSuccess(false);
 
-    // Metadata para user_metadata (lo que el usuario puede gestionar)
-    const userMetaData = { full_name: data.name || null };
-
-    // --- IMPORTANTE ---
-    // El companyId (y roles) idealmente van en app_metadata, pero NO se pueden
-    // establecer directamente desde el cliente con signUp.
-    // Se debe usar un TRIGGER en la base de datos Supabase (en la tabla auth.users)
-    // o una Edge Function llamada después para copiar esta información
-    // (posiblemente desde user_metadata o una tabla intermedia) a app_metadata
-    // o a tu tabla pública de perfiles.
-    //
-    // Por ahora, si recogemos companyId en el form, podríamos pasarlo en 'data'
-    // para que el trigger lo pueda leer desde user_metadata, o ignorarlo aquí
-    // si el trigger lo obtiene de otra fuente.
-    //
-    // Opción 1: Pasar companyId DENTRO de 'data' (user_metadata) para que un trigger lo lea
-    // const userMetaDataWithCompany = { ...userMetaData, dev_company_id_ref: data.companyId };
-
-    // Opción 2: No pasar companyId aquí y confiar en que el trigger/backend lo obtendrá
-    // (por ejemplo, si el usuario se registra a través de una URL de invitación específica de la compañía)
-
-    // Usaremos la Opción 1 por ahora como ejemplo, asumiendo un trigger leerá dev_company_id_ref
-    const userMetaDataForSignUp = {
-        ...userMetaData,
-        // Añadimos companyId aquí temporalmente para que un trigger lo pueda leer
-        // ¡CUIDADO! Esto es visible/editable por el usuario via updateUser.
-        // Una solución más segura es usar un endpoint backend o Edge Function post-registro.
-        company_id_signup_ref: data.companyId || null,
-    };
-    // ------------------
+    // --- Preparar metadata para user_metadata ---
+    // Incluir nombre y, si se proporciona, el companyId como referencia (signup_company_id_ref)
+    // Un trigger/función backend en Supabase DEBERÍA leer 'signup_company_id_ref' de user_metadata
+    // y copiarlo a app_metadata.company_id de forma segura.
+    const userMetaDataForSignUp: { [key: string]: any } = {};
+    if (data.name) {
+        userMetaDataForSignUp.full_name = data.name;
+    }
+    if (data.companyId) {
+        // ¡Importante! Esto solo sirve como referencia para el backend.
+        // NO otorga acceso basado en companyId directamente.
+        userMetaDataForSignUp.signup_company_id_ref = data.companyId;
+        console.warn(`RegisterForm: Sending companyId (${data.companyId}) in user_metadata.signup_company_id_ref. Ensure backend logic moves it to app_metadata.`);
+    }
+    // ------------------------------------------
 
     try {
       console.log("RegisterForm: Attempting Supabase signUp for:", data.email);
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // Llamar a la función signUp del contexto
+      const { data: signUpData, error: signUpError } = await signUp({
         email: data.email,
         password: data.password,
         options: {
-          // Pasar metadata a user_metadata
-          data: userMetaDataForSignUp, // <-- Usar los datos preparados
-
-          // --- NO SE PUEDE PASAR app_metadata DESDE EL CLIENTE ---
-          // app_metadata: appMetaData, // <-- ESTA LÍNEA CAUSABA EL ERROR Y SE ELIMINA
-
-          // Redirección para confirmación de email
-          emailRedirectTo: window.location.origin,
+          // Pasar metadata preparada a user_metadata
+          data: userMetaDataForSignUp,
+          // Redirección para confirmación de email (si aplica)
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       });
 
+      // El hook useAuth ya maneja las notificaciones (toast)
       if (signUpError) {
-        console.error("Supabase signUp error:", signUpError);
-        if (signUpError instanceof AuthApiError && signUpError.message.includes("User already registered")) {
-             setError("This email is already registered. Try logging in.");
-        } else {
-            setError(signUpError.message || 'Registration failed. Please try again.');
-        }
-        setIsLoading(false);
+        // El hook ya mostró el toast, solo actualizamos el estado local de error
+        setError(signUpError.message || 'Registration failed.');
+        setIsLoading(false); // Detener carga en error
         return;
       }
 
-      console.log("Supabase signUp successful:", signUpData);
-
-      // Manejo de éxito y confirmación de email
-      if (signUpData.user && signUpData.user.identities?.length === 0) {
-          setSuccess(true); setError(null);
-      } else if (signUpData.user) {
-           setSuccess(true); setError("Registration successful! You might be logged in automatically.");
-      } else {
-           setError("Registration completed with unexpected status. Please try logging in.");
-      }
+      // Si no hubo error, asumimos éxito (requiere confirmación o no)
+      // El hook useAuth ya mostró el toast de éxito/confirmación
+      setSuccess(true); // Mostrar mensaje de éxito/revisar email en el formulario
+      setError(null);
+      // form.reset(); // Opcional: Limpiar formulario en éxito
 
     } catch (err) {
-      console.error("Unexpected error during registration:", err);
+      // Capturar errores inesperados si el hook no los maneja completamente
+      console.error("RegisterForm: Unexpected error during registration:", err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+      // Asegurar que el toast de error se muestre (aunque el hook debería hacerlo)
+      // toast.error("Registration Failed", { description: error || 'An unexpected error occurred.' });
     } finally {
-      setIsLoading(false);
+      // Detener carga solo si no fue exitoso (para mantener el mensaje de éxito visible)
+      if (!success) setIsLoading(false);
     }
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {error && (
+      {error && !success && ( // Mostrar error solo si no hay éxito
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Registration Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-       {success && (
+       {success && ( // Mostrar mensaje de éxito/confirmación
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
            <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" />
           <AlertTitle className="text-green-800 dark:text-green-200">Registration Submitted</AlertTitle>
@@ -144,7 +127,8 @@ export function RegisterForm() {
           </AlertDescription>
         </Alert>
       )}
-      {/* Campos del Formulario */}
+
+      {/* Campos del Formulario (deshabilitados en éxito o carga) */}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
         <Input id="name" type="text" placeholder="Your Name" {...form.register('name')} disabled={isLoading || success}/>
@@ -160,14 +144,28 @@ export function RegisterForm() {
         <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
         {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
       </div>
+       {/* Campo Company ID (opcional, principalmente para desarrollo/triggers) */}
        <div className="space-y-1">
-         <Label htmlFor="companyId">Company ID (Optional - Dev Only)</Label>
-         <Input id="companyId" type="text" placeholder="Enter Company UUID" {...form.register('companyId')} disabled={isLoading || success}/>
+         <Label htmlFor="companyId">Company ID (Optional)</Label>
+         <Input
+            id="companyId"
+            type="text"
+            placeholder="Enter Company UUID (if provided)"
+            {...form.register('companyId')}
+            disabled={isLoading || success}
+         />
          {form.formState.errors.companyId && <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>}
+         <p className="text-xs text-muted-foreground pt-1">
+            Usually assigned automatically. Only fill if instructed.
+         </p>
        </div>
+
+      {/* Botón de Envío */}
       <Button type="submit" className="w-full" disabled={isLoading || success}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
+
+      {/* Enlace a Login */}
       <div className="mt-4 text-center text-sm">
         Already have an account?{" "}
         <Link href="/login" className="underline text-primary hover:text-primary/80">
