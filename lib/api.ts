@@ -31,19 +31,26 @@ async function request<T>(
 
   let url: string;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // Assume routes starting with /api/v1/ go to the gateway, others are internal Next.js API routes
+  // *** CORREGIDO: Identificar rutas de gateway (v1) vs. internas (simuladas) ***
   const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
+  const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
 
-  if (!isGatewayRoute) {
-    // Use relative URL for internal routes (like /api/auth/login)
-    url = cleanEndpoint;
-    console.debug(`Internal API Request Target: ${url}`);
-  } else {
+  if (isGatewayRoute) {
     // Use absolute API Gateway URL for external routes
     const gatewayUrl = getApiGatewayUrl();
     url = `${gatewayUrl}${cleanEndpoint}`;
     console.debug(`External API Request Target: ${url}`);
+  } else if (isInternalAuthRoute) {
+     // Use relative URL for internal simulated routes (if kept for testing)
+     url = cleanEndpoint;
+     console.warn(`Using SIMULATED internal API route: ${url}`);
+     console.debug(`Internal API Request Target: ${url}`);
+  } else {
+     // Handle other potential internal routes if needed
+     url = cleanEndpoint;
+     console.debug(`Other Internal API Request Target: ${url}`);
   }
+
 
   const token = getToken();
   const headers = new Headers(options.headers || {});
@@ -105,19 +112,22 @@ async function request<T>(
        if (errorData?.detail && typeof errorData.detail === 'string') {
            errorMessage = errorData.detail;
        } else if (errorData?.detail && Array.isArray(errorData.detail)) {
-           errorMessage = errorData.detail.map(e => (typeof e === 'object' && e !== null && 'msg' in e) ? e.msg : String(e)).join(', ');
+           // Handle FastAPI validation errors
+           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
        } else if (errorData?.message) {
            errorMessage = errorData.message;
        } else if (errorText) {
            errorMessage = errorText.substring(0, 200); // Limit length
        } else if (response.status === 401) {
-           errorMessage = "Unauthorized. Please check your login session.";
+           errorMessage = "Unauthorized. Please check your credentials or session.";
        } else if (response.status === 403) {
-           errorMessage = "Forbidden. You don't have permission to access this.";
+           errorMessage = "Forbidden. You don't have permission.";
        } else if (response.status === 404) {
-            errorMessage = "The requested resource was not found.";
+            errorMessage = "Resource not found.";
        } else if (response.status === 422) {
             errorMessage = "Validation Error. Please check your input."; // Generic validation error
+       } else if (response.status >= 500) {
+            errorMessage = "Server error. Please try again later.";
        }
 
       console.error(`API Error: ${response.status} ${errorMessage}`, { url, data: errorData, text: errorText });
@@ -157,28 +167,36 @@ async function request<T>(
   }
 }
 
-// --- Auth Service (Internal API Routes - Simulated Backend) ---
-// KEEPING THESE SIMULATED ROUTES FOR NOW, assuming they are used for local dev/testing
-// In production, you might remove these or ensure they are disabled.
+// --- Auth Service ---
+// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
+// Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
 export const loginUser = async (credentials: { email: string; password: string }) => {
-  console.warn("Using SIMULATED login API route (/api/auth/login)");
-  const response = await request<{ access_token: string }>('/api/auth/login', {
+  console.log("Calling REAL login API via Gateway...");
+  // El backend real debe devolver una estructura como { "access_token": "..." }
+  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- CAMBIADO A RUTA GATEWAY
     method: 'POST',
     body: JSON.stringify(credentials),
   });
+  // La función 'request' ya añade el Content-Type: application/json
   return response.access_token;
 };
 
+// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
+// Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
 export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-    console.warn("Using SIMULATED register API route (/api/auth/register)");
-    const response = await request<{ access_token: string; user: User }>('/api/auth/register', {
+    console.log("Calling REAL register API via Gateway...");
+    // El backend real debería devolver algo como { "user_id": "...", "email": "...", ... }
+    // O quizás también un access_token si hace login automático tras registro.
+    // Ajusta el tipo de respuesta esperado <{ access_token?: string; user: User }> según tu backend.
+    const response = await request<{ access_token?: string; user: User }>('/api/v1/auth/register', { // <-- CAMBIADO A RUTA GATEWAY
         method: 'POST',
         body: JSON.stringify(details),
     });
-    return response; // Returns { access_token, user }
+    return response; // Devuelve lo que el backend real retorne
 };
 
 // --- Ingest Service (External API Routes - /api/v1/ingest) ---
+// (Sin cambios aquí, ya usaban /api/v1/...)
 export interface IngestResponse {
     document_id: string;
     task_id: string;
@@ -188,7 +206,6 @@ export interface IngestResponse {
 
 export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => {
     formData.append('metadata_json', JSON.stringify(metadata));
-    // The request function will add Auth + X-Company-ID headers for gateway routes
     return request<IngestResponse>('/api/v1/ingest', {
         method: 'POST',
         body: formData,
@@ -207,14 +224,12 @@ export interface DocumentStatusResponse {
 }
 
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
-  // The request function will add Auth + X-Company-ID headers for gateway routes
   return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
     method: 'GET',
   });
 };
 
 export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    // The request function will add Auth + X-Company-ID headers for gateway routes
     return request<DocumentStatusResponse[]>('/api/v1/ingest/status', {
          method: 'GET',
     });
@@ -222,6 +237,7 @@ export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> 
 
 
 // --- Query & Chat Service (External API Routes - /api/v1/*) ---
+// (Sin cambios aquí, ya usaban /api/v1/...)
 
 // Type for retrieved documents within API responses (sent by Backend)
 export interface RetrievedDocApi {
@@ -231,11 +247,9 @@ export interface RetrievedDocApi {
     metadata?: Record<string, any> | null;
     document_id?: string | null; // Original document ID (from Supabase DOCUMENTS table)
     file_name?: string | null;   // Original filename (from Supabase DOCUMENTS table)
-    // Add other fields if the backend sends them (like full content, page number, etc.)
 }
 
 // Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
-// Keep this aligned with what the UI needs and what mapApiSourcesToFrontend produces.
 export interface RetrievedDoc {
     id: string; // Chunk ID
     score?: number | null;
@@ -280,7 +294,6 @@ export interface QueryApiResponse {
 
 // Function to list chats for the authenticated user
 export const getChats = async (): Promise<ChatSummary[]> => {
-    // Auth/CompanyID headers added by `request` function
     return request<ChatSummary[]>('/api/v1/chats', {
         method: 'GET',
     });
@@ -292,7 +305,6 @@ export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]>
         console.warn("getChatMessages called with empty chatId");
         return []; // Return empty array if no chatId provided
     }
-    // Auth/CompanyID headers added by `request` function
     return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`, {
         method: 'GET',
     });
@@ -300,9 +312,7 @@ export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]>
 
 // Function to send a query (which handles message saving and chat creation/continuation)
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-  // Ensure chat_id is explicitly null if undefined/empty string, as expected by backend
   const body = { ...payload, chat_id: payload.chat_id || null };
-  // Auth/CompanyID headers added by `request` function
   return request<QueryApiResponse>('/api/v1/query', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -314,8 +324,6 @@ export const deleteChat = async (chatId: string): Promise<void> => {
     if (!chatId) {
         throw new Error("Cannot delete chat with empty ID");
     }
-    // Auth/CompanyID headers added by `request` function
-    // Expecting 204 No Content on success, the `request` function handles this returning null
     await request<null>(`/api/v1/chats/${chatId}`, {
         method: 'DELETE',
     });
@@ -324,26 +332,23 @@ export const deleteChat = async (chatId: string): Promise<void> => {
 
 // --- Type Mapping Helpers ---
 
-// Map API source type (RetrievedDocApi) to frontend source type (RetrievedDoc)
-// This allows flexibility if backend and frontend types diverge slightly
 export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
     if (!apiSources) return undefined;
     return apiSources.map(source => ({
-        id: source.id, // chunk_id from backend/milvus
+        id: source.id,
         score: source.score,
-        content_preview: source.content_preview, // Assuming backend provides this
+        content_preview: source.content_preview,
         metadata: source.metadata,
-        document_id: source.document_id, // Original document UUID
-        file_name: source.file_name,    // Original filename
+        document_id: source.document_id,
+        file_name: source.file_name,
     }));
 };
 
-// Map API message type (ChatMessageApi) to frontend message type (Message)
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
-    id: apiMessage.id, // Message UUID
+    id: apiMessage.id,
     role: apiMessage.role,
     content: apiMessage.content,
-    sources: mapApiSourcesToFrontend(apiMessage.sources), // Use the source mapping function
-    created_at: apiMessage.created_at, // Keep the timestamp string
-    isError: false, // Assume messages from API are not errors unless handled elsewhere
+    sources: mapApiSourcesToFrontend(apiMessage.sources),
+    created_at: apiMessage.created_at,
+    isError: false,
 });

@@ -1,9 +1,8 @@
 // File: lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-// Install jwt-decode: npm install jwt-decode
-import { jwtDecode } from 'jwt-decode'; // Use a proper JWT decoding library
+import { jwtDecode } from 'jwt-decode';
 
-// Basic token handling for client-side (use HttpOnly cookies in production)
+// Basic token handling for client-side
 export const getToken = (): string | null => {
   if (typeof window !== "undefined") {
     return localStorage.getItem(AUTH_TOKEN_KEY);
@@ -23,26 +22,27 @@ export const removeToken = (): void => {
   }
 };
 
+// Frontend User interface - needs to align with JWT claims
 export interface User {
-    // Align with JWT claims expected/needed by frontend
-    userId: string; // Matches 'user_id' claim from backend JWT
-    email: string;
-    name?: string; // Optional name claim
-    companyId: string; // Matches 'company_id' claim from backend JWT
-    // Add other relevant claims like roles if available in token
-    // exp?: number; // Expiry time (managed internally by getUserFromToken)
+    userId: string;    // Expecting 'user_id' claim in JWT
+    email: string;     // Expecting 'email' claim in JWT
+    name?: string;     // Expecting optional 'name' claim in JWT
+    companyId: string; // Expecting 'company_id' claim in JWT
+    // Add other fields if needed, e.g., roles
 }
 
-// Interface for the expected JWT payload structure from your Auth Service
+// Interface for the expected JWT payload structure from your REAL Auth Service
 interface JwtPayload {
-    user_id: string; // Claim name for User ID (as defined in your Auth Service)
-    company_id: string; // Claim name for Company ID (as defined in your Auth Service)
-    email: string;
-    name?: string; // Optional name claim
-    role?: string; // Example: Optional role claim
-    exp: number; // Standard expiry timestamp (seconds since epoch)
-    iat?: number; // Standard issued at timestamp
-    // Add any other claims your backend includes
+    // *** AJUSTA ESTOS NOMBRES DE CLAIMS para que coincidan EXACTAMENTE ***
+    // *** con lo que tu backend (Auth Service / Supabase) pone en el token ***
+    user_id: string;    // Ejemplo: claim para User ID
+    company_id: string; // Ejemplo: claim para Company ID
+    email: string;      // Claim para Email
+    name?: string;     // Claim opcional para Name
+    role?: string;     // Claim opcional para Role
+    exp: number;       // Standard expiry timestamp (seconds since epoch) REQUIRED
+    iat?: number;      // Standard issued at timestamp (optional)
+    // Agrega cualquier otro claim que tu backend incluya y necesites en el frontend
 }
 
 // Function to get user details from the JWT token
@@ -51,6 +51,7 @@ export const getUserFromToken = (token: string | null): User | null => {
   try {
     // Decode the JWT
     const decoded = jwtDecode<JwtPayload>(token);
+    console.log("Decoded JWT Payload:", decoded); // <-- Log para depuración
 
     // --- Validation ---
     // 1. Check expiry
@@ -62,21 +63,23 @@ export const getUserFromToken = (token: string | null): User | null => {
     }
 
     // 2. Check for essential claims required by the frontend
+    // *** VERIFICA que estos claims existen en tu payload decodificado ***
     if (!decoded.user_id || !decoded.company_id || !decoded.email) {
-        console.error("Decoded token is missing essential claims (user_id, company_id, email). Payload:", decoded);
+        console.error("Decoded token is missing essential claims (user_id, company_id, email). Actual Payload:", decoded);
         removeToken(); // Clear invalid token
         return null;
     }
 
     // --- Map decoded payload to User interface ---
     const user: User = {
-      userId: decoded.user_id, // Map from 'user_id' claim
+      userId: decoded.user_id,         // Map from 'user_id' claim
       email: decoded.email,
-      companyId: decoded.company_id, // Map from 'company_id' claim
-      name: decoded.name, // Map optional 'name' claim
+      companyId: decoded.company_id,   // Map from 'company_id' claim
+      name: decoded.name,             // Map optional 'name' claim
       // Add other mappings if needed, e.g., role: decoded.role
     };
 
+    console.log("Mapped User object:", user); // <-- Log para depuración
     return user;
 
   } catch (error) {
