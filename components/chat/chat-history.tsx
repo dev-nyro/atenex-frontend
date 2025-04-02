@@ -4,14 +4,12 @@
 import React, { useState, useEffect, useCallback } from 'react'; // Importar React solo una vez
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-// Importar Button Y buttonVariants correctamente
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Importar Button Y buttonVariants
 import { ScrollArea } from '@/components/ui/scroll-area';
-// Importar iconos solo una vez
-import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react'; // Importar iconos solo una vez
 import { cn } from '@/lib/utils';
 import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook actualizado
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -25,59 +23,70 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// --- INICIO DEL COMPONENTE (SIN DUPLICACIÓN) ---
 export function ChatHistory() {
   const pathname = usePathname();
   const router = useRouter();
-  const { token } = useAuth(); // O session del useAuth refactorizado
+  // --- CORRECCIÓN: Usar session o user en lugar de token ---
+  const { session, user, isLoading: isAuthLoading, signOut } = useAuth();
+  // -----------------------------------------------------
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
   const [chats, setChats] = useState<ChatSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Carga específica de esta lista
   const [error, setError] = useState<string | null>(null);
   const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const fetchChatHistory = useCallback(async (showToast = false) => {
-    // Usar 'token' o 'session' dependiendo de cómo quede useAuth
-    const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-    const isAuthenticated = token || bypassAuth; // Considerar bypass
+    const isAuthenticated = session || bypassAuth;
+
+    // Esperar a que auth cargue si es necesario
+    if (!bypassAuth && isAuthLoading) {
+        console.log("ChatHistory: Waiting for auth to load...");
+        setIsLoading(true); // Mostrar carga mientras auth verifica
+        return;
+    }
 
     if (!isAuthenticated) {
-        console.log("ChatHistory: Not authenticated or bypassed, skipping fetch.");
+        console.log("ChatHistory: Not authenticated, skipping fetch.");
         setChats([]);
         setIsLoading(false);
         if (!bypassAuth) setError("Please log in to view chat history.");
         return;
     }
 
-    console.log("ChatHistory: Fetching chat list...");
+    console.log("ChatHistory: Auth loaded. Fetching chat list...");
     setIsLoading(true);
     setError(null);
     try {
       const fetchedChats = await getChats();
       fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setChats(fetchedChats);
-       if (showToast) toast.success("Chat History Refreshed");
+      if (showToast) toast.success("Chat History Refreshed");
     } catch (err) {
       console.error("Failed to fetch chat history:", err);
       let message = "Could not load chat history.";
-       if (err instanceof ApiError) {
-         message = err.message || message;
-         // if (err.status === 401 && !bypassAuth) { // Solo si no estamos en bypass
-         if (err.status === 401) { // Manejar 401 incluso en bypass? Podría ser un token inválido real
-             message = "Session expired or invalid. Please log in again.";
-             // Considerar llamar a signOut() aquí si se detecta 401
-         }
-       } else if (err instanceof Error) { message = err.message; }
+      if (err instanceof ApiError) {
+        message = err.message || message;
+        if (err.status === 401) {
+          message = "Session expired or invalid. Please log in again.";
+          signOut(); // Forzar logout
+        }
+      } else if (err instanceof Error) { message = err.message; }
       setError(message);
       toast.error("Error Loading Chats", { description: message });
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Terminar carga específica de la lista
     }
-  }, [token]); // Depender de token (o session)
+  // --- CORRECCIÓN: Dependencias ---
+  }, [session, isAuthLoading, bypassAuth, signOut]);
+  // ------------------------------
 
   useEffect(() => {
     fetchChatHistory(false);
-  }, [fetchChatHistory]);
+  }, [fetchChatHistory]); // Ejecutar al montar y cuando cambien las dependencias de fetchChatHistory
 
   const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
      event.stopPropagation();
@@ -88,16 +97,13 @@ export function ChatHistory() {
 
   const handleDeleteConfirmed = async () => {
     if (!chatToDelete) return;
-    console.log("Deleting chat:", chatToDelete.id);
     setIsDeleting(true);
     try {
         await deleteChat(chatToDelete.id);
         setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
         toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
         const currentChatId = pathname.split('/').pop();
-        if (currentChatId === chatToDelete.id) {
-             router.push('/chat');
-        }
+        if (currentChatId === chatToDelete.id) router.push('/chat');
     } catch (err) {
         console.error("Failed to delete chat:", err);
         let message = "Could not delete chat.";
@@ -113,22 +119,24 @@ export function ChatHistory() {
 
   // --- RENDER CONTENT ---
   const renderContent = () => {
-    const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-    const isAuthenticated = token || bypassAuth;
+    const isAuthenticated = session || bypassAuth;
+    const showAuthLoad = !bypassAuth && isAuthLoading; // Mostrar carga solo si auth está cargando y no bypass
 
-    if (!isAuthenticated && !isLoading && !bypassAuth) {
+    // Mostrar carga si auth está cargando O si la lista está cargando
+    if (showAuthLoad || isLoading) {
+        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    }
+
+    if (!isAuthenticated && !bypassAuth) { // Mostrar login solo si no auth, no bypass
          return (
              <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Please log in to view or start chats.</p>
+                 <p className="text-sm mb-2">Please log in to view chat history.</p>
                  <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
              </div>
          );
      }
 
-    if (isLoading) {
-        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-    }
-    if (error && !isLoading) {
+    if (error) { // Mostrar error si existe (después de cargar)
         return (
             <div className="px-2 py-4 text-center text-destructive">
                 <AlertCircle className="mx-auto h-6 w-6 mb-1" />
@@ -139,7 +147,7 @@ export function ChatHistory() {
             </div>
         );
     }
-    if (chats.length === 0 && !isLoading) {
+    if (chats.length === 0) { // Mostrar vacío si no hay chats (y no hay error/carga)
         return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
     }
 
@@ -148,14 +156,12 @@ export function ChatHistory() {
         const isActive = pathname === `/chat/${chat.id}`;
         const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
         return (
-            // Contenedor principal para cada fila de chat
             <div key={chat.id} className="flex items-center group w-full">
-                {/* Enlace que ocupa la mayor parte del espacio */}
                 <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
                     <a
                         className={cn(
                             buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
-                            "flex-1 justify-start h-10 overflow-hidden mr-1", // Ocupa espacio, justifica a la izquierda
+                            "flex-1 justify-start h-10 overflow-hidden mr-1",
                             isActive ? "bg-muted hover:bg-muted" : ""
                         )}
                         title={displayTitle}
@@ -164,11 +170,9 @@ export function ChatHistory() {
                         <span className="truncate flex-1 text-sm">{displayTitle}</span>
                     </a>
                 </Link>
-                {/* Botón de eliminar (Trigger del AlertDialog) */}
                 <AlertDialogTrigger asChild>
                     <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="ghost" size="icon"
                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
                         onClick={(e) => openDeleteConfirmation(chat, e)}
                         aria-label={`Delete chat: ${displayTitle}`}
@@ -176,7 +180,7 @@ export function ChatHistory() {
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                     </Button>
                 </AlertDialogTrigger>
-            </div> // Cierre del div contenedor de la fila
+            </div>
         );
     });
   };
@@ -189,26 +193,11 @@ export function ChatHistory() {
                 {renderContent()}
             </div>
         </ScrollArea>
-
         <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the chat
-                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                    onClick={handleDeleteConfirmed}
-                    disabled={isDeleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
-                </AlertDialogAction>
-            </AlertDialogFooter>
+            <AlertDialogHeader> <AlertDialogTitle>Are you sure?</AlertDialogTitle> <AlertDialogDescription> This action cannot be undone. This will permanently delete the chat <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages. </AlertDialogDescription> </AlertDialogHeader>
+            <AlertDialogFooter> <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel> <AlertDialogAction onClick={handleDeleteConfirmed} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"> {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"} </AlertDialogAction> </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
   );
 }
+// --- FIN DEL COMPONENTE (SIN DUPLICACIÓN) ---

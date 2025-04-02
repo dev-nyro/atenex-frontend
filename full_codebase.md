@@ -76,6 +76,7 @@ atenex-frontend/
 │   ├── constants.ts
 │   ├── hooks
 │   │   └── useAuth.tsx
+│   ├── supabaseClient.ts
 │   └── utils.ts
 ├── next-env.d.ts
 ├── next.config.mjs
@@ -135,8 +136,6 @@ const nextConfig = {
     "@supabase/supabase-js": "^2.49.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "jsonwebtoken": "^9.0.2",
-    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.486.0",
     "next": "^15.2.4",
     "next-themes": "^0.4.6",
@@ -156,7 +155,6 @@ const nextConfig = {
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@tailwindcss/typography": "^0.5.16",
-    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.13.14",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
@@ -169,7 +167,6 @@ const nextConfig = {
     "typescript": "^5.8.2"
   }
 }
-
 ```
 
 ## File: `tsconfig.json`
@@ -338,16 +335,18 @@ module.exports = {
 ```local
 # Environment variables for local development
 
-# Base URL of your deployed API Gateway (REQUIRED for API calls to work)
-# Example: http://localhost:8080 if running gateway locally
-# Example: https://your-gateway-dev.example.com if deployed
-NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:9999  # Una URL falsa
-NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk
-# Add other environment variables needed by your app here
-# Example: NEXT_PUBLIC_SOME_CONFIG=value
-JWT_SECRET=d698c43f3db9fc7a47ac0a49f159d21296d49636a9d5bf2f592e5308374e5be6
-NEXT_PUBLIC_BYPASS_AUTH=true
+# Base URL of your API Gateway (expuesto con ngrok o similar)
+NEXT_PUBLIC_API_GATEWAY_URL=https://TU_URL_DE_NGROK_O_GATEWAY.io # <-- ¡REEMPLAZA ESTO!
+
+# Supabase Credentials (Required for Supabase JS Client)
+NEXT_PUBLIC_SUPABASE_URL=https://ymsilkrhstwxikjiqqog.supabase.co # <-- Tu URL de Supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inltc2lsa3Joc3R3eGlramlxcW9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NDAzOTIsImV4cCI6MjA1ODUxNjM5Mn0.s-RgS3tBAHl5UIZqoiPc8bGy2Kz3cktbDpjJkdvz0Jk # <-- Tu Anon Key de Supabase
+
+# Opcional: Para saltar la verificación de autenticación durante el desarrollo
+# Poner a 'true' para bypass, cualquier otro valor o ausente para requerir auth.
+NEXT_PUBLIC_BYPASS_AUTH=false
+
+# JWT_SECRET=... # <-- YA NO ES NECESARIO AQUÍ
 ```
 
 ## File: `.gitignore`
@@ -1474,44 +1473,43 @@ export default function RootLayout({
 // File: app/page.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react'; // Quitar useState si no se usa
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
-import { cn } from '@/lib/utils'; // Import cn for conditional classes
+import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // <-- IMPORTAR
+import { cn } from '@/lib/utils';
 
 export default function HomePage() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { token } = useAuth(); // O usa `session` si lo prefieres: const { session } = useAuth();
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header/Navigation */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6"> {/* Adjusted padding */}
+        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6">
           <a href="/" className="font-bold text-2xl text-primary">{APP_NAME}</a>
-          <nav className="flex items-center space-x-2 sm:space-x-4"> {/* Reduced base spacing */}
+          <nav className="flex items-center space-x-2 sm:space-x-4">
             <LinkButton href="/">Home</LinkButton>
-            <LinkButton href="/about">About</LinkButton> {/* Shorter text */}
-            <LinkButton href="/contact">Contact</LinkButton> {/* Shorter text */}
-            {token ?
+            <LinkButton href="/about">About</LinkButton>
+            <LinkButton href="/contact">Contact</LinkButton>
+            {token ? ( // O `session`
               <Button variant="secondary" onClick={() => router.push('/chat')} className="ml-2">
                 Go to App
               </Button>
-              :
-              // *** MEJORADO: Botón de Login con mejor feedback visual ***
+            ) : (
               <Button
                  onClick={() => router.push('/login')}
                  className={cn(
-                     "transition-colors duration-150", // Add transition
-                     "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" // Standard hover/focus
+                     "transition-colors duration-150",
+                     "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                  )}
               >
                 Login
               </Button>
-            }
+            )}
           </nav>
         </div>
       </header>
@@ -1522,34 +1520,35 @@ export default function HomePage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
             Unlock Your Enterprise Knowledge with <span className="text-primary">{APP_NAME}</span>
           </h1>
-          <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto"> {/* Constrained width */}
+          <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
             Ask questions in natural language and get instant answers based on your organization's collective knowledge.
           </p>
-           {/* *** MEJORADO: Botón Get Started con mejor feedback visual *** */}
           <Button
             size="lg"
-            onClick={() => token ? router.push('/chat') : router.push('/register')}
+            onClick={() => token ? router.push('/chat') : router.push('/register')} // O `session`
             className={cn(
-                 "transition-colors duration-150", // Add transition
-                 "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" // Standard hover/focus
+                 "transition-colors duration-150",
+                 "hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
              )}
           >
-            {token ? 'Go to Chat' : 'Get Started'}
+            {token ? 'Go to Chat' : 'Get Started'} {/* O `session` */}
           </Button>
         </section>
 
         <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Feature Cards */}
           <FeatureCard title="Intelligent Search" description="Find information quickly using natural language queries." />
           <FeatureCard title="Centralized Knowledge" description="Access all your organization's documents in one place." />
           <FeatureCard title="Improved Productivity" description="Empower your team with faster access to relevant insights." />
         </section>
-         <EmailConfirmationHandler />
+        {/* --- AÑADIR EL HANDLER AQUÍ --- */}
+        {/* Este componente escuchará los cambios de auth y manejará el hash de confirmación */}
+        <EmailConfirmationHandler />
+        {/* ------------------------------ */}
       </main>
 
       {/* Footer */}
       <footer className="bg-secondary/10 border-t py-8">
-        <div className="container text-center text-muted-foreground text-sm"> {/* Adjusted size */}
+        <div className="container text-center text-muted-foreground text-sm">
           © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
         </div>
       </footer>
@@ -1557,17 +1556,14 @@ export default function HomePage() {
   );
 }
 
-// Reusable Link Button Component with hover effect
+// Reusable Link Button Component
 function LinkButton({ href, children }: { href: string; children: React.ReactNode }) {
   const router = useRouter();
   return (
     <Button
         variant="link"
         onClick={() => router.push(href)}
-        className={cn(
-            "text-sm sm:text-base", // Responsive text size
-            "hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm" // Hover/focus styles
-        )}
+        className={cn("text-sm sm:text-base", "hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm")}
      >
       {children}
     </Button>
@@ -1575,10 +1571,9 @@ function LinkButton({ href, children }: { href: string; children: React.ReactNod
 }
 
 // Reusable Feature Card Component
-// (+) ACTUALIZAR ESTA DEFINICIÓN PARA ACEPTAR 'description'
 function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
-    <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border"> {/* Added border */}
+    <div className="p-6 rounded-lg shadow-md bg-card hover:shadow-lg transition-shadow duration-200 border">
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
       <p className="text-muted-foreground">{description}</p>
     </div>
@@ -1591,87 +1586,79 @@ function FeatureCard({ title, description }: { title: string; description: strin
 // File: components/auth/email-confirmation-handler.tsx
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from "sonner";
 
+// Este componente se monta en una página (ej. '/') y escucha el evento
+// SIGNED_IN que Supabase dispara después de procesar el hash de la URL.
 export default function EmailConfirmationHandler() {
     const router = useRouter();
-    const { signIn } = useAuth();
-    const [hasConfirmed, setHasConfirmed] = useState(false);
+    // Usamos una ref para evitar que el efecto se ejecute múltiples veces innecesariamente
+    const processedRef = useRef(false);
 
     useEffect(() => {
-        if (hasConfirmed) {
-            return;
-        }
+        // Solo procesar una vez
+        if (processedRef.current) return;
 
-        const handleEmailConfirmation = async () => {
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const expiresIn = params.get('expires_in');
+        console.log("EmailConfirmationHandler mounted. Listening for auth changes.");
 
-                if (accessToken && refreshToken && expiresIn) {
-                    console.log("Found access token in URL hash:", accessToken);
-                    console.log("Attempting to set session and log in.");
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log(`EmailConfirmationHandler: Auth event received: ${event}`);
 
-                     // Create the supabaseClient
-                     const supabaseClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-                     );
-                    
-                     // Use the access token to get the user and full session
-                     const { data: { user, session }, error } = await supabaseClient.auth.setSession({
-                         access_token: accessToken,
-                         refresh_token: refreshToken,
-                     })
+            // El evento clave después de la confirmación es SIGNED_IN (o USER_UPDATED si ya estaba logueado)
+            // Y la sesión debería contener el usuario confirmado.
+            if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user && !processedRef.current) {
+                 // Verificar si el email está confirmado (puede que el evento salte antes de que el flag esté 100% actualizado)
+                 // Es mejor confiar en que si hay sesión después del flujo de confirmación, está bien.
+                 // const { data: { user } } = await supabase.auth.getUser(); // Opcional: Refrescar datos del usuario
 
-                     if (error) {
-                        console.error("Error setting session:", error);
-                        return; // Stop further execution if session setup fails
-                     }
-                    
-                    if (session) {
-                        try {
-                            const { error: insertError } = await supabaseClient
-                                .from('users')
-                                .insert([
-                                    {
-                                        id: user.id, // Use user.id from the session
-                                        email: user.email,
-                                        full_name: session.user.user_metadata?.name as string || null, // Use name from session metadata
-                                        company_id: session.user.user_metadata?.companyId as string || null, // Use companyId from session metadata
-                                        role: 'user',
-                                        is_active: true,
-                                    }
-                                ]);
+                 console.log("Email confirmed or user updated successfully! Session established:", session);
+                 toast.success("Account Confirmed!", {
+                    description: "You have successfully confirmed your email address.",
+                 });
 
-                            if (insertError) {
-                                console.error("Error inserting user into 'users' table:", insertError);
-                                if (insertError.code === '23505') {
-                                    console.warn("Duplicate user insertion attempted. Ignoring.");
-                                }
-                            } else {
-                                console.log("User inserted into 'users' table successfully.");
-                            }
-                        } catch (insertErr: any) {
-                            console.error("Error during user insertion:", insertErr);
-                        }
+                 processedRef.current = true; // Marcar como procesado
 
-                        setHasConfirmed(true);
-                        await signIn(session);
-                        router.replace('/');
-                    }
-                }
+                 // --- Lógica Opcional Post-Confirmación ---
+                 // Aquí es donde idealmente llamarías a una Edge Function para asegurarte
+                 // de que el usuario existe en tu tabla pública `users` con los metadatos correctos.
+                 // Ejemplo (si tuvieras una función 'ensure-user-profile'):
+                 // try {
+                 //   const { error: funcError } = await supabase.functions.invoke('ensure-user-profile');
+                 //   if (funcError) throw funcError;
+                 //   console.log("User profile ensured via Edge Function.");
+                 // } catch (funcError) {
+                 //   console.error("Error calling Edge Function to ensure profile:", funcError);
+                 //   toast.error("Profile Sync Error", { description: "Could not sync profile data." });
+                 // }
+                 // ------------------------------------------
+
+                 // Redirigir al usuario a la página principal o al chat
+                 // Usamos replace para que el usuario no pueda volver a la URL con el hash
+                 router.replace('/chat'); // O a '/'
+            } else if (event === 'PASSWORD_RECOVERY') {
+                 // Supabase también dispara este evento si el hash era para reseteo de contraseña
+                 console.log("Password recovery flow detected.");
+                 // Aquí podrías redirigir a una página específica para cambiar la contraseña
+                 // router.replace('/reset-password');
+                 toast.info("Password Recovery", { description: "Please set your new password." });
+                 processedRef.current = true; // Marcar como procesado
             }
+
+            // Considera manejar otros eventos si son relevantes (SIGNED_OUT, TOKEN_REFRESHED, etc.)
+        });
+
+        // Limpiar suscripción al desmontar
+        return () => {
+            console.log("EmailConfirmationHandler unmounting. Unsubscribing from auth changes.");
+            subscription?.unsubscribe();
         };
 
-        handleEmailConfirmation();
-    }, [signIn, router, hasConfirmed]);
+    }, [router]); // Dependencia del router para la redirección
 
+    // Este componente no renderiza nada visible
     return null;
 }
 ```
@@ -1690,56 +1677,56 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { ApiError } from '@/lib/api';
-import { createClient } from '@supabase/supabase-js';
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar hook de Auth
+import { ApiError } from '@/lib/api'; // ApiError sigue siendo útil para errores generales
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }), // Updated min to 6 for better security
+  password: z.string().min(6, { message: 'Password must be at least 6 characters long' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login } = useAuth();
+  const { signIn } = useAuth(); // <-- Usar signIn del contexto
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    setError(null); // Clear previous errors
+    setError(null);
     try {
-      console.log("Attempting login with:", data.email);
-      const token = await loginUser(data);
-      console.log("Login successful, received token.");
-      setAuthToken(token); // Update auth state and redirect
-      // Redirect happens inside useAuth's login function
+      console.log("LoginForm: Calling signIn with:", data.email);
+      await signIn(data); // <-- Llamar a la función signIn del hook
+      // La redirección ocurrirá dentro del hook si tiene éxito
+      // No necesitas hacer nada más aquí en caso de éxito
+      console.log("LoginForm: signIn initiated successfully.");
     } catch (err) {
-      console.error("Login failed:", err);
+      // El hook signIn debería lanzar un error en caso de fallo
+      console.error("LoginForm: signIn failed:", err);
       let errorMessage = 'Login failed. Please check your credentials.';
-      if (err instanceof ApiError) {
-        errorMessage = err.message || errorMessage;
-      } else if (err instanceof Error) {
-        errorMessage = err.message || errorMessage;
-      }
+       // Usar ApiError para mostrar el mensaje específico si viene del hook
+       if (err instanceof ApiError) {
+         errorMessage = err.message || errorMessage;
+         if (err.status === 400) { // Supabase suele usar 400 para credenciales inválidas
+             errorMessage = "Invalid email or password.";
+         }
+       } else if (err instanceof Error) {
+         errorMessage = err.message;
+       }
       setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Detener carga solo en caso de error
     }
+    // No poner setIsLoading(false) aquí, el estado de carga se maneja en el hook/página
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {/* *** MEJORADO: Mostrar error de forma más prominente *** */}
       {error && (
         <Alert variant="destructive" role="alert">
           <AlertCircle className="h-4 w-4" />
@@ -1753,15 +1740,14 @@ export function LoginForm() {
           id="email"
           type="email"
           placeholder="name@example.com"
-          autoComplete="email" // Added autocomplete
+          autoComplete="email"
           required
-          disabled={isLoading} // Disable input while loading
+          disabled={isLoading}
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
-          aria-describedby={form.formState.errors.email ? 'email-error' : undefined}
         />
         {form.formState.errors.email && (
-          <p id="email-error" className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
         )}
       </div>
       <div className="space-y-1">
@@ -1769,15 +1755,14 @@ export function LoginForm() {
         <Input
           id="password"
           type="password"
-          autoComplete="current-password" // Added autocomplete
+          autoComplete="current-password"
           required
-          disabled={isLoading} // Disable input while loading
+          disabled={isLoading}
           {...form.register('password')}
           aria-invalid={form.formState.errors.password ? 'true' : 'false'}
-          aria-describedby={form.formState.errors.password ? 'password-error' : undefined}
         />
         {form.formState.errors.password && (
-          <p id="password-error" className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
         )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
@@ -1785,7 +1770,7 @@ export function LoginForm() {
       </Button>
        <div className="mt-4 text-center text-sm">
          Don't have an account?{" "}
-         <Link href="/register" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
+         <Link href="/register" className="underline text-primary hover:text-primary/80">
            Register
          </Link>
        </div>
@@ -1808,27 +1793,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { ApiError } from '@/lib/api';
-import { createClient } from '@supabase/supabase-js';
-import { AuthApiError } from '@supabase/supabase-js';
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react'; // Añadir CheckCircle
+import { supabase } from '@/lib/supabaseClient'; // Importar cliente Supabase
+import { AuthApiError } from '@supabase/supabase-js'; // Tipo de error específico de Supabase Auth
 
+// Esquema Zod incluyendo companyId (opcional por ahora, pero recomendable hacerlo requerido si aplica)
 const registerSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }).optional(),
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
-  // (+) AÑADIR company_id
-  companyId: z.string().uuid({message: 'Invalid Company ID'}).optional(),
+  // Hacer companyId requerido si siempre debe asociarse una compañía al registrarse
+  companyId: z.string().uuid({ message: "Invalid Company ID format (UUID expected)" }).optional(),
+  // Podrías añadir confirmPassword si quieres validación en el frontend
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
+// --- VALOR POR DEFECTO PARA COMPANY ID (SOLO PARA DESARROLLO/PRUEBAS) ---
+// ¡¡¡IMPORTANTE!!! En un entorno real, este ID debería venir de alguna parte
+// (ej. selección del usuario, invitación, URL específica, etc.)
+// NO deberías tener un ID fijo quemado aquí en producción.
+const DEFAULT_DEV_COMPANY_ID = process.env.NEXT_PUBLIC_DEV_COMPANY_ID || '';
+// --------------------------------------------------------------------
+
 export function RegisterForm() {
-  const { login } = useAuth();
+  // No necesitamos useAuth aquí directamente para el registro inicial
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false);
+  const [success, setSuccess] = useState<boolean>(false); // Para mensaje de confirmación
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -1836,8 +1828,7 @@ export function RegisterForm() {
       name: '',
       email: '',
       password: '',
-      // (+) AÑADIR company_id
-      companyId: 'd7387dc8-0312-4b1c-97a5-f96f7995f36c', // Valor por defecto - cambiar en PROD
+      companyId: process.env.NODE_ENV === 'development' && DEFAULT_DEV_COMPANY_ID ? DEFAULT_DEV_COMPANY_ID : '', // Usar valor por defecto en dev
     },
   });
 
@@ -1845,51 +1836,77 @@ export function RegisterForm() {
     setIsLoading(true);
     setError(null);
     setSuccess(false);
+
+    // Construir metadata para Supabase
+    const userMetaData = { full_name: data.name || null };
+    // ¡IMPORTANTE! Datos como company_id o roles van en app_metadata
+    const appMetaData = {
+        // Si companyId no se proporciona en el form (es opcional), no lo incluimos
+        ...(data.companyId && { company_id: data.companyId }),
+        // Podrías añadir roles por defecto aquí si aplica
+        // roles: ['user'],
+    };
+
     try {
-      console.log("Attempting registration with:", data.email);
+      console.log("RegisterForm: Attempting Supabase signUp for:", data.email);
 
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        console.error("Supabase URL or Anon Key not set in environment variables.");
-        setError("Supabase configuration error. Please check your environment variables.");
-        setIsLoading(false);
-        return;
-      }
-
-      const supabaseClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    );
-
-     console.log("Supabase client created."); // Add this
-
-     // Try signing up the user
-     const { data: authResponse, error: authError } = await supabaseClient.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
-           data: {
-              name: data.name || null,
-           },
-        },
-     });
-     console.log("signUp response:", authResponse, authError); // Add this
+          // Datos que el usuario puede ver/editar (a través de updateUser)
+          data: userMetaData,
+          // Datos que solo la app/backend debería gestionar (se añaden al token)
+          // ¡¡ASEGÚRATE QUE ESTO FUNCIONA!! Supabase puede requerir configuración adicional
+          // o que estos datos se añadan post-registro vía backend/trigger.
+          // La documentación indica que 'data' en signUp va a user_metadata.
+          // Para app_metadata, a menudo se necesita un paso adicional (trigger/función).
+          // Vamos a intentar pasarlo aquí, pero verifica que se guarde correctamente.
+           app_metadata: appMetaData, // <--- INTENTO de pasar app_metadata
 
-     if (authError) {
-        console.error("Supabase registration failed:", authError);
-        setError(authError.message || 'Registration failed. Please try again.');
+           // --- IMPORTANTE: Redirección para Confirmación ---
+           // Especifica a dónde debe redirigir Supabase DESPUÉS de que el usuario
+           // haga clic en el enlace de confirmación en su correo.
+           // Debe ser una página en tu app que pueda manejar la sesión (usualmente la raíz o login).
+           emailRedirectTo: window.location.origin, // Redirige a la página actual (ej. https://tuapp.vercel.app/)
+        },
+      });
+
+      if (signUpError) {
+        // Manejar errores específicos de Supabase
+        console.error("Supabase signUp error:", signUpError);
+        if (signUpError instanceof AuthApiError && signUpError.message.includes("User already registered")) {
+             setError("This email is already registered. Try logging in.");
+        } else {
+            setError(signUpError.message || 'Registration failed. Please try again.');
+        }
         setIsLoading(false);
-     } else {
-        setSuccess(true); // Registration successful, set success state
-     }
-    } catch (err: any) {
-      console.error("Registration failed:", err);
-      let errorMessage = 'Registration failed. Please try again.';
-      if (err instanceof ApiError) {
-        errorMessage = err.message || errorMessage;
-      } else if (err instanceof Error) {
-        errorMessage = err.message || errorMessage;
+        return; // Detener si hay error
       }
-      setError(errorMessage);
+
+      console.log("Supabase signUp successful:", signUpData);
+
+      // Verificar si se requiere confirmación por correo (configuración por defecto en Supabase)
+      if (signUpData.user && signUpData.user.identities?.length === 0) {
+          // Esto indica que el usuario existe pero necesita confirmar su email
+          console.log("Registration requires email confirmation.");
+          setSuccess(true); // Mostrar mensaje de éxito/confirmación
+          setError(null);
+      } else if (signUpData.user) {
+           // Si la confirmación no está habilitada (o es login con OAuth), el usuario ya está activo
+           console.log("User registered and automatically confirmed (or confirmation disabled).");
+           // Podrías intentar loguearlo aquí, pero es mejor esperar a onAuthStateChange
+           setSuccess(true); // Mostrar mensaje genérico de éxito
+           setError("Registration successful! You might be logged in automatically."); // Mensaje informativo
+      } else {
+           // Caso inesperado
+           console.warn("SignUp completed but no user data returned and no confirmation needed?");
+           setError("Registration completed with unexpected status. Please try logging in.");
+      }
+
+    } catch (err) { // Captura errores generales del proceso
+      console.error("Unexpected error during registration:", err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -1900,73 +1917,45 @@ export function RegisterForm() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>Registration Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {success && !error && (
+       {success && ( // Mostrar mensaje de éxito/confirmación
         <Alert variant="default" className="bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700">
-          <AlertTitle className="text-green-800 dark:text-green-200">Success</AlertTitle>
+           <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-300" />
+          <AlertTitle className="text-green-800 dark:text-green-200">Registration Submitted</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
-            Account created successfully! Please check your email to verify your account.
+            Please check your email ({form.getValues("email")}) to confirm your account.
           </AlertDescription>
         </Alert>
       )}
+      {/* --- Campos del Formulario --- */}
       <div className="space-y-1">
         <Label htmlFor="name">Name (Optional)</Label>
-        <Input
-          id="name"
-          type="text"
-          placeholder="Your Name"
-          {...form.register('name')}
-          aria-invalid={form.formState.errors.name ? 'true' : 'false'}
-        />
-        {form.formState.errors.name && (
-          <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
-        )}
+        <Input id="name" type="text" placeholder="Your Name" {...form.register('name')} disabled={isLoading || success}/>
+         {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
       </div>
       <div className="space-y-1">
         <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="name@example.com"
-          required
-          {...form.register('email')}
-          aria-invalid={form.formState.errors.email ? 'true' : 'false'}
-        />
-        {form.formState.errors.email && (
-          <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
-        )}
+        <Input id="email" type="email" placeholder="name@example.com" required {...form.register('email')} disabled={isLoading || success}/>
+        {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
       </div>
       <div className="space-y-1">
         <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          required
-          {...form.register('password')}
-          aria-invalid={form.formState.errors.password ? 'true' : 'false'}
-        />
-        {form.formState.errors.password && (
-          <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
-        )}
+        <Input id="password" type="password" required {...form.register('password')} disabled={isLoading || success}/>
+        {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
       </div>
-      {/* (+) AÑADIR company_id */}
-      <div className="space-y-1">
-        <Label htmlFor="companyId">Company ID (Optional)</Label>
-        <Input
-          id="companyId"
-          type="text"
-          placeholder="Company ID"
-          {...form.register('companyId')}
-          aria-invalid={form.formState.errors.companyId ? 'true' : 'false'}
-        />
-        {form.formState.errors.companyId && (
-          <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>
-        )}
-      </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      {/* Campo Company ID (Opcional por defecto, basado en schema) */}
+      {/* Oculta este campo si no quieres que el usuario lo ingrese manualmente */}
+      {/* O hazlo visible y requerido si es necesario */}
+       <div className="space-y-1">
+         <Label htmlFor="companyId">Company ID (Optional - Dev Only)</Label>
+         <Input id="companyId" type="text" placeholder="Enter Company UUID" {...form.register('companyId')} disabled={isLoading || success}/>
+         {form.formState.errors.companyId && <p className="text-sm text-destructive">{form.formState.errors.companyId.message}</p>}
+       </div>
+      {/* ----------------------------- */}
+      <Button type="submit" className="w-full" disabled={isLoading || success}>
         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
       </Button>
       <div className="mt-4 text-center text-sm">
@@ -1983,22 +1972,20 @@ export function RegisterForm() {
 ## File: `components\chat\chat-history.tsx`
 ```tsx
 // File: components/chat/chat-history.tsx
-// File: components/chat/chat-history.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Importar React solo una vez
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { usePathname, useRouter } from 'next/navigation';
+// Importar Button Y buttonVariants correctamente
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+// Importar iconos solo una vez
 import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
-import { useAuth } from '@/lib/hooks/useAuth'; // To ensure user is logged in
+import { useAuth } from '@/lib/hooks/useAuth';
 import { toast } from "sonner";
-// Correct import path for AlertDialog
 import {
     AlertDialog,
     AlertDialogAction,
@@ -2009,157 +1996,100 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"; // Corrected import path
-
+} from "@/components/ui/alert-dialog";
 
 export function ChatHistory() {
   const pathname = usePathname();
-  const router = useRouter(); // Initialize router
-  const { token } = useAuth(); // Get token to know if user is authenticated
+  const router = useRouter();
+  const { token } = useAuth(); // O session del useAuth refactorizado
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isAlertOpen, setIsAlertOpen] = useState(false); // Control alert dialog visibility
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const fetchChatHistory = useCallback(async (showToast = false) => {
-    if (!token) {
-        console.log("ChatHistory: No token, skipping fetch.");
-        setChats([]); // Clear chats if not logged in
+    // Usar 'token' o 'session' dependiendo de cómo quede useAuth
+    const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+    const isAuthenticated = token || bypassAuth; // Considerar bypass
+
+    if (!isAuthenticated) {
+        console.log("ChatHistory: Not authenticated or bypassed, skipping fetch.");
+        setChats([]);
         setIsLoading(false);
-        setError("Please log in to view chat history."); // Inform user
+        if (!bypassAuth) setError("Please log in to view chat history.");
         return;
     }
+
     console.log("ChatHistory: Fetching chat list...");
     setIsLoading(true);
-    setError(null); // Clear previous errors
+    setError(null);
     try {
       const fetchedChats = await getChats();
-      // Sort chats by updated_at descending (newest first)
       fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       setChats(fetchedChats);
-       if (showToast) {
-           toast.success("Chat History Refreshed");
-       }
+       if (showToast) toast.success("Chat History Refreshed");
     } catch (err) {
       console.error("Failed to fetch chat history:", err);
       let message = "Could not load chat history.";
        if (err instanceof ApiError) {
          message = err.message || message;
-         if (err.status === 401) { // Handle unauthorized specifically
+         // if (err.status === 401 && !bypassAuth) { // Solo si no estamos en bypass
+         if (err.status === 401) { // Manejar 401 incluso en bypass? Podría ser un token inválido real
              message = "Session expired or invalid. Please log in again.";
-             // Optionally trigger logout here
+             // Considerar llamar a signOut() aquí si se detecta 401
          }
-       } else if (err instanceof Error) {
-         message = err.message;
-       }
+       } else if (err instanceof Error) { message = err.message; }
       setError(message);
       toast.error("Error Loading Chats", { description: message });
     } finally {
       setIsLoading(false);
     }
-  }, [token]); // Depend only on token
+  }, [token]); // Depender de token (o session)
 
   useEffect(() => {
     fetchChatHistory(false);
-  }, [fetchChatHistory]); // Fetch when component mounts or token changes
-
-  const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
-     event.stopPropagation();
-  const router = useRouter(); // Initialize router
-  const { token } = useAuth(); // Get token to know if user is authenticated
-  const [chats, setChats] = useState<ChatSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [chatToDelete, setChatToDelete] = useState<ChatSummary | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isAlertOpen, setIsAlertOpen] = useState(false); // Control alert dialog visibility
-
-  const fetchChatHistory = useCallback(async (showToast = false) => {
-    if (!token) {
-        console.log("ChatHistory: No token, skipping fetch.");
-        setChats([]); // Clear chats if not logged in
-        setIsLoading(false);
-        setError("Please log in to view chat history."); // Inform user
-        return;
-    }
-    console.log("ChatHistory: Fetching chat list...");
-    setIsLoading(true);
-    setError(null); // Clear previous errors
-    try {
-      const fetchedChats = await getChats();
-      // Sort chats by updated_at descending (newest first)
-      fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-      setChats(fetchedChats);
-       if (showToast) {
-           toast.success("Chat History Refreshed");
-       }
-    } catch (err) {
-      console.error("Failed to fetch chat history:", err);
-      let message = "Could not load chat history.";
-       if (err instanceof ApiError) {
-         message = err.message || message;
-         if (err.status === 401) { // Handle unauthorized specifically
-             message = "Session expired or invalid. Please log in again.";
-             // Optionally trigger logout here
-         }
-       } else if (err instanceof Error) {
-         message = err.message;
-       }
-      setError(message);
-      toast.error("Error Loading Chats", { description: message });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]); // Depend only on token
-
-  useEffect(() => {
-    fetchChatHistory(false);
-  }, [fetchChatHistory]); // Fetch when component mounts or token changes
+  }, [fetchChatHistory]);
 
   const openDeleteConfirmation = (chat: ChatSummary, event: React.MouseEvent) => {
      event.stopPropagation();
      event.preventDefault();
      setChatToDelete(chat);
-     setIsAlertOpen(true); // Open the dialog
+     setIsAlertOpen(true);
   };
 
   const handleDeleteConfirmed = async () => {
     if (!chatToDelete) return;
-
     console.log("Deleting chat:", chatToDelete.id);
     setIsDeleting(true);
     try {
         await deleteChat(chatToDelete.id);
-        // Optimistically update UI or refetch
         setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
         toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
-
-        // If the currently active chat is deleted, navigate to the base chat page
         const currentChatId = pathname.split('/').pop();
         if (currentChatId === chatToDelete.id) {
-             console.log("Active chat deleted, navigating to /chat");
-             router.push('/chat'); // Use Next.js router for navigation
+             router.push('/chat');
         }
     } catch (err) {
         console.error("Failed to delete chat:", err);
         let message = "Could not delete chat.";
-        if (err instanceof ApiError) {
-            message = err.message || message;
-        } else if (err instanceof Error) {
-            message = err.message;
-        }
+        if (err instanceof ApiError) message = err.message || message;
+        else if (err instanceof Error) message = err.message;
         toast.error("Deletion Failed", { description: message });
     } finally {
         setIsDeleting(false);
-        setIsAlertOpen(false); // Close the dialog
-        setChatToDelete(null); // Clear the chat to delete
+        setIsAlertOpen(false);
+        setChatToDelete(null);
     }
   };
 
+  // --- RENDER CONTENT ---
   const renderContent = () => {
-    if (!token && !isLoading) { // Show login prompt if not logged in and not loading
+    const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+    const isAuthenticated = token || bypassAuth;
+
+    if (!isAuthenticated && !isLoading && !bypassAuth) {
          return (
              <div className="px-2 py-4 text-center text-muted-foreground">
                  <p className="text-sm mb-2">Please log in to view or start chats.</p>
@@ -2171,7 +2101,7 @@ export function ChatHistory() {
     if (isLoading) {
         return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
     }
-    if (error && !isLoading) { // Show error only if not loading
+    if (error && !isLoading) {
         return (
             <div className="px-2 py-4 text-center text-destructive">
                 <AlertCircle className="mx-auto h-6 w-6 mb-1" />
@@ -2182,7 +2112,7 @@ export function ChatHistory() {
             </div>
         );
     }
-    if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
+    if (chats.length === 0 && !isLoading) {
         return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
     }
 
@@ -2191,96 +2121,14 @@ export function ChatHistory() {
         const isActive = pathname === `/chat/${chat.id}`;
         const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
         return (
-            // Use AlertDialogTrigger on the delete button, not the whole Link
-            <div key={chat.id} className="flex items-center group">
+            // Contenedor principal para cada fila de chat
+            <div key={chat.id} className="flex items-center group w-full">
+                {/* Enlace que ocupa la mayor parte del espacio */}
                 <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
                     <a
                         className={cn(
-                            // *** CORREGIDO: Ahora buttonVariants está importado y se puede usar ***
                             buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
-                            "w-full justify-start h-10 flex-1 overflow-hidden mr-1", // Adjust styling
-                            isActive ? "bg-muted hover:bg-muted" : ""
-                        )}
-                        title={displayTitle}
-                    >
-     setChatToDelete(chat);
-     setIsAlertOpen(true); // Open the dialog
-  };
-
-  const handleDeleteConfirmed = async () => {
-    if (!chatToDelete) return;
-
-    console.log("Deleting chat:", chatToDelete.id);
-    setIsDeleting(true);
-    try {
-        await deleteChat(chatToDelete.id);
-        // Optimistically update UI or refetch
-        setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
-        toast.success("Chat Deleted", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0,8)}" removed.`});
-
-        // If the currently active chat is deleted, navigate to the base chat page
-        const currentChatId = pathname.split('/').pop();
-        if (currentChatId === chatToDelete.id) {
-             console.log("Active chat deleted, navigating to /chat");
-             router.push('/chat'); // Use Next.js router for navigation
-        }
-    } catch (err) {
-        console.error("Failed to delete chat:", err);
-        let message = "Could not delete chat.";
-        if (err instanceof ApiError) {
-            message = err.message || message;
-        } else if (err instanceof Error) {
-            message = err.message;
-        }
-        toast.error("Deletion Failed", { description: message });
-    } finally {
-        setIsDeleting(false);
-        setIsAlertOpen(false); // Close the dialog
-        setChatToDelete(null); // Clear the chat to delete
-    }
-  };
-
-  const renderContent = () => {
-    if (!token && !isLoading) { // Show login prompt if not logged in and not loading
-         return (
-             <div className="px-2 py-4 text-center text-muted-foreground">
-                 <p className="text-sm mb-2">Please log in to view or start chats.</p>
-                 <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
-             </div>
-         );
-     }
-
-    if (isLoading) {
-        return <div className="flex justify-center items-center h-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-    }
-    if (error && !isLoading) { // Show error only if not loading
-        return (
-            <div className="px-2 py-4 text-center text-destructive">
-                <AlertCircle className="mx-auto h-6 w-6 mb-1" />
-                <p className="text-sm mb-2">{error}</p>
-                <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
-                    <RefreshCw className="mr-1 h-3 w-3"/> Retry
-                </Button>
-            </div>
-        );
-    }
-    if (chats.length === 0 && !isLoading) { // Show empty state only if not loading
-        return <p className="text-sm text-muted-foreground px-2 py-4 text-center">No chat history yet.</p>;
-    }
-
-    // Render chat list
-    return chats.map((chat) => {
-        const isActive = pathname === `/chat/${chat.id}`;
-        const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
-        return (
-            // Use AlertDialogTrigger on the delete button, not the whole Link
-            <div key={chat.id} className="flex items-center group">
-                <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
-                    <a
-                        className={cn(
-                            // *** CORREGIDO: Ahora buttonVariants está importado y se puede usar ***
-                            buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "default" }),
-                            "w-full justify-start h-10 flex-1 overflow-hidden mr-1", // Adjust styling
+                            "flex-1 justify-start h-10 overflow-hidden mr-1", // Ocupa espacio, justifica a la izquierda
                             isActive ? "bg-muted hover:bg-muted" : ""
                         )}
                         title={displayTitle}
@@ -2289,6 +2137,7 @@ export function ChatHistory() {
                         <span className="truncate flex-1 text-sm">{displayTitle}</span>
                     </a>
                 </Link>
+                {/* Botón de eliminar (Trigger del AlertDialog) */}
                 <AlertDialogTrigger asChild>
                     <Button
                         variant="ghost"
@@ -2300,21 +2149,20 @@ export function ChatHistory() {
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                     </Button>
                 </AlertDialogTrigger>
-            </div>
+            </div> // Cierre del div contenedor de la fila
         );
     });
   };
+  // --- FIN RENDER CONTENT ---
 
   return (
-     // Wrap with AlertDialog component, controlled by isAlertOpen state
      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <ScrollArea className="h-full flex-1"> {/* Let parent control height */}
+        <ScrollArea className="h-full flex-1">
             <div className="flex flex-col gap-1 p-2">
                 {renderContent()}
             </div>
         </ScrollArea>
 
-        {/* Dialog Content - Placed outside the loop */}
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -2324,60 +2172,9 @@ export function ChatHistory() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
                 <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                    onClick={handleDeleteConfirmed} // Changed to trigger confirmed delete
-                    disabled={isDeleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Delete"}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-                        <span className="truncate flex-1 text-sm">{displayTitle}</span>
-                    </a>
-                </Link>
-                <AlertDialogTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100"
-                        onClick={(e) => openDeleteConfirmation(chat, e)}
-                        aria-label={`Delete chat: ${displayTitle}`}
-                    >
-                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                    </Button>
-                </AlertDialogTrigger>
-            </div>
-        );
-    });
-  };
-
-  return (
-     // Wrap with AlertDialog component, controlled by isAlertOpen state
-     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <ScrollArea className="h-full flex-1"> {/* Let parent control height */}
-            <div className="flex flex-col gap-1 p-2">
-                {renderContent()}
-            </div>
-        </ScrollArea>
-
-        {/* Dialog Content - Placed outside the loop */}
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the chat
-                    <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0,8)}"</span> and all its messages.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                {/* Cancel button now correctly uses onOpenChange via AlertDialogCancel */}
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                    onClick={handleDeleteConfirmed} // Changed to trigger confirmed delete
+                    onClick={handleDeleteConfirmed}
                     disabled={isDeleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
@@ -2769,14 +2566,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download } from 'lucide-react'; // Import Download icon
-import { ApiError, request, RetrievedDoc } from '@/lib/api'; // Import request function, RetrievedDoc
+// --- CORRECCIÓN: Importar iconos en una sola línea ---
 import { FileText, AlertCircle, Download, Eye } from 'lucide-react';
-import { RetrievedDoc } from '@/lib/api';
+// ---------------------------------------------------
+import { RetrievedDoc } from '@/lib/api'; // Mantener esta importación
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-// (*) CORRECT IMPORT PATH (Ensure components/ui/dialog.tsx exists after running `npx shadcn-ui@latest add dialog`)
 import {
     Dialog,
     DialogContent,
@@ -2786,7 +2582,7 @@ import {
     DialogTrigger,
     DialogFooter,
     DialogClose
-} from "@/components/ui/dialog"; // <--- This path causes the error if the file is missing
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface RetrievedDocumentsPanelProps {
@@ -2805,19 +2601,16 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     };
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
+        // TODO: Implementar llamada real al backend si existe un endpoint de descarga
         const message = `Download requested for: ${doc.file_name || doc.id}`;
         console.log(message);
         toast.info("Download Not Implemented", {
              description: `Backend endpoint for downloading '${doc.file_name || doc.id}' is not yet available.`,
-             action: {
-                label: "Close",
-                onClick: () => {},
-             },
+             action: { label: "Close", onClick: () => {} },
         });
     };
 
   return (
-    // Wrap the entire panel content potentially triggering the dialog
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
@@ -2844,11 +2637,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     </div>
                 )}
                 {documents.map((doc, index) => (
-                    // Use DialogTrigger around the Card to make it clickable
                     <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                          <Card
                             className="cursor-pointer hover:shadow-md transition-shadow duration-150"
-                            onClick={() => handleViewDocument(doc)} // Set selected doc on click
+                            onClick={() => handleViewDocument(doc)}
                             title={`Click to view details for ${doc.file_name || 'document'}`}
                         >
                             <CardContent className="p-3 space-y-1 text-sm">
@@ -2876,7 +2668,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Dialog Content - Rendered conditionally when selectedDoc is not null */}
             {selectedDoc && (
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
@@ -2888,7 +2679,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3 text-sm">
-                        {/* Details content */}
                         <div className="flex justify-between">
                             <span className="font-medium text-muted-foreground">Document ID:</span>
                             <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
@@ -2930,7 +2720,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </DialogContent>
             )}
         </div>
-    </Dialog> // Close the main Dialog wrapper
+    </Dialog>
   );
 }
 ```
@@ -5121,20 +4911,14 @@ if __name__ == "__main__":
 ## File: `lib\api.ts`
 ```ts
 // File: lib/api.ts
-import { getToken, getUserFromToken, User } from './auth/helpers';
-import { getToken, getUserFromToken, User } from './auth/helpers';
+// import { getToken, getUserFromToken, User } from './auth/helpers'; // Ya no se usa getToken/getUserFromToken directamente aquí
 import { getApiGatewayUrl } from './utils';
-// Import Message type from chat-message to align response mapping
-import type { Message } from '@/components/chat/chat-message'; // <-- Import Frontend Message type
-// Import Message type from chat-message to align response mapping
-import type { Message } from '@/components/chat/chat-message'; // <-- Import Frontend Message type
+import type { Message } from '@/components/chat/chat-message';
+import { supabase } from './supabaseClient'; // Importar el cliente Supabase
 
 // --- ApiError Class ---
-// --- ApiError Class ---
 interface ApiErrorData {
-    detail?: string | { msg: string; type: string; loc?: string[] }[] | any; // Added loc for FastAPI errors
-    message?: string;
-    detail?: string | { msg: string; type: string; loc?: string[] }[] | any; // Added loc for FastAPI errors
+    detail?: string | { msg: string; type: string; loc?: string[] }[] | any;
     message?: string;
 }
 
@@ -5148,7 +4932,6 @@ export class ApiError extends Error {
     this.status = status;
     this.data = data;
     Object.setPrototypeOf(this, ApiError.prototype);
-    Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
 
@@ -5160,103 +4943,46 @@ async function request<T>(
 
   let url: string;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  // *** Identificar rutas de gateway (v1) vs. internas (simuladas) ***
-  const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
-  const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
 
-  if (isGatewayRoute) {
-    // Use absolute API Gateway URL for external routes
-    const gatewayUrl = getApiGatewayUrl(); // Get URL from env var or default
-  // *** Identificar rutas de gateway (v1) vs. internas (simuladas) ***
-  const isGatewayRoute = cleanEndpoint.startsWith('/api/v1/');
-  const isInternalAuthRoute = cleanEndpoint.startsWith('/api/auth/'); // Rutas simuladas
-
-  if (isGatewayRoute) {
-    // Use absolute API Gateway URL for external routes
-    const gatewayUrl = getApiGatewayUrl(); // Get URL from env var or default
+  // Asumimos que TODAS las llamadas al backend pasan por el gateway bajo /api/v1/
+  if (cleanEndpoint.startsWith('/api/v1/')) {
+    const gatewayUrl = getApiGatewayUrl();
     url = `${gatewayUrl}${cleanEndpoint}`;
-    console.debug(`External API Request Target: ${url}`);
-  } else if (isInternalAuthRoute) {
-     // Use relative URL for internal simulated routes (IF USED FOR TESTING)
-     url = cleanEndpoint;
-     console.warn(`Using SIMULATED internal API route: ${url}`);
-     console.debug(`Internal API Request Target: ${url}`);
+    console.debug(`Gateway API Request Target: ${url}`);
   } else {
-     // Handle other potential internal routes if needed
-     url = cleanEndpoint;
-     console.debug(`Other Internal API Request Target: ${url}`);
-  }
-    console.debug(`External API Request Target: ${url}`);
-  } else if (isInternalAuthRoute) {
-     // Use relative URL for internal simulated routes (IF USED FOR TESTING)
-     url = cleanEndpoint;
-     console.warn(`Using SIMULATED internal API route: ${url}`);
-     console.debug(`Internal API Request Target: ${url}`);
-  } else {
-     // Handle other potential internal routes if needed
-     url = cleanEndpoint;
-     console.debug(`Other Internal API Request Target: ${url}`);
+    console.error(`Attempting request to non-gateway endpoint: ${cleanEndpoint}. This is likely an error.`);
+    throw new Error(`Invalid API endpoint: ${cleanEndpoint}. Must start with /api/v1/`);
   }
 
+  // --- Obtener token de la sesión actual de Supabase ---
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error("Error getting Supabase session:", sessionError);
+    // Podrías lanzar un error o permitir continuar sin token dependiendo del endpoint
+    // throw new ApiError("Could not retrieve authentication session.", 500);
+  }
+  const token = sessionData?.session?.access_token || null;
+  // -------------------------------------------------------
 
-  const token = getToken();
   const headers = new Headers(options.headers || {});
-  let companyId: string | null = null;
-  let companyId: string | null = null;
 
   headers.set('Accept', 'application/json');
   if (!(options.body instanceof FormData)) {
-     headers.set('Content-Type', 'application/json');
+    headers.set('Content-Type', 'application/json');
   }
 
-  // Add Authorization and X-Company-ID (if applicable and available) only for Gateway routes
-  if (isGatewayRoute && token) {
-  // Add Authorization and X-Company-ID (if applicable and available) only for Gateway routes
-  if (isGatewayRoute && token) {
+  // Añadir token de autorización si existe
+  // El Gateway se encargará de validar y extraer la info necesaria (como company_id)
+  if (token) {
     headers.set('Authorization', `Bearer ${token}`);
-    const user = getUserFromToken(token); // Decode token to get user info
-    if (user?.companyId) {
-        companyId = user.companyId;
-        headers.set('X-Company-ID', companyId); // Add Company ID header
-    } else {
-         console.warn(`Could not extract companyId from token for Gateway request to ${url}. Backend might reject.`);
-         // Depending on backend requirements, you might need to throw an error here
-         // if companyId is mandatory for all gateway requests.
-         // throw new ApiError("Company ID could not be determined from token.", 400);
-    }
-  } else if (isGatewayRoute && !token && !cleanEndpoint.includes('/auth/')) {
-      // Handle missing token for required gateway routes (excluding auth endpoints)
-      console.error(`Authentication token missing for Gateway request to ${url}.`);
-      // Throw an error to prevent the request if auth is mandatory
-      throw new ApiError("Authentication required. Please log in.", 401);
+  } else if (!cleanEndpoint.includes('/api/v1/auth/')) { // No advertir si es una ruta de auth que no requiere token
+     console.warn(`Calling potentially protected gateway route ${cleanEndpoint} without a token.`);
+     // El gateway devolverá 401 si es necesario
   }
 
-    const user = getUserFromToken(token); // Decode token to get user info
-    if (user?.companyId) {
-        companyId = user.companyId;
-        headers.set('X-Company-ID', companyId); // Add Company ID header
-    } else {
-         console.warn(`Could not extract companyId from token for Gateway request to ${url}. Backend might reject.`);
-         // Depending on backend requirements, you might need to throw an error here
-         // if companyId is mandatory for all gateway requests.
-         // throw new ApiError("Company ID could not be determined from token.", 400);
-    }
-  } else if (isGatewayRoute && !token && !cleanEndpoint.includes('/auth/')) {
-      // Handle missing token for required gateway routes (excluding auth endpoints)
-      console.error(`Authentication token missing for Gateway request to ${url}.`);
-      // Throw an error to prevent the request if auth is mandatory
-      throw new ApiError("Authentication required. Please log in.", 401);
-  }
+  const config: RequestInit = { ...options, headers };
 
-
-  const config: RequestInit = {
-    ...options,
-    headers,
-  };
-
-  console.log(`API Request: ${config.method || 'GET'} ${url}`);
-  if (companyId) console.log(` > With Company ID: ${companyId}`);
-
+  console.log(`API Request: ${config.method || 'GET'} ${url} (Token ${token ? 'Present' : 'Absent'})`);
 
   try {
     const response = await fetch(url, config);
@@ -5264,533 +4990,156 @@ async function request<T>(
     if (!response.ok) {
       let errorData: ApiErrorData | null = null;
       let errorText = '';
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        try {
-           errorText = await response.text();
-           console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
-           console.warn(`API error response (${response.status}) was not valid JSON:`, errorText);
-        } catch (textErr) {
-             console.warn(`Could not read API error response body (${response.status}).`);
-        }
-      }
+      try { errorData = await response.json(); } catch { try { errorText = await response.text(); } catch {} }
 
-      // Extract a meaningful error message
       let errorMessage = `HTTP error ${response.status}`;
-       if (errorData?.detail && typeof errorData.detail === 'string') {
-           errorMessage = errorData.detail;
-       } else if (errorData?.detail && Array.isArray(errorData.detail)) {
-           // Handle FastAPI validation errors specifically
-           errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
-       } else if (errorData?.message) { // Handle generic 'message' field
-           errorMessage = errorData.message;
-       } else if (errorText) {
-           errorMessage = errorText.substring(0, 200); // Limit length
-       } else {
-           // Fallback messages based on status code
-           switch (response.status) {
-                case 400: errorMessage = "Bad Request. Please check your input."; break;
-                case 401: errorMessage = "Unauthorized. Please check credentials or login again."; break;
-                case 403: errorMessage = "Forbidden. You don't have permission."; break;
-                case 404: errorMessage = "Resource not found."; break;
-                case 422: errorMessage = "Validation Error. Please check your input."; break;
-                case 500: errorMessage = "Internal Server Error. Please try again later."; break;
-                case 502: errorMessage = "Bad Gateway. Error communicating with upstream service."; break;
-                case 503: errorMessage = "Service Unavailable. Please try again later."; break;
-                case 504: errorMessage = "Gateway Timeout. The server took too long to respond."; break;
-           }
-       }
-
-
+      if (errorData?.detail && typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+      } else if (errorData?.detail && Array.isArray(errorData.detail)) {
+          errorMessage = errorData.detail.map(e => `${e.loc?.join('.')} - ${e.msg}`).join('; ') || 'Validation Error';
+      } else if (errorData?.message) {
+          errorMessage = errorData.message;
+      } else if (errorText) {
+          errorMessage = errorText.substring(0, 200);
+      } else {
+          // Fallbacks
+          switch (response.status) {
+               case 401: errorMessage = "Unauthorized. Please check credentials or login again."; break;
+               case 403: errorMessage = "Forbidden. You don't have permission."; break;
+               // ... otros códigos de estado ...
+               default: break; // Mantener el mensaje genérico
+          }
+      }
       console.error(`API Error: ${response.status} ${errorMessage}`, { url, data: errorData, text: errorText });
       throw new ApiError(errorMessage, response.status, errorData || undefined);
     }
 
-    // Handle No Content response (e.g., for DELETE)
     if (response.status === 204 || response.headers.get('content-length') === '0') {
-    // Handle No Content response (e.g., for DELETE)
-    if (response.status === 204 || response.headers.get('content-length') === '0') {
-        console.log(`API Success: ${response.status} No Content`);
-        return null as T; // Return null for No Content
-        return null as T; // Return null for No Content
+      return null as T;
     }
 
-    // Parse successful JSON response
-    // Parse successful JSON response
     try {
-        const data: T = await response.json();
-        // console.debug(`API Success: ${response.status}`, { url, data });
-        // console.debug(`API Success: ${response.status}`, { url, data });
-        return data;
+      const data: T = await response.json();
+      return data;
     } catch (jsonError) {
-         console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
-         console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
-         throw new ApiError(`Invalid JSON response from server`, response.status);
+      console.error(`API Error: Failed to parse JSON response for ${response.status}`, { url, error: jsonError });
+      throw new ApiError(`Invalid JSON response from server`, response.status);
     }
 
+  // --- CORRECCIÓN DEL BLOQUE CATCH ---
   } catch (error) {
+    // Primero, manejar ApiError conocido
     if (error instanceof ApiError) {
-      // Re-throw known API errors
-      // Re-throw known API errors
       throw error;
-    } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
-        // Handle Network errors specifically
-        console.error('Network Error:', { url, error });
-        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
     }
-    else {
-      // Handle other unexpected errors (e.g., programming errors in this function)
-      console.error('Unexpected error during API request:', { url, error });
-      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred', 500);
-    } else if (error instanceof TypeError && error.message.includes('fetch')) { // More robust check for network errors
-        // Handle Network errors specifically
-        console.error('Network Error:', { url, error });
-        throw new ApiError('Network error: Could not connect to the server. Is the API Gateway running and accessible?', 0); // Use status 0 for network errors
+    // Luego, manejar errores de red específicos
+    else if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
+      console.error('Network Error:', { url, error });
+      throw new ApiError(`Network error connecting to API Gateway at ${url}. Please check connection and gateway status.`, 0); // Status 0 para errores de red
     }
+    // Finalmente, otros errores inesperados
     else {
-      // Handle other unexpected errors (e.g., programming errors in this function)
       console.error('Unexpected error during API request:', { url, error });
-      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred', 500);
+      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred during the request.', 500);
     }
   }
-}
-
-// --- Auth Service ---
-// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
-// Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
-// --- Auth Service ---
-// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
-// Asume que tu gateway enruta /api/v1/auth/login al servicio de autenticación real
-export const loginUser = async (credentials: { email: string; password: string }) => {
-  console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
-  // El backend real debe devolver una estructura como { "access_token": "..." }
-  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
-  console.log("Calling REAL login API via Gateway (/api/v1/auth/login)...");
-  // El backend real debe devolver una estructura como { "access_token": "..." }
-  const response = await request<{ access_token: string }>('/api/v1/auth/login', { // <-- RUTA GATEWAY REAL
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
-  return response.access_token;
-};
-
-// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
-// Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
-// *** CORREGIDO: Apuntar al endpoint REAL del API Gateway ***
-// Asume que tu gateway enruta /api/v1/auth/register al servicio de autenticación real
-export const registerUser = async (details: { email: string; password: string; name?: string }) => {
-    console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
-    // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
-    // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
-    const response = await request<{ access_token?: string; user?: Partial<User>; message?: string }>('/api/v1/auth/register', { // <-- RUTA GATEWAY REAL
-    console.log("Calling REAL register API via Gateway (/api/v1/auth/register)...");
-    // Ajusta el tipo de respuesta esperado <{...}> según lo que devuelve tu backend real.
-    // Podría ser solo un mensaje de éxito, info del usuario, o un token si hay auto-login.
-    const response = await request<{ access_token?: string; user?: Partial<User>; message?: string }>('/api/v1/auth/register', { // <-- RUTA GATEWAY REAL
-        method: 'POST',
-        body: JSON.stringify(details),
-    });
-    return response; // Devuelve la respuesta completa del backend
-    return response; // Devuelve la respuesta completa del backend
-};
-
-// --- Ingest Service (External API Routes - /api/v1/ingest) ---
-// --- Ingest Service (External API Routes - /api/v1/ingest) ---
-export interface IngestResponse {
-    document_id: string;
-    task_id: string;
-    status: string;
-    message: string;
+  // --- FIN CORRECCIÓN BLOQUE CATCH ---
 }
 
 
+// --- Funciones loginUser y registerUser ELIMINADAS ---
+// La autenticación se manejará directamente con el cliente Supabase en los componentes/hooks.
+
+
+// --- Ingest Service Calls (sin cambios, ya usan /api/v1/) ---
+export interface IngestResponse { /* ... */ document_id: string; task_id: string; status: string; message: string; }
 export const uploadDocument = async (formData: FormData, metadata: Record<string, any> = {}) => {
     formData.append('metadata_json', JSON.stringify(metadata));
-    return request<IngestResponse>('/api/v1/ingest', {
-        method: 'POST',
-        body: formData,
-    });
+    return request<IngestResponse>('/api/v1/ingest', { method: 'POST', body: formData });
 };
-
-
-export interface DocumentStatusResponse {
-    document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
-    file_name?: string | null;
-    file_type?: string | null;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
-    error_message?: string | null;
-    last_updated?: string; // ISO 8601 date string
-    last_updated?: string; // ISO 8601 date string
-    message?: string | null;
-}
-
-
+export interface DocumentStatusResponse { /* ... */ document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; last_updated?: string; message?: string | null; }
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
-  return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
-    method: 'GET',
-  });
+    return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, { method: 'GET' });
 };
-
-
 export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    return request<DocumentStatusResponse[]>('/api/v1/ingest/status', {
-         method: 'GET',
-    });
+    return request<DocumentStatusResponse[]>('/api/v1/ingest/status', { method: 'GET' });
 };
 
 
-// --- Query & Chat Service (External API Routes - /api/v1/*) ---
+// --- Query & Chat Service Calls (sin cambios, ya usan /api/v1/) ---
+export interface RetrievedDocApi { /* ... */ id: string; score?: number | null; content_preview?: string | null; metadata?: Record<string, any> | null; document_id?: string | null; file_name?: string | null; }
+export interface RetrievedDoc { /* ... */ id: string; score?: number | null; content_preview?: string | null; metadata?: Record<string, any> | null; document_id?: string | null; file_name?: string | null; }
+export interface ChatSummary { /* ... */ id: string; title: string | null; updated_at: string; }
+export interface ChatMessageApi { /* ... */ id: string; role: 'user' | 'assistant'; content: string; sources: RetrievedDocApi[] | null; created_at: string; }
+export interface QueryPayload { /* ... */ query: string; retriever_top_k?: number; chat_id?: string | null; }
+export interface QueryApiResponse { /* ... */ answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id?: string | null; chat_id: string; }
 
-// Type for retrieved documents within API responses (sent by Backend)
-export interface RetrievedDocApi {
-    id: string;             // Chunk ID from vector store (Milvus)
-    score?: number | null;
-    content_preview?: string | null; // Backend should provide this preview
-    metadata?: Record<string, any> | null;
-    document_id?: string | null; // Original document ID (from Supabase DOCUMENTS table)
-    file_name?: string | null;   // Original filename (from Supabase DOCUMENTS table)
-}
-
-// Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
-// --- Query & Chat Service (External API Routes - /api/v1/*) ---
-
-// Type for retrieved documents within API responses (sent by Backend)
-export interface RetrievedDocApi {
-    id: string;             // Chunk ID from vector store (Milvus)
-    score?: number | null;
-    content_preview?: string | null; // Backend should provide this preview
-    metadata?: Record<string, any> | null;
-    document_id?: string | null; // Original document ID (from Supabase DOCUMENTS table)
-    file_name?: string | null;   // Original filename (from Supabase DOCUMENTS table)
-}
-
-// Frontend type for RetrievedDoc (used in UI components like RetrievedDocumentsPanel)
-export interface RetrievedDoc {
-    id: string; // Chunk ID
-    id: string; // Chunk ID
-    score?: number | null;
-    content_preview?: string | null;
-    metadata?: Record<string, any> | null;
-    document_id?: string | null;
-    file_name?: string | null;
-}
-
-// Types for Chat History API (Backend Responses)
-export interface ChatSummary {
-    id: string;          // Chat UUID
-    title: string | null; // Chat title
-    updated_at: string;  // ISO 8601 timestamp
-}
-
-export interface ChatMessageApi {
-    id: string;          // Message UUID
-    role: 'user' | 'assistant';
-    content: string;
-    sources: RetrievedDocApi[] | null; // Sources associated with assistant message
-    created_at: string;  // ISO 8601 timestamp
-}
-
-// Payload for POST /query
-export interface QueryPayload {
-    query: string;
-    retriever_top_k?: number;
-    chat_id?: string | null; // Send null or omit for a new chat
-}
-
-// Response from POST /query
-export interface QueryApiResponse {
-
-// Types for Chat History API (Backend Responses)
-export interface ChatSummary {
-    id: string;          // Chat UUID
-    title: string | null; // Chat title
-    updated_at: string;  // ISO 8601 timestamp
-}
-
-export interface ChatMessageApi {
-    id: string;          // Message UUID
-    role: 'user' | 'assistant';
-    content: string;
-    sources: RetrievedDocApi[] | null; // Sources associated with assistant message
-    created_at: string;  // ISO 8601 timestamp
-}
-
-// Payload for POST /query
-export interface QueryPayload {
-    query: string;
-    retriever_top_k?: number;
-    chat_id?: string | null; // Send null or omit for a new chat
-}
-
-// Response from POST /query
-export interface QueryApiResponse {
-    answer: string;
-    retrieved_documents: RetrievedDocApi[]; // Docs used for this specific answer
-    retrieved_documents: RetrievedDocApi[]; // Docs used for this specific answer
-    query_log_id?: string | null;
-    chat_id: string; // Backend MUST return the chat_id (new or existing)
-}
+export const getChats = async (): Promise<ChatSummary[]> => { /* ... */ return request<ChatSummary[]>('/api/v1/chats'); };
+export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => { /* ... */ return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`); };
+export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => { /* ... */ return request<QueryApiResponse>('/api/v1/query', { method: 'POST', body: JSON.stringify({...payload, chat_id: payload.chat_id || null}) }); };
+export const deleteChat = async (chatId: string): Promise<void> => { /* ... */ await request<null>(`/api/v1/chats/${chatId}`, { method: 'DELETE' }); };
 
 
-// --- API Functions for Chat History ---
-
-// Function to list chats for the authenticated user
-export const getChats = async (): Promise<ChatSummary[]> => {
-    return request<ChatSummary[]>('/api/v1/chats', {
-        method: 'GET',
-    });
-};
-
-// Function to get messages for a specific chat
-export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
-    if (!chatId) {
-        console.warn("getChatMessages called with empty chatId");
-        return []; // Return empty array if no chatId provided
-    }
-    return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`, {
-        method: 'GET',
-    });
-};
-
-// Function to send a query (which handles message saving and chat creation/continuation)
-    chat_id: string; // Backend MUST return the chat_id (new or existing)
-}
-
-
-// --- API Functions for Chat History ---
-
-// Function to list chats for the authenticated user
-export const getChats = async (): Promise<ChatSummary[]> => {
-    return request<ChatSummary[]>('/api/v1/chats', {
-        method: 'GET',
-    });
-};
-
-// Function to get messages for a specific chat
-export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
-    if (!chatId) {
-        console.warn("getChatMessages called with empty chatId");
-        return []; // Return empty array if no chatId provided
-    }
-    return request<ChatMessageApi[]>(`/api/v1/chats/${chatId}/messages`, {
-        method: 'GET',
-    });
-};
-
-// Function to send a query (which handles message saving and chat creation/continuation)
-export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-  const body = { ...payload, chat_id: payload.chat_id || null };
-  const body = { ...payload, chat_id: payload.chat_id || null };
-  return request<QueryApiResponse>('/api/v1/query', {
-    method: 'POST',
-    body: JSON.stringify(body),
-    body: JSON.stringify(body),
-  });
-};
-
-// Function to delete a chat
-export const deleteChat = async (chatId: string): Promise<void> => {
-    if (!chatId) {
-        throw new Error("Cannot delete chat with empty ID");
-    }
-    await request<null>(`/api/v1/chats/${chatId}`, {
-        method: 'DELETE',
-    });
-};
-
-
-// --- Type Mapping Helpers ---
-
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
-    if (!apiSources) return undefined;
-    return apiSources.map(source => ({
-        id: source.id,
-        score: source.score,
-        content_preview: source.content_preview,
-        metadata: source.metadata,
-        document_id: source.document_id,
-        file_name: source.file_name,
-    }));
-};
-
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
-    id: apiMessage.id,
-    role: apiMessage.role,
-    content: apiMessage.content,
-    sources: mapApiSourcesToFrontend(apiMessage.sources),
-    created_at: apiMessage.created_at,
-    isError: false,
-});
-
-// Function to delete a chat
-export const deleteChat = async (chatId: string): Promise<void> => {
-    if (!chatId) {
-        throw new Error("Cannot delete chat with empty ID");
-    }
-    await request<null>(`/api/v1/chats/${chatId}`, {
-        method: 'DELETE',
-    });
-};
-
-
-// --- Type Mapping Helpers ---
-
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => {
-    if (!apiSources) return undefined;
-    return apiSources.map(source => ({
-        id: source.id,
-        score: source.score,
-        content_preview: source.content_preview,
-        metadata: source.metadata,
-        document_id: source.document_id,
-        file_name: source.file_name,
-    }));
-};
-
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => ({
-    id: apiMessage.id,
-    role: apiMessage.role,
-    content: apiMessage.content,
-    sources: mapApiSourcesToFrontend(apiMessage.sources),
-    created_at: apiMessage.created_at,
-    isError: false,
-});
+// --- Type Mapping Helpers (sin cambios) ---
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null): RetrievedDoc[] | undefined => { /* ... */ };
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ };
 ```
 
 ## File: `lib\auth\helpers.ts`
 ```ts
 // lib/auth/helpers.ts
 import { AUTH_TOKEN_KEY } from "@/lib/constants";
-import { jwtDecode, InvalidTokenError } from 'jwt-decode'; // Importar error específico
+// jwt-decode ya no es estrictamente necesario aquí si confiamos en Supabase
+// import { jwtDecode, InvalidTokenError } from 'jwt-decode';
 
-// --- IMPLEMENTACIONES RESTAURADAS ---
+// --- Funciones básicas de localStorage (pueden eliminarse si no se usan en otro lugar) ---
+// Supabase JS client maneja su propio almacenamiento de sesión, por lo que estas
+// funciones manuales para *el token de autenticación* ya no son la fuente principal.
+// Podrían mantenerse si necesitas almacenar OTROS tokens o datos relacionados con auth.
 export const getToken = (): string | null => {
-  // Asegúrate de que esto solo se ejecute en el cliente
   if (typeof window !== "undefined") {
-    return localStorage.getItem(AUTH_TOKEN_KEY);
+    // Podrías intentar obtener el token de Supabase aquí, pero es mejor usar getSession()
+    // return localStorage.getItem(AUTH_TOKEN_KEY); // <-- Evitar esto para el token de auth
+    console.warn("getToken() manual llamado, considera usar supabase.auth.getSession()");
+    return localStorage.getItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
   }
-  return null; // Retorna null si no está en el navegador
+  return null;
 };
 
 export const setToken = (token: string): void => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(AUTH_TOKEN_KEY, token);
-  }
+   if (typeof window !== "undefined") {
+     // Evitar sobrescribir el manejo de sesión de Supabase
+     // localStorage.setItem(AUTH_TOKEN_KEY, token); // <-- Evitar esto
+     console.warn("setToken() manual llamado, Supabase maneja la sesión.");
+     localStorage.setItem(AUTH_TOKEN_KEY, token); // Mantener por si acaso, pero advertir
+   }
 };
 
 export const removeToken = (): void => {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-  }
+   if (typeof window !== "undefined") {
+     // Podría interferir con Supabase si borra su clave, es mejor usar supabase.auth.signOut()
+     // localStorage.removeItem(AUTH_TOKEN_KEY); // <-- Evitar esto
+     console.warn("removeToken() manual llamado, considera usar supabase.auth.signOut()");
+     localStorage.removeItem(AUTH_TOKEN_KEY); // Mantener por si acaso, pero advertir
+   }
 };
-// --- FIN DE IMPLEMENTACIONES RESTAURADAS ---
+// --- FIN Funciones localStorage ---
 
 
-// Frontend User interface
+// Frontend User interface - Definición de cómo queremos que luzca el usuario en el frontend
+// Esta interfaz se poblará con datos de la sesión de Supabase.
 export interface User {
-    userId: string;    // Mapeado desde 'sub' del JWT
-    email: string;     // Mapeado desde 'email'
-    name?: string;     // Mapeado desde 'user_metadata.full_name' o similar (opcional)
-    companyId: string; // Mapeado desde 'app_metadata.company_id' (o donde esté)
-    roles?: string[];  // Mapeado desde 'app_metadata.roles' (opcional)
-    // Añade otros campos necesarios
+    userId: string;    // Mapeado desde Supabase User ID (user.id)
+    email?: string;    // Mapeado desde Supabase User Email (user.email)
+    name?: string;     // Mapeado desde Supabase User Metadata (user.user_metadata.full_name)
+    companyId?: string; // Mapeado desde Supabase App Metadata (user.app_metadata.company_id)
+    roles?: string[];  // Mapeado desde Supabase App Metadata (user.app_metadata.roles)
+    // Añade otros campos necesarios del objeto User de Supabase
 }
 
-// Interface for the ACTUAL Supabase JWT payload structure
-// ¡¡¡ VERIFICA ESTO CON UN TOKEN REAL DE TU PROYECTO !!!
-interface SupabaseJwtPayload {
-    sub: string;       // User ID (Subject) - ¡MUY PROBABLE!
-    aud: string;       // Audience (e.g., 'authenticated') - ¡MUY PROBABLE!
-    exp: number;       // Expiration time (seconds since epoch) - ¡SEGURO!
-    iat?: number;      // Issued at time (optional)
-    email?: string;     // Email - ¡MUY PROBABLE!
-    phone?: string;    // Phone (optional)
-    role?: string;     // Rol asignado por Supabase Auth (e.g., 'authenticated') - ¡PROBABLE!
-
-    // --- Metadatos ---
-    app_metadata?: {
-        provider?: string;
-        providers?: string[];
-        // --- ¡POSIBLE UBICACIÓN DE COMPANY_ID Y ROLES! ---
-        company_id?: string | number; // Verifica el tipo real
-        roles?: string[];
-        // Otros datos específicos de la aplicación
-        [key: string]: any;
-    };
-    user_metadata?: {
-        // Datos que el usuario puede gestionar (o tú vía admin)
-        full_name?: string;
-        avatar_url?: string;
-        // Otros datos específicos del usuario
-         [key: string]: any;
-    };
-    // Otros claims posibles: session_id (sid), amr, etc.
-}
-
-// Function to get user details from the JWT token
-export const getUserFromToken = (token: string | null): User | null => {
-  if (!token) return null;
-  try {
-    // Decode the JWT
-    const decoded = jwtDecode<SupabaseJwtPayload>(token);
-    // console.debug("getUserFromToken - Raw Decoded JWT:", decoded); // Log para depuración intensa
-
-    // --- Validation ---
-    const now = Date.now() / 1000;
-    if (decoded.exp < now) {
-      console.warn(`Token expired at ${new Date(decoded.exp * 1000)}. Removing.`);
-      removeToken();
-      return null;
-    }
-
-    // --- Claim Extraction and Mapping ---
-    const userId = decoded.sub; // Usar 'sub' como User ID
-    const email = decoded.email;
-    // Extraer company_id de app_metadata (¡AJUSTA SI ES NECESARIO!)
-    const companyIdRaw = decoded.app_metadata?.company_id;
-    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Convertir a string si existe
-
-    // Validar claims esenciales para el frontend
-    if (!userId || !email || !companyId) {
-        console.error("Decoded token missing essential claims:", {
-            hasUserId: !!userId,
-            hasEmail: !!email,
-            hasCompanyId: !!companyId,
-            appMetadata: decoded.app_metadata // Log para ver qué hay
-        });
-        removeToken();
-        return null;
-    }
-
-    // Mapear a la interfaz User del frontend
-    const user: User = {
-      userId: userId,
-      email: email,
-      companyId: companyId, // Ya es string o undefined (y validamos que no sea undefined)
-      // Mapear opcionales (ejemplos)
-      name: decoded.user_metadata?.full_name,
-      roles: decoded.app_metadata?.roles,
-    };
-
-    // console.debug("getUserFromToken - Mapped User:", user);
-    return user;
-
-  } catch (error) {
-     // Manejar errores específicos de jwt-decode
-     if (error instanceof InvalidTokenError) {
-         console.error("Failed to decode token (Invalid):", error.message);
-     } else {
-         console.error("Failed to decode or validate token (Unknown Error):", error);
-     }
-    removeToken();
-    return null;
-  }
-};
+// --- getUserFromToken ELIMINADO ---
+// Ya no decodificaremos manualmente el token. Usaremos los datos del usuario
+// proporcionados por el cliente Supabase (supabase.auth.getUser() o de la sesión).
 ```
 
 ## File: `lib\constants.ts`
@@ -5805,94 +5154,149 @@ export const AUTH_TOKEN_KEY = "atenex_auth_token";
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getToken, setToken, removeToken, getUserFromToken, User } from '@/lib/auth/helpers';
-import { useRouter } from 'next/navigation'; // Use next/navigation for App Router
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient'; // Importar cliente Supabase
+import { User as AppUser } from '@/lib/auth/helpers'; // Importar nuestra interfaz User frontend
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js'; // Tipos de Supabase
 
 interface AuthContextType {
-  user: User | null;
-  token: string | null;
+  user: AppUser | null; // Nuestra interfaz User
+  session: Session | null; // La sesión completa de Supabase
   isLoading: boolean;
-  login: (token: string) => void;
-  logout: () => void;
+  signIn: (credentials: { email: string; password: string }) => Promise<void>; // Cambiado de 'login'
+  signOut: () => Promise<void>; // Cambiado de 'logout'
+  // Podrías añadir otras funciones como signUp si las necesitas centralizadas aquí
 }
 
-// (+) Define un valor por defecto que coincide con la estructura de AuthContextType
 const defaultAuthContextValue: AuthContextType = {
     user: null,
-    token: null,
-    isLoading: true, // Empezar como cargando por defecto si se usa fuera del provider
-    login: (token: string) => {
-        // Función vacía o lanza error si se llama fuera del provider
-        console.error("Login function called outside of AuthProvider context");
-        // throw new Error("Login function called outside AuthProvider");
-    },
-    logout: () => {
-        // Función vacía o lanza error si se llama fuera del provider
-        console.error("Logout function called outside of AuthProvider context");
-        // throw new Error("Logout function called outside AuthProvider");
-    },
+    session: null,
+    isLoading: true,
+    signIn: async () => { console.error("signIn function called outside of AuthProvider context"); },
+    signOut: async () => { console.error("signOut function called outside of AuthProvider context"); },
 };
 
-// (+) Modifica createContext para usar el valor por defecto y el tipo AuthContextType (sin | undefined)
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
-// Explicitly type the props for the component, including children
 interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+// Helper para mapear SupabaseUser a nuestra AppUser
+const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
+    if (!supabaseUser) return null;
+
+    // Extraer companyId y roles de app_metadata (¡Ajusta las claves si son diferentes!)
+    const companyIdRaw = supabaseUser.app_metadata?.company_id;
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined;
+    const roles = supabaseUser.app_metadata?.roles as string[] | undefined;
+
+    // Validar que companyId exista si es obligatorio para tu app
+    if (!companyId) {
+        console.warn("Supabase user is missing 'company_id' in app_metadata.", supabaseUser.app_metadata);
+        // Decide cómo manejar esto: ¿permitir usuario sin companyId o considerarlo inválido?
+        // return null; // Ejemplo: considerar inválido si companyId es mandatorio
+    }
+
+    return {
+        userId: supabaseUser.id,
+        email: supabaseUser.email,
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name, // Intentar con full_name o name
+        companyId: companyId, // Usar el companyId extraído
+        roles: roles,
+    };
+};
+
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setAuthStateToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Check for token on initial load
+  // NEW: Check if we should bypass auth based on env variable
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+
   useEffect(() => {
-    const storedToken = getToken();
-    if (storedToken) {
-      const userData = getUserFromToken(storedToken);
-      if (userData) {
-        setUser(userData);
-        setAuthStateToken(storedToken);
-      } else {
-        // Invalid token found
-        removeToken();
-      }
+    if (bypassAuth) {
+      console.warn("AuthProvider: Bypassing authentication checks.");
+      setIsLoading(false);
+      // Podrías establecer un usuario/sesión dummy si es necesario para desarrollo
+      // setUser({ userId: 'bypass-user', email: 'bypass@example.com', companyId: 'bypass-company' });
+      // setSession({} as Session); // Dummy session
+      return; // No suscribirse a cambios de auth
     }
-    setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Nota: getUserFromToken debería ser estable o incluido si no lo es
 
-  const login = useCallback((newToken: string) => {
-    setToken(newToken);
-    const userData = getUserFromToken(newToken); // Asegúrate que esta función es segura/pura
-    setUser(userData);
-    setAuthStateToken(newToken);
-    // (+) Cambiado a '/' para ir a la página principal después del login
-    router.push('/');
-    console.log("User logged in, token set.");
-  }, [router]); // getUserFromToken no suele necesitar estar aquí si es pura
+    // Obtener sesión inicial
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log("AuthProvider: Initial session fetch complete.", initialSession);
+      setSession(initialSession);
+      setUser(mapSupabaseUserToAppUser(initialSession?.user));
+      setIsLoading(false); // Terminar carga inicial después de obtener la sesión
+    }).catch(error => {
+       console.error("AuthProvider: Error fetching initial session:", error);
+       setIsLoading(false); // Terminar carga incluso si hay error
+    });
 
-  const logout = useCallback(() => {
-    removeToken();
-    setUser(null);
-    setAuthStateToken(null);
-    router.push('/login');
-    console.log("User logged out.");
+    // Escuchar cambios en el estado de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      console.log(`AuthProvider: Auth state changed. Event: ${_event}`, newSession);
+      setSession(newSession);
+      setUser(mapSupabaseUserToAppUser(newSession?.user));
+       // Ya no necesitamos isLoading aquí porque la carga inicial ya se hizo
+       // setIsLoading(false); // <-- Quitar esto de aquí
+    });
+
+    // Limpiar suscripción al desmontar
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [bypassAuth]); // Ejecutar solo una vez o si cambia bypassAuth
+
+  const signIn = useCallback(async (credentials: { email: string; password: string }) => {
+    setIsLoading(true); // Indicar carga durante el inicio de sesión
+    try {
+      const { error } = await supabase.auth.signInWithPassword(credentials);
+      if (error) throw error;
+      // onAuthStateChange actualizará el estado user/session automáticamente
+      console.log("SignIn successful, waiting for auth state change...");
+      router.push('/'); // Redirigir a la página principal tras login exitoso
+    } catch (error: any) {
+      console.error("Error during signIn:", error);
+      // Lanzar el error para que el formulario lo capture
+      throw new ApiError(error.message || "Sign in failed", error.status || 500);
+    } finally {
+        // No establecer isLoading(false) aquí, onAuthStateChange lo hará indirectamente
+        // setIsLoading(false);
+    }
   }, [router]);
 
-  // El valor proporcionado por el Provider ahora siempre coincide con AuthContextType
+  const signOut = useCallback(async () => {
+    setIsLoading(true);
+    try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        // onAuthStateChange actualizará user/session a null
+        console.log("SignOut successful, waiting for auth state change...");
+        router.push('/login'); // Redirigir a login tras cerrar sesión
+    } catch (error: any) {
+        console.error("Error during signOut:", error);
+        // Mostrar error al usuario si es necesario
+        // toast.error("Logout failed", { description: error.message });
+    } finally {
+        // setIsLoading(false); // onAuthStateChange se encargará
+    }
+  }, [router]);
+
   const providerValue = {
       user,
-      token,
-      isLoading,
-      login,
-      logout
+      session, // Exponer la sesión completa de Supabase
+      isLoading: isLoading && !bypassAuth, // Solo estar cargando si no estamos en modo bypass
+      signIn,
+      signOut
   };
 
   return (
-    // Pasa el objeto calculado
     <AuthContext.Provider value={providerValue}>
       {children}
     </AuthContext.Provider>
@@ -5901,19 +5305,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  // La comprobación de undefined ya no es estrictamente necesaria porque
-  // createContext ahora tiene un valor por defecto válido, pero
-  // mantenerla puede ser útil para detectar errores de configuración inesperados.
-  if (context === undefined || context === defaultAuthContextValue) { // (+) Check against default value too
-    // Only throw error if it's truly used outside and hasn't received the real value
-    if (context === defaultAuthContextValue && typeof window !== 'undefined') { // Avoid throwing during SSR/build if possible
-       console.warn("useAuth might be used outside of its Provider or hasn't initialized yet.");
-    } else if (context === undefined) {
-       throw new Error('useAuth must be used within an AuthProvider');
-    }
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
+```
+
+## File: `lib\supabaseClient.ts`
+```ts
+// lib/supabaseClient.ts
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl) {
+  throw new Error("Missing environment variable NEXT_PUBLIC_SUPABASE_URL");
+}
+if (!supabaseAnonKey) {
+  throw new Error("Missing environment variable NEXT_PUBLIC_SUPABASE_ANON_KEY");
+}
+
+// Crear una única instancia del cliente Supabase para ser usada en toda la app
+// Nota: El cliente Supabase maneja la sesión internamente.
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        // Supabase JS client maneja el almacenamiento del token automáticamente (localStorage por defecto)
+        // autoRefreshToken: true, // Habilitado por defecto
+        // persistSession: true, // Habilitado por defecto
+        // detectSessionInUrl: true, // Habilitado por defecto (para OAuth y Magic Links/Confirmación)
+    }
+});
+
+console.log("Supabase client initialized.");
 ```
 
 ## File: `lib\utils.ts`

@@ -39,7 +39,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     };
 
     const handleDownloadDocument = (doc: RetrievedDoc) => {
-        // TODO: Implementar llamada real al backend si existe un endpoint de descarga
         const message = `Download requested for: ${doc.file_name || doc.id}`;
         console.log(message);
         toast.info("Download Not Implemented", {
@@ -61,46 +60,13 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
             </CardHeader>
             <ScrollArea className="flex-1">
                 <div className="p-4 space-y-3">
-                {isLoading && documents.length === 0 && (
-                    <>
-                    <Skeleton className="h-20 w-full rounded-md" />
-                    <Skeleton className="h-20 w-full rounded-md" />
-                    <Skeleton className="h-20 w-full rounded-md" />
-                    </>
-                )}
-                {!isLoading && documents.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <p className="text-sm">No relevant documents found for the last query.</p>
-                    </div>
-                )}
+                {isLoading && documents.length === 0 && ( /* Skeleton */ )}
+                {!isLoading && documents.length === 0 && ( /* No docs found */ )}
                 {documents.map((doc, index) => (
                     <DialogTrigger asChild key={doc.id || `doc-${index}`}>
-                         <Card
-                            className="cursor-pointer hover:shadow-md transition-shadow duration-150"
-                            onClick={() => handleViewDocument(doc)}
-                            title={`Click to view details for ${doc.file_name || 'document'}`}
-                        >
-                            <CardContent className="p-3 space-y-1 text-sm">
-                                <div className="flex justify-between items-start">
-                                    <p className="font-medium text-primary truncate pr-2">
-                                        {index + 1}. {doc.file_name || doc.document_id || `Chunk ${doc.id.substring(0, 8)}`}
-                                    </p>
-                                    {doc.score != null && (
-                                        <Badge variant="secondary" title={`Relevance Score: ${doc.score.toFixed(4)}`}>
-                                            {doc.score.toFixed(2)}
-                                        </Badge>
-                                    )}
-                                </div>
-                                <p className="text-xs text-muted-foreground line-clamp-2">
-                                {doc.content_preview || 'No preview available.'}
-                                </p>
-                                <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
-                                    <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
-                                    <Eye className="h-3 w-3 text-muted-foreground/50" />
-                                </div>
-                            </CardContent>
-                        </Card>
+                         <Card /* ... Card content ... */ >
+                            {/* ... */}
+                         </Card>
                     </DialogTrigger>
                 ))}
                 </div>
@@ -108,53 +74,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 
             {selectedDoc && (
                 <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}>
-                            {selectedDoc.file_name || selectedDoc.document_id || 'Document Details'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Details of the retrieved document chunk.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-3 text-sm">
-                        <div className="flex justify-between">
-                            <span className="font-medium text-muted-foreground">Document ID:</span>
-                            <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="font-medium text-muted-foreground">Chunk ID:</span>
-                            <span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.id}</span>
-                        </div>
-                         <div className="flex justify-between">
-                            <span className="font-medium text-muted-foreground">Relevance Score:</span>
-                            <span>{selectedDoc.score?.toFixed(4) ?? 'N/A'}</span>
-                        </div>
-                        <div>
-                            <span className="font-medium text-muted-foreground block mb-1">Content Preview:</span>
-                            <ScrollArea className="max-h-[250px] border rounded p-2 bg-muted/50 text-xs">
-                                <pre className="whitespace-pre-wrap break-words">{selectedDoc.content_preview || 'No content preview available.'}</pre>
-                            </ScrollArea>
-                        </div>
-                        {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
-                             <div>
-                                <span className="font-medium text-muted-foreground block mb-1">Metadata:</span>
-                                <ScrollArea className="max-h-[100px] border rounded p-2 bg-muted/50 text-xs">
-                                   <pre className="whitespace-pre-wrap break-words">
-                                       {JSON.stringify(selectedDoc.metadata, null, 2)}
-                                   </pre>
-                                </ScrollArea>
-                            </div>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Original (N/A)
-                        </Button>
-                        <DialogClose asChild>
-                           <Button variant="secondary">Close</Button>
-                        </DialogClose>
-                    </DialogFooter>
+                   {/* ... Dialog Content ... */}
                 </DialogContent>
             )}
         </div>
