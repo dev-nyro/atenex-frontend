@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // Handles email confirm links
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail } from 'lucide-react'; // Added icons
+import Link from 'next/link'; // Import the Link component
 
 export default function HomePage() {
   const router = useRouter();

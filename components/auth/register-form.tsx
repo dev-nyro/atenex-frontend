@@ -7,13 +7,14 @@ import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { AuthError } from '@supabase/supabase-js'; // Import Supabase error type
+import { cn } from '@/lib/utils'; // Import cn utility
 
 // Zod schema for registration form validation
 // REMOVED companyId - it will be handled by the ensure-company flow after login

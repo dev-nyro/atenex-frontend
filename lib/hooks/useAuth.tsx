@@ -14,7 +14,8 @@ import React, {
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { User as AppUser } from '@/lib/auth/helpers'; // Use our defined frontend User type
-import type { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
+// Import AuthError directly, not just as a type
+import { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 import { toast } from "sonner";
 import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api'; // Import API function and specific error type
 
@@ -40,6 +41,7 @@ const defaultAuthContextValue: AuthContextType = {
     },
     signUp: async () => {
         console.error("AuthProvider: signUp called outside of AuthProvider");
+        // Use AuthError constructor directly
         return { data: { user: null, session: null }, error: new AuthError("Auth context not initialized") };
     },
     signOut: async () => {
@@ -273,9 +275,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log("AuthProvider: Attempting sign up...");
         setIsLoading(true);
         try {
-            // Ensure email and password are provided
-            if (!params.email || !params.password) {
-                throw new AuthError("Email and password are required for sign up.");
+            // Ensure password is provided and either email or phone is provided
+            const hasEmail = 'email' in params && params.email;
+            const hasPhone = 'phone' in params && params.phone;
+            if (!params.password || (!hasEmail && !hasPhone)) {
+                throw new AuthError("Password and either Email or Phone are required for sign up.");
             }
 
             const { data, error } = await supabase.auth.signUp(params); // Pass params directly
@@ -292,8 +296,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } else if (data.user && !data.session) {
                  // User created but requires confirmation (common case)
                  console.log("AuthProvider: Sign up successful, confirmation required.");
+                 // Safely determine which contact method was used for the message
+                 const contactMethod = 'email' in params && params.email
+                    ? `email (${params.email})`
+                    : ('phone' in params && params.phone ? 'phone' : 'provided contact method');
                  toast.success("Registration Submitted", {
-                    description: `Please check your email (${params.email}) to confirm your account.`,
+                    description: `Please check your ${contactMethod} to confirm your account.`,
                     duration: 10000, // Longer duration for this message
                  });
             } else {
@@ -311,6 +319,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.error("Registration Failed", { description: errorMsg });
             setIsLoading(false);
             // Return an error structure consistent with Supabase response
+            // Use AuthError constructor directly
             return { data: { user: null, session: null }, error: error instanceof AuthError ? error : new AuthError(errorMsg) };
         }
     }, []);
