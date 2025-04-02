@@ -42,8 +42,12 @@ const defaultAuthContextValue: AuthContextType = {
 
 // --- Creación del Contexto (sin cambios) ---
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
-// --- Props del Provider (sin cambios) ---
-interface AuthProviderProps { /* ... */ }
+
+// --- Props del Provider (CORREGIDO: definir children) ---
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
 // --- Helper mapSupabaseUserToAppUser (sin cambios) ---
 const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
     if (!supabaseUser) return null;
