@@ -175,6 +175,28 @@ export async function request<T>(
     }
 }
 
+// --- Definiciones de Tipos ---
+// (Tipos IngestResponse, DocumentStatusResponse, RetrievedDocApi, RetrievedDoc, ChatSummary, ChatMessageApi, QueryPayload, QueryApiResponse permanecen igual)
+
+// (+) NUEVO: Tipos para el endpoint de registro del backend
+interface RegisterUserPayload {
+    email: string;
+    password: string;
+    name: string | null;
+    // company_name es manejado por el backend ahora
+}
+
+interface RegisterUserResponse {
+    message: string; // Ej: "Registration successful, please check your email."
+    user_id?: string; // Opcional: el ID del usuario creado en Supabase
+}
+
+interface EnsureCompanyResponse { // Mantener por si se usa en otro lado
+    message: string;
+    company_id?: string;
+}
+
+
 // --- API Function Definitions ---
 
 // Ingest Service (Sin cambios)
@@ -276,16 +298,23 @@ export const deleteChat = async (chatId: string): Promise<void> => {
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
+// --- Auth Service ---
 
-// User/Company Association (Sin cambios)
-interface EnsureCompanyResponse {
-    message: string;
-    company_id?: string;
-}
-export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
-     console.log("Calling ensure-company association endpoint...");
-     return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
+// (+) NUEVA FUNCIÓN: Registro vía Backend
+export const registerUser = async (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
+    console.log(`Calling backend registration endpoint for ${payload.email}...`);
+    // La compañía 'nyrouwu' se determina en el backend
+    return request<RegisterUserResponse>('/api/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
 };
+
+// (-) QUITAR O COMENTAR SI YA NO SE USA:
+// export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
+//      console.log("Calling ensure-company association endpoint...");
+//      return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
+// };
 
 
 // --- Type Mapping Helpers (Sin cambios) ---

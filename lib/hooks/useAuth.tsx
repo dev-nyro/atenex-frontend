@@ -16,7 +16,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { User as AppUser } from '@/lib/auth/helpers';
 import { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 import { toast } from "sonner";
-import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError, ApiError } from '@/lib/api'; // Import API function and error types
+// (-) QUITAR: import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from ''lib/api'' (see below for file content);
+import { ApiError } from '@/lib/api'; // Mantener ApiError por si acaso
 
 // --- Types ---
 interface AuthContextType {
@@ -24,7 +25,8 @@ interface AuthContextType {
     session: Session | null;
     isLoading: boolean; // Tracks if auth state is being determined (initial load or transitions)
     signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>; // Throws error on failure
-    signUp: (params: SignUpWithPasswordCredentials) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
+    // (+) Modificar tipo signUp para que coincida con la llamada a API (ya no devuelve datos de sesión directamente)
+    signUp: (params: SignUpWithPasswordCredentials) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>; // Mantenemos la firma original por compatibilidad, aunque ahora no la usemos directamente
     signOut: () => Promise<void>;
 }
 
@@ -70,7 +72,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
-    const ensureCompanyCallPending = useRef(false);
+    // (-) QUITAR: const ensureCompanyCallPending = useRef(false);
     const initialLoadComplete = useRef(false); // Track if the initial getSession has completed
 
     // --- Sign Out Logic ---
@@ -101,69 +103,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         let isMounted = true; // Track mount status for async operations
         console.log("AuthProvider: useEffect setup running.");
 
-        // --- Function to handle session updates and company association ---
-        const processSession = async (currentSession: Session | null) => {
-            if (!isMounted) return; // Don't process if unmounted
+        // --- Function to process session (SIMPLIFICADA) ---
+        const processSession = (currentSession: Session | null) => {
+            if (!isMounted) return;
 
             console.log(`AuthProvider: Processing session. Present: ${!!currentSession}`);
-            setSession(currentSession); // Update session state
+            setSession(currentSession);
             const mappedUser = mapSupabaseUserToAppUser(currentSession?.user);
-            setUser(mappedUser); // Update user state
+            setUser(mappedUser);
 
-            // --- Ensure Company Logic ---
-            if (currentSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
-                console.log(`AuthProvider: User ${mappedUser.userId} lacks companyId. Attempting association.`);
-                ensureCompanyCallPending.current = true;
-                setIsLoading(true); // Indicate loading during this critical step
-
-                try {
-                    console.log("AuthProvider: Calling ensure-company association endpoint...");
-                    const result = await ensureCompanyAssociation();
-                    console.log("AuthProvider: ensureCompanyAssociation API call successful:", result.message);
-                    // --- MODIFICACIÓN: Evitar toast duplicados ---
-                    toast.success("Company Association Check", { description: result.message, id: "company-assoc-check" }); // Use ID to prevent duplicates
-
-                    // Refresh session to get updated token
-                    console.log("AuthProvider: Refreshing Supabase session after company association check...");
-                    const { error: refreshError } = await supabase.auth.refreshSession();
-                    if (refreshError) {
-                        console.error("AuthProvider: Failed to refresh session:", refreshError);
-                        toast.error("Session Sync Failed", { description: "Could not update session after setup. Please log in again.", id: "session-refresh-fail" });
-                        await signOut(); // Force sign out if refresh fails
-                    } else {
-                        console.log("AuthProvider: Session refresh triggered. onAuthStateChange will handle update.");
-                        // The listener will receive the updated session and re-process.
-                    }
-                } catch (error) {
-                    console.error("AuthProvider: ensureCompanyAssociation API call failed:", error);
-                    let errorDesc = "Could not complete company setup.";
-                     // Handle specific ApiError vs generic Error
-                     if (error instanceof ApiError) {
-                        errorDesc = error.message || errorDesc;
-                        // Network error is status 0 in our api client
-                        if (error.status === 0) {
-                             errorDesc = "Network Error: Failed to connect for company setup.";
-                        } else if (error.status === 401 || error.status === 403) {
-                            errorDesc = "Authentication error during setup. Please log in again.";
-                            await signOut(); // Force sign out
-                        } else if (error.status === 400) { // Handle specific 400 from backend (config error)
-                            errorDesc = error.message; // Use the specific message from backend
-                        }
-                    } else if (error instanceof Error) { errorDesc = error.message; }
-                    // --- MODIFICACIÓN: Evitar toast duplicados ---
-                    toast.error("Company Setup Failed", { description: errorDesc, duration: 7000, id: "company-setup-fail" });
-                } finally {
-                     if (isMounted) {
-                         ensureCompanyCallPending.current = false;
-                         setIsLoading(false); // Ensure loading stops after attempt
-                         console.log("AuthProvider: Company association attempt finished.");
-                     }
-                }
-            } else {
-                 // If no company check needed, ensure loading is false
-                 if (isMounted) setIsLoading(false);
-                 console.log("AuthProvider: No company association check needed or call already pending.");
+            // (-) YA NO HAY LLAMADA A ensureCompanyAssociation
+            // Ahora sólo verificamos si el usuario está incompleto DESPUÉS del login
+            if (currentSession && mappedUser && !mappedUser.companyId) {
+                // Esto sólo debería ocurrir si el flujo de registro falló en asignar company_id
+                // O si un usuario antiguo existente intenta loguearse
+                console.error(`AuthProvider: User ${mappedUser.userId} logged in BUT lacks companyId in token! Potential setup issue or old user.`);
+                toast.error("Account Issue", {
+                    description: "Your account is missing essential information (company association). Please contact support.",
+                    duration: 10000,
+                    id: "missing-company-id-error"
+                });
+                 // Considerar forzar logout aquí si el companyId es absolutamente esencial
+                 // signOut();
             }
+
+            if (isMounted) setIsLoading(false); // Terminar la carga una vez procesada la sesión
         };
 
 
@@ -182,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 console.log("AuthProvider: Initial session check complete. Session found:", !!initialSession);
                 // Process the initial session AFTER marking initial load complete
                 initialLoadComplete.current = true;
-                await processSession(initialSession);
+                processSession(initialSession); // Llamar a la versión simplificada
 
             } catch (error) {
                 console.error("AuthProvider: Unexpected error during initial session check:", error);
@@ -208,10 +172,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                      await new Promise(resolve => setTimeout(resolve, 50)); // Short delay
                  }
 
-                // Process the session update from the listener
-                await processSession(newSession);
+                // Procesar la nueva sesión (simplificado, sin ensureCompany)
+                processSession(newSession);
 
-                // Handle redirection logic based on event and path
+                // Lógica de redirección (sin cambios)
                 if (event === 'SIGNED_OUT') {
                     const protectedPaths = ['/chat', '/knowledge', '/settings'];
                     if (protectedPaths.some(p => pathname?.startsWith(p))) {
@@ -255,40 +219,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     }, []);
 
-    const signUp = useCallback(async (params: SignUpWithPasswordCredentials) => {
-        console.log("AuthProvider: Attempting sign up...");
-        setIsLoading(true);
-        try {
-            const hasEmail = 'email' in params && params.email;
-            const hasPhone = 'phone' in params && params.phone;
-            if (!params.password || (!hasEmail && !hasPhone)) {
-                throw new AuthError("Password and either Email or Phone are required.");
-            }
-            const { data, error } = await supabase.auth.signUp(params);
-
-            // Process result immediately for UI feedback
-            if (error) {
-                toast.error("Registration Failed", { description: error.message, id:"signup-fail" });
-            } else if (data.user && !data.session) { // Confirmation needed
-                 const contact = hasEmail ? `email (${params.email})` : 'phone';
-                 toast.success("Registration Submitted", { description: `Please check your ${contact} to confirm.`, duration: 10000, id:"signup-confirm" });
-            } else if (data.user && data.session) { // Auto-confirmed/logged in
-                toast.success("Registration Successful!", { description: "You are now logged in.", id:"signup-success" });
-                // Listener will handle session update
-            } else {
-                 toast.warning("Registration Status Unknown", { description: "Please try logging in.", id:"signup-unknown" });
-            }
-            setIsLoading(false); // Stop loading after handling
-            return { data, error }; // Return Supabase result
-
-        } catch (error) {
-            console.error("AuthProvider: Unexpected sign up error:", error);
-            const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred.";
-            toast.error("Registration Failed", { description: errorMsg, id:"signup-fail" });
-            setIsLoading(false);
-            return { data: { user: null, session: null }, error: error instanceof AuthError ? error : new AuthError(errorMsg) };
-        }
-    }, []);
+    // (-) QUITAR EL signUp original que llamaba a supabase.auth.signUp
+    // (+) Dejar una función placeholder o eliminarla si no se usa en ningún otro sitio
+     const signUp = useCallback(async (params: SignUpWithPasswordCredentials) => {
+         // Esta función ya no debería ser llamada directamente por RegisterForm
+         console.warn("AuthProvider: supabase.auth.signUp called directly, should use backend registration.");
+         // Devolvemos una estructura compatible pero con error para evitar romper otros posibles usos
+         return { data: { user: null, session: null }, error: new AuthError("Direct Supabase signUp is deprecated, use backend API.") };
+     }, []);
 
     // --- Context Value ---
     const providerValue: AuthContextType = {

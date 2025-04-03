@@ -26,7 +26,11 @@ atenex-frontend/
 │   │   └── page.tsx
 │   ├── globals.css
 │   ├── layout.tsx
-│   └── page.tsx
+│   ├── page.tsx
+│   ├── privacy
+│   │   └── page.tsx
+│   └── terms
+│       └── page.tsx
 ├── components
 │   ├── auth
 │   │   ├── email-confirmation-handler.tsx
@@ -877,132 +881,128 @@ export default function KnowledgePage() {
 // Purpose: Layout for authenticated sections, handling route protection.
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
+import { useAuth } from '@/lib/hooks/useAuth';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react'; // For loading spinner
-// --- CORRECTION: Import toast from sonner ---
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-// ------------------------------------------
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  // Get auth state from the hook
   const { session, user, isLoading, signOut } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  // Determine if authentication bypass is enabled (for local dev)
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
+  // Ref to track if the "incomplete setup" warning has been shown for this session load
+  const incompleteSetupWarningShown = useRef(false);
+
   useEffect(() => {
-    // 1. Handle Bypass: If bypass is active, log it and do nothing else.
+    // Reset warning flag if session or user changes significantly (e.g., new login)
+    incompleteSetupWarningShown.current = false;
+  }, [session?.user.id]); // Reset based on user ID change
+
+  useEffect(() => {
     if (bypassAuth) {
-      console.warn("AppLayout: Auth check SKIPPED due to NEXT_PUBLIC_BYPASS_AUTH=true.");
+      console.warn("AppLayout: Auth check SKIPPED (Bypass).");
       return;
     }
 
-    // 2. Handle Loading: If auth state is still loading, do nothing yet.
+    // Don't redirect or evaluate further if auth state is still loading
     if (isLoading) {
-      console.log("AppLayout: Waiting for auth state to load...");
+      console.log("AppLayout: Waiting for auth state...");
       return;
     }
 
-    // 3. Handle No Session: If auth has loaded and there's NO session, redirect to login/home.
+    // If loading is finished and there's no session, redirect to home/login
     if (!session) {
       console.log("AppLayout: No session found after loading, redirecting to /");
-      router.replace('/'); // Use replace to avoid adding to browser history
+      router.replace('/');
       return;
     }
 
-    // 4. Handle Session OK, but Missing Critical User Data (e.g., companyId):
-    // If a session exists, but the mapped 'user' object is null or lacks essential data
-    // (like companyId, if it's strictly required *after* the ensure-company flow),
-    // it might indicate an incomplete setup or inconsistent state.
-    // The API Gateway requires companyId for most backend calls.
-    // The ensure-company flow in useAuth should handle adding it, but if something
-    // goes wrong or the user state is invalid, we might need to force a logout.
+    // If session exists, but user mapping failed OR user lacks companyId
+    // *after* the initial loading/association attempt should be complete.
+    // This state indicates a problem (e.g., ensure-company failed silently or token didn't update).
     if (session && (!user || !user.companyId)) {
-        // This condition checks if we have a session, but the user mapping failed OR
-        // the user is mapped but explicitly lacks a companyId AFTER the initial auth flow.
-        console.error(`AppLayout: Session exists but user data is incomplete (User: ${!!user}, CompanyID: ${user?.companyId}). Forcing logout.`);
-        // --- CORRECTION: 'toast' is now defined via import ---
-        toast.error("Incomplete Account Setup", {
-            description: "Your account setup seems incomplete (missing company association). Please log in again.",
-            duration: 7000,
-        });
-        // ----------------------------------------------------
-        signOut(); // Force sign out
-        // No need to redirect here, signOut will trigger an auth state change,
-        // leading to the !session condition above in the next effect run.
-        return;
+       // Only show the toast ONCE per session load attempt to avoid repetition
+       if (!incompleteSetupWarningShown.current) {
+          console.error(`AppLayout: Session exists but user data is incomplete (User: ${!!user}, CompanyID: ${user?.companyId}). Showing warning.`);
+          toast.error("Incomplete Account Setup", {
+             description: "Your account setup seems incomplete (missing company association). Attempting to resolve or please log in again.",
+             duration: 8000, // Longer duration
+             id: "incomplete-setup-warn", // Prevent duplicates
+          });
+          incompleteSetupWarningShown.current = true; // Mark as shown for this session instance
+       }
+       // Optionally force logout immediately:
+       // signOut();
+       // Or let the user stay but potentially face API errors (depends on desired UX)
+       return; // Don't proceed to render children if state is known to be invalid
     }
 
-    // 5. Authenticated and Valid: If we reach here, isLoading is false, session exists,
-    // and the user object (with companyId) is valid. Allow rendering.
-    console.log("AppLayout: Auth check passed. User is authenticated and valid.");
+    // If we reach here: Loading is false, session exists, user exists, user.companyId exists.
+    console.log("AppLayout: Auth check passed.");
+    // Reset warning flag if we reach a valid state
+    incompleteSetupWarningShown.current = false;
 
-  // Dependencies: Trigger effect when loading state, session, user, or bypass status changes.
-  // Include router and signOut as they are used within the effect.
-  }, [isLoading, session, user, bypassAuth, router, signOut]);
+  }, [isLoading, session, user, bypassAuth, router, signOut]); // Dependencies
 
   // --- Render Loading State ---
-  // Show a full-screen loader ONLY if bypass is OFF AND auth is loading.
   if (!bypassAuth && isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        {/* Optional: Add loading text */}
-         <p className="mt-4 text-muted-foreground">Loading session...</p>
+        <p className="mt-4 text-muted-foreground">Loading session...</p>
       </div>
     );
   }
 
-  // --- Render Auth Wall ---
-  // Prevent rendering the protected layout if bypass is OFF AND
-  // (auth is still loading OR there's no session OR user data is invalid)
-  // This prevents content flashing before redirection or state resolution.
-  if (!bypassAuth && (isLoading || !session || !user || !user.companyId)) {
-     // We already handle redirection in useEffect. Render null or a minimal loader
-     // while waiting for the redirect or state update. Using the same loader
-     // as above provides consistency.
-     console.log("AppLayout: Auth guard preventing render (isLoading, no session, or invalid user).");
-     return (
-       <div className="flex h-screen items-center justify-center bg-background">
-         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-       </div>
-     );
+  // --- Render Auth Wall / Incomplete State Blocker ---
+  // Prevent rendering children if:
+  // 1. Auth is NOT bypassed AND
+  // 2. EITHER (a) auth is still loading OR (b) loading is done but there's no session OR (c) user data is incomplete
+  const shouldBlockRender = !bypassAuth && (isLoading || !session || !user || !user.companyId);
+
+  if (shouldBlockRender) {
+      console.log("AppLayout: Auth guard preventing render.");
+      // Render a loader or null while waiting for redirect or state resolution
+      return (
+        <div className="flex h-screen items-center justify-center bg-background">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+           {/* Optionally show a message if blocked due to incomplete setup */}
+           {!isLoading && session && (!user || !user.companyId) && (
+              <p className="mt-4 text-destructive">Resolving account setup...</p>
+           )}
+        </div>
+      );
   }
 
   // --- Render Protected Layout ---
-  // If we reach here, user is authenticated (or bypass is on).
   console.log("AppLayout: Rendering protected layout...");
   return (
-    <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
+     <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
           <ResizablePanel
               collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={20}
               onCollapse={() => setIsSidebarCollapsed(true)}
               onExpand={() => setIsSidebarCollapsed(false)}
               className={cn(
-                  "transition-all duration-300 ease-in-out bg-background dark:bg-card", // Added background color
+                  "transition-all duration-300 ease-in-out bg-background dark:bg-card",
                   isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]"
               )}
-              order={1} // Ensure sidebar comes first visually
+              order={1}
           >
-              {/* Pass isCollapsed state to Sidebar */}
               <Sidebar isCollapsed={isSidebarCollapsed} />
           </ResizablePanel>
           <ResizableHandle withHandle className="bg-border" />
           <ResizablePanel defaultSize={80} minSize={30} order={2}>
               <div className="flex h-full flex-col">
-                  {/* Header component - No need to pass props if Header uses useAuth directly */}
                   <Header />
                   <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
-                      {/* Render the specific page content */}
                       {children}
                   </main>
               </div>
@@ -1867,6 +1867,177 @@ function FeatureCard({ title, description, icon }: { title: string; description:
   );
 }
 
+```
+
+## File: `app\privacy\page.tsx`
+```tsx
+// File: app/privacy/page.tsx
+"use client"; // Mark as client component to use hooks like useRouter
+
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation'; // Import useRouter
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { APP_NAME } from '@/lib/constants';
+
+export default function PrivacyPage() {
+    const router = useRouter(); // Initialize router
+
+  return (
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
+      <Button variant="link" onClick={() => router.push('/')} className="mb-4">← Back to Home</Button>
+      <Card className="max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-2xl md:text-3xl">Privacy Policy</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none space-y-4">
+          <p>Last Updated: [Insert Date]</p>
+
+          <p>
+            {APP_NAME} ("us", "we", or "our") operates the {APP_NAME} application (the "Service"). This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service and the choices you have associated with that data.
+          </p>
+
+          <h2>1. Information Collection and Use</h2>
+          <p>
+            We collect several different types of information for various purposes to provide and improve our Service to you.
+          </p>
+          <ul>
+            <li><strong>Personal Data:</strong> While using our Service, we may ask you to provide us with certain personally identifiable information that can be used to contact or identify you ("Personal Data"). Personally identifiable information may include, but is not limited to: Email address, Name, Company Information (if applicable).</li>
+            <li><strong>Usage Data:</strong> We may also collect information on how the Service is accessed and used ("Usage Data"). This Usage Data may include information such as your computer's Internet Protocol address (e.g., IP address), browser type, browser version, the pages of our Service that you visit, the time and date of your visit, the time spent on those pages, unique device identifiers and other diagnostic data.</li>
+            <li><strong>User Content:</strong> We process the documents and data you upload ("User Content") solely for the purpose of providing the Service features, such as indexing and querying. We treat your User Content as confidential.</li>
+          </ul>
+
+          <h2>2. Use of Data</h2>
+          <p>{APP_NAME} uses the collected data for various purposes:</p>
+          <ul>
+            <li>To provide and maintain the Service</li>
+            <li>To notify you about changes to our Service</li>
+            <li>To allow you to participate in interactive features of our Service when you choose to do so</li>
+            <li>To provide customer care and support</li>
+            <li>To provide analysis or valuable information so that we can improve the Service</li>
+            <li>To monitor the usage of the Service</li>
+            <li>To detect, prevent and address technical issues</li>
+          </ul>
+
+          <h2>3. Data Storage and Security</h2>
+          <p>
+            User Content is stored securely using industry-standard cloud storage providers [Specify if possible, e.g., AWS S3, Google Cloud Storage, MinIO]. We implement security measures designed to protect your information from unauthorized access, disclosure, alteration, and destruction. However, no internet transmission or electronic storage is 100% secure.
+          </p>
+
+          <h2>4. Service Providers</h2>
+          <p>
+            We may employ third-party companies and individuals to facilitate our Service ("Service Providers"), to provide the Service on our behalf, to perform Service-related services or to assist us in analyzing how our Service is used. These third parties have access to your Personal Data only to perform these tasks on our behalf and are obligated not to disclose or use it for any other purpose. Examples include: [List categories, e.g., Cloud hosting (AWS/GCP/Azure), LLM providers (OpenAI/Google), Authentication (Supabase)].
+          </p>
+
+          <h2>5. Your Data Rights</h2>
+          <p>
+            Depending on your jurisdiction, you may have certain rights regarding your Personal Data, such as the right to access, correct, delete, or restrict its processing. Please contact us to exercise these rights.
+          </p>
+
+          <h2>6. Children's Privacy</h2>
+          <p>
+            Our Service does not address anyone under the age of 18 ("Children"). We do not knowingly collect personally identifiable information from anyone under the age of 18.
+          </p>
+
+          <h2>7. Changes to This Privacy Policy</h2>
+          <p>
+            We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.
+          </p>
+
+          <h2>8. Contact Us</h2>
+          <p>
+            If you have any questions about this Privacy Policy, please contact us: [Your Contact Email/Link]
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+## File: `app\terms\page.tsx`
+```tsx
+// File: app/terms/page.tsx
+"use client"; // Mark as client component to use hooks like useRouter
+
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation'; // Import useRouter
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { APP_NAME } from '@/lib/constants';
+
+export default function TermsPage() {
+    const router = useRouter(); // Initialize router
+
+  return (
+    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
+        <Button variant="link" onClick={() => router.push('/')} className="mb-4">← Back to Home</Button>
+      <Card className="max-w-4xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-2xl md:text-3xl">Terms of Service</CardTitle>
+        </CardHeader>
+        <CardContent className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none space-y-4">
+          <p>Last Updated: [Insert Date]</p>
+
+          <h2>1. Acceptance of Terms</h2>
+          <p>
+            By accessing or using the {APP_NAME} service ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of the terms, then you may not access the Service.
+          </p>
+
+          <h2>2. Service Description</h2>
+          <p>
+            {APP_NAME} provides a platform for querying enterprise knowledge bases using natural language processing. Features include document upload, processing, indexing, and natural language querying.
+          </p>
+
+          <h2>3. User Accounts</h2>
+          <p>
+            You are responsible for safeguarding your account credentials and for any activities or actions under your account. You must notify us immediately upon becoming aware of any breach of security or unauthorized use of your account.
+          </p>
+
+          <h2>4. User Content</h2>
+          <p>
+            You retain ownership of any documents or data you upload to the Service ("User Content"). By uploading User Content, you grant {APP_NAME} a worldwide, non-exclusive, royalty-free license to use, process, store, and display your User Content solely for the purpose of providing the Service to you.
+          </p>
+
+          <h2>5. Acceptable Use</h2>
+          <p>
+            You agree not to misuse the Service. Prohibited activities include, but are not limited to: [List prohibited activities, e.g., uploading illegal content, attempting to breach security, overloading the system].
+          </p>
+
+          <h2>6. Termination</h2>
+          <p>
+            We may terminate or suspend your access to the Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
+          </p>
+
+          <h2>7. Disclaimer of Warranties</h2>
+          <p>
+            The Service is provided on an "AS IS" and "AS AVAILABLE" basis. {APP_NAME} makes no warranties, expressed or implied, and hereby disclaims all other warranties including, without limitation, implied warranties of merchantability, fitness for a particular purpose, or non-infringement.
+          </p>
+
+          <h2>8. Limitation of Liability</h2>
+          <p>
+            In no event shall {APP_NAME}, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
+          </p>
+
+          <h2>9. Governing Law</h2>
+          <p>
+            These Terms shall be governed and construed in accordance with the laws of [Your Jurisdiction], without regard to its conflict of law provisions.
+          </p>
+
+          <h2>10. Changes to Terms</h2>
+          <p>
+            We reserve the right, at our sole discretion, to modify or replace these Terms at any time. We will provide notice of any changes by posting the new Terms on this page.
+          </p>
+
+          <h2>11. Contact Us</h2>
+          <p>
+            If you have any questions about these Terms, please contact us at [Your Contact Email/Link].
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 ```
 
 ## File: `components\auth\email-confirmation-handler.tsx`
@@ -5374,11 +5545,11 @@ import { supabase } from './supabaseClient'; // Import the initialized Supabase 
 interface ApiErrorDataDetail {
     msg: string;
     type: string;
-    loc?: (string | number)[]; // Location can be string or number indices
+    loc?: (string | number)[];
 }
 interface ApiErrorData {
-    detail?: string | ApiErrorDataDetail[] | any; // FastAPI often uses 'detail'
-    message?: string; // General message fallback
+    detail?: string | ApiErrorDataDetail[] | any;
+    message?: string;
 }
 export class ApiError extends Error {
     status: number;
@@ -5389,7 +5560,6 @@ export class ApiError extends Error {
         this.name = 'ApiError';
         this.status = status;
         this.data = data;
-        // Ensure the prototype chain is correct for instanceof checks
         Object.setPrototypeOf(this, ApiError.prototype);
     }
 }
@@ -5401,70 +5571,65 @@ export async function request<T>(
 ): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-    // Validate endpoint structure (optional but good practice)
     if (!cleanEndpoint.startsWith('/api/v1/')) {
         console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
 
     let apiUrl: string;
+    let cachedGatewayUrl: string | null = null;
     try {
-        const gatewayUrl = getApiGatewayUrl(); // Fetch base URL using the utility
-        apiUrl = `${gatewayUrl}${cleanEndpoint}`;
+        if (!cachedGatewayUrl) {
+            cachedGatewayUrl = getApiGatewayUrl();
+        }
+        apiUrl = `${cachedGatewayUrl}${cleanEndpoint}`;
     } catch (err) {
-        // If getApiGatewayUrl throws (e.g., in production missing env var)
         console.error("API Request failed: Could not get API Gateway URL.", err);
-        throw new ApiError("API Gateway URL configuration error.", 500);
+        const message = err instanceof Error ? err.message : "API Gateway URL configuration error.";
+        throw new ApiError(message, 500);
     }
-
 
     let token: string | null = null;
     try {
-        // Get the current session token from Supabase *before* making the request
+        // *** OBTENER TOKEN DE SUPABASE JUSTO ANTES DE LA LLAMADA ***
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-            // Log the error but proceed, maybe it's a public endpoint
             console.warn(`API Request: Error getting Supabase session for ${cleanEndpoint}:`, sessionError.message);
         }
         token = sessionData?.session?.access_token || null;
-        // Log token presence for debugging (optional: remove in production)
         // console.log(`API Request to ${cleanEndpoint}: Token ${token ? 'Present' : 'Absent'}`);
 
     } catch (e) {
         console.error(`API Request: Unexpected error fetching Supabase session for ${cleanEndpoint}:`, e);
-        // Decide if you want to proceed without a token or throw an error
-        // throw new ApiError("Failed to retrieve authentication token.", 500);
+        // Proceder sin token pero advertir
     }
 
     const headers = new Headers(options.headers || {});
     headers.set('Accept', 'application/json');
+    // Añadir header para Ngrok si la URL es de Ngrok
+    if (apiUrl.includes("ngrok-free.app")) {
+        headers.set('ngrok-skip-browser-warning', 'true');
+    }
 
-    // Set Content-Type unless it's FormData
+
     if (!(options.body instanceof FormData)) {
-        // Default to JSON if not set and not FormData
         if (!headers.has('Content-Type')) {
              headers.set('Content-Type', 'application/json');
         }
     }
 
-    // Add Authorization header if token exists
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
     } else {
-        // Optional: Decide if you want to disallow requests without tokens for protected routes
-        // This check might be better handled by the API Gateway itself, but you could add a frontend check
-        // if (!isPublicEndpoint(cleanEndpoint)) { // You'd need a helper function isPublicEndpoint
-        //    console.error(`API Request Error: Attempted to call protected endpoint ${cleanEndpoint} without a token.`);
-        //    throw new ApiError("Authentication token is missing.", 401);
-        // }
+        // No lanzar error aquí, el gateway manejará la autenticación requerida
         console.warn(`API Request: Making request to ${cleanEndpoint} without Authorization header.`);
     }
-
 
     const config: RequestInit = {
         ...options,
         headers,
+        // mode: 'cors', // 'cors' es el default para fetch, no es necesario explícitamente
     };
 
     console.log(`API Request: ${config.method || 'GET'} ${apiUrl}`);
@@ -5482,70 +5647,47 @@ export async function request<T>(
                 if (contentType && contentType.includes('application/json')) {
                     errorData = await response.json();
                 } else {
-                    // Read as text if not JSON or if JSON parsing fails
                     errorText = await response.text();
                 }
             } catch (parseError) {
                 console.warn(`API Request: Could not parse error response body (status ${response.status}) from ${apiUrl}. Content-Type: ${contentType}`, parseError);
-                // Attempt to read as text as a fallback if JSON parsing failed
-                if (!errorText) {
-                    try { errorText = await response.text(); } catch {}
-                }
+                try { errorText = await response.text(); } catch {}
             }
 
-            // Construct a meaningful error message
-            let errorMessage = `API Error (${response.status})`; // Default message
+            let errorMessage = `API Error (${response.status})`;
 
+            // Intenta extraer el detalle de FastAPI/errorData
             if (errorData?.detail) {
-                if (typeof errorData.detail === 'string') {
-                    errorMessage = errorData.detail;
-                } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0] === 'object') {
-                    // Handle FastAPI validation errors {loc: [...], msg: ..., type: ...}
-                    errorMessage = errorData.detail
-                        .map((e: ApiErrorDataDetail) => `${e.loc?.join('.')} - ${e.msg}`)
-                        .join('; ') || 'Validation Error';
-                } else {
-                     // Handle other shapes of 'detail' if necessary
+                 if (typeof errorData.detail === 'string') {
+                     errorMessage = errorData.detail;
+                 } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0] === 'object' && errorData.detail[0].msg) {
+                     errorMessage = errorData.detail.map((e: ApiErrorDataDetail) => `${e.loc?.join('.') || 'field'} - ${e.msg}`).join('; ');
+                 } else {
                      try { errorMessage = JSON.stringify(errorData.detail).substring(0, 200); } catch {}
-                }
+                 }
             } else if (errorData?.message && typeof errorData.message === 'string') {
-                errorMessage = errorData.message; // Use 'message' field if available
+                errorMessage = errorData.message;
             } else if (errorText) {
-                errorMessage = errorText.substring(0, 200); // Use text content if no structured error
+                errorMessage = errorText.substring(0, 200);
             } else {
-                // Fallback messages based on status code
-                switch (response.status) {
-                    case 400: errorMessage = 'Bad Request. Please check your input.'; break;
-                    case 401: errorMessage = 'Authentication failed. Please log in again.'; break;
-                    case 403: errorMessage = 'Permission denied. You might lack necessary roles or company association.'; break;
-                    case 404: errorMessage = 'The requested resource was not found.'; break;
-                    case 429: errorMessage = 'Too many requests. Please try again later.'; break;
-                    case 500: errorMessage = 'Internal Server Error. Please try again later or contact support.'; break;
-                    case 502: errorMessage = 'Bad Gateway. The server received an invalid response.'; break;
-                    case 503: errorMessage = 'Service Unavailable. The server is temporarily down.'; break;
-                    case 504: errorMessage = 'Gateway Timeout. The request took too long.'; break;
-                    default: errorMessage = `Request failed with status code ${response.status}.`;
-                }
+                errorMessage = response.statusText || `Request failed with status ${response.status}`;
             }
 
             console.error(`API Error Response: ${response.status} ${response.statusText} from ${apiUrl}`, {
                 status: response.status,
-                message: errorMessage, // Log the derived message
-                responseData: errorData, // Log parsed data if available
-                responseText: errorText, // Log text if available or parsing failed
+                message: errorMessage,
+                responseData: errorData,
+                responseText: errorText || null, // Ensure it's null if empty
             });
 
-            // Throw the custom ApiError
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
         // Handle successful responses
-        // Check for No Content response
         if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return null as T; // Return null for 204 No Content
+            return null as T;
         }
 
-        // Try to parse JSON for other successful responses
         try {
             const data: T = await response.json();
             return data;
@@ -5555,125 +5697,110 @@ export async function request<T>(
         }
 
     } catch (error) {
-        // Handle different types of errors (ApiError, Network errors, others)
-        if (error instanceof ApiError) {
-            // Re-throw known API errors
-            throw error;
-        } else if (error instanceof TypeError && (
-            error.message.includes('fetch') || // Generic fetch error
-            error.message.includes('NetworkError') || // Firefox network error
-            error.message.includes('Failed to fetch') // Common browser network error
-        )) {
-            const networkErrorMessage = `Network Error: Could not connect to the API Gateway at ${getApiGatewayUrl()}. Please check your network connection and the gateway status.`;
-            console.error('API Request Network Error:', { url: apiUrl, gatewayUrl: getApiGatewayUrl(), error: error.message });
+        // Handle specific Network Error cases more reliably
+        if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+            const networkErrorMessage = `Network Error: Could not connect to the API Gateway at ${cachedGatewayUrl}. Please check your network connection and the gateway status.`;
+            console.error('API Request Network Error:', { url: apiUrl, error: error.message });
             throw new ApiError(networkErrorMessage, 0); // Use status 0 for network errors
+        } else if (error instanceof ApiError) {
+            throw error; // Re-throw known API errors
         } else {
-            // Handle other unexpected errors
             console.error('API Request Unexpected Error:', { url: apiUrl, error });
             const message = error instanceof Error ? error.message : 'An unexpected error occurred during the API request.';
-            throw new ApiError(message, 500); // Assume 500 for unexpected errors
+            throw new ApiError(message, 500);
         }
     }
 }
 
 // --- API Function Definitions ---
 
-// Ingest Service
+// Ingest Service (Sin cambios)
 export interface IngestResponse {
     document_id: string;
-    task_id: string; // Celery task ID maybe?
+    task_id: string;
     status: string;
     message: string;
 }
 export const uploadDocument = async (
     formData: FormData,
-    metadata: Record<string, any> = {} // Metadata might not be used if embedded in FormData logic server-side
+    metadata: Record<string, any> = {}
 ): Promise<IngestResponse> => {
-    // Note: Sending metadata alongside FormData might require specific backend handling
-    // or embedding metadata within the FormData itself if the backend expects it.
-    // Adjust if your backend expects metadata differently (e.g., query params, separate JSON part).
-    console.log("Uploading document via API..."); // Added log
-    return request<IngestResponse>('/api/v1/ingest/upload', { // Adjusted endpoint based on typical naming
+    console.log("Uploading document via API...");
+    return request<IngestResponse>('/api/v1/ingest/upload', {
         method: 'POST',
         body: formData,
-        // If metadata needs to be sent separately (less common with FormData):
-        // headers: { 'X-Upload-Metadata': JSON.stringify(metadata) }
     });
 };
 
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string; // Allow other strings for flexibility
+    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
     file_name?: string | null;
     file_type?: string | null;
-    chunk_count?: number | null; // How many chunks were created
-    error_message?: string | null; // Details if status is 'error'
-    last_updated?: string; // ISO timestamp string
-    message?: string | null; // General status message
-    metadata?: Record<string, any> | null; // Original metadata if stored
+    chunk_count?: number | null;
+    error_message?: string | null;
+    last_updated?: string;
+    message?: string | null;
+    metadata?: Record<string, any> | null;
 }
 export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    console.log("Fetching document statuses via API..."); // Added log
-    return request<DocumentStatusResponse[]>('/api/v1/ingest/status'); // Adjusted endpoint
+    console.log("Fetching document statuses via API...");
+    return request<DocumentStatusResponse[]>('/api/v1/ingest/status');
 };
 
 
-// Query Service
+// Query Service (Sin cambios)
 export interface RetrievedDocApi {
-    id: string; // Often the chunk ID
+    id: string;
     score?: number | null;
     content_preview?: string | null;
     metadata?: Record<string, any> | null;
-    document_id?: string | null; // ID of the parent document
-    file_name?: string | null; // Filename of the parent document
+    document_id?: string | null;
+    file_name?: string | null;
 }
-// Frontend type can be the same if no transformation is needed initially
 export type RetrievedDoc = RetrievedDocApi;
 
 export interface ChatSummary {
-    id: string; // Chat ID (UUID)
-    title: string | null; // Optional title, might be first user message or generated
-    updated_at: string; // ISO timestamp
-    created_at: string; // ISO timestamp
+    id: string;
+    title: string | null;
+    updated_at: string;
+    created_at: string;
 }
 
 export interface ChatMessageApi {
-    id: string; // Message ID
+    id: string;
     chat_id: string;
     role: 'user' | 'assistant';
     content: string;
-    sources: RetrievedDocApi[] | null; // Sources used for assistant message
-    created_at: string; // ISO timestamp
-    // Potentially add other fields like model used, latency, etc.
+    sources: RetrievedDocApi[] | null;
+    created_at: string;
 }
 
 export interface QueryPayload {
     query: string;
-    retriever_top_k?: number; // Optional: How many docs to retrieve
-    chat_id?: string | null; // Provide if continuing a conversation
-    // Potentially add other params: filters, generation config, etc.
+    retriever_top_k?: number;
+    chat_id?: string | null;
 }
 
 export interface QueryApiResponse {
-    answer: string; // The generated answer
-    retrieved_documents: RetrievedDocApi[]; // The documents used
-    query_log_id?: string | null; // ID for logging/tracing
-    chat_id: string; // ID of the chat (new or existing)
+    answer: string;
+    retrieved_documents: RetrievedDocApi[];
+    query_log_id?: string | null;
+    chat_id: string;
 }
 
 export const getChats = async (): Promise<ChatSummary[]> => {
-     console.log("Fetching chat list via API..."); // Added log
+     console.log("Fetching chat list via API...");
      return request<ChatSummary[]>('/api/v1/query/chats');
 };
 
 export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
-     console.log(`Fetching messages for chat ${chatId} via API...`); // Added log
+     console.log(`Fetching messages for chat ${chatId} via API...`);
      return request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`);
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     console.log(`Sending query to API (Chat ID: ${payload.chat_id || 'New'})...`); // Added log
-     // Ensure chat_id is explicitly null if undefined/empty, as backend might expect null for new chat
+     console.log(`Sending query to API (Chat ID: ${payload.chat_id || 'New'})...`);
      const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', {
         method: 'POST',
@@ -5682,56 +5809,37 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
-     console.log(`Deleting chat ${chatId} via API...`); // Added log
-     // Expecting 204 No Content on successful deletion
+     console.log(`Deleting chat ${chatId} via API...`);
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
 
-// User/Company Association (API Gateway Endpoint)
+// User/Company Association (Sin cambios)
 interface EnsureCompanyResponse {
-    message: string; // e.g., "Company association successful." or "Company association already exists."
-    company_id?: string; // The company ID that was ensured/found
+    message: string;
+    company_id?: string;
 }
 export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
-     console.log("Calling ensure-company association endpoint..."); // Added log
+     console.log("Calling ensure-company association endpoint...");
      return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
 };
 
 
-// --- Type Mapping Helpers ---
-
-// Maps sources from the API structure to the structure needed by the frontend Message component.
+// --- Type Mapping Helpers (Sin cambios) ---
 export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null | undefined): RetrievedDoc[] | undefined => {
-    if (!apiSources) {
-        return undefined; // Return undefined if sources are null/undefined
-    }
-    // If it's an array (even empty), map each source.
-    // Currently, API and Frontend types are the same (RetrievedDoc = RetrievedDocApi),
-    // so this is mostly a pass-through, but good practice for future changes.
-    return apiSources.map(source => ({
-        id: source.id,
-        score: source.score,
-        content_preview: source.content_preview,
-        metadata: source.metadata,
-        document_id: source.document_id,
-        file_name: source.file_name,
-    }));
+    if (!apiSources) { return undefined; }
+    return apiSources.map(source => ({ ...source })); // Simple copy for now
 };
 
-// Maps a full message object from the API to the frontend Message interface.
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
-    // Use the helper to map the sources array within the message
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
-
-    // Construct the frontend Message object
     return {
         id: apiMessage.id,
         role: apiMessage.role,
         content: apiMessage.content,
-        sources: mappedSources, // Use the potentially transformed sources
-        isError: false, // Assume success when mapping API response
-        created_at: apiMessage.created_at, // Preserve timestamp
+        sources: mappedSources,
+        isError: false,
+        created_at: apiMessage.created_at,
     };
 };
 ```
@@ -5787,337 +5895,296 @@ import React, {
     useState,
     useEffect,
     useCallback,
-    useRef, // Added useRef
+    useRef,
     ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { User as AppUser } from '@/lib/auth/helpers'; // Use our defined frontend User type
-// Import AuthError directly, not just as a type
+import { User as AppUser } from '@/lib/auth/helpers';
 import { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 import { toast } from "sonner";
-import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from '@/lib/api'; // Import API function and specific error type
+import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError, ApiError } from '@/lib/api'; // Import API function and error types
 
 // --- Types ---
 interface AuthContextType {
-    user: AppUser | null; // Use our application-specific User type
-    session: Session | null; // Keep the full Supabase session if needed elsewhere
-    isLoading: boolean; // Tracks if auth state is being determined
-    signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>;
+    user: AppUser | null;
+    session: Session | null;
+    isLoading: boolean; // Tracks if auth state is being determined (initial load or transitions)
+    signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>; // Throws error on failure
     signUp: (params: SignUpWithPasswordCredentials) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
     signOut: () => Promise<void>;
-    // No 'token' here - access via session.access_token if needed directly
 }
 
 // --- Initial Context State ---
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     session: null,
-    isLoading: true, // Start as true until initial check completes
-    signInWithPassword: async () => {
-        console.error("AuthProvider: signInWithPassword called outside of AuthProvider");
-        throw new Error("Auth context not initialized");
-    },
-    signUp: async () => {
-        console.error("AuthProvider: signUp called outside of AuthProvider");
-        // Use AuthError constructor directly
-        return { data: { user: null, session: null }, error: new AuthError("Auth context not initialized") };
-    },
-    signOut: async () => {
-        console.error("AuthProvider: signOut called outside of AuthProvider");
-    },
+    isLoading: true, // Start true until initial check finishes
+    signInWithPassword: async () => { throw new Error("AuthProvider not initialized"); },
+    signUp: async () => { return { data: { user: null, session: null }, error: new AuthError("AuthProvider not initialized") }; },
+    signOut: async () => { console.error("AuthProvider not initialized"); },
 };
 
 // --- Context Definition ---
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
 // --- Props for Provider ---
-interface AuthProviderProps {
-    children: ReactNode;
-}
+interface AuthProviderProps { children: ReactNode; }
 
 // --- Helper to Map Supabase User to App User ---
 const mapSupabaseUserToAppUser = (supabaseUser: SupabaseUser | null | undefined): AppUser | null => {
-    if (!supabaseUser) {
-        return null;
-    }
+    if (!supabaseUser) return null;
 
-    // Extract data safely, checking for undefined/null
     const companyIdRaw = supabaseUser.app_metadata?.company_id;
-    // Ensure companyId is a string if it exists, otherwise undefined
-    const companyId = companyIdRaw ? String(companyIdRaw) : undefined;
-
-    // Extract roles, ensuring it's an array of strings or undefined
+    const companyId = companyIdRaw ? String(companyIdRaw) : undefined; // Ensure string or undefined
     const rolesRaw = supabaseUser.app_metadata?.roles;
-    const roles = Array.isArray(rolesRaw) && rolesRaw.every(r => typeof r === 'string')
-        ? rolesRaw as string[]
-        : undefined;
-
-    // Extract name from user_metadata (common places: 'name' or 'full_name')
+    const roles = Array.isArray(rolesRaw) && rolesRaw.every(r => typeof r === 'string') ? rolesRaw as string[] : undefined;
     const name = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || null;
 
     return {
         userId: supabaseUser.id,
         email: supabaseUser.email,
-        name: name, // Will be string or null
-        companyId: companyId, // Will be string or undefined
-        roles: roles, // Will be string[] or undefined
+        name: name,
+        companyId: companyId,
+        roles: roles,
     };
 };
-
 
 // --- AuthProvider Component ---
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [session, setSession] = useState<Session | null>(null);
-    const [isLoading, setIsLoading] = useState(true); // Start loading until first check
+    const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
-    // Ref to prevent multiple ensureCompany calls running concurrently
     const ensureCompanyCallPending = useRef(false);
-    // Ref to store the initial session check promise
-    const initialCheckPromise = useRef<Promise<void> | null>(null);
+    const initialLoadComplete = useRef(false); // Track if the initial getSession has completed
 
     // --- Sign Out Logic ---
     const signOut = useCallback(async () => {
         console.log("AuthProvider: Initiating sign out...");
-        // Don't set isLoading true here immediately, let onAuthStateChange handle it
-        // to avoid UI flicker if sign out is very fast.
+        // Don't set isLoading true here, let onAuthStateChange handle the transition
         try {
             const { error } = await supabase.auth.signOut();
             if (error) {
                 console.error("AuthProvider: Sign out error:", error);
-                toast.error("Logout Failed", { description: error.message });
+                toast.error("Logout Failed", { description: error.message, id: "logout-error" });
             } else {
                 console.log("AuthProvider: Sign out successful via Supabase.");
-                // Clear local state immediately for faster UI response
-                setUser(null);
-                setSession(null);
-                // Redirect happens via useEffect watching session state change to null
+                // State cleared by onAuthStateChange listener receiving null session
             }
         } catch (error) {
             console.error("AuthProvider: Unexpected sign out error:", error);
-            toast.error("Logout Failed", { description: "An unexpected error occurred during sign out." });
-            // Still clear local state in case of unexpected error
-            setUser(null);
+            toast.error("Logout Failed", { description: "An unexpected error occurred.", id: "logout-error" });
+            // Manually clear state as a fallback
             setSession(null);
-        } finally {
-             // Ensure loading is false after attempt, though onAuthStateChange might set it again briefly
-             setIsLoading(false);
-        }
-    }, []); // No dependencies needed for signOut itself
-
-    // --- Core Effect for Auth State Changes & Initial Load ---
-    useEffect(() => {
-        console.log("AuthProvider: useEffect setup running.");
-
-        // Function to handle session updates and potential company association
-        const handleSessionUpdate = async (currentSession: Session | null) => {
-            console.log("AuthProvider: Handling session update. Session present:", !!currentSession);
-            setSession(currentSession);
-            const mappedUser = mapSupabaseUserToAppUser(currentSession?.user);
-            setUser(mappedUser);
-
-            // --- Ensure Company Association Logic ---
-            // Check only if we have a session, a mapped user, but NO companyId,
-            // and no call is already pending.
-            if (currentSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
-                console.log(`AuthProvider: User ${mappedUser.userId} lacks companyId. Attempting association.`);
-                ensureCompanyCallPending.current = true; // Mark as pending
-                try {
-                    const result = await ensureCompanyAssociation();
-                    console.log("AuthProvider: ensureCompanyAssociation API call successful:", result.message);
-                    toast.info("Company Association", { description: result.message });
-                    // IMPORTANT: Refresh the Supabase session to get the updated token with the new app_metadata
-                    console.log("AuthProvider: Refreshing Supabase session after company association...");
-                    const { error: refreshError } = await supabase.auth.refreshSession();
-                    if (refreshError) {
-                        console.error("AuthProvider: Failed to refresh session after company association:", refreshError);
-                        toast.error("Session Refresh Failed", { description: "Could not update session after company setup. Please log in again." });
-                        // Consider signing out if refresh fails critically
-                        // await signOut();
-                    } else {
-                        console.log("AuthProvider: Session refreshed successfully.");
-                        // The onAuthStateChange listener will fire again with the *new* session,
-                        // updating user/session state automatically. No need to manually set user/session here.
-                    }
-                } catch (error) {
-                    console.error("AuthProvider: ensureCompanyAssociation API call failed:", error);
-                    let errorDesc = "Could not automatically associate your account with a company.";
-                    if (error instanceof EnsureCompanyApiError) {
-                        errorDesc = error.message || errorDesc;
-                         // If the error is 401/403 from the ensure-company endpoint, it implies token issues.
-                         if (error.status === 401 || error.status === 403) {
-                            errorDesc = "Authentication error during company setup. Please log in again.";
-                            await signOut(); // Force sign out on critical auth error
-                         }
-                    } else if (error instanceof Error) {
-                        errorDesc = error.message;
-                    }
-                    toast.error("Company Setup Failed", { description: errorDesc });
-                } finally {
-                    ensureCompanyCallPending.current = false; // Mark as no longer pending
-                }
-            }
-             // --- End Ensure Company Logic ---
-
-             // Regardless of company check, ensure loading is false after handling
-             setIsLoading(false);
-             console.log("AuthProvider: Session update handling complete. isLoading set to false.");
-        };
-
-
-        // 1. Initial Session Check (Only once on mount)
-        if (!initialCheckPromise.current) {
-            console.log("AuthProvider: Performing initial session check...");
-            setIsLoading(true); // Ensure loading is true during initial check
-            initialCheckPromise.current = supabase.auth.getSession()
-                .then(async ({ data: { session: initialSession }, error: initialError }) => {
-                    if (initialError) {
-                        console.error("AuthProvider: Error fetching initial session:", initialError);
-                        toast.error("Session Load Error", { description: "Could not load your session." });
-                    }
-                    console.log("AuthProvider: Initial session check complete. Session found:", !!initialSession);
-                    await handleSessionUpdate(initialSession); // Handle the initial session
-                })
-                .catch(error => {
-                    console.error("AuthProvider: Unexpected error during initial session check:", error);
-                    toast.error("Session Load Error", { description: "An unexpected error occurred." });
-                    setIsLoading(false); // Ensure loading stops on unexpected error
-                });
-        }
-
-
-        // 2. Auth State Change Listener
-        console.log("AuthProvider: Setting up onAuthStateChange listener.");
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-            async (event, newSession) => {
-                console.log(`AuthProvider: onAuthStateChange event: ${event}`, { hasSession: !!newSession });
-
-                // Wait for initial check to complete before processing listener events fully
-                if (initialCheckPromise.current) {
-                    await initialCheckPromise.current;
-                }
-
-                 // Always update state based on the event, but handle company logic specifically on SIGNED_IN
-                 // The handleSessionUpdate function now contains the company check logic.
-                 await handleSessionUpdate(newSession);
-
-                // Handle redirection on SIGNED_OUT
-                if (event === 'SIGNED_OUT') {
-                    // Redirect to home if user was in a protected area
-                    const protectedPaths = ['/chat', '/knowledge', '/settings'];
-                    if (protectedPaths.some(p => pathname?.startsWith(p))) {
-                        console.log("AuthProvider: Signed out from protected route, redirecting to /");
-                        router.push('/'); // Use push for clearer navigation history
-                    }
-                }
-                // Note: Redirection on SIGNED_IN is usually handled by the login form
-                // or components observing the session becoming non-null.
-            }
-        );
-
-        // Cleanup listener on component unmount
-        return () => {
-            console.log("AuthProvider: Unmounting, unsubscribing listener.");
-            authListener?.subscription.unsubscribe();
-            initialCheckPromise.current = null; // Clear the promise ref on unmount
-        };
-    // Dependencies: router and pathname are needed for redirection logic on signout.
-    // signOut is included as it's used within the effect's error handling.
-    }, [router, pathname, signOut]); // Rerun if router or pathname changes (for redirection logic)
-
-    // --- Sign In Action ---
-    const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
-        console.log("AuthProvider: Attempting sign in...");
-        setIsLoading(true); // Indicate loading during sign-in attempt
-        try {
-            const { error } = await supabase.auth.signInWithPassword(credentials);
-            if (error) {
-                console.error("AuthProvider: Sign in error:", error);
-                // Throw the error so the form can catch it and display specifics
-                throw error;
-            }
-            console.log("AuthProvider: signInWithPassword successful. Waiting for onAuthStateChange.");
-            // Don't set loading false here; let onAuthStateChange handle it when the session updates.
-        } catch (error) {
-            // Ensure loading is set to false if an error is thrown *before* Supabase call returns
-            // or if the thrown error needs to be handled immediately.
-             setIsLoading(false);
-             // Re-throw the error for the form
-             throw error;
+            setUser(null);
+            setIsLoading(false);
         }
     }, []);
 
-    // --- Sign Up Action ---
+    // --- Core Effect for Auth State Changes & Initial Load ---
+    useEffect(() => {
+        let isMounted = true; // Track mount status for async operations
+        console.log("AuthProvider: useEffect setup running.");
+
+        // --- Function to handle session updates and company association ---
+        const processSession = async (currentSession: Session | null) => {
+            if (!isMounted) return; // Don't process if unmounted
+
+            console.log(`AuthProvider: Processing session. Present: ${!!currentSession}`);
+            setSession(currentSession); // Update session state
+            const mappedUser = mapSupabaseUserToAppUser(currentSession?.user);
+            setUser(mappedUser); // Update user state
+
+            // --- Ensure Company Logic ---
+            if (currentSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
+                console.log(`AuthProvider: User ${mappedUser.userId} lacks companyId. Attempting association.`);
+                ensureCompanyCallPending.current = true;
+                setIsLoading(true); // Indicate loading during this critical step
+
+                try {
+                    console.log("AuthProvider: Calling ensure-company association endpoint...");
+                    const result = await ensureCompanyAssociation();
+                    console.log("AuthProvider: ensureCompanyAssociation API call successful:", result.message);
+                    // --- MODIFICACIÓN: Evitar toast duplicados ---
+                    toast.success("Company Association Check", { description: result.message, id: "company-assoc-check" }); // Use ID to prevent duplicates
+
+                    // Refresh session to get updated token
+                    console.log("AuthProvider: Refreshing Supabase session after company association check...");
+                    const { error: refreshError } = await supabase.auth.refreshSession();
+                    if (refreshError) {
+                        console.error("AuthProvider: Failed to refresh session:", refreshError);
+                        toast.error("Session Sync Failed", { description: "Could not update session after setup. Please log in again.", id: "session-refresh-fail" });
+                        await signOut(); // Force sign out if refresh fails
+                    } else {
+                        console.log("AuthProvider: Session refresh triggered. onAuthStateChange will handle update.");
+                        // The listener will receive the updated session and re-process.
+                    }
+                } catch (error) {
+                    console.error("AuthProvider: ensureCompanyAssociation API call failed:", error);
+                    let errorDesc = "Could not complete company setup.";
+                     // Handle specific ApiError vs generic Error
+                     if (error instanceof ApiError) {
+                        errorDesc = error.message || errorDesc;
+                        // Network error is status 0 in our api client
+                        if (error.status === 0) {
+                             errorDesc = "Network Error: Failed to connect for company setup.";
+                        } else if (error.status === 401 || error.status === 403) {
+                            errorDesc = "Authentication error during setup. Please log in again.";
+                            await signOut(); // Force sign out
+                        } else if (error.status === 400) { // Handle specific 400 from backend (config error)
+                            errorDesc = error.message; // Use the specific message from backend
+                        }
+                    } else if (error instanceof Error) { errorDesc = error.message; }
+                    // --- MODIFICACIÓN: Evitar toast duplicados ---
+                    toast.error("Company Setup Failed", { description: errorDesc, duration: 7000, id: "company-setup-fail" });
+                } finally {
+                     if (isMounted) {
+                         ensureCompanyCallPending.current = false;
+                         setIsLoading(false); // Ensure loading stops after attempt
+                         console.log("AuthProvider: Company association attempt finished.");
+                     }
+                }
+            } else {
+                 // If no company check needed, ensure loading is false
+                 if (isMounted) setIsLoading(false);
+                 console.log("AuthProvider: No company association check needed or call already pending.");
+            }
+        };
+
+
+        // --- Initial Session Load ---
+        const performInitialCheck = async () => {
+            if (initialLoadComplete.current) return; // Already done
+
+            console.log("AuthProvider: Performing initial session check...");
+            setIsLoading(true);
+            try {
+                const { data: { session: initialSession }, error: initialError } = await supabase.auth.getSession();
+                if (initialError) {
+                    console.error("AuthProvider: Error fetching initial session:", initialError);
+                    toast.error("Session Load Error", { description: "Could not load initial session.", id:"init-session-err"});
+                }
+                console.log("AuthProvider: Initial session check complete. Session found:", !!initialSession);
+                // Process the initial session AFTER marking initial load complete
+                initialLoadComplete.current = true;
+                await processSession(initialSession);
+
+            } catch (error) {
+                console.error("AuthProvider: Unexpected error during initial session check:", error);
+                toast.error("Session Load Error", { description: "An unexpected error occurred.", id:"init-session-err"});
+                initialLoadComplete.current = true; // Mark complete even on error
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        performInitialCheck(); // Run the initial check
+
+        // --- Auth State Change Listener ---
+        console.log("AuthProvider: Setting up onAuthStateChange listener.");
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            async (event, newSession) => {
+                if (!isMounted) return;
+
+                console.log(`AuthProvider: onAuthStateChange event: ${event}`, { hasSession: !!newSession });
+
+                 // Wait if initial load isn't marked complete yet (should be quick)
+                 while (!initialLoadComplete.current) {
+                     console.log("AuthProvider listener: Waiting for initial load...");
+                     await new Promise(resolve => setTimeout(resolve, 50)); // Short delay
+                 }
+
+                // Process the session update from the listener
+                await processSession(newSession);
+
+                // Handle redirection logic based on event and path
+                if (event === 'SIGNED_OUT') {
+                    const protectedPaths = ['/chat', '/knowledge', '/settings'];
+                    if (protectedPaths.some(p => pathname?.startsWith(p))) {
+                        console.log("AuthProvider: Signed out from protected route, redirecting to /");
+                        router.replace('/'); // Use replace to avoid history clutter
+                    }
+                } else if (event === 'SIGNED_IN') {
+                     // Redirect to /chat if user signs in while on a public page like /login or /register
+                     // or if they just confirmed their email (might land on '/')
+                     const publicAuthPaths = ['/login', '/register'];
+                     if (publicAuthPaths.includes(pathname || '') || pathname === '/') {
+                         console.log(`AuthProvider: Signed in on ${pathname}, redirecting to /chat`);
+                         router.replace('/chat'); // Use replace
+                     }
+                 }
+            }
+        );
+
+        // Cleanup
+        return () => {
+            isMounted = false; // Mark as unmounted
+            console.log("AuthProvider: Unmounting, unsubscribing listener.");
+            authListener?.subscription.unsubscribe();
+        };
+    // Dependencies: router, pathname for redirection. signOut added because it's used.
+    }, [router, pathname, signOut]); // Effect setup depends on these
+
+    // --- Actions ---
+    const signInWithPassword = useCallback(async (credentials: SignInWithPasswordCredentials) => {
+        console.log("AuthProvider: Attempting sign in...");
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithPassword(credentials);
+            if (error) throw error; // Throw Supabase error for the form to catch
+            console.log("AuthProvider: signInWithPassword successful trigger. Waiting for onAuthStateChange.");
+            // isLoading will be set to false by processSession via the listener
+        } catch (error) {
+            setIsLoading(false); // Stop loading on direct error
+            console.error("AuthProvider: Sign in failed:", error);
+            throw error; // Re-throw for the form
+        }
+    }, []);
+
     const signUp = useCallback(async (params: SignUpWithPasswordCredentials) => {
         console.log("AuthProvider: Attempting sign up...");
         setIsLoading(true);
         try {
-            // Ensure password is provided and either email or phone is provided
             const hasEmail = 'email' in params && params.email;
             const hasPhone = 'phone' in params && params.phone;
             if (!params.password || (!hasEmail && !hasPhone)) {
-                throw new AuthError("Password and either Email or Phone are required for sign up.");
+                throw new AuthError("Password and either Email or Phone are required.");
             }
+            const { data, error } = await supabase.auth.signUp(params);
 
-            const { data, error } = await supabase.auth.signUp(params); // Pass params directly
-
-            // Handle Supabase-specific responses
+            // Process result immediately for UI feedback
             if (error) {
-                 console.error("AuthProvider: Sign up error:", error);
-                 toast.error("Registration Failed", { description: error.message || "Could not create account." });
-            } else if (data.user && data.session) {
-                 // User created AND session started (e.g., auto-confirm enabled)
-                 console.log("AuthProvider: Sign up successful and user logged in.");
-                 toast.success("Registration Successful!", { description: "You are now logged in." });
-                 // onAuthStateChange will handle the session update and company check
-            } else if (data.user && !data.session) {
-                 // User created but requires confirmation (common case)
-                 console.log("AuthProvider: Sign up successful, confirmation required.");
-                 // Safely determine which contact method was used for the message
-                 const contactMethod = 'email' in params && params.email
-                    ? `email (${params.email})`
-                    : ('phone' in params && params.phone ? 'phone' : 'provided contact method');
-                 toast.success("Registration Submitted", {
-                    description: `Please check your ${contactMethod} to confirm your account.`,
-                    duration: 10000, // Longer duration for this message
-                 });
+                toast.error("Registration Failed", { description: error.message, id:"signup-fail" });
+            } else if (data.user && !data.session) { // Confirmation needed
+                 const contact = hasEmail ? `email (${params.email})` : 'phone';
+                 toast.success("Registration Submitted", { description: `Please check your ${contact} to confirm.`, duration: 10000, id:"signup-confirm" });
+            } else if (data.user && data.session) { // Auto-confirmed/logged in
+                toast.success("Registration Successful!", { description: "You are now logged in.", id:"signup-success" });
+                // Listener will handle session update
             } else {
-                 // Unexpected case
-                 console.warn("AuthProvider: Sign up status unknown.", { data });
-                 toast.warning("Registration Status Unknown", { description: "Please try logging in or check your email." });
+                 toast.warning("Registration Status Unknown", { description: "Please try logging in.", id:"signup-unknown" });
             }
-            setIsLoading(false); // Set loading false after handling response
-            return { data, error }; // Return the result for the form
+            setIsLoading(false); // Stop loading after handling
+            return { data, error }; // Return Supabase result
 
         } catch (error) {
             console.error("AuthProvider: Unexpected sign up error:", error);
-            let errorMsg = "An unexpected error occurred during registration.";
-            if (error instanceof Error) errorMsg = error.message;
-            toast.error("Registration Failed", { description: errorMsg });
+            const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred.";
+            toast.error("Registration Failed", { description: errorMsg, id:"signup-fail" });
             setIsLoading(false);
-            // Return an error structure consistent with Supabase response
-            // Use AuthError constructor directly
             return { data: { user: null, session: null }, error: error instanceof AuthError ? error : new AuthError(errorMsg) };
         }
     }, []);
 
     // --- Context Value ---
     const providerValue: AuthContextType = {
-        user,
-        session,
-        isLoading,
-        signInWithPassword,
-        signUp,
-        signOut,
+        user, session, isLoading, signInWithPassword, signUp, signOut
     };
 
     // --- Render Provider ---
     return (
         <AuthContext.Provider value={providerValue}>
-            {/* Optionally render children only after initial load, or show a global loader */}
-            {/* {isLoading ? <GlobalLoader /> : children} */}
             {children}
         </AuthContext.Provider>
     );
@@ -6129,15 +6196,10 @@ export const useAuth = (): AuthContextType => {
     if (context === undefined) {
         throw new Error('useAuth must be used within an AuthProvider');
     }
-    // Optional: Add a check if the context is still the default value,
-    // which might indicate usage outside the provider or before initialization.
-    // This check might be noisy during initial renders.
-    // if (context === defaultAuthContextValue && typeof window !== 'undefined') {
-    //    console.warn("useAuth hook used possibly outside of AuthProvider or before initialization finished.");
-    // }
+    // Avoid the warning for default value check as it can be noisy.
+    // Ensure the provider wraps the necessary parts of the application tree.
     return context;
 };
-
 ```
 
 ## File: `lib\supabaseClient.ts`
@@ -6199,21 +6261,36 @@ export function cn(...inputs: ClassValue[]) {
 export function getApiGatewayUrl(): string {
     const apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL;
 
+    // Log para depuración: muestra la URL que está obteniendo del entorno
+    console.log(`getApiGatewayUrl: NEXT_PUBLIC_API_GATEWAY_URL = ${apiUrl}`);
+
     if (!apiUrl) {
         const errorMessage = "CRITICAL: NEXT_PUBLIC_API_GATEWAY_URL environment variable is not set.";
         console.error(errorMessage);
 
         // Throw error in production/staging environments
-        if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
-             throw new Error("API Gateway URL is not configured. Please set NEXT_PUBLIC_API_GATEWAY_URL in Vercel environment variables.");
-        } else {
-            // Provide a default for local development ONLY, with a clear warning.
-            // Adjust the default URL if your local gateway runs elsewhere.
-            const defaultDevUrl = "http://localhost:8080"; // Default for local FastAPI gateway
-            console.warn(`⚠️ ${errorMessage} Using default development URL: ${defaultDevUrl}`);
-            return defaultDevUrl;
+        // process.env.NODE_ENV is reliable for this check in Next.js
+        if (process.env.NODE_ENV === 'production') {
+             // En Vercel, usa VERCEL_ENV para distinguir preview de production si es necesario
+             // if (process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
+             console.error("API Gateway URL must be set in production environment variables.");
+             throw new Error("API Gateway URL is not configured for production.");
+             // }
         }
+
+        // Provide a default for local development ONLY, with a clear warning.
+        // Usa la URL de Ngrok que SÍ funciona según los logs del frontend.
+        const defaultDevUrl = "https://1942-2001-1388-53a1-a7c9-241c-4a44-2b12-938f.ngrok-free.app";
+        console.warn(`⚠️ ${errorMessage} Using default development Ngrok URL: ${defaultDevUrl}. Make sure this matches your current ngrok tunnel!`);
+        return defaultDevUrl; // Return default for local dev only
     }
+
+    // Ensure URL format is valid (basic check)
+    if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+        console.error(`Invalid API Gateway URL format: ${apiUrl}. Must start with http:// or https://`);
+        throw new Error(`Invalid API Gateway URL format: ${apiUrl}`);
+    }
+
      // Remove trailing slash if exists to prevent double slashes in requests
     return apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 }
