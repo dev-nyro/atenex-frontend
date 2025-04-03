@@ -274,9 +274,11 @@ export interface QueryApiResponse {
     chat_id: string;
 }
 
-export const getChats = async (): Promise<ChatSummary[]> => {
-     console.log("Fetching chat list via API...");
-     return request<ChatSummary[]>('/api/v1/query/chats');
+export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
+    console.log(`Fetching chat list via API (limit=${limit}, offset=${offset})...`);
+    // Añadir query parameters a la URL
+    const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
+    return request<ChatSummary[]>(endpoint); // GET es el método por defecto
 };
 
 export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {

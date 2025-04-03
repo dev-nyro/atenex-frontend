@@ -81,6 +81,10 @@ export function ChatHistory() {
                     message = "Session expired or invalid. Please log in again.";
                     signOut(); // Force logout on auth error
                 }
+                 // (+) Añadir manejo específico para 422 si aún ocurre
+                 else if (err.status === 422) {
+                     message = `Failed to process request: ${err.message}`;
+                 }
             } else if (err instanceof Error) { message = err.message; }
             setError(message);
             setChats([]); // Clear chats on error
