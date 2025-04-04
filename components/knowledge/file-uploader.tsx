@@ -1,4 +1,4 @@
-// File: components/knowledge/file-uploader.tsx
+// File: atenex-frontend/components/knowledge/file-uploader.tsx
 "use client";
 
 import React, { useState, useCallback } from 'react';
@@ -10,7 +10,6 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { UploadCloud, FileCheck2, AlertCircle, Loader2, X } from 'lucide-react';
 import { uploadDocument, ApiError } from '@/lib/api';
-// (-) QUITAR ESTA LÍNEA (si existía): import { useToast } from "@/components/ui/use-toast";
 // (+) AÑADIR ESTA LÍNEA (si no existe):
 import { toast } from "sonner";
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +25,6 @@ interface UploadedFileStatus {
 
 export function FileUploader() {
     const [filesStatus, setFilesStatus] = useState<UploadedFileStatus[]>([]);
-    // (-) QUITAR ESTA LÍNEA (si existía): const { toast } = useToast(); // No necesitas esto con sonner
 
     const updateFileStatus = (fileName: string, updates: Partial<Omit<UploadedFileStatus, 'file'>>) => {
         setFilesStatus(prev =>
@@ -45,14 +43,23 @@ export function FileUploader() {
         newFiles.forEach(async (fileStatus) => {
             const formData = new FormData();
             formData.append('file', fileStatus.file);
-            const metadata = { source: 'web-uploader' };
+
+            // --- AÑADIR ESTA LÍNEA ---
+            // Crear el objeto metadata y añadirlo como string JSON al FormData
+            // con el nombre de campo esperado por el backend ('metadata_json')
+            const metadata = { source: 'web-uploader' }; // Puedes añadir más datos si es necesario
+            formData.append('metadata_json', JSON.stringify(metadata));
+            // -----------------------
 
             updateFileStatus(fileStatus.file.name, { status: 'uploading', progress: 10 });
 
             try {
                  updateFileStatus(fileStatus.file.name, { progress: 50 });
 
-                const response = await uploadDocument(formData, metadata);
+                // --- MODIFICAR LLAMADA: Quitar el argumento 'metadata' ---
+                // Ahora la metadata va dentro del formData
+                const response = await uploadDocument(formData);
+                // ------------------------------------------------------
 
                 updateFileStatus(fileStatus.file.name, {
                     status: 'success',
@@ -60,14 +67,8 @@ export function FileUploader() {
                     documentId: response.document_id,
                     taskId: response.task_id
                 });
-                // (-) QUITAR ESTO (si existía):
-                // toast({
-                //     title: "Upload Queued",
-                //     description: `${fileStatus.file.name} uploaded successfully and queued for processing.`,
-                // });
-                // (+) AÑADIR/USAR ESTO:
                  toast.success("Upload Queued", {
-                    description: `${fileStatus.file.name} uploaded successfully and queued for processing. Task ID: ${response.task_id}`, // Puedes añadir más info si quieres
+                    description: `${fileStatus.file.name} uploaded successfully and queued for processing. Task ID: ${response.task_id}`,
                  });
 
             } catch (error) {
@@ -79,19 +80,12 @@ export function FileUploader() {
                    errorMessage = error.message;
                 }
                 updateFileStatus(fileStatus.file.name, { status: 'error', progress: 0, error: errorMessage });
-                 // (-) QUITAR ESTO (si existía):
-                 // toast({
-                 //    variant: "destructive",
-                 //    title: `Upload Failed: ${fileStatus.file.name}`,
-                 //    description: errorMessage,
-                 // });
-                 // (+) AÑADIR/USAR ESTO:
                  toast.error(`Upload Failed: ${fileStatus.file.name}`, {
                     description: errorMessage,
                  });
             }
         });
-    // (+) Dependencias de useCallback: no se necesita 'toast' para sonner
+    // Dependencias de useCallback: no se necesita 'toast' para sonner
     }, []);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -103,6 +97,8 @@ export function FileUploader() {
             'text/markdown': ['.md'],
             'text/html': ['.html', '.htm'],
             // Añade más tipos si son soportados por tu backend
+            // 'image/jpeg': ['.jpeg', '.jpg'],
+            // 'image/png': ['.png'],
         },
         multiple: true,
     });
