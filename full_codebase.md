@@ -16,9 +16,7 @@ atenex-frontend/
 │   │       └── page.tsx
 │   ├── (auth)
 │   │   ├── layout.tsx
-│   │   ├── login
-│   │   │   └── page.tsx
-│   │   └── register
+│   │   └── login
 │   │       └── page.tsx
 │   ├── about
 │   │   └── page.tsx
@@ -34,8 +32,7 @@ atenex-frontend/
 ├── components
 │   ├── auth
 │   │   ├── email-confirmation-handler.tsx
-│   │   ├── login-form.tsx
-│   │   └── register-form.tsx
+│   │   └── login-form.tsx
 │   ├── chat
 │   │   ├── chat-history.tsx
 │   │   ├── chat-input.tsx
@@ -1136,26 +1133,6 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <LoginForm />
-      </CardContent>
-    </Card>
-  );
-}
-```
-
-## File: `app\(auth)\register\page.tsx`
-```tsx
-import { RegisterForm } from "@/components/auth/register-form";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-
-export default function RegisterPage() {
-  return (
-    <Card className="w-full max-w-md shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
-        <CardDescription>Únete a Atenex y desbloquea tu conocimiento</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <RegisterForm />
       </CardContent>
     </Card>
   );
@@ -2268,215 +2245,6 @@ export function LoginForm() {
 }
 ```
 
-## File: `components\auth\register-form.tsx`
-```tsx
-// File: components/auth/register-form.tsx
-// Purpose: Handles user registration using the useAuth hook.
-"use client";
-
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
-import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
-import { AuthError } from '@supabase/supabase-js'; // Import Supabase error type
-import { cn } from '@/lib/utils'; // Import cn utility
-
-// Zod schema for registration form validation
-// REMOVED companyId - it will be handled by the ensure-company flow after login
-const registerSchema = z.object({
-  name: z.string().min(2, { message: 'Name must be at least 2 characters.' }).optional(), // Make name optional but validated if provided
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters long.' }) // Increased minimum length
-    // Optional: Add password complexity requirements if desired
-    // .regex(/[a-z]/, { message: "Password must contain a lowercase letter." })
-    // .regex(/[A-Z]/, { message: "Password must contain an uppercase letter." })
-    // .regex(/[0-9]/, { message: "Password must contain a number." })
-    // .regex(/[^a-zA-Z0-9]/, { message: "Password must contain a special character." }),
-});
-
-type RegisterFormValues = z.infer<typeof registerSchema>;
-
-export function RegisterForm() {
-  // Get the signUp function from the auth context
-  const { signUp } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<boolean>(false); // State to show success message
-
-  const form = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', password: '' },
-    mode: 'onChange', // Validate on change
-  });
-
-  const onSubmit = async (data: RegisterFormValues) => {
-    setIsLoading(true);
-    setError(null);
-    setSuccess(false); // Reset success state on new submission
-    try {
-      console.log("RegisterForm: Attempting registration for:", data.email);
-
-      // Call the signUp function from the context
-      // Pass the name in the options.data field for user_metadata
-      const { data: responseData, error: responseError } = await signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            // Include name in user_metadata if provided
-            // Use 'full_name' or 'name' depending on your Supabase setup preference
-            ...(data.name && { name: data.name }),
-          },
-          // Optional: Specify where the confirmation email should redirect the user
-          // emailRedirectTo: `${window.location.origin}/confirm-email`, // Example redirect
-        },
-      });
-
-      // Check the response from the signUp function
-      if (responseError) {
-        // Error occurred during signup
-        setError(responseError.message || 'Registration failed. Please try again.');
-        setIsLoading(false);
-      } else if (responseData.user && !responseData.session) {
-        // Success: User created, needs email confirmation
-        setSuccess(true);
-        // Keep isLoading=true to prevent form resubmission while success message is shown
-      } else if (responseData.user && responseData.session) {
-         // Success: User created AND logged in (e.g., auto-confirm enabled)
-         // AuthProvider will handle the session update and redirect/access.
-         console.log("RegisterForm: Sign up successful and session created.");
-         // You might want to show a brief success message before redirect,
-         // but often the redirect itself is sufficient indication.
-         // setSuccess(true); // Optionally show success message briefly
-         setIsLoading(false); // Allow potential redirect to happen
-      } else {
-         // Unexpected outcome
-         setError("An unexpected issue occurred during registration. Please try again.");
-         setIsLoading(false);
-      }
-
-    } catch (err) {
-      // Catch unexpected errors during the process
-      console.error("RegisterForm: Unexpected error during submission:", err);
-      let errorMessage = 'An unexpected error occurred. Please try again later.';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      setError(errorMessage);
-      setIsLoading(false);
-    }
-  };
-
-  // If registration was successful, show the confirmation message and hide the form
-  if (success) {
-    return (
-       <Alert variant="default" className="border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/30">
-          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-          <AlertTitle className="text-green-800 dark:text-green-200">Account Created!</AlertTitle>
-          <AlertDescription className="text-green-700 dark:text-green-300">
-             Success! Please check your email (<span className="font-medium">{form.getValues('email')}</span>) for a confirmation link to activate your account.
-          </AlertDescription>
-           <div className="mt-4 text-center">
-              <Link href="/login" className={cn(buttonVariants({ variant: "link" }), "text-sm")}>
-                 Go to Login
-              </Link>
-           </div>
-       </Alert>
-    );
-  }
-
-  // Render the form if not successful yet
-  return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {/* Error Alert */}
-      {error && (
-        <Alert variant="destructive" role="alert" aria-live="assertive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Registration Failed</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Name Input (Optional) */}
-      <div className="space-y-1">
-        <Label htmlFor="name">Full Name (Optional)</Label>
-        <Input
-          id="name"
-          type="text"
-          placeholder="Your Name"
-          autoComplete="name"
-          disabled={isLoading}
-          {...form.register('name')}
-          aria-invalid={form.formState.errors.name ? 'true' : 'false'}
-        />
-        {form.formState.errors.name && (
-          <p className="text-sm text-destructive" role="alert">{form.formState.errors.name.message}</p>
-        )}
-      </div>
-
-      {/* Email Input */}
-      <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="name@example.com"
-          autoComplete="email"
-          required
-          disabled={isLoading}
-          aria-required="true"
-          {...form.register('email')}
-          aria-invalid={form.formState.errors.email ? 'true' : 'false'}
-        />
-        {form.formState.errors.email && (
-          <p className="text-sm text-destructive" role="alert">{form.formState.errors.email.message}</p>
-        )}
-      </div>
-
-      {/* Password Input */}
-      <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="••••••••"
-          autoComplete="new-password"
-          required
-          disabled={isLoading}
-          aria-required="true"
-          {...form.register('password')}
-          aria-invalid={form.formState.errors.password ? 'true' : 'false'}
-        />
-        {form.formState.errors.password && (
-          <p className="text-sm text-destructive" role="alert">{form.formState.errors.password.message}</p>
-        )}
-      </div>
-
-      {/* Submit Button */}
-      <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
-      </Button>
-
-      {/* Link to Login */}
-      <div className="mt-4 text-center text-sm">
-        Already have an account?{" "}
-        <Link href="/login" className="underline text-primary hover:text-primary/80 focus:outline-none focus:ring-1 focus:ring-ring rounded-sm">
-          Log In
-        </Link>
-      </div>
-    </form>
-  );
-}
-
-```
-
 ## File: `components\chat\chat-history.tsx`
 ```tsx
 // File: components/chat/chat-history.tsx
@@ -2562,6 +2330,10 @@ export function ChatHistory() {
                     message = "Session expired or invalid. Please log in again.";
                     signOut(); // Force logout on auth error
                 }
+                 // (+) Añadir manejo específico para 422 si aún ocurre
+                 else if (err.status === 422) {
+                     message = `Failed to process request: ${err.message}`;
+                 }
             } else if (err instanceof Error) { message = err.message; }
             setError(message);
             setChats([]); // Clear chats on error
@@ -2763,6 +2535,7 @@ export function ChatHistory() {
         </AlertDialog>
     );
 }
+
 ```
 
 ## File: `components\chat\chat-input.tsx`
@@ -5712,6 +5485,28 @@ export async function request<T>(
     }
 }
 
+// --- Definiciones de Tipos ---
+// (Tipos IngestResponse, DocumentStatusResponse, RetrievedDocApi, RetrievedDoc, ChatSummary, ChatMessageApi, QueryPayload, QueryApiResponse permanecen igual)
+
+// (+) NUEVO: Tipos para el endpoint de registro del backend
+interface RegisterUserPayload {
+    email: string;
+    password: string;
+    name: string | null;
+    // company_name es manejado por el backend ahora
+}
+
+interface RegisterUserResponse {
+    message: string; // Ej: "Registration successful, please check your email."
+    user_id?: string; // Opcional: el ID del usuario creado en Supabase
+}
+
+interface EnsureCompanyResponse { // Mantener por si se usa en otro lado
+    message: string;
+    company_id?: string;
+}
+
+
 // --- API Function Definitions ---
 
 // Ingest Service (Sin cambios)
@@ -5789,9 +5584,11 @@ export interface QueryApiResponse {
     chat_id: string;
 }
 
-export const getChats = async (): Promise<ChatSummary[]> => {
-     console.log("Fetching chat list via API...");
-     return request<ChatSummary[]>('/api/v1/query/chats');
+export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
+    console.log(`Fetching chat list via API (limit=${limit}, offset=${offset})...`);
+    // Añadir query parameters a la URL
+    const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
+    return request<ChatSummary[]>(endpoint); // GET es el método por defecto
 };
 
 export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
@@ -5813,16 +5610,23 @@ export const deleteChat = async (chatId: string): Promise<void> => {
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
+// --- Auth Service ---
 
-// User/Company Association (Sin cambios)
-interface EnsureCompanyResponse {
-    message: string;
-    company_id?: string;
-}
-export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
-     console.log("Calling ensure-company association endpoint...");
-     return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
+// (+) NUEVA FUNCIÓN: Registro vía Backend
+export const registerUser = async (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
+    console.log(`Calling backend registration endpoint for ${payload.email}...`);
+    // La compañía 'nyrouwu' se determina en el backend
+    return request<RegisterUserResponse>('/api/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
 };
+
+// (-) QUITAR O COMENTAR SI YA NO SE USA:
+// export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
+//      console.log("Calling ensure-company association endpoint...");
+//      return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
+// };
 
 
 // --- Type Mapping Helpers (Sin cambios) ---
@@ -5842,6 +5646,7 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
         created_at: apiMessage.created_at,
     };
 };
+
 ```
 
 ## File: `lib\auth\helpers.ts`
@@ -5903,7 +5708,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { User as AppUser } from '@/lib/auth/helpers';
 import { Session, User as SupabaseUser, AuthError, SignInWithPasswordCredentials, SignUpWithPasswordCredentials } from '@supabase/supabase-js';
 import { toast } from "sonner";
-import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError, ApiError } from '@/lib/api'; // Import API function and error types
+// (-) QUITAR: import { ensureCompanyAssociation, ApiError as EnsureCompanyApiError } from ''lib/api'' (see below for file content);
+import { ApiError } from '@/lib/api'; // Mantener ApiError por si acaso
 
 // --- Types ---
 interface AuthContextType {
@@ -5911,7 +5717,8 @@ interface AuthContextType {
     session: Session | null;
     isLoading: boolean; // Tracks if auth state is being determined (initial load or transitions)
     signInWithPassword: (credentials: SignInWithPasswordCredentials) => Promise<void>; // Throws error on failure
-    signUp: (params: SignUpWithPasswordCredentials) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>;
+    // (+) Modificar tipo signUp para que coincida con la llamada a API (ya no devuelve datos de sesión directamente)
+    signUp: (params: SignUpWithPasswordCredentials) => Promise<{ data: { user: SupabaseUser | null; session: Session | null; }; error: AuthError | null; }>; // Mantenemos la firma original por compatibilidad, aunque ahora no la usemos directamente
     signOut: () => Promise<void>;
 }
 
@@ -5957,7 +5764,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
-    const ensureCompanyCallPending = useRef(false);
+    // (-) QUITAR: const ensureCompanyCallPending = useRef(false);
     const initialLoadComplete = useRef(false); // Track if the initial getSession has completed
 
     // --- Sign Out Logic ---
@@ -5988,69 +5795,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         let isMounted = true; // Track mount status for async operations
         console.log("AuthProvider: useEffect setup running.");
 
-        // --- Function to handle session updates and company association ---
-        const processSession = async (currentSession: Session | null) => {
-            if (!isMounted) return; // Don't process if unmounted
+        // --- Function to process session (SIMPLIFICADA) ---
+        const processSession = (currentSession: Session | null) => {
+            if (!isMounted) return;
 
             console.log(`AuthProvider: Processing session. Present: ${!!currentSession}`);
-            setSession(currentSession); // Update session state
+            setSession(currentSession);
             const mappedUser = mapSupabaseUserToAppUser(currentSession?.user);
-            setUser(mappedUser); // Update user state
+            setUser(mappedUser);
 
-            // --- Ensure Company Logic ---
-            if (currentSession && mappedUser && !mappedUser.companyId && !ensureCompanyCallPending.current) {
-                console.log(`AuthProvider: User ${mappedUser.userId} lacks companyId. Attempting association.`);
-                ensureCompanyCallPending.current = true;
-                setIsLoading(true); // Indicate loading during this critical step
-
-                try {
-                    console.log("AuthProvider: Calling ensure-company association endpoint...");
-                    const result = await ensureCompanyAssociation();
-                    console.log("AuthProvider: ensureCompanyAssociation API call successful:", result.message);
-                    // --- MODIFICACIÓN: Evitar toast duplicados ---
-                    toast.success("Company Association Check", { description: result.message, id: "company-assoc-check" }); // Use ID to prevent duplicates
-
-                    // Refresh session to get updated token
-                    console.log("AuthProvider: Refreshing Supabase session after company association check...");
-                    const { error: refreshError } = await supabase.auth.refreshSession();
-                    if (refreshError) {
-                        console.error("AuthProvider: Failed to refresh session:", refreshError);
-                        toast.error("Session Sync Failed", { description: "Could not update session after setup. Please log in again.", id: "session-refresh-fail" });
-                        await signOut(); // Force sign out if refresh fails
-                    } else {
-                        console.log("AuthProvider: Session refresh triggered. onAuthStateChange will handle update.");
-                        // The listener will receive the updated session and re-process.
-                    }
-                } catch (error) {
-                    console.error("AuthProvider: ensureCompanyAssociation API call failed:", error);
-                    let errorDesc = "Could not complete company setup.";
-                     // Handle specific ApiError vs generic Error
-                     if (error instanceof ApiError) {
-                        errorDesc = error.message || errorDesc;
-                        // Network error is status 0 in our api client
-                        if (error.status === 0) {
-                             errorDesc = "Network Error: Failed to connect for company setup.";
-                        } else if (error.status === 401 || error.status === 403) {
-                            errorDesc = "Authentication error during setup. Please log in again.";
-                            await signOut(); // Force sign out
-                        } else if (error.status === 400) { // Handle specific 400 from backend (config error)
-                            errorDesc = error.message; // Use the specific message from backend
-                        }
-                    } else if (error instanceof Error) { errorDesc = error.message; }
-                    // --- MODIFICACIÓN: Evitar toast duplicados ---
-                    toast.error("Company Setup Failed", { description: errorDesc, duration: 7000, id: "company-setup-fail" });
-                } finally {
-                     if (isMounted) {
-                         ensureCompanyCallPending.current = false;
-                         setIsLoading(false); // Ensure loading stops after attempt
-                         console.log("AuthProvider: Company association attempt finished.");
-                     }
-                }
-            } else {
-                 // If no company check needed, ensure loading is false
-                 if (isMounted) setIsLoading(false);
-                 console.log("AuthProvider: No company association check needed or call already pending.");
+            // (-) YA NO HAY LLAMADA A ensureCompanyAssociation
+            // Ahora sólo verificamos si el usuario está incompleto DESPUÉS del login
+            if (currentSession && mappedUser && !mappedUser.companyId) {
+                // Esto sólo debería ocurrir si el flujo de registro falló en asignar company_id
+                // O si un usuario antiguo existente intenta loguearse
+                console.error(`AuthProvider: User ${mappedUser.userId} logged in BUT lacks companyId in token! Potential setup issue or old user.`);
+                toast.error("Account Issue", {
+                    description: "Your account is missing essential information (company association). Please contact support.",
+                    duration: 10000,
+                    id: "missing-company-id-error"
+                });
+                 // Considerar forzar logout aquí si el companyId es absolutamente esencial
+                 // signOut();
             }
+
+            if (isMounted) setIsLoading(false); // Terminar la carga una vez procesada la sesión
         };
 
 
@@ -6069,7 +5838,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 console.log("AuthProvider: Initial session check complete. Session found:", !!initialSession);
                 // Process the initial session AFTER marking initial load complete
                 initialLoadComplete.current = true;
-                await processSession(initialSession);
+                processSession(initialSession); // Llamar a la versión simplificada
 
             } catch (error) {
                 console.error("AuthProvider: Unexpected error during initial session check:", error);
@@ -6095,10 +5864,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                      await new Promise(resolve => setTimeout(resolve, 50)); // Short delay
                  }
 
-                // Process the session update from the listener
-                await processSession(newSession);
+                // Procesar la nueva sesión (simplificado, sin ensureCompany)
+                processSession(newSession);
 
-                // Handle redirection logic based on event and path
+                // Lógica de redirección (sin cambios)
                 if (event === 'SIGNED_OUT') {
                     const protectedPaths = ['/chat', '/knowledge', '/settings'];
                     if (protectedPaths.some(p => pathname?.startsWith(p))) {
@@ -6142,40 +5911,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     }, []);
 
-    const signUp = useCallback(async (params: SignUpWithPasswordCredentials) => {
-        console.log("AuthProvider: Attempting sign up...");
-        setIsLoading(true);
-        try {
-            const hasEmail = 'email' in params && params.email;
-            const hasPhone = 'phone' in params && params.phone;
-            if (!params.password || (!hasEmail && !hasPhone)) {
-                throw new AuthError("Password and either Email or Phone are required.");
-            }
-            const { data, error } = await supabase.auth.signUp(params);
-
-            // Process result immediately for UI feedback
-            if (error) {
-                toast.error("Registration Failed", { description: error.message, id:"signup-fail" });
-            } else if (data.user && !data.session) { // Confirmation needed
-                 const contact = hasEmail ? `email (${params.email})` : 'phone';
-                 toast.success("Registration Submitted", { description: `Please check your ${contact} to confirm.`, duration: 10000, id:"signup-confirm" });
-            } else if (data.user && data.session) { // Auto-confirmed/logged in
-                toast.success("Registration Successful!", { description: "You are now logged in.", id:"signup-success" });
-                // Listener will handle session update
-            } else {
-                 toast.warning("Registration Status Unknown", { description: "Please try logging in.", id:"signup-unknown" });
-            }
-            setIsLoading(false); // Stop loading after handling
-            return { data, error }; // Return Supabase result
-
-        } catch (error) {
-            console.error("AuthProvider: Unexpected sign up error:", error);
-            const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred.";
-            toast.error("Registration Failed", { description: errorMsg, id:"signup-fail" });
-            setIsLoading(false);
-            return { data: { user: null, session: null }, error: error instanceof AuthError ? error : new AuthError(errorMsg) };
-        }
-    }, []);
+    // (-) QUITAR EL signUp original que llamaba a supabase.auth.signUp
+    // (+) Dejar una función placeholder o eliminarla si no se usa en ningún otro sitio
+     const signUp = useCallback(async (params: SignUpWithPasswordCredentials) => {
+         // Esta función ya no debería ser llamada directamente por RegisterForm
+         console.warn("AuthProvider: supabase.auth.signUp called directly, should use backend registration.");
+         // Devolvemos una estructura compatible pero con error para evitar romper otros posibles usos
+         return { data: { user: null, session: null }, error: new AuthError("Direct Supabase signUp is deprecated, use backend API.") };
+     }, []);
 
     // --- Context Value ---
     const providerValue: AuthContextType = {
@@ -6200,6 +5943,7 @@ export const useAuth = (): AuthContextType => {
     // Ensure the provider wraps the necessary parts of the application tree.
     return context;
 };
+
 ```
 
 ## File: `lib\supabaseClient.ts`
