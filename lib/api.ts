@@ -1,4 +1,4 @@
-// File: lib/api.ts
+// File: atenex-frontend/lib/api.ts
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
@@ -75,12 +75,14 @@ export async function request<T>(
         headers.set('ngrok-skip-browser-warning', 'true');
     }
 
-
+    // --- CORRECCIÓN: No setear Content-Type si el body es FormData ---
+    // fetch se encargará de poner 'multipart/form-data' con el boundary correcto
     if (!(options.body instanceof FormData)) {
         if (!headers.has('Content-Type')) {
              headers.set('Content-Type', 'application/json');
         }
     }
+    // -------------------------------------------------------------
 
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
@@ -175,47 +177,29 @@ export async function request<T>(
     }
 }
 
-// --- Definiciones de Tipos ---
-// (Tipos IngestResponse, DocumentStatusResponse, RetrievedDocApi, RetrievedDoc, ChatSummary, ChatMessageApi, QueryPayload, QueryApiResponse permanecen igual)
-
-// (+) NUEVO: Tipos para el endpoint de registro del backend
-interface RegisterUserPayload {
-    email: string;
-    password: string;
-    name: string | null;
-    // company_name es manejado por el backend ahora
-}
-
-interface RegisterUserResponse {
-    message: string; // Ej: "Registration successful, please check your email."
-    user_id?: string; // Opcional: el ID del usuario creado en Supabase
-}
-
-interface EnsureCompanyResponse { // Mantener por si se usa en otro lado
-    message: string;
-    company_id?: string;
-}
-
-
 // --- API Function Definitions ---
 
-// Ingest Service (Sin cambios)
+// --- Ingest Service ---
 export interface IngestResponse {
     document_id: string;
     task_id: string;
     status: string;
     message: string;
 }
+// --- MODIFICAR ESTA FUNCIÓN ---
+// Quitar el argumento 'metadata' ya que ahora va dentro del formData
 export const uploadDocument = async (
-    formData: FormData,
-    metadata: Record<string, any> = {}
+    formData: FormData
 ): Promise<IngestResponse> => {
     console.log("Uploading document via API...");
+    // El cuerpo de la petición es directamente el formData
     return request<IngestResponse>('/api/v1/ingest/upload', {
         method: 'POST',
-        body: formData,
+        body: formData, // Enviar el objeto FormData
+        // NO establecer Content-Type manualmente, fetch lo hará por nosotros
     });
 };
+// --- FIN MODIFICACIÓN ---
 
 export interface DocumentStatusResponse {
     document_id: string;
@@ -234,7 +218,7 @@ export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> 
 };
 
 
-// Query Service (Sin cambios)
+// --- Query Service ---
 export interface RetrievedDocApi {
     id: string;
     score?: number | null;
@@ -275,10 +259,10 @@ export interface QueryApiResponse {
 }
 
 export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
-    console.log(`Fetching chat list via API (limit=${limit}, offset=${offset})...`);
-    // Añadir query parameters a la URL
-    const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-    return request<ChatSummary[]>(endpoint); // GET es el método por defecto
+     console.log(`Fetching chat list via API (limit=${limit}, offset=${offset})...`);
+     // Añadir query parameters a la URL
+     const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
+     return request<ChatSummary[]>(endpoint); // GET es el método por defecto
 };
 
 export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
@@ -301,8 +285,18 @@ export const deleteChat = async (chatId: string): Promise<void> => {
 };
 
 // --- Auth Service ---
+interface RegisterUserPayload {
+    email: string;
+    password: string;
+    name: string | null;
+    // company_name es manejado por el backend ahora
+}
 
-// (+) NUEVA FUNCIÓN: Registro vía Backend
+interface RegisterUserResponse {
+    message: string; // Ej: "Registration successful, please check your email."
+    user_id?: string; // Opcional: el ID del usuario creado en Supabase
+}
+
 export const registerUser = async (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
     console.log(`Calling backend registration endpoint for ${payload.email}...`);
     // La compañía 'nyrouwu' se determina en el backend
@@ -312,14 +306,7 @@ export const registerUser = async (payload: RegisterUserPayload): Promise<Regist
     });
 };
 
-// (-) QUITAR O COMENTAR SI YA NO SE USA:
-// export const ensureCompanyAssociation = async (): Promise<EnsureCompanyResponse> => {
-//      console.log("Calling ensure-company association endpoint...");
-//      return request<EnsureCompanyResponse>('/api/v1/users/me/ensure-company', { method: 'POST' });
-// };
-
-
-// --- Type Mapping Helpers (Sin cambios) ---
+// --- Type Mapping Helpers ---
 export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null | undefined): RetrievedDoc[] | undefined => {
     if (!apiSources) { return undefined; }
     return apiSources.map(source => ({ ...source })); // Simple copy for now
