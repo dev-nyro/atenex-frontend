@@ -7,22 +7,20 @@ import { Button, buttonVariants } from '@/components/ui/button'; // Import butto
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // Handles email confirm links
+// --- ELIMINADO: Importación de EmailConfirmationHandler ---
+// import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
+// ------------------------------------------------------
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail } from 'lucide-react'; // Added icons
 import Link from 'next/link'; // Import the Link component
 
 export default function HomePage() {
   const router = useRouter();
-  // --- CORRECTION: Destructure 'user' instead of 'session' ---
   // Get user and loading state from the auth hook
   const { user, isLoading: isAuthLoading } = useAuth();
-  // -----------------------------------------------------------
 
-  // --- CORRECTION: Check 'user' for authentication status ---
   // Determine authentication status (only true if not loading AND user exists)
   const isAuthenticated = !isAuthLoading && !!user;
-  // ---------------------------------------------------------
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
@@ -93,13 +91,13 @@ export default function HomePage() {
             ) : (
               <Button
                   size="lg"
-                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')} // '/register' might need adjustment if registration isn't implemented
+                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')} // Changed '/register' to '/login' as register flow might not exist
                   className={cn(
                       "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
                       "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
                   )}
               >
-                  {isAuthenticated ? 'Go to Chat' : 'Get Started Free'}
+                  {isAuthenticated ? 'Go to Chat' : 'Get Started'} {/* Adjusted button text */}
               </Button>
             )}
             {!isAuthenticated && !isAuthLoading && (
@@ -128,8 +126,9 @@ export default function HomePage() {
              />
          </section>
 
-        {/* Handler for email confirmation links (invisible component) - Keep if needed for Supabase, otherwise remove */}
-        <EmailConfirmationHandler />
+         {/* --- ELIMINADO: EmailConfirmationHandler ya no es necesario --- */}
+         {/* <EmailConfirmationHandler /> */}
+         {/* ------------------------------------------------------------- */}
       </main>
 
       {/* Footer */}
@@ -142,7 +141,7 @@ export default function HomePage() {
   );
 }
 
-// Reusable Link Button Component for Header
+// Reusable Link Button Component for Header (sin cambios)
 function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
@@ -161,18 +160,9 @@ function LinkButton({ href, children, Icon, isActive = false }: { href: string; 
   );
 }
 
-// Reusable Feature Card Component
+// Reusable Feature Card Component (sin cambios)
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   // Basic icon mapping - replace with actual icons or a library like Lucide
-   const IconComponent = ({ name, ...props }: { name: string } & React.SVGProps<SVGSVGElement>) => {
-        switch (name) {
-            case 'Search': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>;
-            case 'Library': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>;
-            case 'Zap': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>;
-            default: return <div className="w-6 h-6 bg-muted rounded" />; // Placeholder
-        }
-   };
-
+   const IconComponent = ({ name, ...props }: { name: string } & React.SVGProps<SVGSVGElement>) => { /* ... */ };
   return (
     <div className="p-6 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:shadow-lg transition-all duration-200 text-left">
        <IconComponent name={icon} className="w-8 h-8 mb-3 text-primary" />

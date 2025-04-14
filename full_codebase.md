@@ -1675,11 +1675,15 @@ import Link from 'next/link'; // Import the Link component
 
 export default function HomePage() {
   const router = useRouter();
+  // --- CORRECTION: Destructure 'user' instead of 'session' ---
   // Get user and loading state from the auth hook
   const { user, isLoading: isAuthLoading } = useAuth();
+  // -----------------------------------------------------------
 
+  // --- CORRECTION: Check 'user' for authentication status ---
   // Determine authentication status (only true if not loading AND user exists)
   const isAuthenticated = !isAuthLoading && !!user;
+  // ---------------------------------------------------------
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
@@ -1750,7 +1754,7 @@ export default function HomePage() {
             ) : (
               <Button
                   size="lg"
-                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
+                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')} // '/register' might need adjustment if registration isn't implemented
                   className={cn(
                       "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
                       "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
@@ -1785,7 +1789,7 @@ export default function HomePage() {
              />
          </section>
 
-        {/* Handler for email confirmation links (invisible component) */}
+        {/* Handler for email confirmation links (invisible component) - Keep if needed for Supabase, otherwise remove */}
         <EmailConfirmationHandler />
       </main>
 
@@ -1838,7 +1842,6 @@ function FeatureCard({ title, description, icon }: { title: string; description:
     </div>
   );
 }
-
 ```
 
 ## File: `app\privacy\page.tsx`
@@ -2157,8 +2160,9 @@ import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 export function ChatHistory() {
     const pathname = usePathname();
     const router = useRouter();
-    // Get auth state from the hook
-    const { session, isLoading: isAuthLoading, signOut } = useAuth();
+    // --- CORRECTION: Destructure 'user' instead of 'session' ---
+    const { user, isLoading: isAuthLoading, signOut } = useAuth();
+    // ----------------------------------------------------------
 
     // Component State
     const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -2171,7 +2175,9 @@ export function ChatHistory() {
     // --- Function to Fetch Chat History ---
     const fetchChatHistory = useCallback(async (showToast = false) => {
          const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-         const isAuthenticated = !!session || bypassAuth;
+         // --- CORRECTION: Check 'user' for authentication ---
+         const isAuthenticated = !!user || bypassAuth;
+         // ---------------------------------------------------
 
         // Skip if not authenticated (and auth check is complete)
         if (!isAuthLoading && !isAuthenticated) {
@@ -2221,8 +2227,10 @@ export function ChatHistory() {
         } finally {
             setIsLoading(false); // Finish loading history list
         }
-    // Dependencies: Re-run if session or auth loading state changes. Include signOut.
-    }, [session, isAuthLoading, signOut]);
+    // --- CORRECTION: Depend on 'user' instead of 'session' ---
+    // Dependencies: Re-run if user or auth loading state changes. Include signOut.
+    }, [user, isAuthLoading, signOut]);
+    // ---------------------------------------------------------
 
     // --- Effect to Fetch on Mount and Auth Change ---
     useEffect(() => {
@@ -2274,7 +2282,9 @@ export function ChatHistory() {
     // --- Render Logic Helper ---
     const renderContent = () => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-        const isAuthenticated = !!session || bypassAuth;
+        // --- CORRECTION: Check 'user' for authentication ---
+        const isAuthenticated = !!user || bypassAuth;
+        // ---------------------------------------------------
 
         // 1. Loading State (Auth or History)
         if (isLoading || (!bypassAuth && isAuthLoading)) {
@@ -2415,7 +2425,6 @@ export function ChatHistory() {
         </AlertDialog>
     );
 }
-
 ```
 
 ## File: `components\chat\chat-input.tsx`
