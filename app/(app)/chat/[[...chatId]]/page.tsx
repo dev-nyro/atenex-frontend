@@ -41,7 +41,7 @@ export default function ChatPage() {
     // --- CORRECTION: Instantiate usePathname ---
     const pathname = usePathname();
     // ------------------------------------------
-    const { session, user, isLoading: isAuthLoading, signOut } = useAuth(); // Get auth state
+    const { user, isLoading: isAuthLoading, signOut } = useAuth(); // Get auth state
 
     // Extract chatId from dynamic route parameters
     const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
@@ -79,7 +79,7 @@ export default function ChatPage() {
         }
 
         // 2. Skip if not authenticated (and auth has loaded)
-        if (!bypassAuth && !session) {
+        if (!bypassAuth && !user) {
             console.log("ChatPage: Not authenticated, cannot load history.");
             setMessages([welcomeMessage]);
             setHistoryError("Please log in to view or start chats.");
@@ -142,8 +142,8 @@ export default function ChatPage() {
             setIsLoadingHistory(false); // Finished "loading" the welcome state
         }
 
-    // Dependencies: Re-run when chatId, session, or auth loading state changes.
-    }, [chatId, session, isAuthLoading, router, signOut, isLoadingHistory]); // Added isLoadingHistory to deps
+    // Dependencies: Re-run when chatId, user, or auth loading state changes.
+    }, [chatId, user, isAuthLoading, router, signOut, isLoadingHistory]); // Added isLoadingHistory to deps
 
     // --- Effect for Scrolling to Bottom ---
     useEffect(() => {
@@ -165,7 +165,7 @@ export default function ChatPage() {
     // --- Function to Send a Message ---
     const handleSendMessage = useCallback(async (query: string) => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-        const isAuthenticated = !!session || bypassAuth;
+        const isAuthenticated = !!user || bypassAuth;
 
         // Basic validation
         if (!query.trim()) {
@@ -259,7 +259,7 @@ export default function ChatPage() {
             setIsSending(false); // Reset sending state
         }
     // Dependencies: Include all state and functions used
-    }, [chatId, isSending, session, router, isPanelOpen, signOut]);
+    }, [chatId, isSending, user, router, isPanelOpen, signOut]);
 
     // Toggle for the sources panel
     const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
