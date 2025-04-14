@@ -1,5 +1,5 @@
 // File: app/contact/page.tsx
-// Purpose: Contact page, fixing the original error by using 'session' instead of 'token'.
+// Purpose: Contact page, fixing the original error by using 'user' instead of 'session'.
 "use client";
 
 import React from 'react';
@@ -14,14 +14,11 @@ import { toast } from 'sonner';
 
 export default function ContactPage() {
   const router = useRouter();
-  // --- CORRECTION: Use 'session' and 'isLoading' from useAuth ---
-  // The 'token' is inside session?.access_token if needed,
-  // but usually checking for session existence is enough.
-  const { session, isLoading: isAuthLoading } = useAuth();
-  // -----------------------------------------------------------
+  // Remove 'session' from destructuring, use 'user' instead
+  const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Determine authentication status based on loading state and session presence
-  const isAuthenticated = !isAuthLoading && !!session;
+  // Determine authentication status based on loading state and user presence
+  const isAuthenticated = !isAuthLoading && !!user;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
