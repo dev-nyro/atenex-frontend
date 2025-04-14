@@ -31,7 +31,6 @@ atenex-frontend/
 │       └── page.tsx
 ├── components
 │   ├── auth
-│   │   ├── email-confirmation-handler.tsx
 │   │   └── login-form.tsx
 │   ├── chat
 │   │   ├── chat-history.tsx
@@ -77,7 +76,6 @@ atenex-frontend/
 │   ├── constants.ts
 │   ├── hooks
 │   │   └── useAuth.tsx
-│   ├── supabaseClient.ts
 │   └── utils.ts
 ├── next-env.d.ts
 ├── next.config.mjs
@@ -100,10 +98,6 @@ const nextConfig = {
     transpilePackages: ['@radix-ui/react-dialog'],
     reactStrictMode: true,
   
-    env: {
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    },
   };
   
   export default nextConfig;
@@ -111,6 +105,7 @@ const nextConfig = {
 
 ## File: `package.json`
 ```json
+// File: package.json
 {
   "name": "atenex-frontend",
   "version": "0.1.0",
@@ -134,7 +129,9 @@ const nextConfig = {
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
-    "@supabase/supabase-js": "^2.49.4",
+    // --- ELIMINADO: Dependencia de Supabase ---
+    // "@supabase/supabase-js": "^2.49.4",
+    // ------------------------------------------
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.486.0",
@@ -1668,22 +1665,20 @@ import { Button, buttonVariants } from '@/components/ui/button'; // Import butto
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
-import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler'; // Handles email confirm links
+// --- ELIMINADO: Importación de EmailConfirmationHandler ---
+// import EmailConfirmationHandler from '@/components/auth/email-confirmation-handler';
+// ------------------------------------------------------
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail } from 'lucide-react'; // Added icons
 import Link from 'next/link'; // Import the Link component
 
 export default function HomePage() {
   const router = useRouter();
-  // --- CORRECTION: Destructure 'user' instead of 'session' ---
   // Get user and loading state from the auth hook
   const { user, isLoading: isAuthLoading } = useAuth();
-  // -----------------------------------------------------------
 
-  // --- CORRECTION: Check 'user' for authentication status ---
   // Determine authentication status (only true if not loading AND user exists)
   const isAuthenticated = !isAuthLoading && !!user;
-  // ---------------------------------------------------------
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
@@ -1754,13 +1749,13 @@ export default function HomePage() {
             ) : (
               <Button
                   size="lg"
-                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')} // '/register' might need adjustment if registration isn't implemented
+                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')} // Changed '/register' to '/login' as register flow might not exist
                   className={cn(
                       "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
                       "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
                   )}
               >
-                  {isAuthenticated ? 'Go to Chat' : 'Get Started Free'}
+                  {isAuthenticated ? 'Go to Chat' : 'Get Started'} {/* Adjusted button text */}
               </Button>
             )}
             {!isAuthenticated && !isAuthLoading && (
@@ -1789,8 +1784,9 @@ export default function HomePage() {
              />
          </section>
 
-        {/* Handler for email confirmation links (invisible component) - Keep if needed for Supabase, otherwise remove */}
-        <EmailConfirmationHandler />
+         {/* --- ELIMINADO: EmailConfirmationHandler ya no es necesario --- */}
+         {/* <EmailConfirmationHandler /> */}
+         {/* ------------------------------------------------------------- */}
       </main>
 
       {/* Footer */}
@@ -1803,7 +1799,7 @@ export default function HomePage() {
   );
 }
 
-// Reusable Link Button Component for Header
+// Reusable Link Button Component for Header (sin cambios)
 function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
@@ -1822,18 +1818,9 @@ function LinkButton({ href, children, Icon, isActive = false }: { href: string; 
   );
 }
 
-// Reusable Feature Card Component
+// Reusable Feature Card Component (sin cambios)
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   // Basic icon mapping - replace with actual icons or a library like Lucide
-   const IconComponent = ({ name, ...props }: { name: string } & React.SVGProps<SVGSVGElement>) => {
-        switch (name) {
-            case 'Search': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>;
-            case 'Library': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>;
-            case 'Zap': return <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>;
-            default: return <div className="w-6 h-6 bg-muted rounded" />; // Placeholder
-        }
-   };
-
+   const IconComponent = ({ name, ...props }: { name: string } & React.SVGProps<SVGSVGElement>) => { /* ... */ };
   return (
     <div className="p-6 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:shadow-lg transition-all duration-200 text-left">
        <IconComponent name={icon} className="w-8 h-8 mb-3 text-primary" />
@@ -2012,19 +1999,6 @@ export default function TermsPage() {
       </Card>
     </div>
   );
-}
-```
-
-## File: `components\auth\email-confirmation-handler.tsx`
-```tsx
-// File: components/auth/email-confirmation-handler.tsx
-"use client";
-
-// This component is obsolete. Supabase email confirmation is no longer used.
-// You can safely delete this file.
-
-export default function EmailConfirmationHandler() {
-  return null;
 }
 ```
 
@@ -5193,13 +5167,16 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: atenex-frontend/lib/api.ts
+// File: lib/api.ts
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
-import { supabase } from './supabaseClient'; // Import the initialized Supabase client
+// --- ELIMINADO: Importación de Supabase ---
+// import { supabase } from './supabaseClient';
+// -----------------------------------------
+import { AUTH_TOKEN_KEY } from './constants'; // Importar la clave para localStorage
 
-// --- ApiError Class ---
+// --- ApiError Class (sin cambios) ---
 interface ApiErrorDataDetail {
     msg: string;
     type: string;
@@ -5229,11 +5206,13 @@ export async function request<T>(
 ): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
+    // Validar que el endpoint comience con /api/v1/ (sin cambios)
     if (!cleanEndpoint.startsWith('/api/v1/')) {
         console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
 
+    // Obtener la URL del API Gateway (sin cambios)
     let apiUrl: string;
     let cachedGatewayUrl: string | null = null;
     try {
@@ -5247,49 +5226,38 @@ export async function request<T>(
         throw new ApiError(message, 500);
     }
 
+    // --- MODIFICADO: Obtener token desde localStorage ---
     let token: string | null = null;
-    try {
-        // *** OBTENER TOKEN DE SUPABASE JUSTO ANTES DE LA LLAMADA ***
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-            console.warn(`API Request: Error getting Supabase session for ${cleanEndpoint}:`, sessionError.message);
-        }
-        token = sessionData?.session?.access_token || null;
-        // console.log(`API Request to ${cleanEndpoint}: Token ${token ? 'Present' : 'Absent'}`);
-
-    } catch (e) {
-        console.error(`API Request: Unexpected error fetching Supabase session for ${cleanEndpoint}:`, e);
-        // Proceder sin token pero advertir
+    if (typeof window !== 'undefined') { // Asegurarse que se ejecuta en el cliente
+        token = localStorage.getItem(AUTH_TOKEN_KEY);
+        // console.log(`API Request to ${cleanEndpoint}: Token from localStorage ${token ? 'Present' : 'Absent'}`);
     }
+    // --------------------------------------------------
 
+    // Configurar Headers (sin cambios en su mayoría)
     const headers = new Headers(options.headers || {});
     headers.set('Accept', 'application/json');
-    // Añadir header para Ngrok si la URL es de Ngrok
     if (apiUrl.includes("ngrok-free.app")) {
         headers.set('ngrok-skip-browser-warning', 'true');
     }
-
-    // --- CORRECCIÓN: No setear Content-Type si el body es FormData ---
-    // fetch se encargará de poner 'multipart/form-data' con el boundary correcto
     if (!(options.body instanceof FormData)) {
         if (!headers.has('Content-Type')) {
              headers.set('Content-Type', 'application/json');
         }
     }
-    // -------------------------------------------------------------
 
+    // --- Añadir token al header si existe ---
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
-    } else {
-        // No lanzar error aquí, el gateway manejará la autenticación requerida
-        console.warn(`API Request: Making request to ${cleanEndpoint} without Authorization header.`);
+    } else if (!cleanEndpoint.includes('/api/v1/users/login')) { // No advertir para el endpoint de login
+        // Advertir si no hay token para otros endpoints protegidos
+        console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
     }
+    // ---------------------------------------
 
     const config: RequestInit = {
         ...options,
         headers,
-        // mode: 'cors', // 'cors' es el default para fetch, no es necesario explícitamente
     };
 
     console.log(`API Request: ${config.method || 'GET'} ${apiUrl}`);
@@ -5297,7 +5265,7 @@ export async function request<T>(
     try {
         const response = await fetch(apiUrl, config);
 
-        // --- Improved Error Handling ---
+        // --- Manejo de Errores (sin cambios significativos, ya era robusto) ---
         if (!response.ok) {
             let errorData: ApiErrorData | null = null;
             let errorText = '';
@@ -5315,8 +5283,6 @@ export async function request<T>(
             }
 
             let errorMessage = `API Error (${response.status})`;
-
-            // Intenta extraer el detalle de FastAPI/errorData
             if (errorData?.detail) {
                  if (typeof errorData.detail === 'string') {
                      errorMessage = errorData.detail;
@@ -5337,17 +5303,15 @@ export async function request<T>(
                 status: response.status,
                 message: errorMessage,
                 responseData: errorData,
-                responseText: errorText || null, // Ensure it's null if empty
+                responseText: errorText || null,
             });
-
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
-        // Handle successful responses
+        // Manejo de respuestas exitosas (sin cambios)
         if (response.status === 204 || response.headers.get('content-length') === '0') {
             return null as T;
         }
-
         try {
             const data: T = await response.json();
             return data;
@@ -5357,13 +5321,13 @@ export async function request<T>(
         }
 
     } catch (error) {
-        // Handle specific Network Error cases more reliably
+        // Manejo de errores de red y otros (sin cambios)
         if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
             const networkErrorMessage = `Network Error: Could not connect to the API Gateway at ${cachedGatewayUrl}. Please check your network connection and the gateway status.`;
             console.error('API Request Network Error:', { url: apiUrl, error: error.message });
-            throw new ApiError(networkErrorMessage, 0); // Use status 0 for network errors
+            throw new ApiError(networkErrorMessage, 0);
         } else if (error instanceof ApiError) {
-            throw error; // Re-throw known API errors
+            throw error;
         } else {
             console.error('API Request Unexpected Error:', { url: apiUrl, error });
             const message = error instanceof Error ? error.message : 'An unexpected error occurred during the API request.';
@@ -5372,152 +5336,59 @@ export async function request<T>(
     }
 }
 
-// --- API Function Definitions ---
+// --- API Function Definitions (sin cambios en las firmas, la lógica interna de `request` cambió) ---
 
-// --- Ingest Service ---
-export interface IngestResponse {
-    document_id: string;
-    task_id: string;
-    status: string;
-    message: string;
-}
-// --- MODIFICAR ESTA FUNCIÓN ---
-// Quitar el argumento 'metadata' ya que ahora va dentro del formData
-export const uploadDocument = async (
-    formData: FormData
-): Promise<IngestResponse> => {
-    console.log("Uploading document via API...");
-    // El cuerpo de la petición es directamente el formData
+// Ingest Service
+export interface IngestResponse { /*...*/ }
+export const uploadDocument = async (formData: FormData): Promise<IngestResponse> => {
     return request<IngestResponse>('/api/v1/ingest/upload', {
         method: 'POST',
-        body: formData, // Enviar el objeto FormData
-        // NO establecer Content-Type manualmente, fetch lo hará por nosotros
+        body: formData,
     });
 };
-// --- FIN MODIFICACIÓN ---
-
-export interface DocumentStatusResponse {
-    document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
-    error_message?: string | null;
-    last_updated?: string;
-    message?: string | null;
-    metadata?: Record<string, any> | null;
-}
+export interface DocumentStatusResponse { /*...*/ }
 export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    console.log("Fetching document statuses via API...");
     return request<DocumentStatusResponse[]>('/api/v1/ingest/status');
 };
 
-
-// --- Query Service ---
-export interface RetrievedDocApi {
-    id: string;
-    score?: number | null;
-    content_preview?: string | null;
-    metadata?: Record<string, any> | null;
-    document_id?: string | null;
-    file_name?: string | null;
-}
+// Query Service
+export interface RetrievedDocApi { /*...*/ }
 export type RetrievedDoc = RetrievedDocApi;
-
-export interface ChatSummary {
-    id: string;
-    title: string | null;
-    updated_at: string;
-    created_at: string;
-}
-
-export interface ChatMessageApi {
-    id: string;
-    chat_id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    sources: RetrievedDocApi[] | null;
-    created_at: string;
-}
-
-export interface QueryPayload {
-    query: string;
-    retriever_top_k?: number;
-    chat_id?: string | null;
-}
-
-export interface QueryApiResponse {
-    answer: string;
-    retrieved_documents: RetrievedDocApi[];
-    query_log_id?: string | null;
-    chat_id: string;
-}
-
+export interface ChatSummary { /*...*/ }
+export interface ChatMessageApi { /*...*/ }
+export interface QueryPayload { /*...*/ }
+export interface QueryApiResponse { /*...*/ }
 export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
-     console.log(`Fetching chat list via API (limit=${limit}, offset=${offset})...`);
-     // Añadir query parameters a la URL
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     return request<ChatSummary[]>(endpoint); // GET es el método por defecto
+     return request<ChatSummary[]>(endpoint);
 };
-
 export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
-     console.log(`Fetching messages for chat ${chatId} via API...`);
      return request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`);
 };
-
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     console.log(`Sending query to API (Chat ID: ${payload.chat_id || 'New'})...`);
      const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', {
         method: 'POST',
         body: JSON.stringify(body),
      });
 };
-
 export const deleteChat = async (chatId: string): Promise<void> => {
-     console.log(`Deleting chat ${chatId} via API...`);
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
-// --- Auth Service ---
-interface RegisterUserPayload {
-    email: string;
-    password: string;
-    name: string | null;
-    // company_name es manejado por el backend ahora
-}
-
-interface RegisterUserResponse {
-    message: string; // Ej: "Registration successful, please check your email."
-    user_id?: string; // Opcional: el ID del usuario creado en Supabase
-}
-
+// Auth Service (Endpoint /register no se usa directamente en login, pero se deja la definición si existe)
+interface RegisterUserPayload { /*...*/ }
+interface RegisterUserResponse { /*...*/ }
 export const registerUser = async (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
-    console.log(`Calling backend registration endpoint for ${payload.email}...`);
-    // La compañía 'nyrouwu' se determina en el backend
-    return request<RegisterUserResponse>('/api/v1/auth/register', {
+    return request<RegisterUserResponse>('/api/v1/users/register', { // Ajustado endpoint si es necesario
         method: 'POST',
         body: JSON.stringify(payload),
     });
 };
 
-// --- Type Mapping Helpers ---
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null | undefined): RetrievedDoc[] | undefined => {
-    if (!apiSources) { return undefined; }
-    return apiSources.map(source => ({ ...source })); // Simple copy for now
-};
-
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
-    const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
-    return {
-        id: apiMessage.id,
-        role: apiMessage.role,
-        content: apiMessage.content,
-        sources: mappedSources,
-        isError: false,
-        created_at: apiMessage.created_at,
-    };
-};
+// --- Type Mapping Helpers (sin cambios) ---
+export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null | undefined): RetrievedDoc[] | undefined => { /*...*/ };
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /*...*/ };
 ```
 
 ## File: `lib\auth\helpers.ts`
@@ -5562,7 +5433,7 @@ export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ## File: `lib\hooks\useAuth.tsx`
 ```tsx
 // File: lib/hooks/useAuth.tsx
-// Purpose: Provides authentication state and actions using React Context and JWT (API Gateway).
+// Purpose: Provides authentication state and actions using React Context and API Gateway JWT.
 "use client";
 
 import React, {
@@ -5574,104 +5445,233 @@ import React, {
     ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { User as AppUser } from '@/lib/auth/helpers';
+import { User as AppUser } from '@/lib/auth/helpers'; // User interface based on JWT payload
 import { toast } from "sonner";
-import { AUTH_TOKEN_KEY } from '@/lib/constants';
+import { AUTH_TOKEN_KEY } from '@/lib/constants'; // Key for localStorage
+import { getApiGatewayUrl, cn } from '@/lib/utils'; // Import cn if needed elsewhere, getApiGatewayUrl for login endpoint
 
+// Define the shape of the authentication context
 interface AuthContextType {
-    user: AppUser | null;
-    token: string | null;
-    isLoading: boolean;
-    signIn: (email: string, password: string) => Promise<void>;
-    signOut: () => void;
+    user: AppUser | null;      // Decoded user info from JWT
+    token: string | null;     // The raw JWT token
+    isLoading: boolean;       // True while checking auth status on initial load or during login/logout
+    signIn: (email: string, password: string) => Promise<void>; // Function to log in via API Gateway
+    signOut: () => Promise<void>; // Function to log out (clears local token)
 }
 
+// Default context value
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
-    isLoading: true,
-    signIn: async () => { throw new Error("AuthProvider not initialized"); },
-    signOut: () => { throw new Error("AuthProvider not initialized"); },
+    isLoading: true, // Start as true until initial check is done
+    signIn: async () => { throw new Error("AuthProvider not yet initialized"); },
+    signOut: async () => { throw new Error("AuthProvider not yet initialized"); },
 };
 
+// Create the context
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
 interface AuthProviderProps { children: ReactNode; }
 
-function decodeJwt(token: string): any {
+// Helper function to decode JWT payload (basic, no verification needed here)
+// Verification happens at the API Gateway
+function decodeJwtPayload(token: string): any | null {
     try {
-        const payload = token.split('.')[1];
-        return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-    } catch {
+        const base64Url = token.split('.')[1];
+        if (!base64Url) return null;
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map(function (c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                })
+                .join('')
+        );
+        return JSON.parse(jsonPayload);
+    } catch (error) {
+        console.error("Failed to decode JWT:", error);
         return null;
     }
 }
 
-function getUserFromToken(token: string | null): AppUser | null {
-    if (!token) return null;
-    const payload = decodeJwt(token);
-    if (!payload) return null;
+// Helper function to create User object from decoded JWT payload
+function getUserFromDecodedToken(payload: any): AppUser | null {
+    if (!payload || !payload.sub) { // 'sub' (subject) is typically the user ID and is essential
+        return null;
+    }
+    // Map claims from the JWT payload (as defined in your API Gateway's README)
+    // to the AppUser interface
     return {
         userId: payload.sub,
-        email: payload.email,
-        name: payload.name || null,
-        companyId: payload.company_id,
-        roles: payload.roles,
+        email: payload.email, // From 'email' claim
+        name: payload.name || null, // From 'name' claim (optional)
+        companyId: payload.company_id, // From 'company_id' claim
+        roles: payload.roles || [], // From 'roles' claim (optional, default to empty array)
     };
 }
 
+// AuthProvider Component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [token, setToken] = useState<string | null>(null);
     const [user, setUser] = useState<AppUser | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
     const router = useRouter();
 
-    // Load token from localStorage on mount
+    // --- Effect to load token from localStorage on initial mount ---
     useEffect(() => {
-        const stored = typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
-        setToken(stored);
-        setUser(getUserFromToken(stored));
-        setIsLoading(false);
-    }, []);
+        console.log("AuthProvider: Initializing and checking localStorage for token...");
+        // Ensure this runs only on the client
+        if (typeof window !== 'undefined') {
+            try {
+                const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+                if (storedToken) {
+                    const decodedPayload = decodeJwtPayload(storedToken);
+                    const currentUser = getUserFromDecodedToken(decodedPayload);
 
-    // Login function
-    const signIn = useCallback(async (email: string, password: string) => {
+                    if (currentUser) {
+                        // Optional: Check token expiry client-side for immediate feedback,
+                        // though the API Gateway is the ultimate authority.
+                        const isExpired = decodedPayload.exp && (decodedPayload.exp * 1000 < Date.now());
+                        if (isExpired) {
+                            console.warn("AuthProvider: Stored token is expired. Clearing.");
+                            localStorage.removeItem(AUTH_TOKEN_KEY);
+                            setToken(null);
+                            setUser(null);
+                        } else {
+                            console.log("AuthProvider: Valid token found in storage.", currentUser);
+                            setToken(storedToken);
+                            setUser(currentUser);
+                        }
+                    } else {
+                        console.warn("AuthProvider: Invalid token found in storage. Clearing.");
+                        localStorage.removeItem(AUTH_TOKEN_KEY); // Clear invalid token
+                        setToken(null);
+                        setUser(null);
+                    }
+                } else {
+                    console.log("AuthProvider: No token found in storage.");
+                    setToken(null);
+                    setUser(null);
+                }
+            } catch (error) {
+                console.error("AuthProvider: Error accessing localStorage or decoding token:", error);
+                // Clear potentially corrupted state
+                try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
+                setToken(null);
+                setUser(null);
+            } finally {
+                setIsLoading(false); // Finished initial check
+                console.log("AuthProvider: Initial loading complete.");
+            }
+        } else {
+             // Should not happen in client component, but good practice
+             setIsLoading(false);
+        }
+    }, []); // Empty dependency array ensures this runs only once on mount
+
+    // --- Sign In Function ---
+    const signIn = useCallback(async (email: string, password: string): Promise<void> => {
+        console.log("AuthProvider: Attempting sign in...");
         setIsLoading(true);
+        // Reset previous errors if you track them in state
+        let gatewayUrl = '';
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL}/api/v1/users/login`, {
+            gatewayUrl = getApiGatewayUrl(); // Get URL just before the fetch
+            const loginEndpoint = `${gatewayUrl}/api/v1/users/login`;
+            console.log(`AuthProvider: Calling login endpoint: ${loginEndpoint}`);
+
+            const response = await fetch(loginEndpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    // Add ngrok header if needed
+                    ...(gatewayUrl.includes("ngrok-free.app") && { 'ngrok-skip-browser-warning': 'true' }),
+                },
                 body: JSON.stringify({ email, password }),
             });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.message || 'Invalid credentials');
+
+            const responseBody = await response.json(); // Try to parse JSON regardless of status
+
+            if (!response.ok) {
+                // Use error message from API response if available
+                const errorMessage = responseBody?.message || responseBody?.detail || `Login failed (${response.status})`;
+                console.error("AuthProvider: Login API call failed.", { status: response.status, body: responseBody });
+                throw new Error(errorMessage);
             }
-            const data = await res.json();
-            const jwt = data.token || data.access_token;
-            if (!jwt) throw new Error('No token received');
-            localStorage.setItem(AUTH_TOKEN_KEY, jwt);
-            setToken(jwt);
-            setUser(getUserFromToken(jwt));
-            toast.success('Login successful');
-            router.replace('/chat');
+
+            // --- Successful Login ---
+            const receivedToken = responseBody?.access_token || responseBody?.token; // Check for common token names
+            if (!receivedToken || typeof receivedToken !== 'string') {
+                console.error("AuthProvider: No valid token received in login response.", responseBody);
+                throw new Error("Login successful, but no token was received.");
+            }
+
+            const decodedPayload = decodeJwtPayload(receivedToken);
+            const loggedInUser = getUserFromDecodedToken(decodedPayload);
+
+            if (!loggedInUser) {
+                console.error("AuthProvider: Received token is invalid or cannot be decoded.", receivedToken);
+                throw new Error("Login successful, but received an invalid token.");
+            }
+
+            // Store token and update state
+            localStorage.setItem(AUTH_TOKEN_KEY, receivedToken);
+            setToken(receivedToken);
+            setUser(loggedInUser);
+            console.log("AuthProvider: Sign in successful.", loggedInUser);
+            toast.success("Login Successful", { description: `Welcome back, ${loggedInUser.name || loggedInUser.email}!` });
+
+            // Redirect to the chat page (or intended destination)
+            router.replace('/chat'); // Use replace to avoid login page in history
+
         } catch (err: any) {
-            toast.error('Login failed', { description: err.message });
-            throw err;
+            console.error("AuthProvider: Sign in error:", err);
+            // Clear any potentially partially set state
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            setToken(null);
+            setUser(null);
+            toast.error("Login Failed", { description: err.message || "An unexpected error occurred." });
+            throw err; // Re-throw error so the form can catch it if needed
         } finally {
             setIsLoading(false);
         }
+    // Include router in dependencies
     }, [router]);
 
-    // Logout function
-    const signOut = useCallback(() => {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        setToken(null);
-        setUser(null);
-        toast.success('Logged out');
-        router.replace('/login');
+    // --- Sign Out Function ---
+    const signOut = useCallback(async (): Promise<void> => {
+        console.log("AuthProvider: Signing out...");
+        setIsLoading(true); // Optional: show loading state during sign out
+        try {
+            // Clear local token and state immediately
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            setToken(null);
+            setUser(null);
+            console.log("AuthProvider: Token removed and state cleared.");
+            toast.success("Logged Out", { description: "You have been successfully logged out." });
+
+            // Redirect to login page
+            router.replace('/login'); // Use replace
+
+            // Note: There's usually no backend API call needed for simple JWT logout,
+            // unless you implement token blacklisting on the gateway (more complex).
+        } catch (error) {
+             console.error("AuthProvider: Error during sign out process:", error);
+             // Even if redirect fails, ensure state is cleared
+             localStorage.removeItem(AUTH_TOKEN_KEY);
+             setToken(null);
+             setUser(null);
+             toast.error("Logout Issue", { description: "An error occurred during logout." });
+        } finally {
+             setIsLoading(false);
+        }
+
+    // Include router in dependencies
     }, [router]);
 
+    // Context value provided to consumers
     const value: AuthContextType = {
         user,
         token,
@@ -5687,21 +5687,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
 };
 
+// Custom hook to use the AuthContext
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
-    if (!context) throw new Error('useAuth must be used within an AuthProvider');
+    if (context === undefined) { // Check for undefined, not just falsy
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
     return context;
 };
-
-```
-
-## File: `lib\supabaseClient.ts`
-```ts
-// File: lib/supabaseClient.ts
-// This file is no longer needed. Supabase has been removed from the authentication flow.
-// All authentication is now handled via JWT and the API Gateway.
-
-// (File intentionally left blank or can be deleted.)
 ```
 
 ## File: `lib\utils.ts`
