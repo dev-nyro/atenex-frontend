@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { session, user, isLoading, signOut } = useAuth();
+  const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -22,9 +22,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const incompleteSetupWarningShown = useRef(false);
 
   useEffect(() => {
-    // Reset warning flag if session or user changes significantly (e.g., new login)
+    // Reset warning flag if user changes significantly (e.g., new login)
     incompleteSetupWarningShown.current = false;
-  }, [session?.user.id]); // Reset based on user ID change
+  }, [user?.userId]); // Reset based on user ID change
 
   useEffect(() => {
     if (bypassAuth) {
@@ -38,20 +38,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // If loading is finished and there's no session, redirect to home/login
-    if (!session) {
-      console.log("AppLayout: No session found after loading, redirecting to /");
+    // If loading is finished and there's no user, redirect to home/login
+    if (!user) {
+      console.log("AppLayout: No user found after loading, redirecting to /");
       router.replace('/');
       return;
     }
 
-    // If session exists, but user mapping failed OR user lacks companyId
-    // *after* the initial loading/association attempt should be complete.
-    // This state indicates a problem (e.g., ensure-company failed silently or token didn't update).
-    if (session && (!user || !user.companyId)) {
+    // If user exists, but lacks companyId
+    if (user && !user.companyId) {
        // Only show the toast ONCE per session load attempt to avoid repetition
        if (!incompleteSetupWarningShown.current) {
-          console.error(`AppLayout: Session exists but user data is incomplete (User: ${!!user}, CompanyID: ${user?.companyId}). Showing warning.`);
+          console.error(`AppLayout: User data is incomplete (CompanyID: ${user?.companyId}). Showing warning.`);
           toast.error("Incomplete Account Setup", {
              description: "Your account setup seems incomplete (missing company association). Attempting to resolve or please log in again.",
              duration: 8000, // Longer duration
@@ -65,12 +63,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
        return; // Don't proceed to render children if state is known to be invalid
     }
 
-    // If we reach here: Loading is false, session exists, user exists, user.companyId exists.
+    // If we reach here: Loading is false, user exists, user.companyId exists.
     console.log("AppLayout: Auth check passed.");
     // Reset warning flag if we reach a valid state
     incompleteSetupWarningShown.current = false;
 
-  }, [isLoading, session, user, bypassAuth, router, signOut]); // Dependencies
+  }, [isLoading, user, bypassAuth, router, signOut]); // Dependencies
 
   // --- Render Loading State ---
   if (!bypassAuth && isLoading) {
@@ -85,8 +83,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // --- Render Auth Wall / Incomplete State Blocker ---
   // Prevent rendering children if:
   // 1. Auth is NOT bypassed AND
-  // 2. EITHER (a) auth is still loading OR (b) loading is done but there's no session OR (c) user data is incomplete
-  const shouldBlockRender = !bypassAuth && (isLoading || !session || !user || !user.companyId);
+  // 2. EITHER (a) auth is still loading OR (b) loading is done but there's no user OR (c) user data is incomplete
+  const shouldBlockRender = !bypassAuth && (isLoading || !user || !user.companyId);
 
   if (shouldBlockRender) {
       console.log("AppLayout: Auth guard preventing render.");
@@ -95,7 +93,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen items-center justify-center bg-background">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
            {/* Optionally show a message if blocked due to incomplete setup */}
-           {!isLoading && session && (!user || !user.companyId) && (
+           {!isLoading && user && !user.companyId && (
               <p className="mt-4 text-destructive">Resolving account setup...</p>
            )}
         </div>
