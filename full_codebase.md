@@ -105,7 +105,7 @@ const nextConfig = {
 
 ## File: `package.json`
 ```json
-// File: package.json
+
 {
   "name": "atenex-frontend",
   "version": "0.1.0",
@@ -129,9 +129,6 @@ const nextConfig = {
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
-    // --- ELIMINADO: Dependencia de Supabase ---
-    // "@supabase/supabase-js": "^2.49.4",
-    // ------------------------------------------
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.486.0",
