@@ -14,11 +14,15 @@ import Link from 'next/link'; // Import the Link component
 
 export default function HomePage() {
   const router = useRouter();
+  // --- CORRECTION: Destructure 'user' instead of 'session' ---
   // Get user and loading state from the auth hook
   const { user, isLoading: isAuthLoading } = useAuth();
+  // -----------------------------------------------------------
 
+  // --- CORRECTION: Check 'user' for authentication status ---
   // Determine authentication status (only true if not loading AND user exists)
   const isAuthenticated = !isAuthLoading && !!user;
+  // ---------------------------------------------------------
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
@@ -89,7 +93,7 @@ export default function HomePage() {
             ) : (
               <Button
                   size="lg"
-                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')}
+                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/register')} // '/register' might need adjustment if registration isn't implemented
                   className={cn(
                       "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
                       "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
@@ -124,7 +128,7 @@ export default function HomePage() {
              />
          </section>
 
-        {/* Handler for email confirmation links (invisible component) */}
+        {/* Handler for email confirmation links (invisible component) - Keep if needed for Supabase, otherwise remove */}
         <EmailConfirmationHandler />
       </main>
 

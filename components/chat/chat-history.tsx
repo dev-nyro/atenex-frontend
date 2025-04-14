@@ -28,8 +28,9 @@ import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 export function ChatHistory() {
     const pathname = usePathname();
     const router = useRouter();
-    // Get auth state from the hook
-    const { session, isLoading: isAuthLoading, signOut } = useAuth();
+    // --- CORRECTION: Destructure 'user' instead of 'session' ---
+    const { user, isLoading: isAuthLoading, signOut } = useAuth();
+    // ----------------------------------------------------------
 
     // Component State
     const [chats, setChats] = useState<ChatSummary[]>([]);
@@ -42,7 +43,9 @@ export function ChatHistory() {
     // --- Function to Fetch Chat History ---
     const fetchChatHistory = useCallback(async (showToast = false) => {
          const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-         const isAuthenticated = !!session || bypassAuth;
+         // --- CORRECTION: Check 'user' for authentication ---
+         const isAuthenticated = !!user || bypassAuth;
+         // ---------------------------------------------------
 
         // Skip if not authenticated (and auth check is complete)
         if (!isAuthLoading && !isAuthenticated) {
@@ -92,8 +95,10 @@ export function ChatHistory() {
         } finally {
             setIsLoading(false); // Finish loading history list
         }
-    // Dependencies: Re-run if session or auth loading state changes. Include signOut.
-    }, [session, isAuthLoading, signOut]);
+    // --- CORRECTION: Depend on 'user' instead of 'session' ---
+    // Dependencies: Re-run if user or auth loading state changes. Include signOut.
+    }, [user, isAuthLoading, signOut]);
+    // ---------------------------------------------------------
 
     // --- Effect to Fetch on Mount and Auth Change ---
     useEffect(() => {
@@ -145,7 +150,9 @@ export function ChatHistory() {
     // --- Render Logic Helper ---
     const renderContent = () => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-        const isAuthenticated = !!session || bypassAuth;
+        // --- CORRECTION: Check 'user' for authentication ---
+        const isAuthenticated = !!user || bypassAuth;
+        // ---------------------------------------------------
 
         // 1. Loading State (Auth or History)
         if (isLoading || (!bypassAuth && isAuthLoading)) {
