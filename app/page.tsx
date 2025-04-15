@@ -13,6 +13,15 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the CORRECTED hook
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail } from 'lucide-react'; // Added icons
 import Link from 'next/link'; // Import the Link component
+// Import specific icons needed for FeatureCard
+import { Search, Library, Zap } from 'lucide-react';
+
+// Map icon names to actual components
+const iconMap: { [key: string]: React.ElementType } = {
+  Search: Search,
+  Library: Library,
+  Zap: Zap,
+};
 
 export default function HomePage() {
   const router = useRouter();
@@ -160,12 +169,15 @@ function LinkButton({ href, children, Icon, isActive = false }: { href: string; 
   );
 }
 
-// Reusable Feature Card Component (sin cambios)
+
+
+
+// Reusable Feature Card Component
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   const IconComponent = ({ name, ...props }: { name: string } & React.SVGProps<SVGSVGElement>) => { /* ... */ };
+   const IconComponent = iconMap[icon] || Zap; // Default to Zap if icon name not found
   return (
     <div className="p-6 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:shadow-lg transition-all duration-200 text-left">
-       <IconComponent name={icon} className="w-8 h-8 mb-3 text-primary" />
+       <IconComponent className="w-8 h-8 mb-3 text-primary" />
       <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
     </div>
