@@ -3,6 +3,7 @@
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
 import { AUTH_TOKEN_KEY } from './constants'; // Importar la clave para localStorage
+import { getAuthHeaders } from './auth/helpers'; // Assuming this helper exists
 
 // --- ApiError Class (sin cambios) ---
 interface ApiErrorDataDetail {
@@ -166,14 +167,38 @@ export interface IngestResponse {
     status: string;
     message: string;
 }
-export const uploadDocument = async (formData: FormData): Promise<IngestResponse> => {
-    // Metadata ya está dentro del formData, la llamada es directa
-    return request<IngestResponse>('/api/v1/ingest/upload', {
-        method: 'POST',
-        body: formData,
-        // NO establezcas Content-Type aquí; el navegador lo hará con el boundary correcto para FormData
+export async function uploadDocument(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch('/api/v1/ingest/upload', { // Ensure this is the correct endpoint
+      method: 'POST',
+      headers: {
+        ...(await getAuthHeaders()), // Add auth headers
+        // Content-Type is set automatically by browser for FormData
+      },
+      body: formData,
     });
-};
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // Handle specific 409 conflict for duplicates
+      if (response.status === 409) {
+        throw new Error(data.message || 'Error: Archivo duplicado o conflicto.');
+      }
+      // Throw other errors with backend message
+      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+    }
+
+    return data; // Return successful response data
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    // Re-throw the error with a potentially more user-friendly message or the specific backend message
+    throw error instanceof Error ? error : new Error('Error al subir el archivo.');
+  }
+}
 
 export interface DocumentStatusResponse {
     document_id: string;
@@ -202,6 +227,58 @@ export const getDocumentStatus = async (documentId: string): Promise<DocumentSta
     return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
 };
 
+export async function getDocumentStatusList(): Promise<any[]> {
+  try {
+    const response = await fetch('/api/v1/ingest/status', { // Ensure this is the correct endpoint
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getAuthHeaders()), // Add auth headers
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({})); // Try to get error message
+      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching document status:', error);
+    throw error instanceof Error ? error : new Error('Error al obtener el estado de los documentos.');
+  }
+}
+
+export async function retryIngestDocument(documentId: string): Promise<any> {
+  try {
+    const response = await fetch(`/api/v1/ingest/retry/${documentId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', // Although no body, good practice
+        ...(await getAuthHeaders()), // Add auth headers
+      },
+    });
+
+    // 202 Accepted is a success case here
+    if (response.status === 202) {
+        return await response.json(); // Contains task_id, status: "processing"
+    }
+
+    const data = await response.json().catch(() => ({})); // Try to get error message
+
+    if (!response.ok) {
+       // Handle specific errors like 404 or 409 (wrong state)
+      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+    }
+
+    // Should ideally not reach here if only 202 is expected on success
+    return data;
+
+  } catch (error) {
+    console.error(`Error retrying ingest for document ${documentId}:`, error);
+    throw error instanceof Error ? error : new Error('Error al reintentar la ingesta del documento.');
+  }
+}
 
 // --- Query Service ---
 export interface RetrievedDocApi {
