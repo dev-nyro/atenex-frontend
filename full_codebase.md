@@ -69,20 +69,21 @@ atenex-frontend/
 │       └── tooltip.tsx
 ├── components.json
 ├── export-codebase.py
+├── knowledge-base-refactor.md
 ├── lib
 │   ├── api.ts
 │   ├── auth
 │   │   └── helpers.ts
 │   ├── constants.ts
 │   ├── hooks
-│   │   └── useAuth.tsx
+│   │   ├── useAuth.tsx
+│   │   ├── useDocumentStatuses.ts
+│   │   └── useUploadDocument.ts
 │   └── utils.ts
 ├── next-env.d.ts
 ├── next.config.mjs
 ├── package.json
 ├── postcss.config.js
-├── public
-│   └── icons
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -426,7 +427,7 @@ ehthumbs_vista.db
 .history/
 ```
 
-## File: `app\(app)\chat\[[...chatId]]\page.tsx`
+## File: `app/(app)/chat/[[...chatId]]/page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx
 // Purpose: Main chat interface page, using useAuth for state and API calls via lib/api.
@@ -443,142 +444,263 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import {
     postQuery,
     getChatMessages,
-    deleteChat,
+    deleteChat, // Asegúrate de que esta importación esté presente si necesitas la función
     RetrievedDoc,
     ApiError,
     mapApiMessageToFrontend,
     mapApiSourcesToFrontend,
-    ChatSummary,
-    ChatMessageApi,
-    // --- AÑADIDO: QueryApiResponse para verificación ---
-    QueryApiResponse
-    // ----------------------------------------------
+    ChatSummary, // Importar si se usa (ej. en sidebar)
+    ChatMessageApi, // Interfaz de la API para mensajes
+    QueryApiResponse // Interfaz de la respuesta 'ask'
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, PlusCircle } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, PlusCircle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { cn } from '@/lib/utils'; // Asegúrate de importar cn
 
+// Mensaje inicial estándar
 const welcomeMessage: Message = {
     id: 'initial-welcome',
     role: 'assistant',
     content: '¡Hola! Soy Atenex. Pregúntame cualquier cosa sobre tus documentos.',
-    created_at: new Date().toISOString(),
+    created_at: new Date().toISOString(), // Timestamp para el mensaje de bienvenida
 };
 
 export default function ChatPage() {
     const params = useParams();
     const router = useRouter();
     const pathname = usePathname();
-    const { user, isLoading: isAuthLoading, signOut } = useAuth(); // Correcto: usar 'user'
+    const { user, isLoading: isAuthLoading, signOut } = useAuth(); // Usar el hook de autenticación
 
+    // Obtener chatId de los parámetros de ruta
     const chatIdParam = params.chatId ? (Array.isArray(params.chatId) ? params.chatId[0] : params.chatId) : undefined;
     const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
 
-    const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
-    const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
-    const [isSending, setIsSending] = useState(false);
-    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [historyError, setHistoryError] = useState<string | null>(null);
-    const [isPanelOpen, setIsPanelOpen] = useState(true);
+    // Estado del chat
+    const [messages, setMessages] = useState<Message[]>([welcomeMessage]); // Inicia con bienvenida
+    const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]); // Documentos recuperados
+    const [isSending, setIsSending] = useState(false); // Enviando mensaje
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false); // Cargando historial
+    const [historyError, setHistoryError] = useState<string | null>(null); // Error al cargar historial
+    const [isPanelOpen, setIsPanelOpen] = useState(true); // Panel derecho abierto/cerrado
 
+    // Refs
     const scrollAreaRef = useRef<HTMLDivElement>(null);
+    // Ref para evitar múltiples fetches para el mismo chat ID durante la carga inicial
     const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
+    // Sincronizar chatId del estado con el parámetro de la URL
     useEffect(() => {
-        setChatId(chatIdParam);
-    }, [chatIdParam]);
+        // Solo actualiza si el parámetro cambia realmente
+        if (chatIdParam !== chatId) {
+            console.log(`ChatPage: URL parameter changed. Setting chatId state to: ${chatIdParam}`);
+            setChatId(chatIdParam);
+            fetchedChatIdRef.current = undefined; // Reset fetch ref cuando el param cambia
+        }
+    }, [chatIdParam, chatId]); // Depende de ambos para detectar cambio
 
+    // Efecto para cargar el historial del chat
     useEffect(() => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-        const currentFetchTarget = chatId || 'welcome';
+        const currentFetchTarget = chatId || 'welcome'; // 'welcome' si no hay chatId
 
-        if (!bypassAuth && isAuthLoading) return;
-        if (!bypassAuth && !user) { /* ... (manejo no autenticado sin cambios) ... */ return; }
-        if (fetchedChatIdRef.current === currentFetchTarget) { /* ... (evitar fetch redundante sin cambios) ... */ return; }
+        // 1. Esperar a que la autenticación termine (si no se bypass)
+        if (!bypassAuth && isAuthLoading) {
+            console.log("ChatPage: Waiting for authentication...");
+             setIsLoadingHistory(true); // Mostrar carga mientras espera auth
+             setMessages([]); // Limpiar mensajes mientras carga auth
+            return;
+        }
 
+        // 2. Verificar si el usuario está autenticado (si no se bypass)
+        if (!bypassAuth && !user) {
+             console.log("ChatPage: User not authenticated. Cannot fetch history.");
+             setMessages([welcomeMessage]); // Mostrar bienvenida si no está logueado
+             setIsLoadingHistory(false); // Terminar carga
+             fetchedChatIdRef.current = 'welcome'; // Marcar como 'cargado' (el estado no logueado)
+            // No redirigir aquí, AppLayout maneja la redirección
+            return;
+        }
+
+        // 3. Evitar fetches redundantes si ya se cargó este chat/estado
+        if (fetchedChatIdRef.current === currentFetchTarget) {
+            console.log(`ChatPage: History for ${currentFetchTarget} already fetched or fetch in progress. Skipping.`);
+            // Si ya se cargó y el estado de carga aún es true, ponerlo a false
+            if (isLoadingHistory) setIsLoadingHistory(false);
+            return;
+        }
+
+        // 4. Iniciar la carga del historial
+        console.log(`ChatPage: Fetching history for target: ${currentFetchTarget}`);
         setIsLoadingHistory(true);
         setHistoryError(null);
-        fetchedChatIdRef.current = currentFetchTarget;
+        setMessages([]); // Limpiar mensajes existentes antes de cargar nuevos
+        setRetrievedDocs([]); // Limpiar documentos también
+        fetchedChatIdRef.current = currentFetchTarget; // Marcar que se está intentando cargar este target
 
+        // 5. Ejecutar la llamada a la API si hay un chatId
         if (chatId) {
             getChatMessages(chatId)
-                .then(apiMessages => {
-                    // --- CORRECCIÓN FINAL: Usar aserción de tipo `as any` ---
-                    // Dado que las comprobaciones anteriores fallaron, forzamos el tipo.
-                    // Esto asume que la API *sí* devuelve 'created_at'.
+                .then((apiMessages: ChatMessageApi[]) => { // Especificar tipo aquí
+                    // --- MODIFICACIÓN: Lógica de ordenación robusta ---
+                    // Ordena por fecha de creación (asume que siempre existe)
+                    // Maneja posibles strings inválidos o nulos por si acaso
                     const sortedMessages = [...apiMessages].sort((a, b) => {
-                        const timeA = (a as any)?.created_at ? new Date((a as any).created_at).getTime() : 0;
-                        const timeB = (b as any)?.created_at ? new Date((b as any).created_at).getTime() : 0;
+                        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
 
+                        // Tratar fechas inválidas (NaN) como 0 para ponerlas al principio o final
                         const validTimeA = !isNaN(timeA) ? timeA : 0;
                         const validTimeB = !isNaN(timeB) ? timeB : 0;
 
+                        // Si ambas son inválidas, mantener orden relativo
                         if (validTimeA === 0 && validTimeB === 0) return 0;
-                        if (validTimeA === 0) return 1; // Poner inválidos/faltantes al final
-                        if (validTimeB === 0) return -1; // Poner inválidos/faltantes al final
+                        // Poner fechas inválidas consistentemente (ej. al principio)
+                        if (validTimeA === 0) return -1;
+                        if (validTimeB === 0) return 1;
 
-                        return validTimeA - validTimeB;
+                        return validTimeA - validTimeB; // Orden ascendente (más antiguo primero)
                     });
-                    // ---------------------------------------------------------
+                    // ---------------------------------------------
 
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
-                    setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
-                    console.log(`ChatPage: History loaded for ${chatId}, ${mappedMessages.length} messages.`);
+                    setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]); // Mostrar bienvenida si el historial está vacío
+                    console.log(`ChatPage: History loaded successfully for ${chatId}. ${mappedMessages.length} messages.`);
                 })
-                .catch(error => { /* ... (manejo de error sin cambios) ... */ })
-                .finally(() => { setIsLoadingHistory(false); });
+                .catch(error => {
+                    console.error(`ChatPage: Error loading history for chat ${chatId}:`, error);
+                    let message = "Failed to load chat history.";
+                     if (error instanceof ApiError) {
+                         message = error.message || `API Error (${error.status})`;
+                         if (error.status === 401 || error.status === 403) {
+                            message = "Session expired or invalid. Please log in again.";
+                            toast.error("Authentication Error", { description: message });
+                            signOut(); // Desloguear si hay error de autenticación
+                         } else if (error.status === 404) {
+                             message = "Chat not found or you don't have permission to access it.";
+                             // Podrías redirigir a /chat si el chat no existe
+                             router.replace('/chat');
+                         } else {
+                             toast.error("Failed to load history", { description: message });
+                         }
+                    } else {
+                        toast.error("Failed to load history", { description: "An unexpected error occurred." });
+                    }
+                    setHistoryError(message);
+                    setMessages([welcomeMessage]); // Mostrar bienvenida en caso de error
+                    fetchedChatIdRef.current = undefined; // Permitir reintentar si falla
+                })
+                .finally(() => {
+                    setIsLoadingHistory(false);
+                    console.log(`ChatPage: Finished loading attempt for ${chatId}`);
+                });
         } else {
+            // Si no hay chatId (página /chat), mostrar bienvenida
+            console.log("ChatPage: No chatId provided, showing welcome message.");
             setMessages([welcomeMessage]);
             setRetrievedDocs([]);
             setIsLoadingHistory(false);
+            fetchedChatIdRef.current = 'welcome'; // Marcar 'welcome' como cargado
         }
-    }, [chatId, user, isAuthLoading, router, signOut, isLoadingHistory]);
+    // Dependencias clave: chatId, estado de autenticación (user, isAuthLoading), signOut, router
+    }, [chatId, user, isAuthLoading, signOut, router]); // Removido isLoadingHistory de deps para evitar bucles
 
+    // Scroll automático al final
     useEffect(() => {
-        if (scrollAreaRef.current) { /* ... (scroll sin cambios) ... */ }
-    }, [messages, isSending]);
+        if (scrollAreaRef.current) {
+            const scrollElement = scrollAreaRef.current;
+            // Pequeño delay para asegurar que el DOM se actualizó antes de hacer scroll
+            const timeoutId = setTimeout(() => {
+                 scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
+            }, 100);
+            return () => clearTimeout(timeoutId); // Limpiar timeout si el componente se desmonta
+        }
+    }, [messages, isSending]); // Depende de los mensajes y del estado de envío
 
+    // Manejador para enviar mensajes
     const handleSendMessage = useCallback(async (query: string) => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
+        // --- MODIFICACIÓN: Usar 'user' para verificar autenticación ---
         const isAuthenticated = !!user || bypassAuth;
+        // -----------------------------------------------------------
 
-        if (!query.trim() || !isAuthenticated || isSending) { /* ... (validaciones sin cambios) ... */ return; }
+        // Validaciones previas
+        if (!query.trim()) {
+             toast.warning("Cannot send empty message.");
+             return;
+        }
+        if (!isAuthenticated) {
+             toast.error("Not Authenticated", { description: "Please log in to send messages."});
+             signOut(); // O redirigir a login
+             return;
+        }
+        if (isSending) {
+            console.warn("ChatPage: Message sending already in progress.");
+            return;
+        }
 
-        const userMessage: Message = { id: `client-user-${Date.now()}`, role: 'user', content: query, created_at: new Date().toISOString() };
-        setMessages(prev => [...prev, userMessage]);
-        setIsSending(true);
-        setRetrievedDocs([]);
+        // Añadir mensaje del usuario a la UI inmediatamente
+        const userMessage: Message = {
+            id: `client-user-${Date.now()}`,
+            role: 'user',
+            content: query,
+            created_at: new Date().toISOString() // Timestamp del cliente para el mensaje del usuario
+        };
+        // Usar una función de actualización para asegurar el estado más reciente
+        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+        setIsSending(true); // Marcar como enviando
+        setRetrievedDocs([]); // Limpiar documentos previos
 
+        // Usar el chatId actual para la llamada a la API (puede ser undefined -> null)
         const currentChatIdForApi = chatId || null;
         console.log(`ChatPage: Sending query to API (Chat ID: ${currentChatIdForApi || 'New'})...`);
 
         try {
-            const response: QueryApiResponse = await postQuery({ query, chat_id: currentChatIdForApi });
+            // Llamada a la API con el payload correcto
+            const response: QueryApiResponse = await postQuery({
+                query,
+                chat_id: currentChatIdForApi,
+                // retriever_top_k: 5 // Opcional: Podrías añadirlo aquí si quieres controlarlo desde el front
+            });
 
-            // --- CORRECCIÓN: Acceder a 'chat_id' directamente (debe existir según la interfaz) ---
+            // --- MODIFICACIÓN: Acceso directo a chat_id garantizado por QueryApiResponse ---
             const returnedChatId = response.chat_id;
             // ------------------------------------------------------------------------------
 
-            const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents);
+            // Mapear documentos recuperados al formato del frontend
+            // Cast to 'any' to bypass the type mismatch, assuming the function handles the actual structure.
+            // Ideally, the types in lib/api.ts should be consistent.
+            const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents as any);
+
+            // Crear mensaje del asistente
             const assistantMessage: Message = {
-                id: `client-assistant-${Date.now()}`,
+                id: `client-assistant-${Date.now()}`, // ID temporal del cliente
                 role: 'assistant',
                 content: response.answer,
-                sources: mappedSources,
-                created_at: new Date().toISOString() // Frontend timestamp for assistant msg
+                sources: mappedSources, // Fuentes mapeadas
+                created_at: new Date().toISOString() // Timestamp del cliente para respuesta del asistente
             };
 
+            // Actualizar mensajes con la respuesta del asistente
             setMessages(prev => [...prev, assistantMessage]);
-            setRetrievedDocs(mappedSources || []);
+            setRetrievedDocs(mappedSources || []); // Actualizar panel de documentos
 
+            // Si era un chat nuevo y la API devolvió un ID, actualizar URL y estado
             if (!currentChatIdForApi && returnedChatId) {
-                console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL.`);
-                setChatId(returnedChatId);
-                fetchedChatIdRef.current = returnedChatId;
-                router.replace(`/chat/${returnedChatId}`, { scroll: false });
+                console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL and state.`);
+                setChatId(returnedChatId); // Actualizar estado interno
+                fetchedChatIdRef.current = returnedChatId; // Marcar como 'cargado'
+                router.replace(`/chat/${returnedChatId}`, { scroll: false }); // Actualizar URL sin recargar
+            } else if (currentChatIdForApi && currentChatIdForApi !== returnedChatId) {
+                 // Esto no debería pasar si la API funciona como se espera (ask en chat existente devuelve el mismo ID)
+                 console.warn(`ChatPage: API returned a different chat ID (${returnedChatId}) than expected (${currentChatIdForApi}) for an existing chat.`);
+                 // Podrías optar por actualizar la URL si confías en la respuesta de la API
+                 // router.replace(`/chat/${returnedChatId}`, { scroll: false });
+                 // setChatId(returnedChatId);
             }
 
+            // Abrir panel si hay documentos y estaba cerrado
             if (mappedSources && mappedSources.length > 0 && !isPanelOpen) {
                 setIsPanelOpen(true);
             }
@@ -591,110 +713,160 @@ export default function ChatPage() {
                  errorMessage = error.message || `API Error (${error.status})`;
                  if (error.status === 401 || error.status === 403) {
                      errorMessage = "Authentication error. Please log in again.";
-                     signOut();
+                     signOut(); // Desloguear
+                 } else {
+                      toast.error("Query Failed", { description: errorMessage });
                  }
              } else if (error instanceof Error) {
                  errorMessage = `Error: ${error.message}`;
+                 toast.error("Query Failed", { description: errorMessage });
+             } else {
+                  toast.error("Query Failed", { description: "An unknown error occurred." });
              }
-            const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true, created_at: new Date().toISOString() };
-            setMessages(prev => [...prev, errorMsgObj]);
-            toast.error("Query Failed", { description: errorMessage });
-        } finally {
-            setIsSending(false);
-        }
-    }, [chatId, isSending, user, router, isPanelOpen, signOut]); // Asegúrate de que 'user' esté aquí
 
+            // Crear un mensaje de error para mostrar en el chat
+            const errorMsgObj: Message = {
+                id: `error-${Date.now()}`,
+                role: 'assistant',
+                content: errorMessage,
+                isError: true,
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, errorMsgObj]); // Añadir mensaje de error
+
+        } finally {
+            setIsSending(false); // Terminar estado de envío
+        }
+    // Dependencias: chatId (para enviar), isSending (para evitar doble envío), user (para auth check), router, isPanelOpen, signOut
+    }, [chatId, isSending, user, router, isPanelOpen, signOut]);
+
+    // Toggle panel derecho
     const handlePanelToggle = () => { setIsPanelOpen(!isPanelOpen); };
 
+    // Navegar a un chat nuevo
     const handleNewChat = () => {
-        router.push('/chat');
+        // Solo navegar si no estamos ya en /chat sin ID
+        if (pathname !== '/chat') {
+             console.log("ChatPage: Starting new chat.");
+             router.push('/chat');
+        } else {
+             // Si ya estamos en /chat, reseteamos el estado local por si acaso
+             setMessages([welcomeMessage]);
+             setRetrievedDocs([]);
+             setChatId(undefined);
+             fetchedChatIdRef.current = 'welcome';
+             console.log("ChatPage: Already on new chat page, reset state.");
+        }
     };
 
+    // Renderiza el contenido del chat (mensajes o estados de carga/error)
     const renderChatContent = (): React.ReactNode => {
+        // Estado de carga del historial
         if (isLoadingHistory) {
             return (
-                <div className="space-y-4">
-                    <Skeleton className="h-16 w-3/4" />
-                    <Skeleton className="h-16 w-1/2 ml-auto" />
-                    <Skeleton className="h-16 w-3/4" />
+                <div className="space-y-4 p-4">
+                    <Skeleton className="h-16 w-3/4 rounded-lg" />
+                    <Skeleton className="h-16 w-1/2 ml-auto rounded-lg" />
+                    <Skeleton className="h-16 w-3/4 rounded-lg" />
                 </div>
             );
         }
 
+        // Estado de error al cargar historial
         if (historyError) {
             return (
-                <div className="flex flex-col items-center justify-center h-full text-destructive">
-                    <AlertCircle className="h-8 w-8 mb-2" />
-                    <p className="text-center font-semibold">Error loading chat history</p>
-                    <p className="text-center text-sm">{historyError}</p>
+                <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center">
+                    <AlertCircle className="h-10 w-10 mb-3" />
+                    <p className="text-lg font-semibold mb-1">Error Loading Chat</p>
+                    <p className="text-sm mb-4">{historyError}</p>
                     <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4">
-                        Retry
+                         <RefreshCw className="mr-2 h-4 w-4" />
+                        Retry Page Load
                     </Button>
                 </div>
             );
         }
 
+        // Renderizar mensajes
         return (
-            <div className="space-y-4">
-                {messages.map((message, index) => (
-                    <ChatMessage key={message.id || `msg-${index}`} message={message} />
+            <div className="space-y-4 pb-4"> {/* Padding bottom para espacio */}
+                {messages.map((message) => (
+                     <ChatMessage key={message.id} message={message} />
                 ))}
+                {/* Indicador "Thinking..." solo si se está enviando */}
                 {isSending && (
-                    <div className="flex items-center space-x-2 text-muted-foreground justify-start">
-                        <BrainCircuit className="h-5 w-5 animate-pulse" />
-                        <span>Atenex is thinking...</span>
+                    <div className="flex items-start space-x-3 pl-11"> {/* Alineado con avatar del asistente */}
+                         <div className="flex items-center space-x-2 text-muted-foreground p-3 bg-muted rounded-lg shadow-sm">
+                            <BrainCircuit className="h-5 w-5 animate-pulse text-primary" />
+                            <span className="text-sm">Atenex is thinking...</span>
+                         </div>
                     </div>
                 )}
             </div>
         );
     };
 
-
-    return ( /* ... (JSX sin cambios estructurales) ... */
-        <div className="flex flex-col h-full">
-            <div className="absolute top-2 left-2 z-10">
+    // --- Renderizado Principal ---
+    return (
+        <div className="flex flex-col h-full bg-muted/20 dark:bg-background">
+            {/* Botón "New Chat" siempre visible arriba a la izquierda */}
+            <div className="absolute top-3 left-3 z-20">
                  <Button
                     variant="outline"
                     size="sm"
                     onClick={handleNewChat}
-                    disabled={isSending || isLoadingHistory || isAuthLoading}
+                    // Deshabilitar si se está enviando, cargando historial o auth, o si ya estamos en new chat
+                    disabled={isSending || isLoadingHistory || isAuthLoading || (!chatId && pathname === '/chat')}
                     title="Start a new chat"
+                    className="bg-background/80 hover:bg-muted" // Estilo para destacar sobre fondo
                  >
                      <PlusCircle className="h-4 w-4 mr-2" />
                      New Chat
                  </Button>
              </div>
-             {/* Resto del JSX */}
-             <ResizablePanelGroup direction="horizontal" className="flex-1">
+
+             {/* Layout Resizable */}
+             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden"> {/* overflow-hidden aquí */}
                  <ResizablePanel defaultSize={isPanelOpen ? 70 : 100} minSize={30}>
                      <div className="flex h-full flex-col relative">
-                         {/* Botón toggle panel */}
-                         <div className="absolute top-2 right-2 z-10">
-                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}>
+                         {/* Botón toggle panel derecho */}
+                         <div className="absolute top-3 right-3 z-20">
+                             <Button
+                                onClick={handlePanelToggle}
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full"
+                                aria-label={isPanelOpen ? 'Close Sources Panel' : 'Open Sources Panel'}
+                             >
                                  {isPanelOpen ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                          </div>
-                         {/* Área de mensajes */}
-                         <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+
+                         {/* Área de scroll para mensajes */}
+                         {/* Añadir padding top para no solaparse con botones */}
+                         <ScrollArea className="flex-1 px-4 pt-14" ref={scrollAreaRef}>
                              {renderChatContent()}
                          </ScrollArea>
-                         {/* Input */}
-                         <div className="border-t p-4 bg-muted/30 shrink-0">
+
+                         {/* Input de chat fijo abajo */}
+                         <div className="border-t p-4 bg-background shadow-inner shrink-0">
                              <ChatInput
                                  onSendMessage={handleSendMessage}
+                                 // Deshabilitar input si se está cargando auth o historial
                                  isLoading={isSending || isLoadingHistory || isAuthLoading}
                              />
                          </div>
                      </div>
                  </ResizablePanel>
-                 {/* Panel de fuentes */}
+
+                 {/* Panel de fuentes (condicional) */}
                  {isPanelOpen && (
                      <>
-                         <ResizableHandle withHandle />
+                         <ResizableHandle withHandle className="bg-border" />
                          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
                              <RetrievedDocumentsPanel
                                  documents={retrievedDocs}
-                                 isLoading={isSending}
+                                 isLoading={isSending} // Solo muestra carga en el panel mientras se 'piensa'
                              />
                          </ResizablePanel>
                      </>
@@ -705,50 +877,121 @@ export default function ChatPage() {
 }
 ```
 
-## File: `app\(app)\knowledge\page.tsx`
+## File: `app/(app)/knowledge/page.tsx`
 ```tsx
-import { FileUploader } from '@/components/knowledge/file-uploader';
-import { DocumentStatusList } from '@/components/knowledge/document-status-list';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+'use client';
+import { useEffect } from 'react'; // Import useEffect
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses'; // Import the new hook
+import { DocumentStatusList } from '@/components/knowledge/document-status-list'; // Assuming this component exists and accepts the new props
+import { FileUploader } from '@/components/knowledge/file-uploader'; // Assuming this component exists
+import { AuthHeaders } from '@/lib/api'; // Keep AuthHeaders for passing down if needed
 
 export default function KnowledgePage() {
+  const { user, isLoading: isAuthLoading } = useAuth(); // Still need auth loading state
+
+  // Use the new hook to manage document state
+  const {
+    documents,
+    isLoading: isLoadingDocuments, // Rename to avoid conflict
+    error: documentsError,
+    fetchDocuments,
+    retryLocalUpdate,
+  } = useDocumentStatuses();
+
+  // Callback for when an upload is successful (passed to FileUploader)
+  const handleUploadSuccess = () => {
+    // Refresh the list after a brief delay
+    setTimeout(fetchDocuments, 1500);
+  };
+
+  // Callback for when a retry is successful (passed to DocumentStatusList)
+  // This now just calls the local update function from the hook
+  const handleRetrySuccess = (documentId: string) => {
+    retryLocalUpdate(documentId);
+    // Optionally trigger a full refresh after a delay via fetchDocuments if needed
+    // setTimeout(fetchDocuments, 5000);
+  };
+
+  // Construct authHeaders for child components that might need them directly (like FileUploader or Retry button inside list)
+  const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
+    'X-User-ID': user.userId,
+    'X-Company-ID': user.companyId,
+  } : null;
+
+  // Show main loading skeleton while auth is resolving
+  if (isAuthLoading) {
+    return (
+      <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <Skeleton className="h-48 w-full mb-4" />
+          </div>
+          <div className="lg:col-span-2 space-y-2">
+            <Skeleton className="h-8 w-1/3 mb-3" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main page content
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Gestión de la Base de Conocimiento</h1>
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      <h1 className="text-2xl font-semibold mb-6">Gestión de Conocimiento</h1>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna de subida */}
+        <div className="lg:col-span-1">
+          <h2 className="text-lg font-medium mb-3">Subir Nuevo Documento</h2>
+          {authHeadersForChildren ? (
+            <FileUploader
+              onUploadSuccess={handleUploadSuccess}
+              authHeaders={authHeadersForChildren}
+            />
+          ) : (
+            <p className="text-muted-foreground">Inicia sesión para subir documentos.</p>
+          )}
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Subir Documentos</CardTitle>
-          <CardDescription>
-            Sube nuevos documentos (PDF, DOCX, TXT, etc.) para ser procesados y añadidos a la base de conocimientos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FileUploader />
-        </CardContent>
-      </Card>
+        {/* Columna de listado */}
+        <div className="lg:col-span-2">
+          <h2 className="text-lg font-medium mb-3">Documentos Subidos</h2>
+          {/* Display error from the hook */}
+          {documentsError && <p className="text-destructive mb-4">Error: {documentsError}</p>}
 
-      <Separator />
-
-       <Card>
-        <CardHeader>
-          <CardTitle>Estado de los Documentos</CardTitle>
-          <CardDescription>
-            Ver el estado de procesamiento de tus documentos subidos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-           <DocumentStatusList />
-        </CardContent>
-      </Card>
-
+          {/* Display loading state from the hook */}
+          {isLoadingDocuments ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            // Only render list if auth headers are available (user is logged in)
+            authHeadersForChildren ? (
+              <DocumentStatusList
+                documents={documents} // Pass documents from the hook
+                isLoading={false} // The list itself isn't loading, the hook handles it
+                onRetrySuccess={handleRetrySuccess} // Pass the retry handler
+                authHeaders={authHeadersForChildren} // Pass headers for potential actions within the list
+              />
+            ) : (
+              // If not loading and no user, show message (unless there was an error)
+              !documentsError && <p className="text-muted-foreground">Inicia sesión para ver documentos.</p>
+            )
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 ```
 
-## File: `app\(app)\layout.tsx`
+## File: `app/(app)/layout.tsx`
 ```tsx
 // File: app/(app)/layout.tsx
 // Purpose: Layout for authenticated sections, handling route protection.
@@ -884,7 +1127,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-## File: `app\(app)\settings\page.tsx`
+## File: `app/(app)/settings/page.tsx`
 ```tsx
 "use client";
 
@@ -969,7 +1212,7 @@ export default function SettingsPage() {
 }
 ```
 
-## File: `app\(auth)\layout.tsx`
+## File: `app/(auth)/layout.tsx`
 ```tsx
 import React from 'react';
 import Image from 'next/image';
@@ -993,7 +1236,7 @@ export default function AuthLayout({
 }
 ```
 
-## File: `app\(auth)\login\page.tsx`
+## File: `app/(auth)/login/page.tsx`
 ```tsx
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -1013,7 +1256,7 @@ export default function LoginPage() {
 }
 ```
 
-## File: `app\about\page.tsx`
+## File: `app/about/page.tsx`
 ```tsx
 "use client";
 
@@ -1137,7 +1380,7 @@ export default function AboutPage() {
 }
 ```
 
-## File: `app\contact\page.tsx`
+## File: `app/contact/page.tsx`
 ```tsx
 // File: app/contact/page.tsx
 // Purpose: Contact page, fixing the original error by using 'user' instead of 'session'.
@@ -1332,7 +1575,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
 }
 ```
 
-## File: `app\globals.css`
+## File: `app/globals.css`
 ```css
 /* File: atenex-frontend/app/globals.css */
 
@@ -1476,7 +1719,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
 }
 ```
 
-## File: `app\layout.tsx`
+## File: `app/layout.tsx`
 ```tsx
 // File: app/layout.tsx
 // Purpose: Root layout, sets up global providers (Theme, Auth) and Toaster.
@@ -1533,7 +1776,7 @@ export default function RootLayout({
 }
 ```
 
-## File: `app\page.tsx`
+## File: `app/page.tsx`
 ```tsx
 // File: app/page.tsx
 // Purpose: Public home page, shows login/register or go to app based on auth state.
@@ -1722,7 +1965,7 @@ function FeatureCard({ title, description, icon }: { title: string; description:
 }
 ```
 
-## File: `app\privacy\page.tsx`
+## File: `app/privacy/page.tsx`
 ```tsx
 // File: app/privacy/page.tsx
 "use client"; // Mark as client component to use hooks like useRouter
@@ -1808,7 +2051,7 @@ export default function PrivacyPage() {
 }
 ```
 
-## File: `app\terms\page.tsx`
+## File: `app/terms/page.tsx`
 ```tsx
 // File: app/terms/page.tsx
 "use client"; // Mark as client component to use hooks like useRouter
@@ -1893,7 +2136,7 @@ export default function TermsPage() {
 }
 ```
 
-## File: `components\auth\login-form.tsx`
+## File: `components/auth/login-form.tsx`
 ```tsx
 // File: components/auth/login-form.tsx
 // Purpose: Handles user login using email and password via the useAuth hook.
@@ -1993,7 +2236,7 @@ export function LoginForm() {
 }
 ```
 
-## File: `components\chat\chat-history.tsx`
+## File: `components/chat/chat-history.tsx`
 ```tsx
 // File: components/chat/chat-history.tsx
 // Purpose: Displays the list of past chats in the sidebar.
@@ -2292,7 +2535,7 @@ export function ChatHistory() {
 }
 ```
 
-## File: `components\chat\chat-input.tsx`
+## File: `components/chat/chat-input.tsx`
 ```tsx
 "use client";
 
@@ -2369,7 +2612,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 }
 ```
 
-## File: `components\chat\chat-interface.tsx`
+## File: `components/chat/chat-interface.tsx`
 ```tsx
     // File: components/chat/chat-interface.tsx
     "use client";
@@ -2559,7 +2802,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
     }
 ```
 
-## File: `components\chat\chat-message.tsx`
+## File: `components/chat/chat-message.tsx`
 ```tsx
 // File: components/chat/chat-message.tsx
 import React from 'react';
@@ -2663,7 +2906,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 }
 ```
 
-## File: `components\chat\retrieved-documents-panel.tsx`
+## File: `components/chat/retrieved-documents-panel.tsx`
 ```tsx
 // File: components/chat/retrieved-documents-panel.tsx
 import React, { useState } from 'react';
@@ -2816,210 +3059,149 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 }
 ```
 
-## File: `components\knowledge\document-status-list.tsx`
+## File: `components/knowledge/document-status-list.tsx`
 ```tsx
 // File: components/knowledge/document-status-list.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, Loader2, RefreshCw, Info } from 'lucide-react';
-import { listDocumentStatuses, DocumentStatusResponse, ApiError } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from "sonner";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { retryIngestDocument } from '@/lib/api'; // Import the retry API function
+import { toast } from 'sonner'; // For notifications
 
-type DocumentStatus = DocumentStatusResponse;
+// Define una interfaz para el tipo de documento esperado
+interface Document {
+  id: string; // o document_id, ajusta según la API
+  name: string; // o filename
+  status: 'uploaded' | 'processing' | 'processed' | 'error';
+  error_message?: string | null; // Mensaje de error opcional
+  created_at: string; // o upload_date
+  // Añade otros campos si son necesarios (e.g., size, type)
+}
 
-export function DocumentStatusList() {
-    const [statuses, setStatuses] = useState<DocumentStatus[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+interface DocumentStatusListProps {
+  documents: any[];
+  isLoading: boolean;
+  authHeaders: import('@/lib/api').AuthHeaders;
+  onRetrySuccess: (documentId: string) => void;
+}
 
-    const fetchStatuses = useCallback(async (showToast = false) => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const data = await listDocumentStatuses();
-            setStatuses(data);
-            if (showToast) {
-                toast.info("Statuses Refreshed", { description: `Loaded ${data.length} document statuses.`});
-            } else if (data.length === 0) {
-                console.log("No document statuses found.");
-            }
-        } catch (err) {
-            console.error("Failed to fetch document statuses:", err);
-            let message = "Could not load document statuses.";
-            if (err instanceof ApiError) {
-                message = err.message || message;
-            } else if (err instanceof Error) {
-                message = err.message;
-            }
-            setError(message);
-            toast.error("Error Loading Statuses", { description: message });
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+// Helper para obtener icono y color según el estado
+const getStatusAttributes = (status: Document['status']) => {
+  switch (status) {
+    case 'uploaded':
+      return { icon: <Loader2 className="h-4 w-4 animate-spin text-blue-500" />, text: 'En Cola', color: 'blue' };
+    case 'processing':
+      return { icon: <Loader2 className="h-4 w-4 animate-spin text-orange-500" />, text: 'Procesando', color: 'orange' };
+    case 'processed':
+      return { icon: <CheckCircle2 className="h-4 w-4 text-green-500" />, text: 'Procesado', color: 'green' };
+    case 'error':
+      return { icon: <AlertTriangle className="h-4 w-4 text-red-500" />, text: 'Error', color: 'red' };
+    default:
+      return { icon: <AlertCircle className="h-4 w-4 text-gray-500" />, text: 'Desconocido', color: 'gray' };
+  }
+};
 
-    useEffect(() => {
-        fetchStatuses(false);
-    }, [fetchStatuses]);
+export function DocumentStatusList({ documents, isLoading, authHeaders, onRetrySuccess }: DocumentStatusListProps) {
 
-    const handleRefresh = () => {
-        fetchStatuses(true);
-    };
+  const handleRetry = async (documentId: string) => {
+    if (!authHeaders) return;
+    const toastId = toast.loading(`Reintentando ingesta para el documento ${documentId}...`);
+    try {
+      const result = await retryIngestDocument(documentId, authHeaders);
+      toast.success(`Reintento iniciado. Nuevo estado: ${result.status || 'procesando'}.`, { id: toastId });
+      onRetrySuccess(documentId);
+    } catch (error: any) {
+      toast.error(`Error al reintentar: ${error.message || 'Error desconocido'}`, { id: toastId });
+    }
+  };
 
-    const getStatusBadge = (status: DocumentStatus['status']) => {
-        switch (status) {
-            case 'uploaded':
-                return <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-900/30"><Clock className="mr-1 h-3 w-3" />Uploaded</Badge>;
-            case 'processing':
-                return <Badge variant="secondary" className="border-yellow-300 text-yellow-800 bg-yellow-50 dark:border-yellow-600 dark:text-yellow-200 dark:bg-yellow-900/30"><Loader2 className="mr-1 h-3 w-3 animate-spin" />Processing</Badge>;
-            case 'processed':
-            case 'indexed':
-                return <Badge variant="default" className="bg-green-100 text-green-800 border-green-300 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-200 dark:border-green-700"><CheckCircle2 className="mr-1 h-3 w-3" />Processed</Badge>;
-            case 'error':
-                return <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3" />Error</Badge>;
-            default:
-                const unknownStatus: string = status;
-                return <Badge variant="outline"><Info className="mr-1 h-3 w-3" />Unknown ({unknownStatus})</Badge>;
-        }
-    };
-
-    const formatDateTime = (dateString?: string) => {
-        if (!dateString) return 'N/A';
-        try {
-            return new Date(dateString).toLocaleString(undefined, {
-                year: 'numeric', month: 'short', day: 'numeric',
-                hour: 'numeric', minute: '2-digit'
-            });
-        } catch {
-            return dateString;
-        }
-    };
-
-    const renderContent = () => {
-        if (isLoading && statuses.length === 0) { // Show skeletons only on initial load
-            return Array.from({ length: 5 }).map((_, index) => ( // Render more skeleton rows
-                <TableRow key={`skel-${index}`}>
-                    <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
-                </TableRow>
-            ));
-        }
-
-        if (error && statuses.length === 0) {
-            return (
-                <TableRow>
-                    <TableCell colSpan={4} className="text-center text-destructive py-8">
-                        <AlertCircle className="mx-auto h-8 w-8 mb-2" />
-                        Error loading statuses: {error}
-                        <Button variant="link" onClick={handleRefresh} className="ml-2">Try Again</Button>
-                    </TableCell>
-                </TableRow>
-            );
-        }
-
-        if (!isLoading && !error && statuses.length === 0) {
-            return (
-                <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        No documents found. Upload documents using the form above.
-                    </TableCell>
-                </TableRow>
-            );
-        }
-
-        return statuses.map((doc) => (
-            <TableRow key={doc.document_id}>
-                <TableCell className="font-medium truncate max-w-xs" title={doc.file_name || 'N/A'}>{doc.file_name || 'N/A'}</TableCell>
-                <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                <TableCell className="text-muted-foreground text-xs max-w-sm">
-                    {doc.status === 'error' ? (
-                        <TooltipProvider delayDuration={100}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="text-destructive truncate block cursor-help underline decoration-dotted">
-                                        {doc.error_message || 'Unknown error'}
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs text-xs">
-                                    <p>{doc.error_message || 'No details provided.'}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    ) : doc.status === 'processed' || doc.status === 'indexed' ? (
-                        `${doc.chunk_count ?? '?'} chunks indexed`
-                    ) : (
-                        doc.message || '--'
-                    )}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                    {formatDateTime(doc.last_updated)}
-                </TableCell>
-            </TableRow>
-        ));
-    };
-
+  if (isLoading) {
     return (
-       <div className="space-y-2">
-           <div className="flex justify-end items-center gap-2">
-                {error && statuses.length > 0 && (
-                    <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="text-xs text-destructive flex items-center gap-1 cursor-help">
-                                    <AlertCircle className="h-4 w-4"/> Refresh Error
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="left" className="max-w-xs text-xs">
-                                <p>{error}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                )}
-                <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
-                    <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </Button>
-           </div>
-            <ScrollArea className="h-[400px] border rounded-md relative">
-                {isLoading && statuses.length > 0 && (
-                   <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-20">
-                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                   </div>
-                )}
-                <Table>
-                    <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
-                        <TableRow>
-                            <TableHead className="w-[40%]">Filename</TableHead>
-                            <TableHead className="w-[15%]">Status</TableHead>
-                            <TableHead className="w-[30%]">Details</TableHead>
-                            <TableHead className="w-[15%] text-right">Last Updated</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {renderContent()}
-                    </TableBody>
-                </Table>
-            </ScrollArea>
+        <div className="flex justify-center items-center p-10">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <span className="ml-2">Cargando documentos...</span>
         </div>
     );
+  }
+
+  if (!documents || documents.length === 0) {
+    return <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
+  }
+
+  return (
+    <TooltipProvider>
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Fecha de Subida</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {documents.map((doc) => {
+              const { icon, text: statusText, color } = getStatusAttributes(doc.status);
+              const date = new Date(doc.created_at).toLocaleString(); // Formatear fecha
+
+              return (
+                <TableRow key={doc.id}>
+                  <TableCell className="font-medium truncate max-w-xs" title={doc.name}>{doc.name}</TableCell>
+                  <TableCell>
+                    <Badge variant={doc.status === 'error' ? 'destructive' : 'outline'} className={`border-${color}-500/50 text-${color}-700 bg-${color}-50 dark:bg-${color}-900/30 dark:text-${color}-300`}>
+                      <span className="mr-1">{icon}</span>
+                      {statusText}
+                      {doc.status === 'error' && doc.error_message && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <AlertCircle className="h-4 w-4 ml-1.5 cursor-help text-red-600" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs break-words">
+                            <p>Error: {doc.error_message}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{date}</TableCell>
+                  <TableCell className="text-right">
+                    {doc.status === 'error' && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             onClick={() => handleRetry(doc.id)}
+                             aria-label="Reintentar ingesta"
+                           >
+                             <RefreshCw className="h-4 w-4" />
+                           </Button>
+                        </TooltipTrigger>
+                         <TooltipContent>
+                            <p>Reintentar Ingesta</p>
+                         </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {/* Add other actions if needed, e.g., delete */}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </TooltipProvider>
+  );
 }
 ```
 
-## File: `components\knowledge\file-uploader.tsx`
+## File: `components/knowledge/file-uploader.tsx`
 ```tsx
 // File: atenex-frontend/components/knowledge/file-uploader.tsx
 "use client";
@@ -3027,170 +3209,154 @@ export function DocumentStatusList() {
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Input no se usa aquí, pero lo dejo por si acaso
+import { Input } from '@/components/ui/input'; // Assuming Input is used or needed elsewhere
 import { Progress } from '@/components/ui/progress';
-// Alert no se usa directamente aquí, pero lo dejo por si acaso
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UploadCloud, FileCheck2, AlertCircle, Loader2, X } from 'lucide-react';
-import { uploadDocument, ApiError } from '@/lib/api';
-// (+) AÑADIR ESTA LÍNEA (si no existe):
-import { toast } from "sonner";
-import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner'; // Using sonner for notifications
+import { uploadDocument } from '@/lib/api'; // Import the API function
+import { UploadCloud, File as FileIcon, X } from 'lucide-react';
 
-interface UploadedFileStatus {
-    file: File;
-    status: 'pending' | 'uploading' | 'success' | 'error';
-    progress: number;
-    error?: string;
-    documentId?: string;
-    taskId?: string;
+// Define accepted file types based on backend documentation
+const acceptedFileTypes = {
+  'application/pdf': ['.pdf'],
+  'application/msword': ['.doc'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'text/plain': ['.txt'],
+  'text/markdown': ['.md', '.markdown'], // Added .markdown as common extension
+  'text/html': ['.html', '.htm'],
+};
+
+interface FileUploaderProps {
+  authHeaders: import('@/lib/api').AuthHeaders;
+  onUploadSuccess: () => void;
 }
 
-export function FileUploader() {
-    const [filesStatus, setFilesStatus] = useState<UploadedFileStatus[]>([]);
+export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0); // Example progress state
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const updateFileStatus = (fileName: string, updates: Partial<Omit<UploadedFileStatus, 'file'>>) => {
-        setFilesStatus(prev =>
-            prev.map(fs => (fs.file.name === fileName ? { ...fs, ...updates } : fs))
-        );
-    };
+  const onDrop = useCallback((acceptedFiles: File[], fileRejections: any[]) => {
+    setError(null); // Clear previous errors
+    setFile(null); // Clear previous file selection
 
-    const onDrop = useCallback((acceptedFiles: File[]) => {
-        const newFiles: UploadedFileStatus[] = acceptedFiles.map(file => ({
-            file,
-            status: 'pending',
-            progress: 0,
-        }));
-        setFilesStatus(prev => [...prev, ...newFiles]);
+    if (fileRejections.length > 0) {
+        // Show specific error for rejected files (type, size etc.)
+        const firstRejection = fileRejections[0];
+        const errorMessages = firstRejection.errors.map((e: any) => e.message).join(', ');
+        // Customize message based on error code if needed
+        if (firstRejection.errors.some((e:any) => e.code === 'file-invalid-type')) {
+             setError(`Tipo de archivo no permitido. Permitidos: PDF, DOC, DOCX, TXT, MD, HTML.`);
+        } else {
+             setError(`Error: ${errorMessages}`);
+        }
+        toast.error(error || "Error al seleccionar el archivo."); // Show toast as well
+        return;
+    }
 
-        newFiles.forEach(async (fileStatus) => {
-            const formData = new FormData();
-            formData.append('file', fileStatus.file);
+    if (acceptedFiles.length > 0) {
+      setFile(acceptedFiles[0]);
+      setUploadProgress(0); // Reset progress
+    }
+  }, []);
 
-            // --- AÑADIR ESTA LÍNEA ---
-            // Crear el objeto metadata y añadirlo como string JSON al FormData
-            // con el nombre de campo esperado por el backend ('metadata_json')
-            const metadata = { source: 'web-uploader' }; // Puedes añadir más datos si es necesario
-            formData.append('metadata_json', JSON.stringify(metadata));
-            // -----------------------
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: acceptedFileTypes,
+    multiple: false, // Allow only single file upload
+    // Add size limits if necessary
+    // maxSize: MAX_FILE_SIZE_BYTES,
+  });
 
-            updateFileStatus(fileStatus.file.name, { status: 'uploading', progress: 10 });
+  const handleUpload = async () => {
+    if (!file || !authHeaders) return;
 
-            try {
-                 updateFileStatus(fileStatus.file.name, { progress: 50 });
+    setIsUploading(true);
+    setError(null);
+    setUploadProgress(0); // Start progress simulation or actual tracking if available
 
-                // --- MODIFICAR LLAMADA: Quitar el argumento 'metadata' ---
-                // Ahora la metadata va dentro del formData
-                const response = await uploadDocument(formData);
-                // ------------------------------------------------------
+    // Simulate progress for demo purposes if no real progress tracking
+    const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => (prev >= 95 ? 95 : prev + 5));
+    }, 200);
 
-                updateFileStatus(fileStatus.file.name, {
-                    status: 'success',
-                    progress: 100,
-                    documentId: response.document_id,
-                    taskId: response.task_id
-                });
-                 toast.success("Upload Queued", {
-                    description: `${fileStatus.file.name} uploaded successfully and queued for processing. Task ID: ${response.task_id}`,
-                 });
 
-            } catch (error) {
-                console.error(`Upload failed for ${fileStatus.file.name}:`, error);
-                let errorMessage = 'Upload failed.';
-                if (error instanceof ApiError && error.message) {
-                   errorMessage = error.message;
-                } else if (error instanceof Error) {
-                   errorMessage = error.message;
-                }
-                updateFileStatus(fileStatus.file.name, { status: 'error', progress: 0, error: errorMessage });
-                 toast.error(`Upload Failed: ${fileStatus.file.name}`, {
-                    description: errorMessage,
-                 });
-            }
-        });
-    // Dependencias de useCallback: no se necesita 'toast' para sonner
-    }, []);
+    try {
+      const result = await uploadDocument(file, authHeaders);
+      clearInterval(progressInterval); // Stop simulation
+      setUploadProgress(100); // Mark as complete
+      toast.success(`Archivo "${file.name}" subido correctamente. Estado: ${result.status || 'recibido'}.`);
+      setFile(null); // Clear selection on success
+      onUploadSuccess(); // Trigger list refresh
+    } catch (err: any) {
+       clearInterval(progressInterval); // Stop simulation on error
+       setUploadProgress(0); // Reset progress
+       const errorMessage = err.message || 'Ocurrió un error al subir el archivo.';
+       setError(errorMessage);
+       toast.error(errorMessage); // Show specific error from API or generic
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: {
-            'application/pdf': ['.pdf'],
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-            'text/plain': ['.txt'],
-            'text/markdown': ['.md'],
-            'text/html': ['.html', '.htm'],
-            // Añade más tipos si son soportados por tu backend
-            // 'image/jpeg': ['.jpeg', '.jpg'],
-            // 'image/png': ['.png'],
-        },
-        multiple: true,
-    });
+  const removeFile = () => {
+    setFile(null);
+    setError(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  }
 
-     const removeFile = (fileName: string) => {
-        setFilesStatus(prev => prev.filter(fs => fs.file.name !== fileName));
-    };
+  return (
+    <div className="space-y-4">
+      <div
+        {...getRootProps()}
+        className={`p-6 border-2 border-dashed rounded-md cursor-pointer text-center transition-colors
+                    ${isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/50 hover:border-primary/70'}
+                    ${error ? 'border-destructive' : ''}`}
+      >
+        <input {...getInputProps()} />
+        <UploadCloud className="mx-auto h-10 w-10 text-muted-foreground mb-2" />
+        {isDragActive ? (
+          <p>Suelta el archivo aquí...</p>
+        ) : (
+          <p>Arrastra y suelta un archivo aquí, o haz clic para seleccionar (PDF, DOC, DOCX, TXT, MD, HTML)</p>
+        )}
+      </div>
 
-    return (
-        <div className="space-y-4">
-            <div
-                {...getRootProps()}
-                className={`flex flex-col items-center justify-center w-full p-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors duration-200 ease-in-out
-                ${isDragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-muted/50'}`}
-            >
-                <input {...getInputProps()} />
-                <UploadCloud className={`w-12 h-12 mb-4 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                {isDragActive ? (
-                    <p className="text-lg font-semibold text-primary">Drop the files here ...</p>
-                ) : (
-                    <>
-                        <p className="text-lg font-semibold mb-2">Drag & drop files here, or click to select</p>
-                        <p className="text-sm text-muted-foreground">Supported types: PDF, DOCX, TXT, MD, HTML</p>
-                         {/* Add size limits if known from backend */}
-                        {/* <p className="text-xs text-muted-foreground mt-1">Max file size: 50MB</p> */}
-                    </>
-                )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {file && (
+        <div className="p-3 border rounded-md flex items-center justify-between space-x-2">
+            <div className="flex items-center space-x-2 overflow-hidden">
+                 <FileIcon className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                 <span className="text-sm truncate" title={file.name}>{file.name}</span>
+                 <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
             </div>
-
-            {filesStatus.length > 0 && (
-                <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Upload Queue:</h4>
-                    {filesStatus.map((fs) => (
-                        <div key={fs.file.name} className="flex items-center justify-between p-2 border rounded-md bg-background">
-                            <div className="flex items-center space-x-2 overflow-hidden">
-                                {fs.status === 'success' && <FileCheck2 className="w-5 h-5 text-green-600 flex-shrink-0" />}
-                                {fs.status === 'error' && <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />}
-                                {(fs.status === 'pending' || fs.status === 'uploading') && <Loader2 className="w-5 h-5 text-muted-foreground animate-spin flex-shrink-0" />}
-                                <span className="text-sm truncate flex-1" title={fs.file.name}>{fs.file.name}</span>
-                                <span className="text-xs text-muted-foreground flex-shrink-0">({(fs.file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                             </div>
-                             <div className="flex items-center space-x-2 flex-shrink-0">
-                                {fs.status === 'uploading' && <Progress value={fs.progress} className="w-20 h-2" />}
-                                {fs.status === 'success' && <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50 dark:bg-green-900 dark:text-green-300 dark:border-green-700">Queued</Badge>}
-                                {fs.status === 'error' && <Badge variant="destructive" title={fs.error}>Error</Badge>}
-                                {/* Permitir eliminar incluso si está subiendo o tuvo éxito/error */}
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFile(fs.file.name)} title="Remove from queue">
-                                    <X className="h-4 w-4" />
-                                </Button>
-                             </div>
-                            {/* Mostrar mensaje de error debajo si existe */}
-                             {fs.status === 'error' && fs.error && (
-                                <p className="text-xs text-destructive col-span-full mt-1 pl-7" title={fs.error}>
-                                   {fs.error}
-                                </p>
-                             )}
-                        </div>
-                    ))}
-                     {filesStatus.some(fs => fs.status === 'error') && (
-                        <p className="text-xs text-destructive mt-2">Some uploads failed. Check individual errors above.</p>
-                     )}
-                </div>
-            )}
+          {!isUploading && (
+             <Button variant="ghost" size="sm" onClick={removeFile} aria-label="Quitar archivo">
+                <X className="h-4 w-4" />
+             </Button>
+          )}
         </div>
-    );
+      )}
+
+      {isUploading && (
+        <Progress value={uploadProgress} className="w-full" />
+      )}
+
+      <Button
+        onClick={handleUpload}
+        disabled={!file || isUploading}
+        className="w-full"
+      >
+        {isUploading ? 'Subiendo...' : 'Subir Archivo'}
+      </Button>
+    </div>
+  );
 }
 ```
 
-## File: `components\layout\header.tsx`
+## File: `components/layout/header.tsx`
 ```tsx
 // File: components/layout/header.tsx
 // Purpose: Displays the top header bar with theme toggle and user menu.
@@ -3341,7 +3507,7 @@ export function Header() {
 
 ```
 
-## File: `components\layout\sidebar.tsx`
+## File: `components/layout/sidebar.tsx`
 ```tsx
 "use client";
 
@@ -3428,7 +3594,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 }
 ```
 
-## File: `components\theme-palette-button.tsx`
+## File: `components/theme-palette-button.tsx`
 ```tsx
 // File: components/theme-palette-button.tsx
 "use client";
@@ -3487,7 +3653,7 @@ export function ThemePaletteButton() {
 }
 ```
 
-## File: `components\theme-provider.tsx`
+## File: `components/theme-provider.tsx`
 ```tsx
 // File: components/theme-provider.tsx
 "use client";
@@ -3500,12 +3666,12 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 ```
 
-## File: `components\theme-toggle.tsx`
+## File: `components/theme-toggle.tsx`
 ```tsx
 
 ```
 
-## File: `components\ui\alert-dialog.tsx`
+## File: `components/ui/alert-dialog.tsx`
 ```tsx
 "use client"
 
@@ -3667,7 +3833,7 @@ export {
 
 ```
 
-## File: `components\ui\alert.tsx`
+## File: `components/ui/alert.tsx`
 ```tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -3738,7 +3904,7 @@ export { Alert, AlertTitle, AlertDescription }
 
 ```
 
-## File: `components\ui\avatar.tsx`
+## File: `components/ui/avatar.tsx`
 ```tsx
 "use client"
 
@@ -3796,7 +3962,7 @@ export { Avatar, AvatarImage, AvatarFallback }
 
 ```
 
-## File: `components\ui\badge.tsx`
+## File: `components/ui/badge.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3847,7 +4013,7 @@ export { Badge, badgeVariants }
 
 ```
 
-## File: `components\ui\button.tsx`
+## File: `components/ui/button.tsx`
 ```tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -3911,7 +4077,7 @@ export { Button, buttonVariants }
 
 ```
 
-## File: `components\ui\card.tsx`
+## File: `components/ui/card.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4008,7 +4174,7 @@ export {
 
 ```
 
-## File: `components\ui\dialog.tsx`
+## File: `components/ui/dialog.tsx`
 ```tsx
 "use client"
 
@@ -4148,7 +4314,7 @@ export {
 
 ```
 
-## File: `components\ui\dropdown-menu.tsx`
+## File: `components/ui/dropdown-menu.tsx`
 ```tsx
 "use client"
 
@@ -4410,7 +4576,7 @@ export {
 
 ```
 
-## File: `components\ui\input.tsx`
+## File: `components/ui/input.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4436,7 +4602,7 @@ export { Input }
 
 ```
 
-## File: `components\ui\label.tsx`
+## File: `components/ui/label.tsx`
 ```tsx
 "use client"
 
@@ -4465,7 +4631,7 @@ export { Label }
 
 ```
 
-## File: `components\ui\progress.tsx`
+## File: `components/ui/progress.tsx`
 ```tsx
 "use client"
 
@@ -4501,7 +4667,7 @@ export { Progress }
 
 ```
 
-## File: `components\ui\resizable.tsx`
+## File: `components/ui/resizable.tsx`
 ```tsx
 "use client"
 
@@ -4562,7 +4728,7 @@ export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
 
 ```
 
-## File: `components\ui\scroll-area.tsx`
+## File: `components/ui/scroll-area.tsx`
 ```tsx
 "use client"
 
@@ -4625,7 +4791,7 @@ export { ScrollArea, ScrollBar }
 
 ```
 
-## File: `components\ui\separator.tsx`
+## File: `components/ui/separator.tsx`
 ```tsx
 "use client"
 
@@ -4658,7 +4824,7 @@ export { Separator }
 
 ```
 
-## File: `components\ui\skeleton.tsx`
+## File: `components/ui/skeleton.tsx`
 ```tsx
 import { cn } from "@/lib/utils"
 
@@ -4676,7 +4842,7 @@ export { Skeleton }
 
 ```
 
-## File: `components\ui\sonner.tsx`
+## File: `components/ui/sonner.tsx`
 ```tsx
 "use client"
 
@@ -4706,7 +4872,7 @@ export { Toaster }
 
 ```
 
-## File: `components\ui\table.tsx`
+## File: `components/ui/table.tsx`
 ```tsx
 "use client"
 
@@ -4827,7 +4993,7 @@ export {
 
 ```
 
-## File: `components\ui\textarea.tsx`
+## File: `components/ui/textarea.tsx`
 ```tsx
 import * as React from "react"
 
@@ -4850,7 +5016,7 @@ export { Textarea }
 
 ```
 
-## File: `components\ui\tooltip.tsx`
+## File: `components/ui/tooltip.tsx`
 ```tsx
 "use client"
 
@@ -5056,15 +5222,38 @@ if __name__ == "__main__":
     generate_codebase_markdown()
 ```
 
-## File: `lib\api.ts`
+## File: `knowledge-base-refactor.md`
+```md
+# Refactorización Vista Knowledge
+
+## Checklist Refactorización Knowledge
+
+- [x] 1. Auditar llamadas API en `knowledge/page.tsx` y corregir URL (404 HTML → JSON).
+- [x] 2. Añadir en `lib/api.ts` funciones: `getDocumentStatuses`, `retryDocument`, `uploadDocument`.
+- [x] 3. Definir interfaces TypeScript para `DocumentStatus` y respuestas de API.
+- [x] 4. Crear hook `useDocumentStatuses` con paginación o scroll infinito.
+- [ ] 5. Crear hook `useUploadDocument` que capture y muestre errores 409 (duplicados).
+- [ ] 6. Refactorizar/crear componente `DocumentStatusTable`:
+  - Columnas: nombre de archivo, estado (badge), número de chunks, fecha última actualización, mensaje de error.
+  - Botón “Reintentar” para los documentos en estado `error`.
+- [ ] 7. Integrar uploader de archivos en la misma vista (formulario o modal) usando `file-uploader.tsx`.
+- [ ] 8. Manejo de estado global de carga y notificaciones de error/éxito (toasts con `sonner`).
+- [ ] 9. Asegurar estilos responsivos y soporte dark/light mode.
+- [ ] 10. Añadir tests unitarios para hooks y componentes (Jest + React Testing Library).
+- [ ] 11. Prueba manual con dataset grande (cientos de documentos): paginación o scroll infinito.
+- [ ] 12. Revisar prevención de duplicados: simular error 409 y mostrar mensaje claro.
+- [ ] 13. Documentar cambios en README y en los componentes relevantes.
+- [ ] 14. Crear PR, solicitar revisión de equipo y desplegar en staging.
+- [ ] 15. Validación final en producción y cierre de tareas.
+
+```
+
+## File: `lib/api.ts`
 ```ts
 // File: lib/api.ts
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
-// --- ELIMINADO: Importación de Supabase ---
-// import { supabase } from './supabaseClient'; // <= ¡Eliminar esta línea!
-// -----------------------------------------
 import { AUTH_TOKEN_KEY } from './constants'; // Importar la clave para localStorage
 
 // --- ApiError Class (sin cambios) ---
@@ -5090,7 +5279,7 @@ export class ApiError extends Error {
     }
 }
 
-// --- Core Request Function ---
+// --- Core Request Function (sin cambios en lógica principal, solo logs y manejo de token desde localStorage) ---
 export async function request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -5115,7 +5304,7 @@ export async function request<T>(
         throw new ApiError(message, 500);
     }
 
-    // --- >>> RESTAURADO: Obtener token desde localStorage ---
+    // Obtener token desde localStorage
     let token: string | null = null;
     if (typeof window !== 'undefined') { // Asegurarse que se ejecuta en el cliente
         token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -5123,16 +5312,6 @@ export async function request<T>(
     } else {
         console.warn(`API Request: localStorage not available for ${cleanEndpoint} (SSR/Server Context?). Cannot get auth token.`);
     }
-     // --- <<< FIN RESTAURADO ---
-
-    // --- ELIMINADO: Bloque try/catch para supabase.auth.getSession() ---
-    // try {
-    //    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    //     // ... resto del código Supabase eliminado ...
-    // } catch (e) {
-    //     // ... código Supabase eliminado ...
-    // }
-    // --------------------------------------------------------------------
 
     const headers = new Headers(options.headers || {});
     headers.set('Accept', 'application/json');
@@ -5143,15 +5322,18 @@ export async function request<T>(
         if (!headers.has('Content-Type')) {
              headers.set('Content-Type', 'application/json');
         }
+    } else {
+        // Browsers usually set the correct Content-Type for FormData automatically, including the boundary.
+        // Explicitly setting it can sometimes cause issues. Let's remove it if body is FormData.
+        headers.delete('Content-Type');
     }
 
-    // --- Añadir token al header si existe (lógica sin cambios) ---
+    // Añadir token al header si existe
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
     } else if (!cleanEndpoint.includes('/api/v1/users/login')) { // No advertir para login
         console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
     }
-    // -----------------------------------------------------------
 
     const config: RequestInit = {
         ...options,
@@ -5163,7 +5345,7 @@ export async function request<T>(
     try {
         const response = await fetch(apiUrl, config);
 
-        // --- Manejo de Errores (sin cambios) ---
+        // --- Manejo de Errores ---
         if (!response.ok) {
             let errorData: ApiErrorData | null = null;
             let errorText = '';
@@ -5173,42 +5355,58 @@ export async function request<T>(
                     errorData = await response.json();
                 } else { errorText = await response.text(); }
             } catch (parseError) {
-                 console.warn(`API Request: Could not parse error response body...`, parseError);
-                 try { errorText = await response.text(); } catch {}
+                 console.warn(`API Request: Could not parse error response body for ${response.status} ${response.statusText} from ${apiUrl}`, parseError);
+                 try { errorText = await response.text(); } catch {} // Try reading as text as fallback
             }
-            let errorMessage = `API Error (${response.status})`;
-            // Extraer mensaje (sin cambios) ...
-            if (errorData?.detail) { /* ... */ }
-            else if (errorData?.message) { /* ... */ }
-            else if (errorText) { /* ... */ }
-            else { errorMessage = response.statusText || `Request failed...`; }
 
-            console.error(`API Error Response: ${response.status} ${response.statusText} from ${apiUrl}`, { /*...*/ });
+            let errorMessage = `API Error (${response.status})`;
+            // Extraer mensaje significativo de la respuesta de error
+            if (errorData) {
+                if (typeof errorData.detail === 'string') {
+                    errorMessage = errorData.detail;
+                } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') {
+                    // Handle FastAPI validation errors
+                    errorMessage = errorData.detail.map(d => `${d.loc ? d.loc.join('.')+': ' : ''}${d.msg}`).join('; ');
+                } else if (typeof errorData.message === 'string') {
+                    errorMessage = errorData.message;
+                }
+            } else if (errorText) {
+                errorMessage = errorText.substring(0, 200); // Limit length if it's HTML or long text
+            } else {
+                errorMessage = response.statusText || `Request failed with status ${response.status}`;
+            }
+
+            console.error(`API Error Response: ${response.status} ${response.statusText} from ${apiUrl}`, { data: errorData, text: errorText });
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
-        // --- Manejo de respuestas exitosas (sin cambios) ---
-        if (response.status === 204 || response.headers.get('content-length') === '0') { return null as T; }
+        // --- Manejo de respuestas exitosas ---
+        if (response.status === 204 || response.headers.get('content-length') === '0') {
+            return null as T;
+        }
+
         try {
             const data: T = await response.json();
             return data;
         } catch (jsonError) {
-            console.error(`API Request: Invalid JSON...`, jsonError);
-            throw new ApiError(`Invalid JSON response...`, response.status);
+             const responseText = await response.text().catch(() => "Could not read response text."); // Try reading text if JSON fails
+             console.error(`API Request: Invalid JSON response from ${apiUrl}. Status: ${response.status}. Response Text: ${responseText}`, jsonError);
+             throw new ApiError(`Invalid JSON response received from server.`, response.status);
         }
 
     } catch (error) {
-        // --- Manejo de errores de red y otros (sin cambios) ---
-        if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) { /*...*/ }
-        else if (error instanceof ApiError) { throw error; }
-        else {
+        if (error instanceof ApiError) {
+             throw error; // Re-throw known API errors
+        } else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+             const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
+             console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
+             throw new ApiError(networkErrorMsg, 0); // Use 0 or a specific code for network errors
+        } else {
              console.error(`API Request: Unexpected error during fetch to ${apiUrl}`, error);
-             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-             throw new ApiError(`Unexpected error: ${message}`, 500);
+             const message = error instanceof Error ? error.message : 'An unknown fetch error occurred.';
+             throw new ApiError(`Unexpected fetch error: ${message}`, 500);
         }
     }
-    // Should be unreachable, but satisfies TS control flow analysis
-    throw new Error("request function reached end unexpectedly");
 }
 
 // --- API Function Definitions ---
@@ -5220,43 +5418,162 @@ export interface IngestResponse {
     status: string;
     message: string;
 }
-export const uploadDocument = async (formData: FormData): Promise<IngestResponse> => {
-    return request<IngestResponse>('/api/v1/ingest/upload', {
-        method: 'POST',
-        body: formData,
+
+// Define AuthHeaders type for clarity
+export interface AuthHeaders {
+  'X-Company-ID': string;
+  'X-User-ID': string;
+}
+
+// --- MODIFICACIÓN: Eliminar fetchWithAuth y usar request directamente ---
+// Base fetch function to include auth headers
+/* // Eliminado fetchWithAuth
+async function fetchWithAuth(path: string, options: RequestInit & { auth: AuthHeaders }) { // Changed first arg to path
+    const { auth, ...restOptions } = options;
+    const headers = {
+        ...restOptions.headers,
+        'X-Company-ID': auth['X-Company-ID'],
+        'X-User-ID': auth['X-User-ID'],
+    };
+
+    // Construct the full URL
+    const baseUrl = getApiGatewayUrl(); // Get base URL
+    const fullUrl = `${baseUrl}${path}`; // Concatenate base URL and path
+
+    // Need to handle FormData correctly here if used
+    let body = restOptions.body;
+    if (!(body instanceof FormData)) {
+        if (!headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+    } else {
+        // Let the browser set the Content-Type for FormData
+        delete headers['Content-Type'];
+    }
+
+    return fetch(fullUrl, { ...restOptions, headers, body });
+}
+*/
+// -------------------------------------------------------------------
+
+export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // --- MODIFICACIÓN: Usar request --- 
+  try {
+    // Pass auth headers directly to the request options
+    const response = await request<IngestResponse>('/api/v1/ingest/upload', {
+      method: 'POST',
+      headers: {
+        // Content-Type is handled by request for FormData
+        ...auth, // Spread the auth headers
+      },
+      body: formData,
     });
-};
+    return response;
+  } catch (error) {
+    console.error('Error uploading document:', error);
+    // Re-throw the error (ApiError or other) for the caller to handle
+    // The request function already formats ApiError messages
+    throw error;
+  }
+  // ----------------------------------
+}
+
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string;
+    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // string como fallback. 'indexed' eliminado por ahora.
     file_name?: string | null;
     file_type?: string | null;
     chunk_count?: number | null;
     error_message?: string | null;
-    last_updated?: string; // << Debería ser `updated_at` o `last_updated` consistentemente
-    message?: string | null;
-    metadata?: Record<string, any> | null;
+    created_at?: string; // Timestamp de creación
+    updated_at?: string; // Timestamp de última actualización (más útil que last_updated)
+    // file_path?: string | null; // Probablemente no necesario en el frontend listado
+    // message?: string | null; // Mensaje específico de /status/{id}, no garantizado en la lista
+    // metadata?: Record<string, any> | null; // No esencial para la lista de estado
 }
-export const listDocumentStatuses = async (): Promise<DocumentStatusResponse[]> => {
-    return request<DocumentStatusResponse[]>('/api/v1/ingest/status');
+
+// --- MODIFICACIÓN: Usar request y añadir params --- 
+export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
+  const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
+  try {
+    // Pass auth headers directly to the request options
+    const response = await request<DocumentStatusResponse[]>(endpoint, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...auth, // Spread the auth headers
+      },
+    });
+    // Handle potential null response if API could return 204, though unlikely for a list
+    return response || [];
+  } catch (error) {
+    console.error('Error fetching document status list:', error);
+    // Re-throw the error (ApiError or other) for the caller to handle
+    throw error;
+  }
+}
+// -------------------------------------------------
+
+export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
+    return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
 };
+
+export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+  const endpoint = `/api/v1/ingest/retry/${documentId}`;
+  try {
+    // Pass auth headers directly to the request options
+    const response = await request<IngestResponse>(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...auth, // Spread the auth headers
+      },
+      // No body needed for this request
+    });
+    // The request function handles 202 correctly if the API returns JSON
+    // If the API returns 202 with no body, request returns null. We might need to adjust
+    // based on actual API behavior for 202.
+    // Assuming the API returns the standard IngestResponse on 202 as per docs:
+    if (!response) {
+        // This case might happen if the API returns 202 No Content, which contradicts the docs
+        // Returning a synthetic response or throwing an error might be needed.
+        // For now, let's assume the docs are correct and response is IngestResponse.
+        console.warn(`Retry endpoint ${endpoint} returned unexpected null response.`);
+        throw new ApiError('Retry initiated but no confirmation received.', 202);
+    }
+    return response;
+  } catch (error) {
+    console.error(`Error retrying ingest for document ${documentId}:`, error);
+    // Re-throw the error (ApiError or other) for the caller to handle
+    throw error;
+  }
+}
+// ----------------------------------
 
 // --- Query Service ---
 export interface RetrievedDocApi {
-    id: string;
-    score?: number | null;
-    content_preview?: string | null;
-    metadata?: Record<string, any> | null;
-    document_id?: string | null;
-    file_name?: string | null;
+    id: string; // Chunk ID
+    document_id: string; // ID del documento original
+    file_name: string;
+    content: string; // Contenido completo del chunk (puede ser largo)
+    content_preview: string; // Vista previa corta del contenido
+    metadata: Record<string, any> | null; // Metadata asociada al chunk/documento
+    score: number; // Puntuación de relevancia
 }
+// El tipo frontend puede ser igual al de la API por ahora
 export type RetrievedDoc = RetrievedDocApi;
 
 export interface ChatSummary {
     id: string;
     title: string | null;
-    updated_at: string;
     created_at: string;
+    updated_at: string;
+    // --- MODIFICACIÓN: Añadir message_count ---
+    message_count: number;
+    // --------------------------------------
 }
 
 export interface ChatMessageApi {
@@ -5264,8 +5581,17 @@ export interface ChatMessageApi {
     chat_id: string;
     role: 'user' | 'assistant';
     content: string;
-    sources: RetrievedDocApi[] | null;
-    created_at: string; // Definición clave para el error
+    // --- MODIFICACIÓN: Aclarar el tipo de sources ---
+    // La API devuelve null o un array de objetos con estructura específica
+    sources: Array<{
+        chunk_id: string;
+        document_id: string;
+        file_name: string;
+        score: number;
+        preview: string; // Este campo está en la API de mensajes, usarlo en el mapeo si es necesario
+    }> | null;
+    // -------------------------------------------
+    created_at: string; // La API garantiza este campo para mensajes
 }
 
 export interface QueryPayload {
@@ -5276,65 +5602,95 @@ export interface QueryPayload {
 
 export interface QueryApiResponse {
     answer: string;
-    retrieved_documents: RetrievedDocApi[];
-    query_log_id?: string | null;
-    chat_id: string; // Definición clave para el segundo error
+    retrieved_documents: RetrievedDocApi[]; // Usa la interfaz definida arriba
+    query_log_id: string | null; // Puede ser null
+    chat_id: string; // La API de Ask garantiza devolver esto
 }
 
-export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
+export const getChats = async (limit: number = 50, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
      return request<ChatSummary[]>(endpoint);
 };
 
-export const getChatMessages = async (chatId: string): Promise<ChatMessageApi[]> => {
-     return request<ChatMessageApi[]>(`/api/v1/query/chats/${chatId}/messages`);
+// --- MODIFICACIÓN: Añadir params a la firma ---
+export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
+     const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
+     // -----------------------------------------
+     return request<ChatMessageApi[]>(endpoint);
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     const body = { ...payload, chat_id: payload.chat_id || null };
+     // Asegurarse que chat_id es null si no se proporciona, como espera la API
+     const body = {
+         ...payload,
+         chat_id: payload.chat_id || null
+     };
      return request<QueryApiResponse>('/api/v1/query/ask', {
         method: 'POST',
         body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' } // Explícito aquí
      });
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
+     // El request ya maneja la respuesta 204 devolviendo null
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
 // --- Auth Service ---
-// La definición de registerUser puede permanecer si se usa en otro lugar,
-// pero no es parte del flujo de login normal con JWT.
-interface RegisterUserPayload { email: string; password: string; name: string | null; }
-interface RegisterUserResponse { message: string; user_id?: string; }
-export const registerUser = async (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
-    return request<RegisterUserResponse>('/api/v1/users/register', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
-};
+// Definición de LoginPayload explícita
+interface LoginPayload {
+    email: string;
+    password: string;
+}
+// Definición de LoginResponse explícita basada en la documentación
+export interface LoginResponse {
+    access_token: string;
+    token_type: string; // "bearer"
+    user_id: string;
+    email: string;
+    full_name: string;
+    role: string;
+    company_id: string;
+}
+// Login se maneja en useAuth.tsx, no necesita una función aquí
 
 // --- Type Mapping Helpers ---
-export const mapApiSourcesToFrontend = (apiSources: RetrievedDocApi[] | null | undefined): RetrievedDoc[] | undefined => {
-    if (!apiSources) { return undefined; }
-    return apiSources.map(source => ({ ...source }));
+// Mapea la estructura de sources recibida en ChatMessageApi a RetrievedDoc
+export const mapApiSourcesToFrontend = (
+    apiSources: ChatMessageApi['sources'] // Usa el tipo correcto definido en ChatMessageApi
+): RetrievedDoc[] | undefined => {
+    if (!apiSources) {
+        return undefined;
+    }
+    // Mapea cada source de la API de mensaje al formato RetrievedDoc
+    return apiSources.map(source => ({
+        id: source.chunk_id, // Mapea chunk_id a id
+        document_id: source.document_id,
+        file_name: source.file_name,
+        content: source.preview, // Usa preview como content por defecto (podría ajustarse si hay más data)
+        content_preview: source.preview,
+        metadata: null, // La API de mensajes no provee metadata detallada en 'sources'
+        score: source.score,
+    }));
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
+    // Mapear las sources usando la función anterior
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
+
     return {
         id: apiMessage.id,
         role: apiMessage.role,
         content: apiMessage.content,
-        sources: mappedSources,
+        sources: mappedSources, // Usa las sources mapeadas
         isError: false,
-        // Usar created_at del objeto apiMessage si existe
-        created_at: apiMessage.created_at ?? new Date().toISOString(), // Fallback por si acaso
+        created_at: apiMessage.created_at, // Usar siempre el timestamp de la API
     };
 };
 ```
 
-## File: `lib\auth\helpers.ts`
+## File: `lib/auth/helpers.ts`
 ```ts
 // File: lib/auth/helpers.ts
 // Purpose: Define shared authentication types/interfaces. Remove outdated manual token helpers.
@@ -5367,13 +5723,13 @@ export interface User {
 
 ```
 
-## File: `lib\constants.ts`
+## File: `lib/constants.ts`
 ```ts
 export const APP_NAME = "Atenex";
 export const AUTH_TOKEN_KEY = "atenex_auth_token";
 ```
 
-## File: `lib\hooks\useAuth.tsx`
+## File: `lib/hooks/useAuth.tsx`
 ```tsx
 // File: lib/hooks/useAuth.tsx
 // Purpose: Provides authentication state and actions using React Context and API Gateway JWT.
@@ -5640,7 +5996,135 @@ export const useAuth = (): AuthContextType => {
 };
 ```
 
-## File: `lib\utils.ts`
+## File: `lib/hooks/useDocumentStatuses.ts`
+```ts
+import { useState, useEffect, useCallback } from 'react';
+import { getDocumentStatusList, DocumentStatusResponse, AuthHeaders, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/hooks/useAuth';
+
+interface UseDocumentStatusesReturn {
+  documents: DocumentStatusResponse[];
+  isLoading: boolean;
+  error: string | null;
+  fetchDocuments: () => Promise<void>; // Función para refrescar manualmente
+  retryLocalUpdate: (documentId: string) => void; // Función para actualizar estado local al reintentar
+}
+
+export function useDocumentStatuses(): UseDocumentStatusesReturn {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Loading state for documents specifically
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDocuments = useCallback(async () => {
+    // Don't fetch if auth is still loading or user is not available
+    if (isAuthLoading || !user?.userId || !user?.companyId) {
+      // If auth finished and no user, clear documents and stop loading
+      if (!isAuthLoading) {
+        setDocuments([]);
+        setIsLoading(false);
+        setError(null); // No error, just no user
+      }
+      return;
+    }
+
+    const authHeaders: AuthHeaders = {
+      'X-User-ID': user.userId,
+      'X-Company-ID': user.companyId,
+    };
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // TODO: Implement pagination/infinite loading here later if needed
+      const data = await getDocumentStatusList(authHeaders); // Using default limit/offset for now
+      setDocuments(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      const errorMessage = err instanceof ApiError ? err.message : (err.message || 'Error al cargar la lista de documentos.');
+      setError(errorMessage);
+      setDocuments([]); // Clear documents on error
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, isAuthLoading]); // Depend on user and auth loading state
+
+  // Initial fetch when auth is ready
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]); // fetchDocuments already depends on user/isAuthLoading
+
+  // Function to optimistically update status locally when retry is triggered
+  const retryLocalUpdate = useCallback((documentId: string) => {
+    setDocuments(prevDocs =>
+      prevDocs.map(doc =>
+        doc.document_id === documentId
+          ? { ...doc, status: 'processing', error_message: null } // Optimistic update
+          : doc
+      )
+    );
+    // Optionally trigger a full refresh after a delay
+    // setTimeout(fetchDocuments, 5000);
+  }, []); // No dependencies needed for this specific update logic
+
+  return { documents, isLoading, error, fetchDocuments, retryLocalUpdate };
+}
+
+```
+
+## File: `lib/hooks/useUploadDocument.ts`
+```ts
+import { useState, useCallback } from 'react';
+import { uploadDocument, IngestResponse, AuthHeaders, ApiError } from '@/lib/api';
+
+interface UseUploadDocumentReturn {
+  isUploading: boolean;
+  uploadError: string | null;
+  uploadResponse: IngestResponse | null;
+  uploadFile: (file: File, authHeaders: AuthHeaders) => Promise<void>;
+}
+
+export function useUploadDocument(onSuccess?: (response: IngestResponse) => void): UseUploadDocumentReturn {
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadResponse, setUploadResponse] = useState<IngestResponse | null>(null);
+
+  const uploadFile = useCallback(async (file: File, authHeaders: AuthHeaders) => {
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadResponse(null);
+
+    try {
+      const response = await uploadDocument(file, authHeaders);
+      setUploadResponse(response);
+      if (onSuccess) {
+        onSuccess(response);
+      }
+    } catch (err: any) {
+      let errorMessage = 'Error al subir el documento.';
+      if (err instanceof ApiError) {
+        // Check for specific 409 Conflict error (duplicate)
+        if (err.status === 409) {
+          errorMessage = err.message || 'Error: Ya existe un documento con este nombre.'; // Use backend message if available
+        } else {
+          errorMessage = err.message; // Use the generic ApiError message
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setUploadError(errorMessage);
+      setUploadResponse(null); // Clear response on error
+    } finally {
+      setIsUploading(false);
+    }
+  }, [onSuccess]); // Dependency on onSuccess callback
+
+  return { isUploading, uploadError, uploadResponse, uploadFile };
+}
+
+```
+
+## File: `lib/utils.ts`
 ```ts
 // File: lib/utils.ts
 // Purpose: General utility functions, including CN for classnames and API URL retrieval.
