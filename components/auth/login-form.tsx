@@ -1,5 +1,4 @@
 // File: components/auth/login-form.tsx
-// Purpose: Handles user login using email and password via the useAuth hook.
 "use client";
 
 import React, { useState } from 'react';
@@ -13,52 +12,54 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 
-// Zod schema for login form validation
+// Esquema Zod con mensajes en español
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters long.' }),
+  email: z.string().email({ message: 'Por favor, introduce una dirección de correo válida.' }),
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  // Get the signIn function from the auth context
   const { signIn, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
-    mode: 'onChange',
+    mode: 'onChange', // Validar al cambiar
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setError(null);
     try {
       await signIn(data.email, data.password);
-      // Success: redirection handled by AuthProvider
+      // Éxito: redirección manejada por AuthProvider
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials and try again.');
+      // Usar el mensaje de error de la API si está disponible, si no, uno genérico en español
+      setError(err.message || 'Inicio de sesión fallido. Revisa tus credenciales e inténtalo de nuevo.');
     }
   };
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      {/* Error Alert */}
+      {/* Alerta de Error */}
       {error && (
         <Alert variant="destructive" role="alert" aria-live="assertive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Login Failed</AlertTitle>
+          {/* Título de Alerta Traducido */}
+          <AlertTitle>Inicio de Sesión Fallido</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      {/* Email Input */}
+      {/* Campo Email */}
       <div className="space-y-1">
-        <Label htmlFor="email">Email</Label>
+        {/* Label Traducido */}
+        <Label htmlFor="email">Correo Electrónico</Label>
         <Input
           id="email"
           type="email"
-          placeholder="name@example.com"
+          placeholder="nombre@ejemplo.com"
           autoComplete="email"
           required
           disabled={isLoading}
@@ -66,13 +67,15 @@ export function LoginForm() {
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
         />
+        {/* Mensaje de error de validación (ya en español por el schema) */}
         {form.formState.errors.email && (
           <p className="text-sm text-destructive" role="alert">{form.formState.errors.email.message}</p>
         )}
       </div>
-      {/* Password Input */}
+      {/* Campo Contraseña */}
       <div className="space-y-1">
-        <Label htmlFor="password">Password</Label>
+        {/* Label Traducido */}
+        <Label htmlFor="password">Contraseña</Label>
         <Input
           id="password"
           type="password"
@@ -83,13 +86,14 @@ export function LoginForm() {
           {...form.register('password')}
           aria-invalid={form.formState.errors.password ? 'true' : 'false'}
         />
+        {/* Mensaje de error de validación (ya en español por el schema) */}
         {form.formState.errors.password && (
           <p className="text-sm text-destructive" role="alert">{form.formState.errors.password.message}</p>
         )}
       </div>
-      {/* Submit Button */}
+      {/* Botón de Envío Traducido */}
       <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Log In'}
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Iniciar Sesión'}
       </Button>
     </form>
   );

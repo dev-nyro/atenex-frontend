@@ -1,22 +1,21 @@
-// File: atenex-frontend/components/knowledge/file-uploader.tsx
+// File: components/knowledge/file-uploader.tsx
 "use client";
 
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Assuming Input is used or needed elsewhere
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { toast } from 'sonner'; // Using sonner for notifications
-import { uploadDocument } from '@/lib/api'; // Import the API function
+import { toast } from 'sonner';
+import { uploadDocument } from '@/lib/api';
 import { UploadCloud, File as FileIcon, X } from 'lucide-react';
 
-// Define accepted file types based on backend documentation
 const acceptedFileTypes = {
   'application/pdf': ['.pdf'],
   'application/msword': ['.doc'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'text/plain': ['.txt'],
-  'text/markdown': ['.md', '.markdown'], // Added .markdown as common extension
+  'text/markdown': ['.md', '.markdown'],
   'text/html': ['.html', '.htm'],
 };
 
@@ -27,40 +26,38 @@ interface FileUploaderProps {
 
 export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number>(0); // Example progress state
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: any[]) => {
-    setError(null); // Clear previous errors
-    setFile(null); // Clear previous file selection
+    setError(null);
+    setFile(null);
 
     if (fileRejections.length > 0) {
-        // Show specific error for rejected files (type, size etc.)
         const firstRejection = fileRejections[0];
         const errorMessages = firstRejection.errors.map((e: any) => e.message).join(', ');
-        // Customize message based on error code if needed
+        let customError = `Error: ${errorMessages}`;
         if (firstRejection.errors.some((e:any) => e.code === 'file-invalid-type')) {
-             setError(`Tipo de archivo no permitido. Permitidos: PDF, DOC, DOCX, TXT, MD, HTML.`);
-        } else {
-             setError(`Error: ${errorMessages}`);
+             customError = `Tipo de archivo no permitido. Permitidos: PDF, DOC, DOCX, TXT, MD, HTML.`;
+        } else if (firstRejection.errors.some((e:any) => e.code === 'file-too-large')) {
+            customError = `El archivo es demasiado grande.`; // Añadir límite si se especifica
         }
-        toast.error(error || "Error al seleccionar el archivo."); // Show toast as well
+        setError(customError);
+        toast.error("Archivo no válido", { description: customError }); // Toast traducido
         return;
     }
 
     if (acceptedFiles.length > 0) {
       setFile(acceptedFiles[0]);
-      setUploadProgress(0); // Reset progress
+      setUploadProgress(0);
     }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: acceptedFileTypes,
-    multiple: false, // Allow only single file upload
-    // Add size limits if necessary
-    // maxSize: MAX_FILE_SIZE_BYTES,
+    multiple: false,
   });
 
   const handleUpload = async () => {
@@ -68,27 +65,27 @@ export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps
 
     setIsUploading(true);
     setError(null);
-    setUploadProgress(0); // Start progress simulation or actual tracking if available
+    setUploadProgress(0);
 
-    // Simulate progress for demo purposes if no real progress tracking
     const progressInterval = setInterval(() => {
         setUploadProgress((prev) => (prev >= 95 ? 95 : prev + 5));
     }, 200);
 
-
     try {
       const result = await uploadDocument(file, authHeaders);
-      clearInterval(progressInterval); // Stop simulation
-      setUploadProgress(100); // Mark as complete
-      toast.success(`Archivo "${file.name}" subido correctamente. Estado: ${result.status || 'recibido'}.`);
-      setFile(null); // Clear selection on success
-      onUploadSuccess(); // Trigger list refresh
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      // Toast traducido
+      toast.success("Archivo Subido", { description: `Archivo "${file.name}" subido. Estado: ${result.status || 'recibido'}.` });
+      setFile(null);
+      onUploadSuccess();
     } catch (err: any) {
-       clearInterval(progressInterval); // Stop simulation on error
-       setUploadProgress(0); // Reset progress
+       clearInterval(progressInterval);
+       setUploadProgress(0);
        const errorMessage = err.message || 'Ocurrió un error al subir el archivo.';
        setError(errorMessage);
-       toast.error(errorMessage); // Show specific error from API or generic
+       // Toast traducido
+       toast.error("Error al Subir", { description: errorMessage });
     } finally {
       setIsUploading(false);
     }
@@ -112,8 +109,10 @@ export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps
         <input {...getInputProps()} />
         <UploadCloud className="mx-auto h-10 w-10 text-muted-foreground mb-2" />
         {isDragActive ? (
+          // Texto traducido
           <p>Suelta el archivo aquí...</p>
         ) : (
+          // Texto traducido
           <p>Arrastra y suelta un archivo aquí, o haz clic para seleccionar (PDF, DOC, DOCX, TXT, MD, HTML)</p>
         )}
       </div>
@@ -128,6 +127,7 @@ export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps
                  <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
             </div>
           {!isUploading && (
+             // aria-label traducido
              <Button variant="ghost" size="sm" onClick={removeFile} aria-label="Quitar archivo">
                 <X className="h-4 w-4" />
              </Button>
@@ -144,6 +144,7 @@ export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps
         disabled={!file || isUploading}
         className="w-full"
       >
+        {/* Texto traducido */}
         {isUploading ? 'Subiendo...' : 'Subir Archivo'}
       </Button>
     </div>

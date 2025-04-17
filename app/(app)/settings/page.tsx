@@ -1,3 +1,4 @@
+// File: app/(app)/settings/page.tsx
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -7,11 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner'; // Para notificaciones
 
-// Basic placeholder settings page
 export default function SettingsPage() {
     const { user } = useAuth();
     const [name, setName] = useState(user?.name || '');
+    const [isSaving, setIsSaving] = useState(false); // Estado para el botón
 
     useEffect(() => {
         if (user) {
@@ -24,10 +26,22 @@ export default function SettingsPage() {
     };
 
     const handleSave = async () => {
-        // TODO: Implementar la lógica para guardar los cambios en el perfil del usuario.
-        // Esto implicaría hacer una llamada a la API para actualizar el nombre del usuario.
-        // Puedes usar la función 'request' de lib/api.ts para hacer la llamada a la API.
-        console.log('Guardando cambios:', { name });
+        setIsSaving(true);
+        // TODO: Implementar llamada API real a /users/me/update o similar
+        console.log('Guardando cambios (simulado):', { name });
+        try {
+          // Simular llamada a API
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Aquí iría la llamada real: await updateUserProfile({ name });
+          toast.success("Perfil Actualizado", { description: "Tu nombre ha sido guardado." });
+          // Opcional: actualizar el estado global del usuario si el nombre cambia
+          // (requeriría una función updateUser en useAuth)
+        } catch (error) {
+          console.error("Error al guardar perfil:", error);
+          toast.error("Error al Guardar", { description: "No se pudo actualizar el perfil." });
+        } finally {
+           setIsSaving(false);
+        }
     };
 
   return (
@@ -42,13 +56,21 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
             <div className="space-y-1">
                  <Label htmlFor="name">Nombre</Label>
-                 <Input id="name" value={name} onChange={handleNameChange} />
+                 <Input
+                    id="name"
+                    value={name}
+                    onChange={handleNameChange}
+                    disabled={isSaving}
+                 />
             </div>
              <div className="space-y-1">
                  <Label htmlFor="email">Correo electrónico</Label>
                  <Input id="email" type="email" defaultValue={user?.email} disabled />
+                 <p className="text-xs text-muted-foreground">El correo electrónico no se puede cambiar.</p>
             </div>
-             <Button onClick={handleSave}>Guardar Cambios</Button>
+             <Button onClick={handleSave} disabled={isSaving || name === (user?.name || '')}>
+                {isSaving ? "Guardando..." : "Guardar Cambios"}
+             </Button>
         </CardContent>
       </Card>
 
@@ -61,6 +83,11 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
            <p className="text-sm text-muted-foreground">La gestión de la configuración de la empresa aún no está implementada.</p>
+           {/* Placeholder para futuras opciones */}
+           {/* <div className="space-y-2 mt-4">
+                <Label htmlFor="companyName">Nombre de la Empresa</Label>
+                <Input id="companyName" defaultValue={user?.companyId} disabled/>
+           </div> */}
         </CardContent>
       </Card>
 
@@ -69,10 +96,11 @@ export default function SettingsPage() {
        <Card>
         <CardHeader>
           <CardTitle>Apariencia</CardTitle>
-          <CardDescription>Personaliza la apariencia.</CardDescription>
+          <CardDescription>Personaliza la apariencia de la interfaz.</CardDescription>
         </CardHeader>
         <CardContent>
            <p className="text-sm text-muted-foreground">La selección de temas está disponible en el encabezado.</p>
+           {/* Aquí podría ir el ThemePaletteButton si se quisiera aquí también */}
         </CardContent>
       </Card>
 

@@ -1,3 +1,4 @@
+// File: components/chat/chat-input.tsx
 "use client";
 
 import React, { useState, useRef, KeyboardEvent } from 'react';
@@ -49,11 +50,13 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        placeholder="Ask Atenex anything about your documents..."
+        // MODIFICADO: Placeholder traducido
+        placeholder="Pregúntale a Atenex..."
         className="flex-1 resize-none max-h-40 min-h-[40px] overflow-y-auto rounded-lg border p-2 pr-12 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-primary" // Added padding right for button
         rows={1}
         disabled={isLoading}
-        aria-label="Chat input"
+        // MODIFICADO: aria-label traducido
+        aria-label="Entrada de chat"
       />
       <Button
         type="submit"
@@ -66,7 +69,8 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
         ) : (
           <SendHorizonal className="h-5 w-5" />
         )}
-        <span className="sr-only">Send message</span>
+        {/* MODIFICADO: sr-only traducido */}
+        <span className="sr-only">Enviar mensaje</span>
       </Button>
     </form>
   );

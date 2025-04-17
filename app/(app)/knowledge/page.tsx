@@ -1,3 +1,4 @@
+// File: app/(app)/knowledge/page.tsx
 'use client'; // Required for hooks and client-side interactions
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -48,61 +49,51 @@ export default function KnowledgePage() {
       const data = await getDocumentStatusList(authHeaders);
 
       // Mapear la respuesta de la API a la interfaz Document local si es necesario
-      // Asumiendo que la respuesta de getDocumentStatusList ya coincide con DocumentStatusResponse
-      // y que DocumentStatusList espera algo similar a DocumentStatusResponse
-      // Si DocumentStatusList usa la interfaz 'Document', necesitamos mapear:
       const mappedData: Document[] = (Array.isArray(data) ? data : []).map((item: any) => ({
-        id: item.document_id, // Mapear document_id a id
-        name: item.file_name || 'N/A', // Mapear file_name a name
+        id: item.document_id,
+        name: item.file_name || 'N/D', // Usar N/D para nombre no disponible
         status: item.status,
         error_message: item.error_message,
-        created_at: item.created_at || new Date().toISOString(), // Usar created_at si existe
+        created_at: item.created_at || new Date().toISOString(),
       }));
 
       setDocuments(mappedData);
     } catch (err: any) {
       setError(err.message || 'Error al cargar la lista de documentos.');
-      setDocuments([]); // Limpiar documentos en caso de error
+      setDocuments([]);
     } finally {
       setIsLoading(false);
     }
-    // Depender de user para re-ejecutar si cambia
   }, [user, isAuthLoading]);
 
   // Carga inicial de documentos
   useEffect(() => {
-    // Solo empezar a cargar documentos una vez que la autenticación haya terminado y tengamos usuario
     if (!isAuthLoading) {
-        setIsLoading(true); // Asegurarse de que isLoading es true antes de llamar a fetchDocuments
+        setIsLoading(true);
         fetchDocuments();
     }
   }, [fetchDocuments, isAuthLoading]);
 
   // Callback para cuando una subida es exitosa
   const handleUploadSuccess = () => {
-    // Refrescar la lista después de un breve retraso para dar tiempo al backend
-    setTimeout(fetchDocuments, 1500); // Ajusta el tiempo si es necesario
+    setTimeout(fetchDocuments, 1500);
   };
 
   // Callback para cuando un reintento es exitoso (iniciado)
   const handleRetrySuccess = (documentId: string) => {
-    // Actualizar el estado local del documento a 'processing' inmediatamente para UX
     setDocuments(prevDocs =>
         prevDocs.map(doc =>
             doc.id === documentId ? { ...doc, status: 'processing', error_message: null } : doc
         )
     );
-    // Opcionalmente, refrescar toda la lista después de un tiempo para obtener el estado final
-    // setTimeout(fetchDocuments, 5000); // Ejemplo: refrescar después de 5s
+    // setTimeout(fetchDocuments, 5000);
   };
 
-  // Construir authHeaders aquí también para pasarlo a los hijos
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
     'X-User-ID': user.userId,
     'X-Company-ID': user.companyId,
   } : null;
 
-  // Mostrar estado de carga mientras se verifica la autenticación
   if (isAuthLoading) {
     return (
         <div className="container mx-auto p-4 md:p-6 space-y-6 flex justify-center items-center h-[calc(100vh-100px)]">
@@ -119,7 +110,6 @@ export default function KnowledgePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <h2 className="text-lg font-medium mb-3">Subir Nuevo Documento</h2>
-          {/* Pasar authHeaders al FileUploader */}
           {authHeadersForChildren ? (
             <FileUploader
                 onUploadSuccess={handleUploadSuccess}
@@ -133,7 +123,6 @@ export default function KnowledgePage() {
         <div className="lg:col-span-2">
           <h2 className="text-lg font-medium mb-3">Documentos Subidos</h2>
           {error && <p className="text-destructive mb-4">Error: {error}</p>}
-          {/* Usar isLoading (estado local) en lugar de isAuthLoading aquí */}
           {isLoading ? (
              <div className="space-y-2">
                 <Skeleton className="h-10 w-full" />
@@ -141,11 +130,10 @@ export default function KnowledgePage() {
                 <Skeleton className="h-10 w-full" />
              </div>
           ) : (
-            /* Pasar authHeaders al DocumentStatusList */
             authHeadersForChildren ? (
                 <DocumentStatusList
                   documents={documents}
-                  isLoading={false} // Ya hemos manejado la carga principal
+                  isLoading={false}
                   onRetrySuccess={handleRetrySuccess}
                   authHeaders={authHeadersForChildren}
                 />

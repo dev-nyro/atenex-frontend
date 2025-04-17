@@ -7,27 +7,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { retryIngestDocument } from '@/lib/api'; // Import the retry API function
-import { toast } from 'sonner'; // For notifications
+import { retryIngestDocument } from '@/lib/api';
+import { toast } from 'sonner';
 
-// Define una interfaz para el tipo de documento esperado
 interface Document {
-  id: string; // o document_id, ajusta según la API
-  name: string; // o filename
+  id: string;
+  name: string;
   status: 'uploaded' | 'processing' | 'processed' | 'error';
-  error_message?: string | null; // Mensaje de error opcional
-  created_at: string; // o upload_date
-  // Añade otros campos si son necesarios (e.g., size, type)
+  error_message?: string | null;
+  created_at: string;
 }
 
 interface DocumentStatusListProps {
-  documents: any[];
+  documents: Document[]; // Usar la interfaz definida
   isLoading: boolean;
   authHeaders: import('@/lib/api').AuthHeaders;
   onRetrySuccess: (documentId: string) => void;
 }
 
-// Helper para obtener icono y color según el estado
+// Helper con textos traducidos
 const getStatusAttributes = (status: Document['status']) => {
   switch (status) {
     case 'uploaded':
@@ -76,6 +74,7 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
         <Table>
           <TableHeader>
             <TableRow>
+              {/* Cabeceras traducidas */}
               <TableHead>Nombre</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Fecha de Subida</TableHead>
@@ -85,7 +84,8 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
           <TableBody>
             {documents.map((doc) => {
               const { icon, text: statusText, color } = getStatusAttributes(doc.status);
-              const date = new Date(doc.created_at).toLocaleString(); // Formatear fecha
+              // Formato de fecha localizado (depende del navegador del usuario)
+              const date = new Date(doc.created_at).toLocaleString();
 
               return (
                 <TableRow key={doc.id}>
@@ -115,17 +115,18 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
                              variant="ghost"
                              size="icon"
                              onClick={() => handleRetry(doc.id)}
+                             // aria-label traducido
                              aria-label="Reintentar ingesta"
                            >
                              <RefreshCw className="h-4 w-4" />
                            </Button>
                         </TooltipTrigger>
                          <TooltipContent>
+                            {/* Tooltip traducido */}
                             <p>Reintentar Ingesta</p>
                          </TooltipContent>
                       </Tooltip>
                     )}
-                    {/* Add other actions if needed, e.g., delete */}
                   </TableCell>
                 </TableRow>
               );

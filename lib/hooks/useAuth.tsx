@@ -1,5 +1,4 @@
 // File: lib/hooks/useAuth.tsx
-// Purpose: Provides authentication state and actions using React Context and API Gateway JWT.
 "use client";
 
 import React, {
@@ -11,36 +10,31 @@ import React, {
     ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { User as AppUser } from '@/lib/auth/helpers'; // User interface based on JWT payload
+import { User as AppUser } from '@/lib/auth/helpers';
 import { toast } from "sonner";
-import { AUTH_TOKEN_KEY } from '@/lib/constants'; // Key for localStorage
-import { getApiGatewayUrl, cn } from '@/lib/utils'; // Import cn if needed elsewhere, getApiGatewayUrl for login endpoint
+import { AUTH_TOKEN_KEY } from '@/lib/constants';
+import { getApiGatewayUrl, cn } from '@/lib/utils';
 
-// Define the shape of the authentication context
 interface AuthContextType {
-    user: AppUser | null;      // Decoded user info from JWT
-    token: string | null;     // The raw JWT token
-    isLoading: boolean;       // True while checking auth status on initial load or during login/logout
-    signIn: (email: string, password: string) => Promise<void>; // Function to log in via API Gateway
-    signOut: () => Promise<void>; // Function to log out (clears local token)
+    user: AppUser | null;
+    token: string | null;
+    isLoading: boolean;
+    signIn: (email: string, password: string) => Promise<void>;
+    signOut: () => Promise<void>;
 }
 
-// Default context value
 const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
-    isLoading: true, // Start as true until initial check is done
-    signIn: async () => { throw new Error("AuthProvider not yet initialized"); },
-    signOut: async () => { throw new Error("AuthProvider not yet initialized"); },
+    isLoading: true,
+    signIn: async () => { throw new Error("AuthProvider no inicializado"); }, // Traducido
+    signOut: async () => { throw new Error("AuthProvider no inicializado"); }, // Traducido
 };
 
-// Create the context
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
 
 interface AuthProviderProps { children: ReactNode; }
 
-// Helper function to decode JWT payload (basic, no verification needed here)
-// Verification happens at the API Gateway
 function decodeJwtPayload(token: string): any | null {
     try {
         const base64Url = token.split('.')[1];
@@ -56,38 +50,32 @@ function decodeJwtPayload(token: string): any | null {
         );
         return JSON.parse(jsonPayload);
     } catch (error) {
-        console.error("Failed to decode JWT:", error);
+        console.error("Fallo al decodificar JWT:", error); // Traducido
         return null;
     }
 }
 
-// Helper function to create User object from decoded JWT payload
 function getUserFromDecodedToken(payload: any): AppUser | null {
-    if (!payload || !payload.sub) { // 'sub' (subject) is typically the user ID and is essential
+    if (!payload || !payload.sub) {
         return null;
     }
-    // Map claims from the JWT payload (as defined in your API Gateway's README)
-    // to the AppUser interface
     return {
         userId: payload.sub,
-        email: payload.email, // From 'email' claim
-        name: payload.name || null, // From 'name' claim (optional)
-        companyId: payload.company_id, // From 'company_id' claim
-        roles: payload.roles || [], // From 'roles' claim (optional, default to empty array)
+        email: payload.email,
+        name: payload.name || null,
+        companyId: payload.company_id,
+        roles: payload.roles || [],
     };
 }
 
-// AuthProvider Component
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [token, setToken] = useState<string | null>(null);
     const [user, setUser] = useState<AppUser | null>(null);
-    const [isLoading, setIsLoading] = useState(true); // Start loading until token is checked
+    const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
 
-    // --- Effect to load token from localStorage on initial mount ---
     useEffect(() => {
-        console.log("AuthProvider: Initializing and checking localStorage for token...");
-        // Ensure this runs only on the client
+        console.log("AuthProvider: Inicializando y buscando token en localStorage...");
         if (typeof window !== 'undefined') {
             try {
                 const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -96,148 +84,130 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     const currentUser = getUserFromDecodedToken(decodedPayload);
 
                     if (currentUser) {
-                        // Optional: Check token expiry client-side for immediate feedback,
-                        // though the API Gateway is the ultimate authority.
                         const isExpired = decodedPayload.exp && (decodedPayload.exp * 1000 < Date.now());
                         if (isExpired) {
-                            console.warn("AuthProvider: Stored token is expired. Clearing.");
+                            console.warn("AuthProvider: Token almacenado está expirado. Limpiando."); // Traducido
                             localStorage.removeItem(AUTH_TOKEN_KEY);
                             setToken(null);
                             setUser(null);
                         } else {
-                            console.log("AuthProvider: Valid token found in storage.", currentUser);
+                            console.log("AuthProvider: Token válido encontrado en almacenamiento.", currentUser);
                             setToken(storedToken);
                             setUser(currentUser);
                         }
                     } else {
-                        console.warn("AuthProvider: Invalid token found in storage. Clearing.");
-                        localStorage.removeItem(AUTH_TOKEN_KEY); // Clear invalid token
+                        console.warn("AuthProvider: Token inválido encontrado en almacenamiento. Limpiando."); // Traducido
+                        localStorage.removeItem(AUTH_TOKEN_KEY);
                         setToken(null);
                         setUser(null);
                     }
                 } else {
-                    console.log("AuthProvider: No token found in storage.");
+                    console.log("AuthProvider: No se encontró token en almacenamiento."); // Traducido
                     setToken(null);
                     setUser(null);
                 }
             } catch (error) {
-                console.error("AuthProvider: Error accessing localStorage or decoding token:", error);
-                // Clear potentially corrupted state
+                console.error("AuthProvider: Error accediendo a localStorage o decodificando token:", error); // Traducido
                 try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
                 setToken(null);
                 setUser(null);
             } finally {
-                setIsLoading(false); // Finished initial check
-                console.log("AuthProvider: Initial loading complete.");
+                setIsLoading(false);
+                console.log("AuthProvider: Carga inicial completa."); // Traducido
             }
         } else {
-             // Should not happen in client component, but good practice
              setIsLoading(false);
         }
-    }, []); // Empty dependency array ensures this runs only once on mount
+    }, []);
 
-    // --- Sign In Function ---
     const signIn = useCallback(async (email: string, password: string): Promise<void> => {
-        console.log("AuthProvider: Attempting sign in...");
+        console.log("AuthProvider: Intentando iniciar sesión..."); // Traducido
         setIsLoading(true);
-        // Reset previous errors if you track them in state
         let gatewayUrl = '';
         try {
-            gatewayUrl = getApiGatewayUrl(); // Get URL just before the fetch
+            gatewayUrl = getApiGatewayUrl();
             const loginEndpoint = `${gatewayUrl}/api/v1/users/login`;
-            console.log(`AuthProvider: Calling login endpoint: ${loginEndpoint}`);
+            console.log(`AuthProvider: Llamando al endpoint de login: ${loginEndpoint}`);
 
             const response = await fetch(loginEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    // Add ngrok header if needed
                     ...(gatewayUrl.includes("ngrok-free.app") && { 'ngrok-skip-browser-warning': 'true' }),
                 },
                 body: JSON.stringify({ email, password }),
             });
 
-            const responseBody = await response.json(); // Try to parse JSON regardless of status
+            const responseBody = await response.json();
 
             if (!response.ok) {
-                // Use error message from API response if available
-                const errorMessage = responseBody?.message || responseBody?.detail || `Login failed (${response.status})`;
-                console.error("AuthProvider: Login API call failed.", { status: response.status, body: responseBody });
+                const errorMessage = responseBody?.message || responseBody?.detail || `Fallo en login (${response.status})`; // Traducido
+                console.error("AuthProvider: Llamada a API de login fallida.", { status: response.status, body: responseBody }); // Traducido
                 throw new Error(errorMessage);
             }
 
-            // --- Successful Login ---
-            const receivedToken = responseBody?.access_token || responseBody?.token; // Check for common token names
+            const receivedToken = responseBody?.access_token || responseBody?.token;
             if (!receivedToken || typeof receivedToken !== 'string') {
-                console.error("AuthProvider: No valid token received in login response.", responseBody);
-                throw new Error("Login successful, but no token was received.");
+                console.error("AuthProvider: No se recibió un token válido en la respuesta de login.", responseBody); // Traducido
+                throw new Error("Login exitoso, pero no se recibió token."); // Traducido
             }
 
             const decodedPayload = decodeJwtPayload(receivedToken);
             const loggedInUser = getUserFromDecodedToken(decodedPayload);
 
             if (!loggedInUser) {
-                console.error("AuthProvider: Received token is invalid or cannot be decoded.", receivedToken);
-                throw new Error("Login successful, but received an invalid token.");
+                console.error("AuthProvider: Token recibido es inválido o no se puede decodificar.", receivedToken); // Traducido
+                throw new Error("Login exitoso, pero se recibió un token inválido."); // Traducido
             }
 
-            // Store token and update state
             localStorage.setItem(AUTH_TOKEN_KEY, receivedToken);
             setToken(receivedToken);
             setUser(loggedInUser);
-            console.log("AuthProvider: Sign in successful.", loggedInUser);
-            toast.success("Login Successful", { description: `Welcome back, ${loggedInUser.name || loggedInUser.email}!` });
+            console.log("AuthProvider: Inicio de sesión exitoso.", loggedInUser); // Traducido
+            // Toast traducido
+            toast.success("Inicio de Sesión Exitoso", { description: `¡Bienvenido de nuevo, ${loggedInUser.name || loggedInUser.email}!` });
 
-            // Redirect to the chat page (or intended destination)
-            router.replace('/chat'); // Use replace to avoid login page in history
+            router.replace('/chat');
 
         } catch (err: any) {
-            console.error("AuthProvider: Sign in error:", err);
-            // Clear any potentially partially set state
+            console.error("AuthProvider: Error en inicio de sesión:", err); // Traducido
             localStorage.removeItem(AUTH_TOKEN_KEY);
             setToken(null);
             setUser(null);
-            toast.error("Login Failed", { description: err.message || "An unexpected error occurred." });
-            throw err; // Re-throw error so the form can catch it if needed
+            // Toast traducido
+            toast.error("Inicio de Sesión Fallido", { description: err.message || "Ocurrió un error inesperado." });
+            throw err;
         } finally {
             setIsLoading(false);
         }
-    // Include router in dependencies
     }, [router]);
 
-    // --- Sign Out Function ---
     const signOut = useCallback(async (): Promise<void> => {
-        console.log("AuthProvider: Signing out...");
-        setIsLoading(true); // Optional: show loading state during sign out
+        console.log("AuthProvider: Cerrando sesión..."); // Traducido
+        setIsLoading(true);
         try {
-            // Clear local token and state immediately
             localStorage.removeItem(AUTH_TOKEN_KEY);
             setToken(null);
             setUser(null);
-            console.log("AuthProvider: Token removed and state cleared.");
-            toast.success("Logged Out", { description: "You have been successfully logged out." });
+            console.log("AuthProvider: Token eliminado y estado limpiado."); // Traducido
+            // Toast traducido
+            toast.success("Sesión Cerrada", { description: "Has cerrado sesión correctamente." });
 
-            // Redirect to login page
-            router.replace('/login'); // Use replace
+            router.replace('/login');
 
-            // Note: There's usually no backend API call needed for simple JWT logout,
-            // unless you implement token blacklisting on the gateway (more complex).
         } catch (error) {
-             console.error("AuthProvider: Error during sign out process:", error);
-             // Even if redirect fails, ensure state is cleared
+             console.error("AuthProvider: Error durante el proceso de cierre de sesión:", error); // Traducido
              localStorage.removeItem(AUTH_TOKEN_KEY);
              setToken(null);
              setUser(null);
-             toast.error("Logout Issue", { description: "An error occurred during logout." });
+             // Toast traducido
+             toast.error("Problema al Cerrar Sesión", { description: "Ocurrió un error durante el cierre de sesión." });
         } finally {
              setIsLoading(false);
         }
-
-    // Include router in dependencies
     }, [router]);
 
-    // Context value provided to consumers
     const value: AuthContextType = {
         user,
         token,
@@ -253,11 +223,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
 };
 
-// Custom hook to use the AuthContext
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
-    if (context === undefined) { // Check for undefined, not just falsy
-        throw new Error('useAuth must be used within an AuthProvider');
+    if (context === undefined) {
+        throw new Error('useAuth debe ser usado dentro de un AuthProvider'); // Traducido
     }
     return context;
 };
