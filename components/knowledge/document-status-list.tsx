@@ -21,9 +21,10 @@ interface Document {
 }
 
 interface DocumentStatusListProps {
-  documents: Document[];
+  documents: any[];
   isLoading: boolean;
-  onRetrySuccess: (documentId: string) => void; // Callback para actualizar estado local o refrescar
+  authHeaders: import('@/lib/api').AuthHeaders;
+  onRetrySuccess: (documentId: string) => void;
 }
 
 // Helper para obtener icono y color según el estado
@@ -42,14 +43,15 @@ const getStatusAttributes = (status: Document['status']) => {
   }
 };
 
-export function DocumentStatusList({ documents, isLoading, onRetrySuccess }: DocumentStatusListProps) {
+export function DocumentStatusList({ documents, isLoading, authHeaders, onRetrySuccess }: DocumentStatusListProps) {
 
   const handleRetry = async (documentId: string) => {
+    if (!authHeaders) return;
     const toastId = toast.loading(`Reintentando ingesta para el documento ${documentId}...`);
     try {
-      const result = await retryIngestDocument(documentId);
+      const result = await retryIngestDocument(documentId, authHeaders);
       toast.success(`Reintento iniciado. Nuevo estado: ${result.status || 'procesando'}.`, { id: toastId });
-      onRetrySuccess(documentId); // Notificar al padre para actualizar UI
+      onRetrySuccess(documentId);
     } catch (error: any) {
       toast.error(`Error al reintentar: ${error.message || 'Error desconocido'}`, { id: toastId });
     }

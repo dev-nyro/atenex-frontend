@@ -21,10 +21,11 @@ const acceptedFileTypes = {
 };
 
 interface FileUploaderProps {
-  onUploadSuccess: () => void; // Callback to refresh list on success
+  authHeaders: import('@/lib/api').AuthHeaders;
+  onUploadSuccess: () => void;
 }
 
-export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
+export function FileUploader({ authHeaders, onUploadSuccess }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0); // Example progress state
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -63,7 +64,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
   });
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !authHeaders) return;
 
     setIsUploading(true);
     setError(null);
@@ -76,7 +77,7 @@ export function FileUploader({ onUploadSuccess }: FileUploaderProps) {
 
 
     try {
-      const result = await uploadDocument(file);
+      const result = await uploadDocument(file, authHeaders);
       clearInterval(progressInterval); // Stop simulation
       setUploadProgress(100); // Mark as complete
       toast.success(`Archivo "${file.name}" subido correctamente. Estado: ${result.status || 'recibido'}.`);

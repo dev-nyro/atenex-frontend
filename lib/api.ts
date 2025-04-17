@@ -3,7 +3,6 @@
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
 import { AUTH_TOKEN_KEY } from './constants'; // Importar la clave para localStorage
-import { getAuthHeaders } from './auth/helpers'; // Assuming this helper exists
 
 // --- ApiError Class (sin cambios) ---
 interface ApiErrorDataDetail {
@@ -167,35 +166,54 @@ export interface IngestResponse {
     status: string;
     message: string;
 }
-export async function uploadDocument(file: File): Promise<any> {
+
+// Define AuthHeaders type for clarity
+export interface AuthHeaders { 
+  'X-Company-ID': string;
+  'X-User-ID': string;
+}
+
+// Base fetch function to include auth headers
+async function fetchWithAuth(path: string, options: RequestInit & { auth: AuthHeaders }) { // Changed first arg to path
+    const { auth, ...restOptions } = options;
+    const headers = {
+        ...restOptions.headers,
+        'X-Company-ID': auth['X-Company-ID'], 
+        'X-User-ID': auth['X-User-ID'],       
+    };
+
+    // Construct the full URL
+    const baseUrl = getApiGatewayUrl(); // Get base URL
+    const fullUrl = `${baseUrl}${path}`; // Concatenate base URL and path
+
+    return fetch(fullUrl, { ...restOptions, headers });
+}
+
+
+export async function uploadDocument(file: File, auth: AuthHeaders): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
 
   try {
-    const response = await fetch('/api/v1/ingest/upload', { // Ensure this is the correct endpoint
+    // Pass only the path to fetchWithAuth
+    const response = await fetchWithAuth('/ingest/upload', { 
       method: 'POST',
-      headers: {
-        ...(await getAuthHeaders()), // Add auth headers
-        // Content-Type is set automatically by browser for FormData
-      },
+      auth: auth, 
       body: formData,
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      // Handle specific 409 conflict for duplicates
       if (response.status === 409) {
         throw new Error(data.message || 'Error: Archivo duplicado o conflicto.');
       }
-      // Throw other errors with backend message
       throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
     }
 
-    return data; // Return successful response data
+    return data;
   } catch (error) {
     console.error('Error uploading document:', error);
-    // Re-throw the error with a potentially more user-friendly message or the specific backend message
     throw error instanceof Error ? error : new Error('Error al subir el archivo.');
   }
 }
@@ -227,13 +245,14 @@ export const getDocumentStatus = async (documentId: string): Promise<DocumentSta
     return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
 };
 
-export async function getDocumentStatusList(): Promise<any[]> {
+export async function getDocumentStatusList(auth: AuthHeaders): Promise<any[]> {
   try {
-    const response = await fetch('/api/v1/ingest/status', { // Ensure this is the correct endpoint
+    // Pass only the path to fetchWithAuth
+    const response = await fetchWithAuth('/ingest/status', { 
       method: 'GET',
+      auth: auth, 
       headers: {
         'Content-Type': 'application/json',
-        ...(await getAuthHeaders()), // Add auth headers
       },
     });
 
@@ -249,13 +268,14 @@ export async function getDocumentStatusList(): Promise<any[]> {
   }
 }
 
-export async function retryIngestDocument(documentId: string): Promise<any> {
+export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<any> {
   try {
-    const response = await fetch(`/api/v1/ingest/retry/${documentId}`, {
+    // Pass only the path (with documentId) to fetchWithAuth
+    const response = await fetchWithAuth(`/ingest/retry/${documentId}`, { 
       method: 'POST',
+      auth: auth, 
       headers: {
-        'Content-Type': 'application/json', // Although no body, good practice
-        ...(await getAuthHeaders()), // Add auth headers
+        'Content-Type': 'application/json',
       },
     });
 
@@ -267,7 +287,7 @@ export async function retryIngestDocument(documentId: string): Promise<any> {
     const data = await response.json().catch(() => ({})); // Try to get error message
 
     if (!response.ok) {
-       // Handle specific errors like 404 or 409 (wrong state)
+      // Handle specific errors like 404 or 409 (wrong state)
       throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
     }
 
