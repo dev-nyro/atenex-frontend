@@ -1,4 +1,4 @@
-// File: components/knowledge/document-status-list.tsx
+// File: components/knowledge/document-status-list.tsx (MODIFICADO)
 "use client";
 
 import React from 'react';
@@ -6,116 +6,135 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
-import { retryIngestDocument } from '@/lib/api';
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle } from 'lucide-react'; // Added HelpCircle for chunks
+import { retryIngestDocument, DocumentStatusResponse, AuthHeaders } from '@/lib/api'; // Usar interfaz y función API
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
+import { cn } from '@/lib/utils';
 
-interface Document {
-  id: string;
-  name: string;
-  status: 'uploaded' | 'processing' | 'processed' | 'error';
-  error_message?: string | null;
-  created_at: string;
-}
+// Interfaz local renombrada para claridad (usa la de la API)
+type DocumentStatus = DocumentStatusResponse;
 
 interface DocumentStatusListProps {
-  documents: Document[]; // Usar la interfaz definida
+  documents: DocumentStatus[]; // Usar la interfaz de la API
   isLoading: boolean;
-  authHeaders: import('@/lib/api').AuthHeaders;
+  authHeaders: AuthHeaders;
   onRetrySuccess: (documentId: string) => void;
 }
 
-// Helper con textos traducidos
-const getStatusAttributes = (status: Document['status']) => {
-  switch (status) {
-    case 'uploaded':
-      return { icon: <Loader2 className="h-4 w-4 animate-spin text-blue-500" />, text: 'En Cola', color: 'blue' };
-    case 'processing':
-      return { icon: <Loader2 className="h-4 w-4 animate-spin text-orange-500" />, text: 'Procesando', color: 'orange' };
-    case 'processed':
-      return { icon: <CheckCircle2 className="h-4 w-4 text-green-500" />, text: 'Procesado', color: 'green' };
-    case 'error':
-      return { icon: <AlertTriangle className="h-4 w-4 text-red-500" />, text: 'Error', color: 'red' };
-    default:
-      return { icon: <AlertCircle className="h-4 w-4 text-gray-500" />, text: 'Desconocido', color: 'gray' };
-  }
+// Helper con textos y estilos actualizados
+const getStatusAttributes = (status: DocumentStatus['status']) => {
+    switch (status) {
+        case 'uploaded':
+          return { icon: Loader2, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true };
+        case 'processing':
+          return { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true };
+        case 'processed':
+          return { icon: CheckCircle2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false };
+        case 'error':
+          return { icon: AlertTriangle, text: 'Error', className: 'text-red-600 bg-red-100 border-red-200 dark:text-red-300 dark:bg-red-900/30 dark:border-red-700', animate: false };
+        default:
+          // Mapear cualquier otro estado (como 'indexed' si volviera) a Desconocido o similar
+          return { icon: AlertCircle, text: status || 'Desconocido', className: 'text-gray-600 bg-gray-100 border-gray-200 dark:text-gray-400 dark:bg-gray-700/30 dark:border-gray-600', animate: false };
+      }
 };
 
 export function DocumentStatusList({ documents, isLoading, authHeaders, onRetrySuccess }: DocumentStatusListProps) {
 
-  const handleRetry = async (documentId: string) => {
+  const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
-    const toastId = toast.loading(`Reintentando ingesta para el documento ${documentId}...`);
+    const displayId = fileName || documentId.substring(0, 8) + "...";
+    const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
     try {
-      const result = await retryIngestDocument(documentId, authHeaders);
-      toast.success(`Reintento iniciado. Nuevo estado: ${result.status || 'procesando'}.`, { id: toastId });
-      onRetrySuccess(documentId);
+      await retryIngestDocument(documentId, authHeaders);
+      // Ya no necesitamos el 'result.status' porque onRetrySuccess hace la actualización local
+      toast.success("Reintento Iniciado", {
+        id: toastId,
+        description: `El documento "${displayId}" se está procesando de nuevo.`,
+      });
+      onRetrySuccess(documentId); // Llama al callback para actualizar UI localmente
     } catch (error: any) {
-      toast.error(`Error al reintentar: ${error.message || 'Error desconocido'}`, { id: toastId });
+      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error("Error al Reintentar", {
+        id: toastId,
+        description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}`,
+      });
     }
   };
 
-  if (isLoading) {
-    return (
-        <div className="flex justify-center items-center p-10">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <span className="ml-2">Cargando documentos...</span>
-        </div>
-    );
-  }
+  // Ya no se necesita el estado de carga interno, lo maneja el hook padre
+  // if (isLoading) { ... }
 
   if (!documents || documents.length === 0) {
-    return <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
+    // Mensaje si no hay documentos (y no está cargando)
+    return isLoading ? null : <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
   }
 
   return (
     <TooltipProvider>
-      <div className="border rounded-md">
+      <div className="border rounded-md overflow-hidden"> {/* overflow-hidden para bordes redondeados */}
         <Table>
           <TableHeader>
             <TableRow>
-              {/* Cabeceras traducidas */}
-              <TableHead>Nombre</TableHead>
+              {/* Columnas actualizadas */}
+              <TableHead>Nombre Archivo</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead>Fecha de Subida</TableHead>
+              <TableHead className="text-center hidden sm:table-cell">Chunks</TableHead> {/* Oculto en móvil */}
+              <TableHead className="hidden md:table-cell">Última Actualización</TableHead> {/* Oculto en pantallas pequeñas */}
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {documents.map((doc) => {
-              const { icon, text: statusText, color } = getStatusAttributes(doc.status);
-              // Formato de fecha localizado (depende del navegador del usuario)
-              const date = new Date(doc.created_at).toLocaleString();
+              const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
+              // Usar updated_at si existe, si no created_at
+              const dateToShow = doc.updated_at || doc.created_at;
+              const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
+              const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
 
               return (
-                <TableRow key={doc.id}>
-                  <TableCell className="font-medium truncate max-w-xs" title={doc.name}>{doc.name}</TableCell>
+                <TableRow key={doc.document_id}>
+                  <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate" title={displayFileName}>
+                    {displayFileName}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant={doc.status === 'error' ? 'destructive' : 'outline'} className={`border-${color}-500/50 text-${color}-700 bg-${color}-50 dark:bg-${color}-900/30 dark:text-${color}-300`}>
-                      <span className="mr-1">{icon}</span>
+                    <Badge variant='outline' className={cn("border", statusClassName)}>
+                      <Icon className={cn("h-4 w-4 mr-1.5", animate && "animate-spin")} />
                       {statusText}
                       {doc.status === 'error' && doc.error_message && (
-                        <Tooltip>
+                        <Tooltip delayDuration={100}>
                           <TooltipTrigger asChild>
-                            <AlertCircle className="h-4 w-4 ml-1.5 cursor-help text-red-600" />
+                            {/* Usar AlertCircle para el tooltip de error */}
+                            <AlertCircle className="h-4 w-4 ml-1.5 cursor-help opacity-70 hover:opacity-100" />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-xs break-words">
+                          <TooltipContent side="top" className="max-w-xs break-words bg-destructive text-destructive-foreground">
                             <p>Error: {doc.error_message}</p>
                           </TooltipContent>
                         </Tooltip>
                       )}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{date}</TableCell>
+                  <TableCell className="text-center hidden sm:table-cell">
+                    {/* Mostrar chunks si están disponibles, si no 'N/D' */}
+                    {doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : (
+                         <Tooltip delayDuration={100}>
+                             <TooltipTrigger className='cursor-default'>N/D</TooltipTrigger>
+                             <TooltipContent>
+                                Conteo de chunks no disponible.
+                             </TooltipContent>
+                         </Tooltip>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
                   <TableCell className="text-right">
                     {doc.status === 'error' && (
-                      <Tooltip>
+                      <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
                            <Button
                              variant="ghost"
                              size="icon"
-                             onClick={() => handleRetry(doc.id)}
-                             // aria-label traducido
+                             className="h-7 w-7" // Botón más pequeño
+                             onClick={() => handleRetry(doc.document_id, doc.file_name)}
                              aria-label="Reintentar ingesta"
                            >
                              <RefreshCw className="h-4 w-4" />
@@ -127,6 +146,7 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
                          </TooltipContent>
                       </Tooltip>
                     )}
+                    {/* Espacio para futuras acciones como 'Eliminar' */}
                   </TableCell>
                 </TableRow>
               );

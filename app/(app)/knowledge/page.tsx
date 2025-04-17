@@ -1,147 +1,148 @@
-// File: app/(app)/knowledge/page.tsx
-'use client'; // Required for hooks and client-side interactions
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { FileUploader } from '@/components/knowledge/file-uploader';
-import { DocumentStatusList } from '@/components/knowledge/document-status-list';
-import { getDocumentStatusList } from '@/lib/api'; // Import API function
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
-import { useAuth } from '@/lib/hooks/useAuth'; // Import useAuth hook
-import { AuthHeaders } from '@/lib/api'; // Import AuthHeaders type
+// File: app/(app)/knowledge/page.tsx (MODIFICADO)
+'use client';
+import React from 'react'; // No se necesita useState, useEffect, useCallback aquí
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button'; // Import Button
 import { Loader2 } from 'lucide-react';
-
-// Define la interfaz para el tipo de documento esperado (debe coincidir con la de DocumentStatusList)
-interface Document {
-  id: string; // Ajustado a 'id' según el componente DocumentStatusList
-  name: string; // Ajustado a 'name' según el componente DocumentStatusList
-  status: 'uploaded' | 'processing' | 'processed' | 'error';
-  error_message?: string | null;
-  created_at: string;
-}
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses'; // Hook para estados
+import { useUploadDocument } from '@/lib/hooks/useUploadDocument'; // Hook para subida
+import { DocumentStatusList } from '@/components/knowledge/document-status-list';
+import { FileUploader } from '@/components/knowledge/file-uploader';
+import { AuthHeaders } from '@/lib/api';
 
 export default function KnowledgePage() {
-  const { user, isLoading: isAuthLoading } = useAuth(); // Get user and auth loading state
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Función para cargar o refrescar la lista de documentos
-  const fetchDocuments = useCallback(async () => {
-    if (!user?.userId || !user?.companyId) {
-        // No intentar cargar si no hay información de usuario
-        // Podrías mostrar un mensaje o simplemente esperar
-        if (!isAuthLoading) {
-            setError("Información de usuario no disponible. Por favor, inicie sesión.");
-            setIsLoading(false);
-        }
-        return;
+  // Hook para manejar la lista de estados de documentos
+  const {
+    documents,
+    isLoading: isLoadingDocuments,
+    error: documentsError,
+    fetchDocuments, // Función para refrescar la lista
+    retryLocalUpdate, // Función para actualizar localmente al reintentar
+  } = useDocumentStatuses();
+
+  // Hook para manejar la subida de archivos
+  const {
+    isUploading,
+    uploadError,
+    // uploadResponse, // No necesitamos mostrar la respuesta aquí directamente
+    uploadFile,
+    clearUploadStatus // Para limpiar el error de subida si el usuario interactúa de nuevo
+  } = useUploadDocument(
+    // Callback onSuccess: Refrescar la lista después de subir
+    () => {
+        // Pequeño delay para dar tiempo al backend a actualizar el estado
+        setTimeout(() => {
+            fetchDocuments();
+        }, 1500);
     }
+  );
 
-    const authHeaders: AuthHeaders = {
-        'X-User-ID': user.userId,
-        'X-Company-ID': user.companyId,
-    };
-
-    // setIsLoading(true); // Opcional: mostrar carga en cada refresh
-    setError(null);
-    try {
-      // Pasar authHeaders a la función API
-      const data = await getDocumentStatusList(authHeaders);
-
-      // Mapear la respuesta de la API a la interfaz Document local si es necesario
-      const mappedData: Document[] = (Array.isArray(data) ? data : []).map((item: any) => ({
-        id: item.document_id,
-        name: item.file_name || 'N/D', // Usar N/D para nombre no disponible
-        status: item.status,
-        error_message: item.error_message,
-        created_at: item.created_at || new Date().toISOString(),
-      }));
-
-      setDocuments(mappedData);
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar la lista de documentos.');
-      setDocuments([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, isAuthLoading]);
-
-  // Carga inicial de documentos
-  useEffect(() => {
-    if (!isAuthLoading) {
-        setIsLoading(true);
-        fetchDocuments();
-    }
-  }, [fetchDocuments, isAuthLoading]);
-
-  // Callback para cuando una subida es exitosa
-  const handleUploadSuccess = () => {
-    setTimeout(fetchDocuments, 1500);
-  };
-
-  // Callback para cuando un reintento es exitoso (iniciado)
+  // Handler para el botón de reintentar en la lista
   const handleRetrySuccess = (documentId: string) => {
-    setDocuments(prevDocs =>
-        prevDocs.map(doc =>
-            doc.id === documentId ? { ...doc, status: 'processing', error_message: null } : doc
-        )
-    );
+    retryLocalUpdate(documentId); // Actualiza UI localmente
+    // Opcional: refrescar toda la lista después de un tiempo
     // setTimeout(fetchDocuments, 5000);
   };
 
+  // Construir headers solo si el usuario está autenticado
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
     'X-User-ID': user.userId,
     'X-Company-ID': user.companyId,
   } : null;
 
+  // Estado de carga principal (Autenticación)
   if (isAuthLoading) {
     return (
-        <div className="container mx-auto p-4 md:p-6 space-y-6 flex justify-center items-center h-[calc(100vh-100px)]">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <span className="ml-2">Verificando autenticación...</span>
+        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+          <h1 className="text-2xl font-semibold mb-6">
+             <Skeleton className="h-8 w-1/2" />
+          </h1>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-3">
+               <Skeleton className="h-6 w-1/3" />
+               <Skeleton className="h-32 w-full" />
+               <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="lg:col-span-2 space-y-3">
+               <Skeleton className="h-6 w-1/4" />
+               <Skeleton className="h-10 w-full" />
+               <Skeleton className="h-10 w-full" />
+               <Skeleton className="h-10 w-full" />
+            </div>
+          </div>
         </div>
     );
   }
 
+  // Renderizado principal
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
       <h1 className="text-2xl font-semibold">Gestionar Base de Conocimiento</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <h2 className="text-lg font-medium mb-3">Subir Nuevo Documento</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8"> {/* Aumentado gap */}
+        {/* Columna de subida */}
+        <div className="lg:col-span-1 space-y-4"> {/* Añadido space-y */}
+          <h2 className="text-lg font-medium">Subir Nuevo Documento</h2>
           {authHeadersForChildren ? (
             <FileUploader
-                onUploadSuccess={handleUploadSuccess}
-                authHeaders={authHeadersForChildren}
+              authHeaders={authHeadersForChildren}
+              onUploadFile={uploadFile} // Pasar la función de subida del hook
+              isUploading={isUploading} // Pasar estado de carga del hook
+              uploadError={uploadError} // Pasar error de subida del hook
+              clearUploadStatus={clearUploadStatus} // Pasar función para limpiar estado
             />
           ) : (
-            <p className="text-muted-foreground">Inicia sesión para subir documentos.</p>
+            <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
+              Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
+            </p>
           )}
         </div>
 
-        <div className="lg:col-span-2">
-          <h2 className="text-lg font-medium mb-3">Documentos Subidos</h2>
-          {error && <p className="text-destructive mb-4">Error: {error}</p>}
-          {isLoading ? (
+        {/* Columna de listado */}
+        <div className="lg:col-span-2 space-y-4"> {/* Wrap list column content */}
+           <div className='flex justify-between items-center'>
+              <h2 className="text-lg font-medium">Documentos Subidos</h2>
+              {/* Botón opcional para refrescar manualmente */}
+              {authHeadersForChildren && (
+                 <Button variant="outline" size="sm" onClick={fetchDocuments} disabled={isLoadingDocuments}>
+                    <Loader2 className={`mr-2 h-4 w-4 ${isLoadingDocuments ? 'animate-spin' : 'hidden'}`} /> {/* Use template literal for class */}
+                    Refrescar Lista
+                 </Button>
+             )}
+          </div>
+
+          {/* Mostrar error de carga de la lista */}
+          {documentsError && (
+              <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
+                Error al cargar documentos: {documentsError}
+              </div>
+          )}
+
+          {/* Mostrar estado de carga de la lista */}
+          {isLoadingDocuments ? (
              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
              </div>
           ) : (
+            // Renderizar la lista solo si hay headers (usuario logueado)
             authHeadersForChildren ? (
                 <DocumentStatusList
                   documents={documents}
                   isLoading={false}
                   onRetrySuccess={handleRetrySuccess}
-                  authHeaders={authHeadersForChildren}
+                  authHeaders={authHeadersForChildren} // Pasar headers por si se necesitan dentro
                 />
             ) : (
-                !error && <p className="text-muted-foreground">Inicia sesión para ver documentos.</p>
+                // Mensaje si no está cargando, no hay error y no hay usuario
+                !documentsError && <p className="text-muted-foreground text-center py-6">Inicia sesión para ver tus documentos.</p>
             )
           )}
-        </div>
+        </div> {/* Close list column wrapper */}
       </div>
     </div>
   );

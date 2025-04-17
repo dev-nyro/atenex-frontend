@@ -168,137 +168,138 @@ export interface IngestResponse {
 }
 
 // Define AuthHeaders type for clarity
-export interface AuthHeaders { 
+export interface AuthHeaders {
   'X-Company-ID': string;
   'X-User-ID': string;
 }
 
+// --- MODIFICACIÓN: Eliminar fetchWithAuth y usar request directamente ---
 // Base fetch function to include auth headers
+/* // Eliminado fetchWithAuth
 async function fetchWithAuth(path: string, options: RequestInit & { auth: AuthHeaders }) { // Changed first arg to path
     const { auth, ...restOptions } = options;
     const headers = {
         ...restOptions.headers,
-        'X-Company-ID': auth['X-Company-ID'], 
-        'X-User-ID': auth['X-User-ID'],       
+        'X-Company-ID': auth['X-Company-ID'],
+        'X-User-ID': auth['X-User-ID'],
     };
 
     // Construct the full URL
     const baseUrl = getApiGatewayUrl(); // Get base URL
     const fullUrl = `${baseUrl}${path}`; // Concatenate base URL and path
 
-    return fetch(fullUrl, { ...restOptions, headers });
+    // Need to handle FormData correctly here if used
+    let body = restOptions.body;
+    if (!(body instanceof FormData)) {
+        if (!headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+    } else {
+        // Let the browser set the Content-Type for FormData
+        delete headers['Content-Type'];
+    }
+
+    return fetch(fullUrl, { ...restOptions, headers, body });
 }
+*/
+// -------------------------------------------------------------------
 
-
-export async function uploadDocument(file: File, auth: AuthHeaders): Promise<any> {
+export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
   const formData = new FormData();
   formData.append('file', file);
 
+  // --- MODIFICACIÓN: Usar request --- 
   try {
-    // Pass only the path to fetchWithAuth
-    const response = await fetchWithAuth('/ingest/upload', { 
+    // Pass auth headers directly to the request options
+    const response = await request<IngestResponse>('/api/v1/ingest/upload', {
       method: 'POST',
-      auth: auth, 
+      headers: {
+        // Content-Type is handled by request for FormData
+        ...auth, // Spread the auth headers
+      },
       body: formData,
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 409) {
-        throw new Error(data.message || 'Error: Archivo duplicado o conflicto.');
-      }
-      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
-    }
-
-    return data;
+    return response;
   } catch (error) {
     console.error('Error uploading document:', error);
-    throw error instanceof Error ? error : new Error('Error al subir el archivo.');
+    // Re-throw the error (ApiError or other) for the caller to handle
+    // The request function already formats ApiError messages
+    throw error;
   }
+  // ----------------------------------
 }
 
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'indexed' | 'error' | string; // string como fallback
+    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // string como fallback. 'indexed' eliminado por ahora.
     file_name?: string | null;
     file_type?: string | null;
-    chunk_count?: number | null; // Backend might not return this always
+    chunk_count?: number | null;
     error_message?: string | null;
-    // --- MODIFICACIÓN: Usar updated_at y añadir campos faltantes ---
-    created_at?: string; // Coincide con la respuesta esperada
-    updated_at?: string; // Coincide con la respuesta esperada (reemplaza last_updated)
-    file_path?: string | null; // Coincide con la respuesta esperada
-    // -----------------------------------------------------------
-    message?: string | null;
-    metadata?: Record<string, any> | null;
+    created_at?: string; // Timestamp de creación
+    updated_at?: string; // Timestamp de última actualización (más útil que last_updated)
+    // file_path?: string | null; // Probablemente no necesario en el frontend listado
+    // message?: string | null; // Mensaje específico de /status/{id}, no garantizado en la lista
+    // metadata?: Record<string, any> | null; // No esencial para la lista de estado
 }
 
-// --- MODIFICACIÓN: Añadir params a la firma, aunque no se usen ahora ---
-export const listDocumentStatuses = async (limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> => {
-    const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
-    // -----------------------------------------------------------
-    return request<DocumentStatusResponse[]>(endpoint);
-};
+// --- MODIFICACIÓN: Usar request y añadir params --- 
+export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
+  const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
+  try {
+    // Pass auth headers directly to the request options
+    const response = await request<DocumentStatusResponse[]>(endpoint, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...auth, // Spread the auth headers
+      },
+    });
+    // Handle potential null response if API could return 204, though unlikely for a list
+    return response || [];
+  } catch (error) {
+    console.error('Error fetching document status list:', error);
+    // Re-throw the error (ApiError or other) for the caller to handle
+    throw error;
+  }
+}
+// -------------------------------------------------
 
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
     return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
 };
 
-export async function getDocumentStatusList(auth: AuthHeaders): Promise<any[]> {
+export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+  const endpoint = `/api/v1/ingest/retry/${documentId}`;
   try {
-    // Pass only the path to fetchWithAuth
-    const response = await fetchWithAuth('/ingest/status', { 
-      method: 'GET',
-      auth: auth, 
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({})); // Try to get error message
-      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching document status:', error);
-    throw error instanceof Error ? error : new Error('Error al obtener el estado de los documentos.');
-  }
-}
-
-export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<any> {
-  try {
-    // Pass only the path (with documentId) to fetchWithAuth
-    const response = await fetchWithAuth(`/ingest/retry/${documentId}`, { 
+    // Pass auth headers directly to the request options
+    const response = await request<IngestResponse>(endpoint, {
       method: 'POST',
-      auth: auth, 
       headers: {
         'Content-Type': 'application/json',
+        ...auth, // Spread the auth headers
       },
+      // No body needed for this request
     });
-
-    // 202 Accepted is a success case here
-    if (response.status === 202) {
-        return await response.json(); // Contains task_id, status: "processing"
+    // The request function handles 202 correctly if the API returns JSON
+    // If the API returns 202 with no body, request returns null. We might need to adjust
+    // based on actual API behavior for 202.
+    // Assuming the API returns the standard IngestResponse on 202 as per docs:
+    if (!response) {
+        // This case might happen if the API returns 202 No Content, which contradicts the docs
+        // Returning a synthetic response or throwing an error might be needed.
+        // For now, let's assume the docs are correct and response is IngestResponse.
+        console.warn(`Retry endpoint ${endpoint} returned unexpected null response.`);
+        throw new ApiError('Retry initiated but no confirmation received.', 202);
     }
-
-    const data = await response.json().catch(() => ({})); // Try to get error message
-
-    if (!response.ok) {
-      // Handle specific errors like 404 or 409 (wrong state)
-      throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
-    }
-
-    // Should ideally not reach here if only 202 is expected on success
-    return data;
-
+    return response;
   } catch (error) {
     console.error(`Error retrying ingest for document ${documentId}:`, error);
-    throw error instanceof Error ? error : new Error('Error al reintentar la ingesta del documento.');
+    // Re-throw the error (ApiError or other) for the caller to handle
+    throw error;
   }
 }
+// ----------------------------------
 
 // --- Query Service ---
 export interface RetrievedDocApi {
