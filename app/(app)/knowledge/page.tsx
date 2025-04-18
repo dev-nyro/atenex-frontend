@@ -1,6 +1,6 @@
 // File: app/(app)/knowledge/page.tsx (MODIFICADO - Iteración 4.1 -> Refinado)
 'use client';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,6 +34,7 @@ export default function KnowledgePage() {
   const {
     isUploading,
     uploadError,
+    uploadResponse,
     uploadFile,
     clearUploadStatus
   } = useUploadDocument(
@@ -44,6 +45,15 @@ export default function KnowledgePage() {
         }, 1500); // Espera 1.5s para dar tiempo a que el backend empiece a procesar
     }
   );
+
+  // Cuando se obtiene una respuesta de subida con document_id válido, recargar lista y refrescar ese documento
+  useEffect(() => {
+    if (uploadResponse?.document_id) {
+      // Refrescar lista completa y estado individual
+      fetchDocuments(true);
+      refreshDocument(uploadResponse.document_id);
+    }
+  }, [uploadResponse, fetchDocuments, refreshDocument]);
 
   // Callback para cuando un reintento se inicia (actualiza UI y refresca desde API)
   const handleRetrySuccess = useCallback((documentId: string) => {

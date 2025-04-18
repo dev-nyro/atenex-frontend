@@ -812,14 +812,13 @@ export default function ChatPage() {
 
 ## File: `app\(app)\knowledge\page.tsx`
 ```tsx
-// File: app/(app)/knowledge/page.tsx (MODIFICADO - Iteración 4.1)
+// File: app/(app)/knowledge/page.tsx (MODIFICADO - Iteración 4.1 -> Refinado)
 'use client';
 import React, { useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-// Importar Card y sus componentes
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
-import { Loader2, AlertTriangle } from 'lucide-react'; // Añadido AlertTriangle
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Loader2, AlertTriangle, UploadCloud, FileText } from 'lucide-react'; // Iconos relevantes
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses';
 import { useUploadDocument } from '@/lib/hooks/useUploadDocument';
@@ -827,94 +826,114 @@ import { DocumentStatusList } from '@/components/knowledge/document-status-list'
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { AuthHeaders } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Añadir Alert
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
+  // Hook para manejar el estado de los documentos
   const {
     documents,
-    isLoading: isLoadingDocuments,
+    isLoading: isLoadingDocuments, // Renombrado isLoadingDocuments para claridad
     error: documentsError,
     fetchDocuments,
     fetchMore,
     hasMore,
-    retryLocalUpdate,
-    refreshDocument,
-    deleteLocalDocument,
+    retryLocalUpdate, // Para actualizar UI inmediatamente al reintentar
+    refreshDocument, // Para forzar refresco desde API
+    deleteLocalDocument, // Para actualizar UI inmediatamente al borrar
   } = useDocumentStatuses();
 
+  // Hook para manejar la subida de archivos
   const {
     isUploading,
     uploadError,
     uploadFile,
     clearUploadStatus
   } = useUploadDocument(
+    // Callback onSuccess para refrescar la lista después de un tiempo prudencial
     () => {
-        // Refrescar la lista un poco después de subir, para dar tiempo a que aparezca
         setTimeout(() => {
-            fetchDocuments(true);
-        }, 1500);
+            fetchDocuments(true); // reset = true para obtener la lista desde el principio
+        }, 1500); // Espera 1.5s para dar tiempo a que el backend empiece a procesar
     }
   );
 
-  const handleRetrySuccess = (documentId: string) => {
-    retryLocalUpdate(documentId);
-    // Opcional: Refrescar el documento específico inmediatamente después del reintento local
-    // refreshDocument(documentId);
-  };
+  // Callback para cuando un reintento se inicia (actualiza UI y refresca desde API)
+  const handleRetrySuccess = useCallback((documentId: string) => {
+    retryLocalUpdate(documentId); // Cambia estado a 'processing' localmente
+    refreshDocument(documentId); // Pide el estado actualizado a la API
+  }, [retryLocalUpdate, refreshDocument]);
 
+  // Callback para cuando se confirma la eliminación (actualiza UI localmente)
   const handleDeleteSuccess = useCallback((documentId: string) => {
     deleteLocalDocument(documentId);
-    // Podríamos simplemente eliminar localmente o refrescar toda la lista
-    // fetchDocuments(true); // Si queremos asegurar consistencia total
+    // Opcional: fetchDocuments(true); si se prefiere recargar toda la lista
   }, [deleteLocalDocument]);
 
+  // Prepara los headers de autenticación para los componentes hijos
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
     'X-User-ID': user.userId,
     'X-Company-ID': user.companyId,
   } : null;
 
-  // Skeleton de carga principal
+  // --- Renderizado ---
+
+  // Skeleton de Carga Principal (mientras se verifica la autenticación)
   if (isAuthLoading) {
     return (
-        // Usamos grid para un layout más flexible en el skeleton
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 grid gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-3">
-             <Skeleton className="h-10 w-1/3 mb-6" /> {/* Skeleton para el título principal */}
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+          <Skeleton className="h-10 w-1/3 mb-6" /> {/* Skeleton título */}
+          <div className="grid gap-8 lg:grid-cols-3 items-start">
+            <Skeleton className="h-64 rounded-xl lg:col-span-1" /> {/* Skeleton Uploader */}
+            <Skeleton className="h-80 rounded-xl lg:col-span-2" /> {/* Skeleton Lista */}
           </div>
-          {/* Skeletons para las cards */}
-          <Skeleton className="h-64 rounded-xl lg:col-span-1" />
-          <Skeleton className="h-80 rounded-xl lg:col-span-2" />
         </div>
     );
   }
 
-  // Renderizado principal usando grid layout
+  // Renderizado Principal con Layout de Grid
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
         {/* Título de la página */}
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Base de Conocimiento</h1>
+        <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                 <FileText className="h-7 w-7" /> {/* Icono representativo */}
+                 Base de Conocimiento
+            </h1>
+             {/* Botón global de refresco, solo si está autenticado */}
+            {authHeadersForChildren && (
+                <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
+                    <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
+                    Refrescar Todo
+                </Button>
+            )}
+        </div>
 
-        {/* Grid para las dos secciones principales */}
+
+        {/* Grid para las dos secciones principales: Subida y Lista */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-            {/* Columna Izquierda: Subir Documento */}
-            <Card className="lg:col-span-1 sticky top-20"> {/* Hacemos sticky la card de subida en pantallas grandes */}
+            {/* Columna Izquierda: Subir Documento (Card Sticky) */}
+            <Card className="lg:col-span-1 lg:sticky top-20 shadow-md">
                 <CardHeader>
-                    <CardTitle className="text-xl">Subir Nuevo Documento</CardTitle>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                        <UploadCloud className="h-5 w-5 text-primary" /> Subir Nuevo Documento
+                    </CardTitle>
                     <CardDescription>Añade archivos a tu base de conocimiento.</CardDescription>
                 </CardHeader>
                 <CardContent>
                 {authHeadersForChildren ? (
+                    // Componente FileUploader si el usuario está autenticado
                     <FileUploader
-                    authHeaders={authHeadersForChildren}
-                    onUploadFile={uploadFile}
-                    isUploading={isUploading}
-                    uploadError={uploadError}
-                    clearUploadStatus={clearUploadStatus}
+                        authHeaders={authHeadersForChildren}
+                        onUploadFile={uploadFile}
+                        isUploading={isUploading}
+                        uploadError={uploadError}
+                        clearUploadStatus={clearUploadStatus}
                     />
                 ) : (
+                    // Mensaje si el usuario no está autenticado
                     <Alert variant="default" className="bg-muted/50">
                          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                         <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
@@ -927,21 +946,14 @@ export default function KnowledgePage() {
             </Card>
 
             {/* Columna Derecha: Lista de Documentos */}
-            <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                     <div>
-                         <CardTitle className="text-xl">Documentos Subidos</CardTitle>
-                         <CardDescription>Gestiona los documentos de tu organización.</CardDescription>
-                     </div>
-                    {authHeadersForChildren && (
-                        <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
-                            <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
-                            Refrescar
-                        </Button>
-                    )}
-                </CardHeader>
+            <Card className="lg:col-span-2 shadow-md">
+                 {/* Header de la card de lista, sin botón de refresco aquí (ya está global) */}
+                 <CardHeader>
+                    <CardTitle className="text-xl">Documentos Subidos</CardTitle>
+                    <CardDescription>Gestiona los documentos de tu organización.</CardDescription>
+                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {/* Mostrar error de carga de la lista */}
+                    {/* Mostrar Error de Carga de la Lista */}
                     {documentsError && (
                         <Alert variant="destructive">
                              <AlertTriangle className="h-4 w-4" />
@@ -953,28 +965,33 @@ export default function KnowledgePage() {
                         </Alert>
                     )}
 
-                    {/* Mostrar skeleton o lista */}
-                    {isLoadingDocuments && !documentsError && documents.length === 0 ? (
+                    {/* Mostrar Skeleton si está cargando y no hay error */}
+                    {isLoadingDocuments && documents.length === 0 && !documentsError && (
                         <div className="space-y-2 pt-2">
-                            <Skeleton className="h-12 w-full rounded-md" />
-                            <Skeleton className="h-12 w-full rounded-md" />
-                            <Skeleton className="h-12 w-full rounded-md" />
+                            <Skeleton className="h-14 w-full rounded-md" />
+                            <Skeleton className="h-14 w-full rounded-md" />
+                            <Skeleton className="h-14 w-full rounded-md" />
                         </div>
-                    ) : (
-                        authHeadersForChildren ? (
+                    )}
+
+                    {/* Mostrar Lista de Documentos si hay headers y no está en skeleton inicial */}
+                     {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
                         <DocumentStatusList
                             documents={documents}
                             authHeaders={authHeadersForChildren}
-                            onRetrySuccess={handleRetrySuccess}
-                            fetchMore={fetchMore}
-                            hasMore={hasMore}
-                            refreshDocument={refreshDocument}
-                            onDeleteSuccess={handleDeleteSuccess}
+                            onRetrySuccess={handleRetrySuccess} // Pasa el callback de reintento
+                            fetchMore={fetchMore} // Pasa la función para cargar más
+                            hasMore={hasMore} // Pasa el indicador de si hay más
+                            refreshDocument={refreshDocument} // Pasa la función de refresco individual
+                            onDeleteSuccess={handleDeleteSuccess} // Pasa el callback de eliminación
+                            isLoading={isLoadingDocuments} // Indica si se está cargando más
                         />
-                        ) : (
-                            !documentsError && <p className="text-muted-foreground text-center py-10 text-sm">Inicia sesión para ver tus documentos.</p>
-                        )
                     )}
+
+                     {/* Mensaje si no está autenticado y no hubo error */}
+                     {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
+                        <p className="text-muted-foreground text-center py-10 text-sm">Inicia sesión para ver tus documentos.</p>
+                     )}
                 </CardContent>
             </Card>
         </div>
@@ -3317,7 +3334,7 @@ const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTML
 
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (CORREGIDO Y MODIFICADO - Iteración 4.1)
+// File: components/knowledge/document-status-list.tsx (CORREGIDO Y MEJORADO - Iteración 4.1 -> Refinado)
 "use client";
 
 import React from 'react';
@@ -3325,8 +3342,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle, Trash2, ServerCrash } from 'lucide-react';
-import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument } from '@/lib/api';
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, Trash2, ServerCrash, Info, FileClock, FileCheck2, FileX2, FileQuestion } from 'lucide-react'; // Más iconos para estados
+import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument, retryIngestDocument } from '@/lib/api'; // Importar retryIngestDocument
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -3338,34 +3355,31 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
-import { Info } from 'lucide-react'; // Importar Info
+} from "@/components/ui/alert-dialog"; // No se necesita Trigger aquí
+import { Skeleton } from '@/components/ui/skeleton';
 
+// Mapeo de estado a atributos visuales (mejorado con más iconos)
+const statusMap: { [key: string]: { icon: React.ElementType, text: string, className: string, animate: boolean } } = {
+    uploaded:   { icon: FileClock, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true },
+    processing: { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true },
+    processed:  { icon: FileCheck2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false },
+    error:      { icon: FileX2, text: 'Error', className: 'text-red-600 bg-red-100 border-red-200 dark:text-red-300 dark:bg-red-900/30 dark:border-red-700', animate: false },
+    default:    { icon: FileQuestion, text: 'Desconocido', className: 'text-gray-600 bg-gray-100 border-gray-200 dark:text-gray-400 dark:bg-gray-700/30 dark:border-gray-600', animate: false }
+};
+
+// Tipo de documento (usando la interfaz base de la API)
 type DocumentStatus = DocumentStatusResponse;
 
 export interface DocumentStatusListProps {
   documents: DocumentStatus[];
   authHeaders: AuthHeaders;
-  onRetrySuccess: (documentId: string) => void;
+  onRetrySuccess: (documentId: string) => void; // Callback al iniciar reintento
   fetchMore: () => void;
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
-  onDeleteSuccess: (documentId: string) => void;
-  // Añadimos isLoadingDocuments a las props ya que lo necesitamos aquí
-  isLoading?: boolean; // Renombrado a isLoading para simplificar
+  onDeleteSuccess: (documentId: string) => void; // Callback al confirmar eliminación local
+  isLoading: boolean; // Indica si se están cargando más documentos
 }
-
-const getStatusAttributes = (status: DocumentStatus['status']) => {
-    switch (status) {
-        case 'uploaded': return { icon: Loader2, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true };
-        case 'processing': return { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true };
-        case 'processed': return { icon: CheckCircle2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false };
-        case 'error': return { icon: AlertTriangle, text: 'Error', className: 'text-red-600 bg-red-100 border-red-200 dark:text-red-300 dark:bg-red-900/30 dark:border-red-700', animate: false };
-        default: return { icon: ServerCrash, text: status || 'Desconocido', className: 'text-gray-600 bg-gray-100 border-gray-200 dark:text-gray-400 dark:bg-gray-700/30 dark:border-gray-600', animate: false };
-    }
-};
 
 export function DocumentStatusList({
     documents,
@@ -3375,48 +3389,60 @@ export function DocumentStatusList({
     hasMore,
     refreshDocument,
     onDeleteSuccess,
-    isLoading = false // Recibe isLoading (antes isLoadingDocuments)
+    isLoading
 }: DocumentStatusListProps) {
   const [docToDelete, setDocToDelete] = React.useState<DocumentStatus | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isAlertOpen, setIsAlertOpen] = React.useState(false);
+  const [isRetrying, setIsRetrying] = React.useState<string | null>(null); // ID del doc reintentando
+  const [isRefreshing, setIsRefreshing] = React.useState<string | null>(null); // ID del doc refrescando
 
-  // Funciones handleRetry, handleRefresh, openDeleteConfirmation, handleDeleteConfirmed (sin cambios lógicos internos)
+  // --- Handlers de Acciones ---
+
   const handleRetry = async (documentId: string, fileName?: string | null) => {
-    if (!authHeaders) return;
+    if (!authHeaders || isRetrying) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
+    setIsRetrying(documentId); // Marcar como reintentando
     const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
+
     try {
-      // TODO: Implementar llamada API real si existe
-      // await retryIngestDocument(documentId, authHeaders);
-      await new Promise(res => setTimeout(res, 700)); // Simular llamada
+      await retryIngestDocument(documentId, authHeaders); // Llama a la API real
       toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` });
-      onRetrySuccess(documentId); // Actualizar UI localmente
-      refreshDocument(documentId); // Refrescar estado desde API
+      onRetrySuccess(documentId); // Actualiza UI local y pide refresco (manejado en el padre)
     } catch (error: any) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       toast.error("Error al Reintentar", { id: toastId, description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}` });
+    } finally {
+      setIsRetrying(null); // Desmarcar
     }
   };
 
-  const handleRefresh = (documentId: string, fileName?: string | null) => {
+  const handleRefresh = async (documentId: string, fileName?: string | null) => {
+     if (isRefreshing) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
+    setIsRefreshing(documentId); // Marcar como refrescando
     toast.info(`Actualizando estado de "${displayId}"...`);
-    refreshDocument(documentId);
+    try {
+        await refreshDocument(documentId); // Llama a la función del padre (que llama a la API)
+    } catch (error) {
+        // El error ya se maneja en el hook, aquí solo limpiamos el estado visual
+        console.error("Error during refresh handled by parent hook");
+    } finally {
+        setIsRefreshing(null); // Desmarcar
+    }
   };
 
   const openDeleteConfirmation = (doc: DocumentStatus) => {
     setDocToDelete(doc);
-    setIsAlertOpen(true);
+    // No necesitamos setIsAlertOpen(true); Dialog se controla externamente si es necesario, o usamos state local si es modal
   };
 
   const handleDeleteConfirmed = async () => {
-    if (!docToDelete || !authHeaders) return;
+    if (!docToDelete || !authHeaders || isDeleting) return;
     const display = docToDelete.file_name || docToDelete.document_id.substring(0, 8) + '...';
     setIsDeleting(true);
     const toastId = toast.loading(`Eliminando "${display}"...`);
     try {
-      await deleteIngestDocument(docToDelete.document_id, authHeaders);
+      await deleteIngestDocument(docToDelete.document_id, authHeaders); // Llama a la API real
       onDeleteSuccess(docToDelete.document_id); // Actualiza UI localmente
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
     } catch (e: any) {
@@ -3424,15 +3450,16 @@ export function DocumentStatusList({
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
     } finally {
       setIsDeleting(false);
-      setIsAlertOpen(false);
-      setDocToDelete(null);
+      setDocToDelete(null); // Cierra el diálogo de confirmación
     }
   };
 
-  // Estado vacío mejorado
-  if (!isLoading && (!documents || documents.length === 0)) { // Verifica isLoading aquí también
+  // --- Renderizado ---
+
+  // Estado Vacío (si no está cargando y no hay documentos)
+  if (!isLoading && (!documents || documents.length === 0)) {
     return (
-        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border rounded-lg bg-muted/30 mt-4">
+        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border-2 border-dashed rounded-lg bg-muted/30 mt-4 min-h-[150px]">
             <Info className="h-8 w-8 mb-3 opacity-50"/>
             <p className="text-sm font-medium mb-1">Sin Documentos</p>
             <p className="text-xs">Aún no se han subido documentos a la base de conocimiento.</p>
@@ -3440,51 +3467,56 @@ export function DocumentStatusList({
     );
   }
 
+  // Componente Principal (Tabla y Diálogo)
   return (
-    <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+    <AlertDialog open={!!docToDelete} onOpenChange={(open) => !open && setDocToDelete(null)}>
       <TooltipProvider>
-        {/* Leyenda de Estados (opcional, si se quiere mantener) */}
-        {/* <div className="flex flex-wrap gap-2 mb-4 text-xs">...</div> */}
-
-        {/* Contenedor de la tabla con borde y overflow */}
-        <div className="border rounded-lg overflow-hidden">
-          <Table className='w-full'> {/* Asegurar ancho completo */}
+        {/* Contenedor de la tabla con borde */}
+        <div className="border rounded-lg overflow-hidden shadow-sm">
+          <Table className='w-full text-sm'> {/* Tamaño de texto base */}
             <TableHeader>
-              {/* Cabecera con fondo y borde */}
               <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
-                <TableHead className="w-[40%] pl-4 pr-2 py-2.5">Nombre Archivo</TableHead>
+                 {/* Ajuste de padding y widths */}
+                <TableHead className="w-[35%] pl-4 pr-2 py-2.5">Nombre Archivo</TableHead>
                 <TableHead className="w-[15%] px-2 py-2.5">Estado</TableHead>
                 <TableHead className="w-[10%] text-center px-2 py-2.5 hidden sm:table-cell">Chunks</TableHead>
-                <TableHead className="w-[20%] px-2 py-2.5 hidden md:table-cell">Actualización</TableHead>
-                <TableHead className="w-[15%] text-right pr-4 pl-2 py-2.5">Acciones</TableHead>
+                <TableHead className="w-[20%] px-2 py-2.5 hidden md:table-cell">Últ. Actualización</TableHead>
+                <TableHead className="w-[20%] text-right pr-4 pl-2 py-2.5">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {documents.map((doc) => {
-                const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
+                const statusInfo = statusMap[doc.status] || statusMap.default;
+                const Icon = statusInfo.icon;
+                const isCurrentlyRetrying = isRetrying === doc.document_id;
+                const isCurrentlyRefreshing = isRefreshing === doc.document_id;
+                const isActionDisabled = isDeleting || isCurrentlyRetrying || isCurrentlyRefreshing;
+
                 const dateToShow = doc.last_updated;
                 const displayDate = dateToShow ? new Date(dateToShow).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short'}) : 'N/D';
                 const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
-                const displayChunks = doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : '-'; // Usar guión en lugar de N/D
+                // Usar ?? para manejar null y undefined
+                const displayChunks = doc.milvus_chunk_count ?? doc.chunk_count ?? '-'; // Prioriza conteo real de Milvus si existe
 
                 return (
-                  // Fila con hover sutil
                   <TableRow key={doc.document_id} className="group hover:bg-accent/50 data-[state=selected]:bg-accent">
-                    {/* Celda Nombre Archivo */}
+                    {/* Celda Nombre */}
                     <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs truncate pl-4 pr-2 py-2" title={displayFileName}>
                       {displayFileName}
                     </TableCell>
                     {/* Celda Estado */}
                     <TableCell className="px-2 py-2">
-                      <Badge variant='outline' className={cn("border text-xs font-medium whitespace-nowrap", statusClassName)}>
-                        <Icon className={cn("h-3.5 w-3.5 mr-1", animate && "animate-spin")} />
-                        {statusText}
+                      <Badge variant='outline' className={cn("border text-xs font-medium whitespace-nowrap py-0.5", statusInfo.className)}>
+                        <Icon className={cn("h-3.5 w-3.5 mr-1.5", statusInfo.animate && "animate-spin")} />
+                        {statusInfo.text}
+                        {/* Tooltip para errores */}
                         {doc.status === 'error' && doc.error_message && (
                           <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
-                               <Button variant="ghost" size="icon" className='h-4 w-4 p-0 ml-1 cursor-help opacity-70 hover:opacity-100'>
+                               {/* Usar un div simple para no interferir con el layout de Badge */}
+                               <div className='inline-flex items-center justify-center h-4 w-4 ml-1 cursor-help opacity-70 hover:opacity-100'>
                                  <AlertCircle className="h-3.5 w-3.5" />
-                               </Button>
+                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs break-words bg-destructive text-destructive-foreground p-2 text-xs shadow-lg">
                               <p>Error: {doc.error_message}</p>
@@ -3500,13 +3532,13 @@ export function DocumentStatusList({
                     {/* Celda Fecha */}
                     <TableCell className="text-muted-foreground text-xs px-2 py-2 hidden md:table-cell">{displayDate}</TableCell>
                     {/* Celda Acciones */}
-                    <TableCell className="text-right space-x-0.5 pr-4 pl-2 py-1"> {/* Reducido space */}
+                    <TableCell className="text-right space-x-0.5 pr-4 pl-2 py-1">
                       {/* Botón Reintentar */}
                       {doc.status === 'error' && (
                         <Tooltip delayDuration={100}>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta">
-                              <RefreshCw className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}>
+                              {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent><p>Reintentar</p></TooltipContent>
@@ -3515,19 +3547,19 @@ export function DocumentStatusList({
                       {/* Botón Actualizar */}
                       <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado">
-                             <RefreshCw className="h-4 w-4" />
+                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}>
+                             {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
                            </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Actualizar Estado</p></TooltipContent>
                       </Tooltip>
                       {/* Botón Eliminar */}
                       <Tooltip delayDuration={100}>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmation(doc)} aria-label="Eliminar documento">
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmation(doc)} aria-label="Eliminar documento" disabled={isActionDisabled}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        </AlertDialogTrigger>
+                        </TooltipTrigger>
                         <TooltipContent><p>Eliminar</p></TooltipContent>
                       </Tooltip>
                     </TableCell>
@@ -3540,24 +3572,25 @@ export function DocumentStatusList({
 
         {/* Botón Cargar Más */}
         {hasMore && (
-          <div className="pt-4 text-center">
-            {/* CORRECCIÓN: Usar isLoading de las props, no una variable local */}
-            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting || isLoading}>
+          <div className="pt-6 text-center">
+            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Cargar más
+                Cargar más documentos
             </Button>
           </div>
         )}
       </TooltipProvider>
 
-      {/* AlertDialog de Confirmación (mejorado) */}
+      {/* AlertDialog de Confirmación de Eliminación */}
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Confirmar Eliminación?</AlertDialogTitle>
+          <AlertDialogTitle className="flex items-center gap-2">
+             <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
+          </AlertDialogTitle>
           <AlertDialogDescription>
             Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados de la base de conocimiento:
             <br />
-            <span className="font-semibold text-foreground mt-2 block">"{docToDelete?.file_name || docToDelete?.document_id}"</span>
+            <span className="font-semibold text-foreground mt-2 block break-all">"{docToDelete?.file_name || docToDelete?.document_id}"</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -3565,7 +3598,7 @@ export function DocumentStatusList({
           <AlertDialogAction
             onClick={handleDeleteConfirmed}
             disabled={isDeleting}
-            className={buttonVariants({ variant: "destructive" })}
+            className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")} // Ancho mínimo para el botón
           >
             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
             Eliminar Permanentemente
@@ -3579,36 +3612,39 @@ export function DocumentStatusList({
 
 ## File: `components\knowledge\file-uploader.tsx`
 ```tsx
-// File: components/knowledge/file-uploader.tsx (MODIFICADO - Iteración 4.1)
+// File: components/knowledge/file-uploader.tsx (MODIFICADO - Iteración 4.1 -> Refinado Feedback Visual)
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-// Progress ya no se usa directamente aquí
 import { toast } from 'sonner';
-import { UploadCloud, File as FileIcon, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'; // Añadidos iconos
+import { UploadCloud, File as FileIcon, X, Loader2, CheckCircle2, AlertTriangle, FileUp } from 'lucide-react'; // FileUp para icono inicial
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge'; // Para mostrar tipo archivo
 
-// Tipos de archivo aceptados
+// Tipos de archivo aceptados (tomados del README Ingest)
 const acceptedFileTypes = {
   'application/pdf': ['.pdf'],
   'application/msword': ['.doc'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'text/plain': ['.txt'],
-  'text/markdown': ['.md', '.markdown'],
+  'text/markdown': ['.md', '.markdown'], // Añadido .markdown
   'text/html': ['.html', '.htm'],
+  // Faltaban en la definición anterior pero mencionados en el video/README
+  // 'application/vnd.oasis.opendocument.text': ['.odt'], // Si se soportan
+  // 'application/epub+zip': ['.epub'], // Si se soportan
 };
-// Lista para mostrar al usuario
 const allowedExtensions = Object.values(acceptedFileTypes).flat().map(ext => ext.substring(1).toUpperCase()).join(', ');
+const MAX_FILE_SIZE_MB = 50; // Definir un límite (ej. 50MB) - AJUSTAR SEGÚN NECESIDAD
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 interface FileUploaderProps {
   authHeaders: import('@/lib/api').AuthHeaders;
   onUploadFile: (file: File, authHeaders: import('@/lib/api').AuthHeaders) => Promise<boolean>;
-  isUploading: boolean;
-  uploadError: string | null;
-  clearUploadStatus: () => void;
+  isUploading: boolean; // Estado de carga del hook padre
+  uploadError: string | null; // Error del hook padre
+  clearUploadStatus: () => void; // Función para limpiar error/éxito del padre
 }
 
 export function FileUploader({
@@ -3620,32 +3656,40 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [dropzoneError, setDropzoneError] = useState<string | null>(null);
-  const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null); // Para feedback visual post-subida
+  const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null);
 
+  // Efecto para limpiar errores/éxito visual si el archivo cambia o se deselecciona
   useEffect(() => {
-    setDropzoneError(null);
-    setLocalUploadSuccess(null); // Limpiar éxito/error visual si cambia el archivo
-    if (uploadError) {
-        // No limpiar el error de subida automáticamente, dejar que el usuario lo vea
+    if (!file) {
+        setDropzoneError(null);
+        setLocalUploadSuccess(null);
+        // No limpiar uploadError aquí, podría ser un error persistente del último intento
+    } else {
+        // Si se selecciona un NUEVO archivo, limpiar estados visuales y error del padre
+        setDropzoneError(null);
+        setLocalUploadSuccess(null);
+        clearUploadStatus();
     }
-  }, [file]); // Solo depende del archivo seleccionado
+  }, [file, clearUploadStatus]);
 
+  // Manejador del Dropzone
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
+    // Siempre limpiar estados al soltar nuevos archivos
     setDropzoneError(null);
     setLocalUploadSuccess(null);
-    clearUploadStatus(); // Limpiar error de subida previo
+    clearUploadStatus();
     setFile(null);
 
     if (fileRejections.length > 0) {
-        const firstRejection = fileRejections[0];
-        const errorMessages = firstRejection.errors.map((e) => e.message).join(', ');
-        let customError = `Error: ${errorMessages}`;
-        if (firstRejection.errors.some((e) => e.code === 'file-invalid-type')) {
-             customError = `Tipo de archivo no permitido. Permitidos: ${allowedExtensions}.`;
-        } else if (firstRejection.errors.some((e) => e.code === 'file-too-large')) {
-            customError = `El archivo es demasiado grande (límite no especificado).`; // TODO: Añadir límite si se conoce
+        const rejection = fileRejections[0];
+        let msg = rejection.errors.map(e => e.message).join(', ');
+        if (rejection.errors.some(e => e.code === 'file-invalid-type')) {
+            msg = `Tipo de archivo no válido. Permitidos: ${allowedExtensions}.`;
+        } else if (rejection.errors.some(e => e.code === 'file-too-large')) {
+            msg = `El archivo supera el límite de ${MAX_FILE_SIZE_MB} MB.`;
         }
-        setDropzoneError(customError);
+        setDropzoneError(msg);
+        toast.error("Archivo Rechazado", { description: msg });
         return;
     }
 
@@ -3654,105 +3698,132 @@ export function FileUploader({
     }
   }, [clearUploadStatus]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
     onDrop,
     accept: acceptedFileTypes,
+    maxSize: MAX_FILE_SIZE_BYTES,
     multiple: false,
-    disabled: isUploading,
+    disabled: isUploading, // Deshabilitar dropzone mientras se sube
   });
 
+  // Manejador del click del botón de subida
   const handleUploadClick = async () => {
     if (!file || !authHeaders || isUploading) return;
     setLocalUploadSuccess(null); // Resetear estado visual
 
-    const success = await onUploadFile(file, authHeaders);
-    setLocalUploadSuccess(success); // Guardar estado de éxito/fallo para UI
+    const success = await onUploadFile(file, authHeaders); // Llama a la función del hook padre
+    setLocalUploadSuccess(success);
     if (success) {
-        setFile(null); // Limpiar selección si fue exitosa
+        // Limpiar selección solo si la subida fue exitosa (estado 202)
+        // Si falla (ej. 409 duplicado), mantener el archivo seleccionado para info
+        setFile(null);
     }
-    // Los toasts son manejados por el hook useUploadDocument
+    // El hook padre se encarga de los toasts
   };
 
+  // Quitar el archivo seleccionado
   const removeFile = () => {
     setFile(null);
-    setDropzoneError(null);
-    setLocalUploadSuccess(null);
-    clearUploadStatus(); // Limpiar cualquier error de subida previo
   }
 
-  // Combinar error del dropzone y del hook de subida
-  const displayError = dropzoneError || uploadError;
+  // Determinar el error a mostrar (prioridad al error de subida si existe)
+  const displayError = uploadError || dropzoneError;
+  // Determinar si el estado visual es de éxito (solo si la subida terminó y fue exitosa)
+  const displaySuccess = !isUploading && localUploadSuccess === true;
+  // Determinar si el estado visual es de fallo (solo si la subida terminó y falló, y no hay error de dropzone)
+  const displayFailure = !isUploading && localUploadSuccess === false && !dropzoneError;
 
   return (
     <div className="space-y-4">
-      {/* Dropzone Area */}
+      {/* Área del Dropzone */}
       <div
         {...getRootProps()}
         className={cn(
-            `relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg text-center transition-colors duration-200 ease-in-out`,
-            isUploading
-                ? 'cursor-not-allowed bg-muted/30 border-muted/50 text-muted-foreground'
-                : 'cursor-pointer border-muted-foreground/30 hover:border-primary/50 hover:bg-accent/50 dark:hover:bg-accent/10',
-            isDragActive ? 'border-primary bg-primary/10 border-solid' : '',
-            displayError ? 'border-destructive bg-destructive/5 border-solid' : '', // Estilo error más claro
-            localUploadSuccess === true ? 'border-green-500 bg-green-500/10 border-solid' : '', // Estilo éxito
-            localUploadSuccess === false && !displayError ? 'border-destructive bg-destructive/5 border-solid' : '' // Estilo fallo (si no hay otro error)
+            `relative flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg text-center transition-all duration-200 ease-in-out min-h-[180px] outline-none`, // Aumentar padding y altura mínima
+            // Estilos interactivos (no mientras sube)
+            !isUploading && 'cursor-pointer hover:border-primary/50 hover:bg-accent/50 dark:hover:bg-accent/10',
+            !isUploading && (isDragActive || isFocused) && 'border-primary bg-primary/10 border-solid ring-2 ring-primary/30',
+            // Estilos de estado (deshabilitado, error, éxito, fallo)
+            isUploading && 'cursor-not-allowed bg-muted/30 border-muted/50 text-muted-foreground',
+            displayError && 'border-destructive bg-destructive/5 border-solid text-destructive',
+            displaySuccess && 'border-green-500 bg-green-500/10 border-solid text-green-700 dark:text-green-400',
+            displayFailure && 'border-destructive bg-destructive/5 border-solid text-destructive' // Mismo estilo que error para fallo
         )}
       >
-        <input {...getInputProps()} disabled={isUploading} />
+        <input {...getInputProps()} />
 
-        {/* Icono central */}
-        <div className={cn("mb-2 transition-transform duration-200", isDragActive ? "scale-110" : "")}>
-            {localUploadSuccess === true && <CheckCircle2 className="h-10 w-10 text-green-600" />}
-            {localUploadSuccess === false && !displayError && <AlertTriangle className="h-10 w-10 text-destructive" />}
-            {displayError && <AlertTriangle className="h-10 w-10 text-destructive" />}
-            {localUploadSuccess === null && !displayError && <UploadCloud className={cn("h-10 w-10", isUploading ? "text-muted-foreground/60" : "text-muted-foreground/80")} />}
+        {/* Icono Central Dinámico */}
+        <div className="mb-3 transform transition-transform duration-200 ease-in-out motion-safe:hover:scale-105">
+            {isUploading && <Loader2 className="h-10 w-10 animate-spin" />}
+            {displaySuccess && <CheckCircle2 className="h-10 w-10" />}
+            {(displayError || displayFailure) && <AlertTriangle className="h-10 w-10" />}
+            {!isUploading && !displaySuccess && !displayError && !displayFailure && (
+                 <FileUp className={cn("h-10 w-10", isDragActive ? "text-primary" : "text-muted-foreground/60")} />
+            )}
         </div>
 
-        {/* Texto del Dropzone */}
-        {isDragActive ? (
-          <p className="text-sm font-medium text-primary">Suelta el archivo aquí...</p>
-        ) : (
-          <p className={cn("text-sm", isUploading ? "text-muted-foreground/80" : "text-foreground/90")}>
-            Arrastra y suelta un archivo, o{' '}
-            <span className="font-medium text-primary underline underline-offset-2">haz clic para seleccionar</span>
-            <span className="mt-1 block text-xs text-muted-foreground">(Permitidos: {allowedExtensions})</span>
-          </p>
-        )}
+        {/* Texto del Dropzone Dinámico */}
+        <div className="text-sm max-w-xs">
+             {isUploading && <p className="font-medium">Subiendo archivo...</p>}
+             {displaySuccess && <p className="font-medium">Archivo puesto en cola exitosamente.</p>}
+             {displayError && <p className="font-medium">{displayError}</p>}
+             {displayFailure && <p className="font-medium">Fallo la subida del archivo.</p>}
+
+             {/* Texto por defecto / arrastre */}
+            {!isUploading && !displaySuccess && !displayError && !displayFailure && (
+                isDragActive ? (
+                <p className="font-medium text-primary">Suelta el archivo aquí...</p>
+                ) : (
+                <p className={cn("text-foreground/90")}>
+                    Arrastra y suelta un archivo, o{' '}
+                    <span className="font-medium text-primary underline underline-offset-2">haz clic para seleccionar</span>
+                </p>
+                )
+            )}
+            {/* Siempre mostrar extensiones permitidas y límite (si no hay error/éxito/subida) */}
+            {!isUploading && !displaySuccess && !displayError && !displayFailure && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                    (Permitidos: {allowedExtensions}. Máx: {MAX_FILE_SIZE_MB}MB)
+                </p>
+            )}
+        </div>
       </div>
 
-      {/* Mensaje de Error (si existe) */}
-      {displayError && <p className="text-sm text-destructive px-1 flex items-center gap-1.5"><AlertTriangle className="h-4 w-4"/>{displayError}</p>}
-
-      {/* Preview del Archivo Seleccionado */}
-      {file && (
-        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40">
-            <div className="flex items-center space-x-3 overflow-hidden">
+      {/* Preview del Archivo Seleccionado (si existe y no está subiendo/completado) */}
+      {file && !isUploading && localUploadSuccess === null && (
+        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
+            <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
                  <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
                  <div className='flex flex-col min-w-0'>
                     <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
-                    <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB) - <Badge variant="outline" className='ml-1 py-0 px-1'>{file.type || 'desconocido'}</Badge></span>
+                    <span className="text-xs text-muted-foreground">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB) -
+                        <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
+                    </span>
                  </div>
             </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
+          {/* Botón para quitar archivo, deshabilitado si está subiendo */}
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
             <X className="h-4 w-4" />
           </Button>
         </div>
       )}
 
-      {/* Botón de Subida */}
-      <Button
-        onClick={handleUploadClick}
-        disabled={!file || isUploading}
-        className="w-full"
-      >
-        {isUploading ? (
-            <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Subiendo...
-            </>
-         ) : 'Subir y Procesar Archivo'}
-      </Button>
+      {/* Botón de Subida (visible solo si hay archivo y no se completó la subida) */}
+      {file && localUploadSuccess === null && (
+          <Button
+            onClick={handleUploadClick}
+            disabled={isUploading} // Deshabilitar si está subiendo
+            className="w-full"
+          >
+            {isUploading ? (
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Subiendo...
+                </>
+             ) : 'Subir y Procesar Archivo'}
+          </Button>
+       )}
     </div>
   );
 }
@@ -5693,12 +5764,13 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: lib/api.ts (MODIFICADO - Añadida deleteIngestDocument)
+// File: lib/api.ts (REVISADO Y ASEGURADO - Coincide con READMEs)
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
 
+// --- Tipos de Error ---
 interface ApiErrorDataDetail {
     msg: string;
     type: string;
@@ -5706,7 +5778,7 @@ interface ApiErrorDataDetail {
 }
 interface ApiErrorData {
     detail?: string | ApiErrorDataDetail[] | any;
-    message?: string;
+    message?: string; // Campo alternativo común para mensajes de error
 }
 export class ApiError extends Error {
     status: number;
@@ -5721,119 +5793,148 @@ export class ApiError extends Error {
     }
 }
 
+// --- Función Genérica de Request ---
+/**
+ * Realiza una solicitud a la API Gateway.
+ * Maneja la URL base, token de autenticación, headers y errores comunes.
+ * @param endpoint Ruta del endpoint (ej. '/api/v1/ingest/status')
+ * @param options Opciones de Fetch API (method, body, etc.)
+ * @returns Promise<T> La respuesta parseada como JSON o null si es 204.
+ * @throws {ApiError} Si la respuesta no es OK (status >= 400) o hay otros errores.
+ */
 export async function request<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
+    // Validar formato del endpoint (debe empezar con /api/v1/)
     if (!cleanEndpoint.startsWith('/api/v1/')) {
         console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
 
+    // Obtener URL del API Gateway
     let apiUrl: string;
-    let cachedGatewayUrl: string | null = null;
     try {
-        if (!cachedGatewayUrl) {
-            cachedGatewayUrl = getApiGatewayUrl();
-        }
-        apiUrl = `${cachedGatewayUrl}${cleanEndpoint}`;
+        apiUrl = `${getApiGatewayUrl()}${cleanEndpoint}`;
     } catch (err) {
         console.error("API Request failed: Could not get API Gateway URL.", err);
         const message = err instanceof Error ? err.message : "API Gateway URL configuration error.";
         throw new ApiError(message, 500);
     }
 
+    // Obtener token de autenticación si está disponible
     let token: string | null = null;
     if (typeof window !== 'undefined') {
         token = localStorage.getItem(AUTH_TOKEN_KEY);
     } else {
+        // Advertir si se ejecuta en contexto de servidor (no debería para llamadas protegidas)
         console.warn(`API Request: localStorage not available for ${cleanEndpoint} (SSR/Server Context?). Cannot get auth token.`);
     }
 
+    // Configurar Headers
     const headers = new Headers(options.headers || {});
     headers.set('Accept', 'application/json');
+    // Header especial para evitar advertencia de Ngrok (si se usa)
     if (apiUrl.includes("ngrok-free.app")) {
         headers.set('ngrok-skip-browser-warning', 'true');
     }
+    // Establecer Content-Type a JSON por defecto, excepto para FormData
     if (!(options.body instanceof FormData)) {
         if (!headers.has('Content-Type')) {
              headers.set('Content-Type', 'application/json');
         }
     } else {
+        // Dejar que el navegador establezca Content-Type para FormData (incluye boundary)
         headers.delete('Content-Type');
     }
-
+    // Añadir token de autorización si existe
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
     } else if (!cleanEndpoint.includes('/api/v1/users/login')) {
+        // Advertir si se llama a endpoint protegido sin token (excepto login)
         console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
     }
 
+    // Configuración final de la solicitud
     const config: RequestInit = {
         ...options,
         headers,
     };
 
-    console.log(`API Request: ${config.method || 'GET'} ${apiUrl}`);
+    // Loggear la solicitud (útil para depuración)
+    // console.log(`API Request: ${config.method || 'GET'} ${apiUrl}`);
 
     try {
+        // Realizar la solicitud Fetch
         const response = await fetch(apiUrl, config);
 
+        // --- Manejo de Respuestas ---
+
+        // Si la respuesta NO es OK (status >= 400)
         if (!response.ok) {
             let errorData: ApiErrorData | null = null;
             let errorText = '';
             const contentType = response.headers.get('content-type');
+
+            // Intentar parsear el cuerpo del error (JSON o Texto)
             try {
                 if (contentType && contentType.includes('application/json')) {
                     errorData = await response.json();
                 } else { errorText = await response.text(); }
             } catch (parseError) {
                  console.warn(`API Request: Could not parse error response body for ${response.status} ${response.statusText} from ${apiUrl}`, parseError);
-                 try { errorText = await response.text(); } catch {}
+                 try { errorText = await response.text(); } catch {} // Intenta leer como texto si falla JSON
             }
 
+            // Construir mensaje de error significativo
             let errorMessage = `API Error (${response.status})`;
             if (errorData) {
-                if (typeof errorData.detail === 'string') {
+                if (typeof errorData.detail === 'string') { // FastAPI a veces usa string
                     errorMessage = errorData.detail;
-                } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') {
+                } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') { // FastAPI validation errors
                     errorMessage = errorData.detail.map(d => `${d.loc ? d.loc.join('.')+': ' : ''}${d.msg}`).join('; ');
-                } else if (typeof errorData.message === 'string') {
+                } else if (typeof errorData.message === 'string') { // Otros formatos
                     errorMessage = errorData.message;
                 }
-            } else if (errorText) {
-                errorMessage = errorText.substring(0, 200);
-            } else {
+            } else if (errorText) { // Si no hubo JSON o falló, usar texto
+                errorMessage = errorText.substring(0, 200); // Limitar longitud
+            } else { // Fallback
                 errorMessage = response.statusText || `Request failed with status ${response.status}`;
             }
 
             console.error(`API Error Response: ${response.status} ${response.statusText} from ${apiUrl}`, { data: errorData, text: errorText });
+            // Lanzar ApiError personalizado
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
-        // Manejo correcto de 204 No Content
+        // Manejo específico de respuestas 204 No Content
         if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return null as T; // Devuelve null explícitamente para respuestas sin contenido
+            return null as T; // Devuelve null explícito para concordar con Promise<void>
         }
 
+        // Intentar parsear la respuesta JSON para respuestas OK con contenido
         try {
             const data: T = await response.json();
             return data;
         } catch (jsonError) {
-             const responseText = await response.text().catch(() => "Could not read response text.");
+             // Si falla el parseo JSON de una respuesta OK
+             const responseText = await response.text().catch(() => "Could not read response text."); // Leer como texto para depurar
              console.error(`API Request: Invalid JSON response from ${apiUrl}. Status: ${response.status}. Response Text: ${responseText}`, jsonError);
              throw new ApiError(`Invalid JSON response received from server.`, response.status);
         }
 
     } catch (error) {
+        // Re-lanzar ApiError si ya fue capturado
         if (error instanceof ApiError) { throw error; }
+        // Manejar errores de red (TypeError: Failed to fetch)
         else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
              const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
              console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
-             throw new ApiError(networkErrorMsg, 0);
+             throw new ApiError(networkErrorMsg, 0); // Status 0 para errores de red
         } else {
+             // Otros errores inesperados
              console.error(`API Request: Unexpected error during fetch to ${apiUrl}`, error);
              const message = error instanceof Error ? error.message : 'An unknown fetch error occurred.';
              throw new ApiError(`Unexpected fetch error: ${message}`, 500);
@@ -5841,12 +5942,14 @@ export async function request<T>(
     }
 }
 
+// --- Tipos Específicos de Servicio ---
+
 // --- Ingest Service ---
 export interface IngestResponse {
     document_id: string;
-    task_id: string;
-    status: string;
-    message: string;
+    task_id: string; // ID de la tarea Celery
+    status: string; // Estado inicial ('uploaded' o 'processing' si reintenta)
+    message: string; // Mensaje de confirmación
 }
 
 export interface AuthHeaders {
@@ -5854,63 +5957,131 @@ export interface AuthHeaders {
   'X-User-ID': string;
 }
 
+// Interfaz para la respuesta de la lista de estados (GET /status)
+export interface DocumentStatusResponse {
+    document_id: string;
+    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // Tipos conocidos + fallback string
+    file_name?: string | null;
+    file_type?: string | null;
+    chunk_count?: number | null; // Desde DB
+    error_message?: string | null; // Mensaje de error si status='error'
+    created_at?: string; // Fecha creación registro
+    last_updated: string; // Fecha última actualización registro
+    // Campos adicionales que el backend añade al verificar en GET /status
+    minio_exists?: boolean; // Si el archivo existe en MinIO (verificado por el backend)
+    milvus_chunk_count?: number; // Conteo real de chunks en Milvus (verificado por el backend)
+}
+
+// Interfaz para la respuesta detallada (GET /status/{id}) - campos de verificación garantizados
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
+    minio_exists: boolean; // Garantizado
+    milvus_chunk_count: number; // Garantizado
+    message?: string; // Mensaje descriptivo adicional del backend
+}
+
+
+// --- Query Service ---
+export interface RetrievedDocApi {
+    id: string; // ID del chunk en Milvus
+    document_id: string; // ID del documento padre
+    file_name: string | null; // Nombre del archivo original
+    content: string; // Contenido completo del chunk (puede ser largo)
+    content_preview: string; // Versión corta/preview del contenido
+    metadata: Record<string, any> | null; // Metadatos asociados al chunk
+    score: number; // Puntuación de relevancia del retriever
+}
+// Usamos el mismo tipo para frontend por ahora
+export type RetrievedDoc = RetrievedDocApi;
+
+export interface ChatSummary {
+    id: string; // ID del chat
+    title: string | null; // Título del chat (puede ser null)
+    created_at: string; // Fecha creación
+    updated_at: string; // Fecha última actualización
+    message_count: number; // Número de mensajes en el chat
+}
+
+export interface ChatMessageApi {
+    id: string; // ID del mensaje
+    chat_id: string; // ID del chat al que pertenece
+    role: 'user' | 'assistant'; // Quién envió el mensaje
+    content: string; // Contenido del mensaje
+    // Fuentes usadas por el asistente (si aplica)
+    sources: Array<{
+        chunk_id: string;
+        document_id: string;
+        file_name: string | null;
+        score: number;
+        preview: string; // Vista previa del chunk fuente
+    }> | null;
+    created_at: string; // Fecha creación del mensaje
+}
+
+export interface QueryPayload {
+    query: string; // La pregunta del usuario
+    retriever_top_k?: number; // Opcional: cuántos documentos recuperar
+    chat_id?: string | null; // Opcional: ID del chat existente o null para uno nuevo
+}
+
+export interface QueryApiResponse {
+    answer: string; // La respuesta del LLM
+    retrieved_documents: RetrievedDocApi[]; // Documentos/chunks usados
+    query_log_id: string | null; // ID del registro en query_logs
+    chat_id: string; // ID del chat (nuevo o existente)
+}
+
+
+// --- Auth Service (API Gateway) ---
+// No necesitamos definir LoginPayload aquí, se pasa directamente en useAuth
+export interface LoginResponse {
+    access_token: string; // El token JWT
+    token_type: string; // "bearer"
+    // Información del usuario devuelta para conveniencia (puede variar)
+    user_id: string;
+    email: string;
+    full_name: string | null;
+    role: string; // O roles: string[]
+    company_id: string | null; // Puede ser null si aún no está asociado
+}
+
+
+// --- Funciones API Específicas ---
+
+// ** INGEST SERVICE **
+
+/**
+ * POST /api/v1/ingest/upload
+ * Sube un archivo para ser procesado. Requiere X-Company-ID y X-User-ID (implícito en auth).
+ */
 export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
   const formData = new FormData();
   formData.append('file', file);
-  try {
-    const response = await request<IngestResponse>('/api/v1/ingest/upload', {
-      method: 'POST',
-      headers: { ...auth },
-      body: formData,
-    });
-    return response;
-  } catch (error) {
-    console.error('Error uploading document:', error);
-    throw error;
-  }
+  // Metadata JSON opcional - no implementado en UI actual
+  // formData.append('metadata_json', JSON.stringify({ custom_key: 'value' }));
+  return request<IngestResponse>('/api/v1/ingest/upload', {
+    method: 'POST',
+    headers: { ...auth } as Record<string, string>, // Pasar headers de autenticación/compañía
+    body: formData,
+  });
 }
 
-// Interfaz para la respuesta de la lista de estados
-export interface DocumentStatusResponse {
-    document_id: string;
-    status: string; // 'uploaded', 'processing', 'processed', 'error'
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null; // Desde DB, puede ser actualizado por /status individual
-    error_message?: string | null;
-    created_at?: string;
-    last_updated: string; // Timestamp de última actualización (más útil)
-    // Campos adicionales que pueden venir de la verificación en GET /status
-    minio_exists?: boolean;
-    milvus_chunk_count?: number;
-}
-
-// Interfaz para la respuesta detallada de un documento individual
-export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
-    minio_exists: boolean; // Garantizado por el endpoint individual
-    milvus_chunk_count: number; // Garantizado por el endpoint individual
-    message?: string; // Mensaje detallado del backend
-}
-
-
-export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
+/**
+ * GET /api/v1/ingest/status
+ * Obtiene la lista paginada de estados de documentos para la compañía. Requiere X-Company-ID.
+ */
+export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
-  try {
-    const response = await request<DocumentStatusResponse[]>(endpoint, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...auth,
-      },
-    });
-    return response || [];
-  } catch (error) {
-    console.error('Error fetching document status list:', error);
-    throw error;
-  }
+  const response = await request<DocumentStatusResponse[]>(endpoint, {
+    method: 'GET',
+    headers: { ...auth } as Record<string, string>,
+  });
+  return response || []; // Devolver array vacío si la respuesta es null/undefined
 }
 
-
+/**
+ * GET /api/v1/ingest/status/{document_id}
+ * Obtiene el estado detallado de un documento específico. Requiere X-Company-ID.
+ */
 export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
     return request<DetailedDocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
         method: 'GET',
@@ -5918,35 +6089,29 @@ export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): 
     });
 };
 
-
+/**
+ * POST /api/v1/ingest/retry/{document_id}
+ * Reintenta la ingesta de un documento que falló. Requiere X-Company-ID y X-User-ID.
+ */
 export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> {
   const endpoint = `/api/v1/ingest/retry/${documentId}`;
-  try {
-    const response = await request<IngestResponse>(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...auth,
-      },
-    });
-    if (!response) {
-        console.warn(`Retry endpoint ${endpoint} returned unexpected null response.`);
-        throw new ApiError('Retry initiated but no confirmation received.', 202);
-    }
-    return response;
-  } catch (error) {
-    console.error(`Error retrying ingest for document ${documentId}:`, error);
-    throw error;
-  }
+  // Este endpoint espera 202 Accepted con un cuerpo IngestResponse
+  return request<IngestResponse>(endpoint, {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json', // Aunque no haya body, especificar
+        ...auth
+    } as Record<string, string>,
+  });
 }
 
-
 /**
- * Elimina un documento de la base de conocimiento (Milvus, MinIO y registro).
- * Endpoint: DELETE /api/v1/ingest/{document_id}
+ * DELETE /api/v1/ingest/{document_id}
+ * Elimina un documento (registro DB, archivo MinIO, chunks Milvus). Requiere X-Company-ID.
  */
 export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
-  // request devuelve null para 204, que es el tipo esperado para void
+  // Espera 204 No Content, que request<T> manejará devolviendo null.
+  // El tipo de retorno void es correcto para el consumidor.
   await request<null>(`/api/v1/ingest/${documentId}`, {
     method: 'DELETE',
     headers: { ...auth } as Record<string, string>,
@@ -5954,106 +6119,77 @@ export async function deleteIngestDocument(documentId: string, auth: AuthHeaders
 }
 
 
-// --- Query Service ---
-export interface RetrievedDocApi {
-    id: string;
-    document_id: string;
-    file_name: string;
-    content: string;
-    content_preview: string;
-    metadata: Record<string, any> | null;
-    score: number;
-}
-export type RetrievedDoc = RetrievedDocApi;
+// ** QUERY SERVICE **
 
-export interface ChatSummary {
-    id: string;
-    title: string | null;
-    created_at: string;
-    updated_at: string;
-    message_count: number;
-}
-
-export interface ChatMessageApi {
-    id: string;
-    chat_id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    sources: Array<{
-        chunk_id: string;
-        document_id: string;
-        file_name: string;
-        score: number;
-        preview: string;
-    }> | null;
-    created_at: string;
-}
-
-export interface QueryPayload {
-    query: string;
-    retriever_top_k?: number;
-    chat_id?: string | null;
-}
-
-export interface QueryApiResponse {
-    answer: string;
-    retrieved_documents: RetrievedDocApi[];
-    query_log_id: string | null;
-    chat_id: string;
-}
-
-export const getChats = async (limit: number = 50, offset: number = 0): Promise<ChatSummary[]> => {
+/**
+ * GET /api/v1/query/chats
+ * Obtiene la lista de chats del usuario/compañía. Requiere X-Company-ID y X-User-ID (implícitos en el token).
+ */
+export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     try { return await request<ChatSummary[]>(endpoint); }
-     catch (error) { console.error("Error fetching chats:", error); throw error; }
+     const response = await request<ChatSummary[]>(endpoint); // No necesita pasar auth explícito, va en token
+     return response || [];
 };
 
+/**
+ * GET /api/v1/query/chats/{chat_id}/messages
+ * Obtiene los mensajes de un chat específico. Requiere X-Company-ID y X-User-ID.
+ */
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     try { return await request<ChatMessageApi[]>(endpoint); }
-     catch (error) { console.error(`Error fetching messages for chat ${chatId}:`, error); throw error; }
+     const response = await request<ChatMessageApi[]>(endpoint);
+     return response || [];
 };
 
+/**
+ * POST /api/v1/query/ask
+ * Envía una consulta para obtener una respuesta (RAG o saludo). Requiere X-Company-ID y X-User-ID.
+ */
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
+     // Asegurar que chat_id sea null si no se proporciona, como espera el backend
      const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', {
-        method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }
+        method: 'POST',
+        body: JSON.stringify(body),
+        // Content-Type es añadido por defecto en request()
      });
 };
 
+/**
+ * DELETE /api/v1/query/chats/{chat_id}
+ * Elimina un chat y sus mensajes/logs asociados. Requiere X-Company-ID y X-User-ID.
+ */
 export const deleteChat = async (chatId: string): Promise<void> => {
+    // Espera 204 No Content
     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
-// --- Auth Service ---
-interface LoginPayload {
-    email: string;
-    password: string;
-}
-export interface LoginResponse {
-    access_token: string;
-    token_type: string;
-    user_id: string;
-    email: string;
-    full_name: string;
-    role: string;
-    company_id: string;
-}
 
-// --- Type Mapping Helpers ---
+// --- Helpers de Mapeo de Tipos (API -> Frontend) ---
+
 export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
-    if (!apiSources) return undefined;
+    if (!apiSources || apiSources.length === 0) return undefined;
     return apiSources.map(source => ({
-        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name,
-        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
+        // Mapeo cuidadoso según las definiciones de tipos
+        id: source.chunk_id,
+        document_id: source.document_id,
+        file_name: source.file_name || null, // Asegurar null si no viene
+        content: source.preview, // Usar preview como content principal por ahora
+        content_preview: source.preview,
+        metadata: null, // Metadata no viene en este nivel según ChatMessageApi
+        score: source.score,
     }));
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
     return {
-        id: apiMessage.id, role: apiMessage.role, content: apiMessage.content,
-        sources: mappedSources, isError: false, created_at: apiMessage.created_at,
+        id: apiMessage.id,
+        role: apiMessage.role,
+        content: apiMessage.content,
+        sources: mappedSources, // Puede ser undefined
+        isError: false, // Asumir no error al mapear desde API normal
+        created_at: apiMessage.created_at,
     };
 };
 ```
@@ -6335,110 +6471,123 @@ export const useAuth = (): AuthContextType => {
 
 ## File: `lib\hooks\useDocumentStatuses.ts`
 ```ts
-// File: lib/hooks/useDocumentStatuses.ts (MODIFICADO - Corregido error y adaptado a API)
+// File: lib/hooks/useDocumentStatuses.ts (REVISADO Y CORREGIDO - Coincide con API y componentes)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     getDocumentStatusList,
-    DocumentStatusResponse, // Usar esta interfaz base
-    DetailedDocumentStatusResponse, // Usar esta para refresco individual
+    DocumentStatusResponse,
+    DetailedDocumentStatusResponse,
     AuthHeaders,
     ApiError,
-    getDocumentStatus // Importar la función individual
+    getDocumentStatus
 } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { toast } from 'sonner'; // Para mostrar errores al refrescar
 
-// Devolver la interfaz base en el hook, ya que la lista puede no tener todos los detalles
+const DEFAULT_LIMIT = 30; // Ajustar límite si es necesario
+
 interface UseDocumentStatusesReturn {
-  documents: DocumentStatusResponse[];
-  isLoading: boolean;
-  error: string | null;
-  fetchDocuments: (reset?: boolean) => Promise<void>;
-  fetchMore: () => void;
-  hasMore: boolean;
-  retryLocalUpdate: (documentId: string) => void;
-  refreshDocument: (documentId: string) => Promise<void>; // Refrescar estado individual
-  deleteLocalDocument: (documentId: string) => void;
+  documents: DocumentStatusResponse[]; // Lista de documentos
+  isLoading: boolean; // Estado general de carga (inicial o cargando más)
+  error: string | null; // Mensaje de error si falla la carga
+  fetchDocuments: (reset?: boolean) => Promise<void>; // Función para (re)cargar documentos
+  fetchMore: () => void; // Función para cargar la siguiente página
+  hasMore: boolean; // Indica si hay más documentos por cargar
+  retryLocalUpdate: (documentId: string) => void; // Actualiza UI para reintento
+  refreshDocument: (documentId: string) => Promise<void>; // Refresca un documento individual
+  deleteLocalDocument: (documentId: string) => void; // Elimina un documento de la UI local
 }
 
 export function useDocumentStatuses(): UseDocumentStatusesReturn {
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const offsetRef = useRef<number>(0);
-  const limit = 50; // Reducir límite por si las verificaciones paralelas son pesadas
-  const [hasMore, setHasMore] = useState<boolean>(true); // Asumir que hay más al inicio
+  const { user, isLoading: isAuthLoading } = useAuth(); // Obtener usuario y estado de auth
+  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]); // Estado para la lista de documentos
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Estado de carga general
+  const [error, setError] = useState<string | null>(null); // Estado de error
+  const offsetRef = useRef<number>(0); // Referencia para el offset de paginación
+  const [hasMore, setHasMore] = useState<boolean>(true); // Estado para saber si hay más páginas
+  const isFetchingRef = useRef<boolean>(false); // Ref para evitar llamadas concurrentes
 
-  const fetchDocuments = useCallback(async (reset: boolean = true) => {
-    if (isAuthLoading || !user?.userId || !user?.companyId) {
-      if (!isAuthLoading) {
+  // Función principal para cargar documentos
+  const fetchDocuments = useCallback(async (reset: boolean = false) => {
+    // Evitar ejecución si ya se está cargando o si no hay usuario/compañía
+    if (isFetchingRef.current || isAuthLoading || !user?.userId || !user?.companyId) {
+      if (!isAuthLoading && !user?.userId) {
+        // Si la autenticación terminó y no hay usuario, limpiar estado
         setDocuments([]); setIsLoading(false); setError(null); setHasMore(false);
       }
       return;
     }
 
+    isFetchingRef.current = true; // Marcar como cargando
+    setIsLoading(true); // Activar estado de carga visual
+    setError(null); // Limpiar errores previos
+
+    // Preparar headers de autenticación
     const authHeaders: AuthHeaders = {
       'X-User-ID': user.userId,
       'X-Company-ID': user.companyId,
     };
 
-    setIsLoading(true);
-    setError(null);
-
     try {
-      const currentOffset = reset ? 0 : offsetRef.current;
-      const data = await getDocumentStatusList(authHeaders, limit, currentOffset);
+      const currentOffset = reset ? 0 : offsetRef.current; // Determinar offset
+      const data = await getDocumentStatusList(authHeaders, DEFAULT_LIMIT, currentOffset);
 
       // Actualizar estado de paginación
-      setHasMore(data.length === limit);
-      offsetRef.current = currentOffset + data.length; // Actualizar offset correctamente
+      setHasMore(data.length === DEFAULT_LIMIT);
+      offsetRef.current = currentOffset + data.length; // Incrementar offset
 
-      // Actualizar documentos (reemplazar o añadir)
+      // Actualizar lista de documentos (reemplazar si reset=true, añadir si reset=false)
       setDocuments(prev => reset ? data : [...prev, ...data]);
 
     } catch (err: any) {
       const errorMessage = err instanceof ApiError ? err.message : (err.message || 'Error al cargar la lista de documentos.');
       setError(errorMessage);
-      // Mantener documentos existentes en caso de error al cargar más? O limpiar? Por ahora limpiamos.
-      if(reset) setDocuments([]);
-      setHasMore(false); // Asumir que no hay más si hay error
+      // Opcional: limpiar documentos en error, o mantener los actuales
+      // if(reset) setDocuments([]);
+      setHasMore(false); // Asumir no más páginas si hay error
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Desactivar estado de carga visual
+      isFetchingRef.current = false; // Desmarcar como cargando
     }
-  }, [user, isAuthLoading]); // Dependencias correctas
+  }, [user, isAuthLoading]); // Dependencias: usuario y estado de auth
 
-  // Carga inicial
+  // Carga inicial de documentos cuando el usuario esté disponible
   useEffect(() => {
-    if (user?.userId && user?.companyId) { // Solo llamar si hay usuario
-        fetchDocuments(true);
-    } else if (!isAuthLoading) { // Si auth terminó y no hay usuario, limpiar
+    if (user?.userId && user?.companyId && documents.length === 0) { // Cargar solo si hay usuario y la lista está vacía
+        fetchDocuments(true); // reset = true
+    } else if (!isAuthLoading && !user?.userId) {
+        // Si auth terminó y no hay usuario, asegurar estado limpio
         setDocuments([]);
         setIsLoading(false);
         setError(null);
         setHasMore(false);
     }
-  }, [user, isAuthLoading, fetchDocuments]); // Depender también de fetchDocuments
+    // No incluir fetchDocuments en dependencias para evitar bucles si cambia rápido
+  }, [user, isAuthLoading]); // Solo depende del usuario y auth
 
+  // Actualiza la UI localmente cuando se inicia un reintento
   const retryLocalUpdate = useCallback((documentId: string) => {
     setDocuments(prevDocs =>
       prevDocs.map(doc =>
         doc.document_id === documentId
-          ? { ...doc, status: 'processing', error_message: null }
+          ? { ...doc, status: 'processing', error_message: null } // Cambiar estado a 'processing'
           : doc
       )
     );
   }, []);
 
+  // Carga la siguiente página de documentos
   const fetchMore = useCallback(() => {
-    if (!isLoading && hasMore) {
-      fetchDocuments(false); // Llamar con reset=false para añadir, no reemplazar
+    if (!isLoading && hasMore && !isFetchingRef.current) {
+      fetchDocuments(false); // reset = false para añadir
     }
   }, [fetchDocuments, isLoading, hasMore]);
 
-  // --- CORRECCIÓN: Pasar authHeaders a getDocumentStatus ---
+  // Refresca el estado de un documento individual desde la API
   const refreshDocument = useCallback(async (documentId: string) => {
     if (!user?.userId || !user?.companyId) {
         console.error("Cannot refresh document: user or company ID missing.");
+        toast.error("Error de autenticación", { description: "No se pudo verificar la sesión." });
         return;
     }
     const authHeaders: AuthHeaders = {
@@ -6446,23 +6595,24 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
         'X-Company-ID': user.companyId,
       };
     try {
-      // Pasar authHeaders como segundo argumento
-      const updated = await getDocumentStatus(documentId, authHeaders);
-      // Actualizar el documento específico en la lista
-      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updated : doc));
+      const updatedDoc = await getDocumentStatus(documentId, authHeaders); // Llama a la API
+      // Actualiza el documento específico en la lista local
+      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updatedDoc : doc));
+      // Opcional: toast de éxito
+      // toast.success("Estado Actualizado", { description: `Se actualizó el estado de ${updatedDoc.file_name || documentId}.` });
     } catch (error){
       console.error(`Failed to refresh status for document ${documentId}:`, error);
-      // Opcional: mostrar toast de error
-      // toast.error("Error al refrescar estado", { description: error instanceof Error ? error.message : "Error desconocido" });
+      toast.error("Error al refrescar estado", { description: error instanceof Error ? error.message : "Error desconocido" });
     }
-  }, [user]); // Añadir user como dependencia
+  }, [user]); // Depende del usuario para los headers
 
+  // Elimina un documento de la lista local (después de confirmación API exitosa)
   const deleteLocalDocument = useCallback((documentId: string) => {
     setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
-    // Recalcular si hay más después de eliminar? Podría ser complejo.
-    // Por ahora, el usuario puede hacer clic en "Cargar más" si es necesario.
+    // Nota: No recalcula 'hasMore' aquí para simplificar. Podría ser necesario en casos complejos.
   }, []);
 
+  // Devuelve el estado y las funciones del hook
   return { documents, isLoading, error, fetchDocuments, fetchMore, hasMore, retryLocalUpdate, refreshDocument, deleteLocalDocument };
 }
 ```
