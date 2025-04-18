@@ -1,33 +1,36 @@
-// File: components/knowledge/file-uploader.tsx (MODIFICADO - Iteración 4.1)
+// File: components/knowledge/file-uploader.tsx (MODIFICADO - Iteración 4.1 -> Refinado Feedback Visual)
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useDropzone, FileRejection } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-// Progress ya no se usa directamente aquí
 import { toast } from 'sonner';
-import { UploadCloud, File as FileIcon, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'; // Añadidos iconos
+import { UploadCloud, File as FileIcon, X, Loader2, CheckCircle2, AlertTriangle, FileUp } from 'lucide-react'; // FileUp para icono inicial
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge'; // Para mostrar tipo archivo
 
-// Tipos de archivo aceptados
+// Tipos de archivo aceptados (tomados del README Ingest)
 const acceptedFileTypes = {
   'application/pdf': ['.pdf'],
   'application/msword': ['.doc'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'text/plain': ['.txt'],
-  'text/markdown': ['.md', '.markdown'],
+  'text/markdown': ['.md', '.markdown'], // Añadido .markdown
   'text/html': ['.html', '.htm'],
+  // Faltaban en la definición anterior pero mencionados en el video/README
+  // 'application/vnd.oasis.opendocument.text': ['.odt'], // Si se soportan
+  // 'application/epub+zip': ['.epub'], // Si se soportan
 };
-// Lista para mostrar al usuario
 const allowedExtensions = Object.values(acceptedFileTypes).flat().map(ext => ext.substring(1).toUpperCase()).join(', ');
+const MAX_FILE_SIZE_MB = 50; // Definir un límite (ej. 50MB) - AJUSTAR SEGÚN NECESIDAD
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 interface FileUploaderProps {
   authHeaders: import('@/lib/api').AuthHeaders;
   onUploadFile: (file: File, authHeaders: import('@/lib/api').AuthHeaders) => Promise<boolean>;
-  isUploading: boolean;
-  uploadError: string | null;
-  clearUploadStatus: () => void;
+  isUploading: boolean; // Estado de carga del hook padre
+  uploadError: string | null; // Error del hook padre
+  clearUploadStatus: () => void; // Función para limpiar error/éxito del padre
 }
 
 export function FileUploader({
@@ -39,32 +42,40 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [dropzoneError, setDropzoneError] = useState<string | null>(null);
-  const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null); // Para feedback visual post-subida
+  const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null);
 
+  // Efecto para limpiar errores/éxito visual si el archivo cambia o se deselecciona
   useEffect(() => {
-    setDropzoneError(null);
-    setLocalUploadSuccess(null); // Limpiar éxito/error visual si cambia el archivo
-    if (uploadError) {
-        // No limpiar el error de subida automáticamente, dejar que el usuario lo vea
+    if (!file) {
+        setDropzoneError(null);
+        setLocalUploadSuccess(null);
+        // No limpiar uploadError aquí, podría ser un error persistente del último intento
+    } else {
+        // Si se selecciona un NUEVO archivo, limpiar estados visuales y error del padre
+        setDropzoneError(null);
+        setLocalUploadSuccess(null);
+        clearUploadStatus();
     }
-  }, [file]); // Solo depende del archivo seleccionado
+  }, [file, clearUploadStatus]);
 
+  // Manejador del Dropzone
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
+    // Siempre limpiar estados al soltar nuevos archivos
     setDropzoneError(null);
     setLocalUploadSuccess(null);
-    clearUploadStatus(); // Limpiar error de subida previo
+    clearUploadStatus();
     setFile(null);
 
     if (fileRejections.length > 0) {
-        const firstRejection = fileRejections[0];
-        const errorMessages = firstRejection.errors.map((e) => e.message).join(', ');
-        let customError = `Error: ${errorMessages}`;
-        if (firstRejection.errors.some((e) => e.code === 'file-invalid-type')) {
-             customError = `Tipo de archivo no permitido. Permitidos: ${allowedExtensions}.`;
-        } else if (firstRejection.errors.some((e) => e.code === 'file-too-large')) {
-            customError = `El archivo es demasiado grande (límite no especificado).`; // TODO: Añadir límite si se conoce
+        const rejection = fileRejections[0];
+        let msg = rejection.errors.map(e => e.message).join(', ');
+        if (rejection.errors.some(e => e.code === 'file-invalid-type')) {
+            msg = `Tipo de archivo no válido. Permitidos: ${allowedExtensions}.`;
+        } else if (rejection.errors.some(e => e.code === 'file-too-large')) {
+            msg = `El archivo supera el límite de ${MAX_FILE_SIZE_MB} MB.`;
         }
-        setDropzoneError(customError);
+        setDropzoneError(msg);
+        toast.error("Archivo Rechazado", { description: msg });
         return;
     }
 
@@ -73,105 +84,132 @@ export function FileUploader({
     }
   }, [clearUploadStatus]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, isFocused } = useDropzone({
     onDrop,
     accept: acceptedFileTypes,
+    maxSize: MAX_FILE_SIZE_BYTES,
     multiple: false,
-    disabled: isUploading,
+    disabled: isUploading, // Deshabilitar dropzone mientras se sube
   });
 
+  // Manejador del click del botón de subida
   const handleUploadClick = async () => {
     if (!file || !authHeaders || isUploading) return;
     setLocalUploadSuccess(null); // Resetear estado visual
 
-    const success = await onUploadFile(file, authHeaders);
-    setLocalUploadSuccess(success); // Guardar estado de éxito/fallo para UI
+    const success = await onUploadFile(file, authHeaders); // Llama a la función del hook padre
+    setLocalUploadSuccess(success);
     if (success) {
-        setFile(null); // Limpiar selección si fue exitosa
+        // Limpiar selección solo si la subida fue exitosa (estado 202)
+        // Si falla (ej. 409 duplicado), mantener el archivo seleccionado para info
+        setFile(null);
     }
-    // Los toasts son manejados por el hook useUploadDocument
+    // El hook padre se encarga de los toasts
   };
 
+  // Quitar el archivo seleccionado
   const removeFile = () => {
     setFile(null);
-    setDropzoneError(null);
-    setLocalUploadSuccess(null);
-    clearUploadStatus(); // Limpiar cualquier error de subida previo
   }
 
-  // Combinar error del dropzone y del hook de subida
-  const displayError = dropzoneError || uploadError;
+  // Determinar el error a mostrar (prioridad al error de subida si existe)
+  const displayError = uploadError || dropzoneError;
+  // Determinar si el estado visual es de éxito (solo si la subida terminó y fue exitosa)
+  const displaySuccess = !isUploading && localUploadSuccess === true;
+  // Determinar si el estado visual es de fallo (solo si la subida terminó y falló, y no hay error de dropzone)
+  const displayFailure = !isUploading && localUploadSuccess === false && !dropzoneError;
 
   return (
     <div className="space-y-4">
-      {/* Dropzone Area */}
+      {/* Área del Dropzone */}
       <div
         {...getRootProps()}
         className={cn(
-            `relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg text-center transition-colors duration-200 ease-in-out`,
-            isUploading
-                ? 'cursor-not-allowed bg-muted/30 border-muted/50 text-muted-foreground'
-                : 'cursor-pointer border-muted-foreground/30 hover:border-primary/50 hover:bg-accent/50 dark:hover:bg-accent/10',
-            isDragActive ? 'border-primary bg-primary/10 border-solid' : '',
-            displayError ? 'border-destructive bg-destructive/5 border-solid' : '', // Estilo error más claro
-            localUploadSuccess === true ? 'border-green-500 bg-green-500/10 border-solid' : '', // Estilo éxito
-            localUploadSuccess === false && !displayError ? 'border-destructive bg-destructive/5 border-solid' : '' // Estilo fallo (si no hay otro error)
+            `relative flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg text-center transition-all duration-200 ease-in-out min-h-[180px] outline-none`, // Aumentar padding y altura mínima
+            // Estilos interactivos (no mientras sube)
+            !isUploading && 'cursor-pointer hover:border-primary/50 hover:bg-accent/50 dark:hover:bg-accent/10',
+            !isUploading && (isDragActive || isFocused) && 'border-primary bg-primary/10 border-solid ring-2 ring-primary/30',
+            // Estilos de estado (deshabilitado, error, éxito, fallo)
+            isUploading && 'cursor-not-allowed bg-muted/30 border-muted/50 text-muted-foreground',
+            displayError && 'border-destructive bg-destructive/5 border-solid text-destructive',
+            displaySuccess && 'border-green-500 bg-green-500/10 border-solid text-green-700 dark:text-green-400',
+            displayFailure && 'border-destructive bg-destructive/5 border-solid text-destructive' // Mismo estilo que error para fallo
         )}
       >
-        <input {...getInputProps()} disabled={isUploading} />
+        <input {...getInputProps()} />
 
-        {/* Icono central */}
-        <div className={cn("mb-2 transition-transform duration-200", isDragActive ? "scale-110" : "")}>
-            {localUploadSuccess === true && <CheckCircle2 className="h-10 w-10 text-green-600" />}
-            {localUploadSuccess === false && !displayError && <AlertTriangle className="h-10 w-10 text-destructive" />}
-            {displayError && <AlertTriangle className="h-10 w-10 text-destructive" />}
-            {localUploadSuccess === null && !displayError && <UploadCloud className={cn("h-10 w-10", isUploading ? "text-muted-foreground/60" : "text-muted-foreground/80")} />}
+        {/* Icono Central Dinámico */}
+        <div className="mb-3 transform transition-transform duration-200 ease-in-out motion-safe:hover:scale-105">
+            {isUploading && <Loader2 className="h-10 w-10 animate-spin" />}
+            {displaySuccess && <CheckCircle2 className="h-10 w-10" />}
+            {(displayError || displayFailure) && <AlertTriangle className="h-10 w-10" />}
+            {!isUploading && !displaySuccess && !displayError && !displayFailure && (
+                 <FileUp className={cn("h-10 w-10", isDragActive ? "text-primary" : "text-muted-foreground/60")} />
+            )}
         </div>
 
-        {/* Texto del Dropzone */}
-        {isDragActive ? (
-          <p className="text-sm font-medium text-primary">Suelta el archivo aquí...</p>
-        ) : (
-          <p className={cn("text-sm", isUploading ? "text-muted-foreground/80" : "text-foreground/90")}>
-            Arrastra y suelta un archivo, o{' '}
-            <span className="font-medium text-primary underline underline-offset-2">haz clic para seleccionar</span>
-            <span className="mt-1 block text-xs text-muted-foreground">(Permitidos: {allowedExtensions})</span>
-          </p>
-        )}
+        {/* Texto del Dropzone Dinámico */}
+        <div className="text-sm max-w-xs">
+             {isUploading && <p className="font-medium">Subiendo archivo...</p>}
+             {displaySuccess && <p className="font-medium">Archivo puesto en cola exitosamente.</p>}
+             {displayError && <p className="font-medium">{displayError}</p>}
+             {displayFailure && <p className="font-medium">Fallo la subida del archivo.</p>}
+
+             {/* Texto por defecto / arrastre */}
+            {!isUploading && !displaySuccess && !displayError && !displayFailure && (
+                isDragActive ? (
+                <p className="font-medium text-primary">Suelta el archivo aquí...</p>
+                ) : (
+                <p className={cn("text-foreground/90")}>
+                    Arrastra y suelta un archivo, o{' '}
+                    <span className="font-medium text-primary underline underline-offset-2">haz clic para seleccionar</span>
+                </p>
+                )
+            )}
+            {/* Siempre mostrar extensiones permitidas y límite (si no hay error/éxito/subida) */}
+            {!isUploading && !displaySuccess && !displayError && !displayFailure && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                    (Permitidos: {allowedExtensions}. Máx: {MAX_FILE_SIZE_MB}MB)
+                </p>
+            )}
+        </div>
       </div>
 
-      {/* Mensaje de Error (si existe) */}
-      {displayError && <p className="text-sm text-destructive px-1 flex items-center gap-1.5"><AlertTriangle className="h-4 w-4"/>{displayError}</p>}
-
-      {/* Preview del Archivo Seleccionado */}
-      {file && (
-        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40">
-            <div className="flex items-center space-x-3 overflow-hidden">
+      {/* Preview del Archivo Seleccionado (si existe y no está subiendo/completado) */}
+      {file && !isUploading && localUploadSuccess === null && (
+        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
+            <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
                  <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
                  <div className='flex flex-col min-w-0'>
                     <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
-                    <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB) - <Badge variant="outline" className='ml-1 py-0 px-1'>{file.type || 'desconocido'}</Badge></span>
+                    <span className="text-xs text-muted-foreground">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB) -
+                        <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
+                    </span>
                  </div>
             </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
+          {/* Botón para quitar archivo, deshabilitado si está subiendo */}
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
             <X className="h-4 w-4" />
           </Button>
         </div>
       )}
 
-      {/* Botón de Subida */}
-      <Button
-        onClick={handleUploadClick}
-        disabled={!file || isUploading}
-        className="w-full"
-      >
-        {isUploading ? (
-            <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Subiendo...
-            </>
-         ) : 'Subir y Procesar Archivo'}
-      </Button>
+      {/* Botón de Subida (visible solo si hay archivo y no se completó la subida) */}
+      {file && localUploadSuccess === null && (
+          <Button
+            onClick={handleUploadClick}
+            disabled={isUploading} // Deshabilitar si está subiendo
+            className="w-full"
+          >
+            {isUploading ? (
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Subiendo...
+                </>
+             ) : 'Subir y Procesar Archivo'}
+          </Button>
+       )}
     </div>
   );
 }

@@ -84,7 +84,6 @@ atenex-frontend/
 ├── next-env.d.ts
 ├── next.config.mjs
 ├── package.json
-├── plan-refactorizacion.md
 ├── postcss.config.js
 ├── public
 │   └── icons
@@ -1310,6 +1309,7 @@ export default function AuthLayout({
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from "@/lib/constants";
+import Link from "next/link"; // Importar Link
 
 export default function LoginPage() {
   return (
@@ -1320,15 +1320,29 @@ export default function LoginPage() {
         <CardDescription>Accede a tu cuenta {APP_NAME}</CardDescription> {/* Nombre App */}
       </CardHeader>
       {/* Padding inferior en CardContent */}
-      <CardContent className="pb-8">
+      <CardContent className="pb-8 px-6"> {/* Padding horizontal también */}
         <LoginForm />
-        {/* TODO: Añadir enlace a "¿Olvidaste tu contraseña?" o "Registrarse" si aplica */}
-        {/* <p className="mt-4 px-8 text-center text-sm text-muted-foreground">
-             ¿Nuevo en Atenex?{' '}
-             <Link href="/register" className="underline underline-offset-4 hover:text-primary">
-                 Regístrate
-             </Link>
-         </p> */}
+         {/* Separador y enlace (si se añade registro) */}
+         {/* <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                      O continuar con
+                  </span>
+              </div>
+          </div> */}
+         {/* Placeholder para botones de SSO si se añaden */}
+         {/* <div className="grid gap-2"> ... </div> */}
+
+        {/* Enlace a Registro (si existe) */}
+        {/* <p className="mt-6 text-center text-sm text-muted-foreground">
+            ¿No tienes cuenta?{' '}
+            <Link href="/register" className="font-medium text-primary hover:underline underline-offset-4">
+                Regístrate aquí
+            </Link>
+        </p> */}
       </CardContent>
     </Card>
   );
@@ -1457,7 +1471,7 @@ export default function AboutPage() {
                  </div>
               </CardContent>
           </Card>
-          <Separator />
+          <Separator className="my-12" /> {/* Separador al final */}
       </div>
   );
 }
@@ -1474,14 +1488,14 @@ import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Phone, Linkedin, MessageCircle, Loader2, Building, MapPin } from 'lucide-react'; // Añadidos Building, MapPin
+import { Mail, Phone, Linkedin, MessageCircle, Loader2, Building, MapPin, ArrowLeft } from 'lucide-react'; // Icono volver
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import Link from 'next/link'; // Importar Link
-import { Separator } from '@/components/ui/separator'; // Importar Separator
-import { Input } from '@/components/ui/input'; // Para el formulario
-import { Label } from '@/components/ui/label'; // Para el formulario
-import { Textarea } from '@/components/ui/textarea'; // Para el formulario
+import Link from 'next/link';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 
 export default function ContactPage() {
@@ -1489,7 +1503,7 @@ export default function ContactPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const isAuthenticated = !isAuthLoading && !!user;
 
-  // Header (similar al de landing page)
+  // Header consistente con otras páginas públicas
   const renderHeader = () => (
     <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
@@ -1498,7 +1512,7 @@ export default function ContactPage() {
             className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
             aria-label={`${APP_NAME} - Inicio`}
           >
-             <Building className="w-6 h-6" /> {/* Icono diferente */}
+             <Building className="w-6 h-6" /> {/* Usar Building para consistencia */}
             <span className='font-bold'>{APP_NAME}</span>
           </Link>
           <nav className="flex items-center space-x-1 sm:space-x-2">
@@ -1545,7 +1559,7 @@ export default function ContactPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 items-start max-w-6xl mx-auto">
 
           {/* Columna Izquierda: Formulario */}
-          <Card className="lg:col-span-3 shadow-md">
+          <Card className="lg:col-span-3 shadow-md border">
             <CardHeader>
               <CardTitle>Envíanos un Mensaje</CardTitle>
               <CardDescription>
@@ -1559,17 +1573,18 @@ export default function ContactPage() {
 
           {/* Columna Derecha: Información Adicional */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="shadow-md">
+            <Card className="shadow-md border">
               <CardHeader>
                 <CardTitle className="text-lg">Información de Contacto</CardTitle>
+                <CardDescription>Otras formas de localizarnos.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                  <ContactInfoItem Icon={Mail} label="Correo Electrónico:" href="mailto:info@atenex.ai" text="info@atenex.ai" />
                  <ContactInfoItem Icon={Phone} label="Teléfono:" href="tel:+15551234567" text="+1 (555) 123-4567" />
-                 <Separator className='my-3'/>
+                 <Separator className='my-4'/> {/* Más margen en separador */}
                  <ContactInfoItem Icon={Linkedin} label="LinkedIn:" href="https://linkedin.com/company/atenex" text="Atenex en LinkedIn" targetBlank={true} />
                  <ContactInfoItem Icon={MessageCircle} label="WhatsApp:" href="https://wa.me/15551234567" text="Chatea por WhatsApp" targetBlank={true}/>
-                 <Separator className='my-3'/>
+                 <Separator className='my-4'/>
                  <ContactInfoItem Icon={MapPin} label="Oficina:" text="Dirección Ficticia, Ciudad, País" />
               </CardContent>
             </Card>
@@ -1577,7 +1592,7 @@ export default function ContactPage() {
         </div>
       </main>
 
-       {/* Footer similar al de landing page */}
+       {/* Footer Consistente */}
        <footer className="bg-muted/20 border-t border-border/60 py-6 mt-16">
          <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
            <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
@@ -1592,8 +1607,8 @@ export default function ContactPage() {
   );
 }
 
-// Componente LinkButton (sin cambios)
-function LinkButton({ href, children, isActive = false }: { href: string; children: React.ReactNode; isActive?: boolean }) {
+// Componente LinkButton (consistente)
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
@@ -1601,17 +1616,20 @@ function LinkButton({ href, children, isActive = false }: { href: string; childr
         onClick={() => router.push(href)}
         className={cn(
             "text-sm px-2 sm:px-3 py-1 h-8",
-            "hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring rounded",
-            isActive ? "text-primary font-medium bg-accent/50" : "text-muted-foreground hover:text-foreground"
+            "rounded-md",
+            "hover:bg-accent hover:text-accent-foreground",
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            isActive ? "text-primary font-semibold bg-primary/10" : "text-muted-foreground"
         )}
      >
+       {Icon && <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />}
       {children}
     </Button>
   );
 }
 
 
-// Formulario de contacto mejorado
+// Formulario de contacto (consistente)
 function ContactForm() {
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -1651,22 +1669,24 @@ function ContactForm() {
   );
 }
 
-// Componente ContactInfoItem (sin cambios lógicos)
+// Componente ContactInfoItem (consistente)
 function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ElementType, label: string, href?: string, text: string, targetBlank?: boolean }) {
     const content = (
         <>
             <Icon className="h-4 w-4 text-primary flex-shrink-0" />
             <span className="font-medium text-foreground/90">{label}</span>
-            <span className="text-muted-foreground truncate">{text}</span>
+            <span className="text-muted-foreground break-all">{text}</span> {/* Allow break-all for long text */}
         </>
     );
+    const containerClasses = "flex items-center space-x-2 text-sm";
+    const linkClasses = "inline-flex items-center gap-2 group hover:text-primary transition-colors";
 
     return (
-        <div className="flex items-center space-x-2 text-sm">
+        <div className={containerClasses}>
             {href ? (
                  <a
                     href={href}
-                    className="inline-flex items-center gap-2 group"
+                    className={cn(linkClasses)}
                     target={targetBlank ? "_blank" : undefined}
                     rel={targetBlank ? "noopener noreferrer" : undefined}
                 >
@@ -1836,95 +1856,70 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
 
 ## File: `app\help\page.tsx`
 ```tsx
-// File: app/privacy/page.tsx (MODIFICADO - Iteración 5.2)
+// File: app/help/page.tsx (MODIFICADO - Iteración 5.2)
 "use client";
 
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
-import { APP_NAME } from '@/lib/constants';
-import { ArrowLeft } from 'lucide-react'; // Icono volver
+import { ArrowLeft, BookText, Mail, Phone } from 'lucide-react'; // Iconos
 
-export default function PrivacyPage() {
-    const router = useRouter();
+export default function HelpPage() {
+  const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-        <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-6">
-            {/* Botón volver */}
-            <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver al Inicio
-            </Button>
-            {/* Card principal */}
-            <Card className="shadow-sm border">
-                <CardHeader>
-                <CardTitle className="text-2xl md:text-3xl font-bold">Política de Privacidad</CardTitle>
-                <CardDescription>Última Actualización: [Insertar Fecha]</CardDescription> {/* Fecha aquí */}
-                </CardHeader>
-                <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none pt-0"> {/* prose para estilos de texto */}
-                <p>
-                    {APP_NAME} ("nosotros", "nos", o "nuestro") opera la aplicación {APP_NAME} (el "Servicio"). Esta página le informa de nuestras políticas relativas a la recopilación, uso y divulgación de datos personales cuando utiliza nuestro Servicio y las opciones que tiene asociadas a esos datos.
-                </p>
+    <div className="container mx-auto max-w-3xl p-4 md:p-8 space-y-8">
+       {/* Botón volver mejorado */}
+        <Button variant="ghost" onClick={() => router.push('/chat')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver a la Aplicación
+        </Button>
+      {/* Título principal */}
+      <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">Ayuda y Soporte</h1>
 
-                <h2>1. Recopilación y Uso de Información</h2>
-                <p>
-                    Recopilamos diferentes tipos de información para diversos fines para proporcionar y mejorar nuestro Servicio para usted.
-                </p>
-                <ul>
-                    <li><strong>Datos Personales:</strong> Al utilizar nuestro Servicio, podemos pedirle que nos proporcione cierta información de identificación personal que puede utilizarse para contactarle o identificarle ("Datos Personales"). La información de identificación personal puede incluir, entre otros: Dirección de correo electrónico, Nombre, Información de la empresa (si aplica).</li>
-                    <li><strong>Datos de Uso:</strong> También podemos recopilar información sobre cómo se accede y utiliza el Servicio ("Datos de Uso"). Estos Datos de Uso pueden incluir información como la dirección de Protocolo de Internet de su ordenador (por ejemplo, dirección IP), tipo de navegador, versión del navegador, las páginas de nuestro Servicio que visita, la hora y fecha de su visita, el tiempo dedicado a esas páginas, identificadores únicos de dispositivos y otros datos de diagnóstico.</li>
-                    <li><strong>Contenido del Usuario:</strong> Procesamos los documentos y datos que usted carga ("Contenido del Usuario") únicamente con el fin de proporcionar las funciones del Servicio, como la indexación y la consulta. Tratamos su Contenido de Usuario como confidencial.</li>
-                </ul>
+      <Card className="border shadow-sm">
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+             <BookText className="h-5 w-5 text-primary"/> Documentación
+          </CardTitle>
+          <CardDescription>Recursos y guías para usar Atenex.</CardDescription>
+        </CardHeader>
+        <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+          <p>
+            Encuentra guías detalladas y respuestas a preguntas frecuentes sobre cómo utilizar {APP_NAME}.
+            Visita nuestra <a href="https://docs.atenex.com" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline hover:text-primary/80">documentación oficial</a> para más información.
+          </p>
+        </CardContent>
+      </Card>
 
-                <h2>2. Uso de Datos</h2>
-                <p>{APP_NAME} utiliza los datos recopilados para diversos fines:</p>
-                 <ul>
-                    <li>Para proporcionar y mantener el Servicio</li>
-                    <li>Para notificarle cambios en nuestro Servicio</li>
-                    <li>Para permitirle participar en funciones interactivas de nuestro Servicio cuando decida hacerlo</li>
-                    <li>Para proporcionar atención y soporte al cliente</li>
-                    <li>Para proporcionar análisis o información valiosa para que podamos mejorar el Servicio</li>
-                    <li>Para supervisar el uso del Servicio</li>
-                    <li>Para detectar, prevenir y abordar problemas técnicos</li>
-                 </ul>
-
-                <h2>3. Almacenamiento y Seguridad de los Datos</h2>
-                <p>
-                    El Contenido del Usuario se almacena de forma segura utilizando proveedores de almacenamiento en la nube estándar de la industria [Especificar si es posible, ej., AWS S3, Google Cloud Storage, MinIO]. Implementamos medidas de seguridad diseñadas para proteger su información contra el acceso, divulgación, alteración y destrucción no autorizados. Sin embargo, ninguna transmisión por Internet o almacenamiento electrónico es 100% seguro.
-                </p>
-
-                 <h2>4. Proveedores de Servicios</h2>
-                 <p>
-                    Podemos emplear a empresas e individuos terceros para facilitar nuestro Servicio ("Proveedores de Servicios"), para proporcionar el Servicio en nuestro nombre, para realizar servicios relacionados con el Servicio o para ayudarnos a analizar cómo se utiliza nuestro Servicio. Estos terceros tienen acceso a sus Datos Personales sólo para realizar estas tareas en nuestro nombre y están obligados a no divulgarlos ni utilizarlos para ningún otro fin. Ejemplos incluyen: [Listar categorías, ej., Alojamiento en la nube (AWS/GCP/Azure), Proveedores LLM (OpenAI/Google), Autenticación (Supabase)].
-                 </p>
-
-                 <h2>5. Sus Derechos sobre los Datos</h2>
-                 <p>
-                    Dependiendo de su jurisdicción, puede tener ciertos derechos con respecto a sus Datos Personales, como el derecho a acceder, corregir, eliminar o restringir su procesamiento. Póngase en contacto con nosotros para ejercer estos derechos.
-                 </p>
-
-                 <h2>6. Privacidad de los Niños</h2>
-                 <p>
-                    Nuestro Servicio no se dirige a menores de 18 años ("Niños"). No recopilamos conscientemente información de identificación personal de menores de 18 años.
-                 </p>
-
-                 <h2>7. Cambios a esta Política de Privacidad</h2>
-                 <p>
-                    Podemos actualizar nuestra Política de Privacidad de vez en cuando. Le notificaremos cualquier cambio publicando la nueva Política de Privacidad en esta página. Se le aconseja revisar esta Política de Privacidad periódicamente para cualquier cambio.
-                 </p>
-
-                 <h2>8. Contáctenos</h2>
-                 <p>
-                    Si tiene alguna pregunta sobre esta Política de Privacidad, por favor contáctenos: [Su Correo/Enlace de Contacto]
-                 </p>
-                </CardContent>
-            </Card>
-        </div>
+       <Card className="border shadow-sm">
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+             <Mail className="h-5 w-5 text-primary"/> Contactar con Soporte
+          </CardTitle>
+           <CardDescription>Si necesitas asistencia adicional.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm"> {/* Tamaño de texto base */}
+           <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className='font-medium'>Email:</span>
+              <a href="mailto:soporte@atenex.com" className="text-primary underline hover:text-primary/80">soporte@atenex.com</a>
+           </div>
+           <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className='font-medium'>Teléfono:</span>
+               <a href="tel:+34123456789" className="text-primary underline hover:text-primary/80">+34 123 456 789</a>
+           </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
+// Definición local de APP_NAME si no está importado globalmente
+const APP_NAME = "Atenex";
 ```
 
 ## File: `app\layout.tsx`
@@ -2127,20 +2122,22 @@ export default function HomePage() {
   );
 }
 
-// Componente LinkButton (sin cambios)
-function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon: React.ElementType; isActive?: boolean }) {
+// Componente LinkButton (Revisado para consistencia)
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
         variant="ghost"
         onClick={() => router.push(href)}
         className={cn(
-            "text-sm px-2 sm:px-3 py-1 h-8",
-            "hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring rounded",
-            isActive ? "text-primary font-medium bg-accent/50" : "text-muted-foreground hover:text-foreground"
+            "text-sm px-2 sm:px-3 py-1 h-8", // Tamaño consistente
+            "rounded-md", // Borde redondeado consistente
+            "hover:bg-accent hover:text-accent-foreground", // Hover consistente
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", // Focus consistente
+            isActive ? "text-primary font-semibold bg-primary/10" : "text-muted-foreground" // Estilo activo/inactivo
         )}
      >
-       <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />
+       {Icon && <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />}
       {children}
     </Button>
   );
@@ -2167,85 +2164,92 @@ function FeatureCard({ title, description, icon }: { title: string; description:
 
 ## File: `app\privacy\page.tsx`
 ```tsx
-// File: app/privacy/page.tsx
-"use client"; // Mark as client component to use hooks like useRouter
+// File: app/privacy/page.tsx (MODIFICADO - Iteración 5.2)
+"use client";
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
 import { APP_NAME } from '@/lib/constants';
+import { ArrowLeft } from 'lucide-react'; // Icono volver
 
 export default function PrivacyPage() {
-    const router = useRouter(); // Initialize router
+    const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <Button variant="link" onClick={() => router.push('/')} className="mb-4">← Back to Home</Button>
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl md:text-3xl">Privacy Policy</CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none space-y-4">
-          <p>Last Updated: [Insert Date]</p>
+    <div className="min-h-screen bg-background text-foreground">
+        <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-6">
+            {/* Botón volver */}
+            <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver al Inicio
+            </Button>
+            {/* Card principal */}
+            <Card className="shadow-sm border">
+                <CardHeader>
+                <CardTitle className="text-2xl md:text-3xl font-bold">Política de Privacidad</CardTitle>
+                <CardDescription>Última Actualización: [Insertar Fecha]</CardDescription> {/* Fecha aquí */}
+                </CardHeader>
+                <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none pt-0"> {/* prose para estilos de texto */}
+                <p>
+                    {APP_NAME} ("nosotros", "nos", o "nuestro") opera la aplicación {APP_NAME} (el "Servicio"). Esta página le informa de nuestras políticas relativas a la recopilación, uso y divulgación de datos personales cuando utiliza nuestro Servicio y las opciones que tiene asociadas a esos datos.
+                </p>
 
-          <p>
-            {APP_NAME} ("us", "we", or "our") operates the {APP_NAME} application (the "Service"). This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service and the choices you have associated with that data.
-          </p>
+                <h2>1. Recopilación y Uso de Información</h2>
+                <p>
+                    Recopilamos diferentes tipos de información para diversos fines para proporcionar y mejorar nuestro Servicio para usted.
+                </p>
+                <ul>
+                    <li><strong>Datos Personales:</strong> Al utilizar nuestro Servicio, podemos pedirle que nos proporcione cierta información de identificación personal que puede utilizarse para contactarle o identificarle ("Datos Personales"). La información de identificación personal puede incluir, entre otros: Dirección de correo electrónico, Nombre, Información de la empresa (si aplica).</li>
+                    <li><strong>Datos de Uso:</strong> También podemos recopilar información sobre cómo se accede y utiliza el Servicio ("Datos de Uso"). Estos Datos de Uso pueden incluir información como la dirección de Protocolo de Internet de su ordenador (por ejemplo, dirección IP), tipo de navegador, versión del navegador, las páginas de nuestro Servicio que visita, la hora y fecha de su visita, el tiempo dedicado a esas páginas, identificadores únicos de dispositivos y otros datos de diagnóstico.</li>
+                    <li><strong>Contenido del Usuario:</strong> Procesamos los documentos y datos que usted carga ("Contenido del Usuario") únicamente con el fin de proporcionar las funciones del Servicio, como la indexación y la consulta. Tratamos su Contenido de Usuario como confidencial.</li>
+                </ul>
 
-          <h2>1. Information Collection and Use</h2>
-          <p>
-            We collect several different types of information for various purposes to provide and improve our Service to you.
-          </p>
-          <ul>
-            <li><strong>Personal Data:</strong> While using our Service, we may ask you to provide us with certain personally identifiable information that can be used to contact or identify you ("Personal Data"). Personally identifiable information may include, but is not limited to: Email address, Name, Company Information (if applicable).</li>
-            <li><strong>Usage Data:</strong> We may also collect information on how the Service is accessed and used ("Usage Data"). This Usage Data may include information such as your computer's Internet Protocol address (e.g., IP address), browser type, browser version, the pages of our Service that you visit, the time and date of your visit, the time spent on those pages, unique device identifiers and other diagnostic data.</li>
-            <li><strong>User Content:</strong> We process the documents and data you upload ("User Content") solely for the purpose of providing the Service features, such as indexing and querying. We treat your User Content as confidential.</li>
-          </ul>
+                <h2>2. Uso de Datos</h2>
+                <p>{APP_NAME} utiliza los datos recopilados para diversos fines:</p>
+                 <ul>
+                    <li>Para proporcionar y mantener el Servicio</li>
+                    <li>Para notificarle cambios en nuestro Servicio</li>
+                    <li>Para permitirle participar en funciones interactivas de nuestro Servicio cuando decida hacerlo</li>
+                    <li>Para proporcionar atención y soporte al cliente</li>
+                    <li>Para proporcionar análisis o información valiosa para que podamos mejorar el Servicio</li>
+                    <li>Para supervisar el uso del Servicio</li>
+                    <li>Para detectar, prevenir y abordar problemas técnicos</li>
+                 </ul>
 
-          <h2>2. Use of Data</h2>
-          <p>{APP_NAME} uses the collected data for various purposes:</p>
-          <ul>
-            <li>To provide and maintain the Service</li>
-            <li>To notify you about changes to our Service</li>
-            <li>To allow you to participate in interactive features of our Service when you choose to do so</li>
-            <li>To provide customer care and support</li>
-            <li>To provide analysis or valuable information so that we can improve the Service</li>
-            <li>To monitor the usage of the Service</li>
-            <li>To detect, prevent and address technical issues</li>
-          </ul>
+                <h2>3. Almacenamiento y Seguridad de los Datos</h2>
+                <p>
+                    El Contenido del Usuario se almacena de forma segura utilizando proveedores de almacenamiento en la nube estándar de la industria [Especificar si es posible, ej., AWS S3, Google Cloud Storage, MinIO]. Implementamos medidas de seguridad diseñadas para proteger su información contra el acceso, divulgación, alteración y destrucción no autorizados. Sin embargo, ninguna transmisión por Internet o almacenamiento electrónico es 100% seguro.
+                </p>
 
-          <h2>3. Data Storage and Security</h2>
-          <p>
-            User Content is stored securely using industry-standard cloud storage providers [Specify if possible, e.g., AWS S3, Google Cloud Storage, MinIO]. We implement security measures designed to protect your information from unauthorized access, disclosure, alteration, and destruction. However, no internet transmission or electronic storage is 100% secure.
-          </p>
+                 <h2>4. Proveedores de Servicios</h2>
+                 <p>
+                    Podemos emplear a empresas e individuos terceros para facilitar nuestro Servicio ("Proveedores de Servicios"), para proporcionar el Servicio en nuestro nombre, para realizar servicios relacionados con el Servicio o para ayudarnos a analizar cómo se utiliza nuestro Servicio. Estos terceros tienen acceso a sus Datos Personales sólo para realizar estas tareas en nuestro nombre y están obligados a no divulgarlos ni utilizarlos para ningún otro fin. Ejemplos incluyen: [Listar categorías, ej., Alojamiento en la nube (AWS/GCP/Azure), Proveedores LLM (OpenAI/Google), Autenticación (Supabase)].
+                 </p>
 
-          <h2>4. Service Providers</h2>
-          <p>
-            We may employ third-party companies and individuals to facilitate our Service ("Service Providers"), to provide the Service on our behalf, to perform Service-related services or to assist us in analyzing how our Service is used. These third parties have access to your Personal Data only to perform these tasks on our behalf and are obligated not to disclose or use it for any other purpose. Examples include: [List categories, e.g., Cloud hosting (AWS/GCP/Azure), LLM providers (OpenAI/Google), Authentication (Supabase)].
-          </p>
+                 <h2>5. Sus Derechos sobre los Datos</h2>
+                 <p>
+                    Dependiendo de su jurisdicción, puede tener ciertos derechos con respecto a sus Datos Personales, como el derecho a acceder, corregir, eliminar o restringir su procesamiento. Póngase en contacto con nosotros para ejercer estos derechos.
+                 </p>
 
-          <h2>5. Your Data Rights</h2>
-          <p>
-            Depending on your jurisdiction, you may have certain rights regarding your Personal Data, such as the right to access, correct, delete, or restrict its processing. Please contact us to exercise these rights.
-          </p>
+                 <h2>6. Privacidad de los Niños</h2>
+                 <p>
+                    Nuestro Servicio no se dirige a menores de 18 años ("Niños"). No recopilamos conscientemente información de identificación personal de menores de 18 años.
+                 </p>
 
-          <h2>6. Children's Privacy</h2>
-          <p>
-            Our Service does not address anyone under the age of 18 ("Children"). We do not knowingly collect personally identifiable information from anyone under the age of 18.
-          </p>
+                 <h2>7. Cambios a esta Política de Privacidad</h2>
+                 <p>
+                    Podemos actualizar nuestra Política de Privacidad de vez en cuando. Le notificaremos cualquier cambio publicando la nueva Política de Privacidad en esta página. Se le aconseja revisar esta Política de Privacidad periódicamente para cualquier cambio.
+                 </p>
 
-          <h2>7. Changes to This Privacy Policy</h2>
-          <p>
-            We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.
-          </p>
-
-          <h2>8. Contact Us</h2>
-          <p>
-            If you have any questions about this Privacy Policy, please contact us: [Your Contact Email/Link]
-          </p>
-        </CardContent>
-      </Card>
+                 <h2>8. Contáctenos</h2>
+                 <p>
+                    Si tiene alguna pregunta sobre esta Política de Privacidad, por favor contáctenos: [Su Correo/Enlace de Contacto]
+                 </p>
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }
@@ -2359,6 +2363,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils'; // Importar cn
+import Link from 'next/link'; // Para enlace "Olvidaste contraseña"
 
 // Esquema Zod (sin cambios)
 const loginSchema = z.object({
@@ -2375,7 +2380,7 @@ export function LoginForm() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
-    mode: 'onChange',
+    mode: 'onChange', // Validar al cambiar
   });
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -2419,7 +2424,13 @@ export function LoginForm() {
       </div>
       {/* Campo Contraseña */}
       <div className="space-y-1.5">
-        <Label htmlFor="password">Contraseña</Label>
+        <div className="flex items-center justify-between">
+             <Label htmlFor="password">Contraseña</Label>
+             {/* Enlace "¿Olvidaste tu contraseña?" */}
+             {/* <Link href="#" className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2">
+                 ¿Olvidaste tu contraseña?
+             </Link> */}
+        </div>
         <Input
           id="password"
           type="password"
@@ -2434,12 +2445,6 @@ export function LoginForm() {
         {form.formState.errors.password && (
           <p className="text-xs text-destructive pt-1" role="alert">{form.formState.errors.password.message}</p>
         )}
-        {/* TODO: Añadir enlace "¿Olvidaste tu contraseña?" aquí si es necesario */}
-        {/* <div className="flex items-center justify-end pt-1">
-            <Link href="#" className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2">
-                ¿Olvidaste tu contraseña?
-            </Link>
-        </div> */}
       </div>
       {/* Botón de Envío */}
       <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isDirty || !form.formState.isValid}>
@@ -3312,7 +3317,7 @@ const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTML
 
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (MODIFICADO - Iteración 4.1)
+// File: components/knowledge/document-status-list.tsx (CORREGIDO Y MODIFICADO - Iteración 4.1)
 "use client";
 
 import React from 'react';
@@ -3348,6 +3353,8 @@ export interface DocumentStatusListProps {
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
   onDeleteSuccess: (documentId: string) => void;
+  // Añadimos isLoadingDocuments a las props ya que lo necesitamos aquí
+  isLoading?: boolean; // Renombrado a isLoading para simplificar
 }
 
 const getStatusAttributes = (status: DocumentStatus['status']) => {
@@ -3360,12 +3367,21 @@ const getStatusAttributes = (status: DocumentStatus['status']) => {
     }
 };
 
-export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, onDeleteSuccess }: DocumentStatusListProps) {
+export function DocumentStatusList({
+    documents,
+    authHeaders,
+    onRetrySuccess,
+    fetchMore,
+    hasMore,
+    refreshDocument,
+    onDeleteSuccess,
+    isLoading = false // Recibe isLoading (antes isLoadingDocuments)
+}: DocumentStatusListProps) {
   const [docToDelete, setDocToDelete] = React.useState<DocumentStatus | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
 
-  // Funciones handleRetry, handleRefresh, openDeleteConfirmation, handleDeleteConfirmed (sin cambios lógicos)
+  // Funciones handleRetry, handleRefresh, openDeleteConfirmation, handleDeleteConfirmed (sin cambios lógicos internos)
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
@@ -3414,7 +3430,7 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
   };
 
   // Estado vacío mejorado
-  if (!documents || documents.length === 0) {
+  if (!isLoading && (!documents || documents.length === 0)) { // Verifica isLoading aquí también
     return (
         <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border rounded-lg bg-muted/30 mt-4">
             <Info className="h-8 w-8 mb-3 opacity-50"/>
@@ -3525,6 +3541,7 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
         {/* Botón Cargar Más */}
         {hasMore && (
           <div className="pt-4 text-center">
+            {/* CORRECCIÓN: Usar isLoading de las props, no una variable local */}
             <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting || isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Cargar más
@@ -6631,168 +6648,4 @@ Simplemente hazme una pregunta sobre el contenido que esperas encontrar.`;
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
 
-```
-
-## File: `plan-refactorizacion.md`
-```md
-## Plan de Refactorización de UI/UX para Atenex Frontend
-
-Este plan detalla los pasos para modernizar la interfaz de usuario y mejorar la experiencia de usuario de la aplicación Atenex Frontend. El objetivo es lograr un diseño más limpio, profesional y eficiente, adecuado para un SaaS B2B, sin alterar la funcionalidad principal.
-
-**Principios Generales a Aplicar:**
-
-*   **Consistencia:** Asegurar que los estilos (colores, tipografía, espaciado, bordes, sombras) sean coherentes en toda la aplicación.
-*   **Claridad Visual:** Mejorar la jerarquía de la información, usar el espacio en blanco de manera efectiva y reducir el desorden visual.
-*   **Profesionalismo:** Utilizar una paleta de colores refinada (ajustar los temas existentes si es necesario), tipografía legible y animaciones sutiles y significativas.
-*   **Eficiencia:** Optimizar los flujos de usuario dentro de lo posible a través del diseño (mejor navegación, feedback claro).
-*   **Adaptabilidad:** Asegurar que los nuevos diseños sean responsivos y funcionen bien en diferentes tamaños de pantalla.
-
-**Checklist de Refactorización:**
-
-### Iteración 1: Estructura Principal y Layout del Dashboard
-
-*   **Objetivo:** Replantear la disposición general del layout autenticado para optimizar el espacio y mejorar la navegación, especialmente abordando la sección apretada del historial de chats.
-*   **Pasos:**
-    1.  **[X] Revisar y Refactorizar `app/(app)/layout.tsx`:**
-        *   [X] Considerar una estructura de 3 columnas para el `ResizablePanelGroup` si se decide separar el historial de chats: `Sidebar Navegación | Panel Historial Chats | Panel Contenido Principal`. (Se mantuvo 2 columnas por ahora)
-        *   [X] *Alternativa:* Mantener 2 columnas pero mejorar significativamente cómo se integra `ChatHistory` dentro de la `Sidebar`. (Realizado)
-        *   [X] Ajustar `defaultSize`, `minSize`, `maxSize` de los `ResizablePanel` para un estado inicial más equilibrado. (Realizado)
-        *   [X] Mejorar visualmente el `ResizableHandle` para que sea más sutil pero claro (modificar `components/ui/resizable.tsx` si es necesario, o aplicar clases CSS directamente). (Realizado)
-        *   **Archivos:** `app/(app)/layout.tsx`, `components/ui/resizable.tsx`.
-    2.  **[X] Rediseñar `components/layout/sidebar.tsx`:**
-        *   **Navegación Principal:**
-            *   [X] Mejorar el estilo de los ítems de navegación (padding, iconos, tipografía). (Realizado)
-            *   [X] Refinar el indicador visual del ítem activo (quizás un borde izquierdo más prominente o un fondo más distintivo pero sutil). (Realizado)
-            *   [X] Ajustar el espaciado general dentro de la barra lateral. (Realizado)
-            *   [X] Mejorar la apariencia en estado colapsado (`isCollapsed={true}`), asegurando que los iconos estén bien centrados y el tooltip sea claro. (Realizado)
-        *   **Botón "Nuevo Chat":**
-            *   [X] Revisar su prominencia y estilo. Quizás integrarlo de forma más elegante o darle un estilo más acorde al look empresarial. (Realizado)
-            *   [X] Asegurar que funcione bien tanto en estado expandido como colapsado. (Realizado)
-        *   **Integración del Historial (si no se separa en 3 columnas):** Preparar el espacio donde se integrará el `ChatHistory` rediseñado (ver Iteración 2). (Realizado)
-        *   **Archivos:** `components/layout/sidebar.tsx`, `app/globals.css` (para posibles variables de color/estilo del sidebar).
-    3.  **[X] Refinar `components/layout/header.tsx`:**
-        *   [X] Ajustar el espaciado y alineación de los iconos de la derecha (Palette, Help, User Menu) para que se sientan más cohesionados. (Realizado)
-        *   [X] Revisar el estilo del `DropdownMenu` del usuario para coherencia con el nuevo diseño. (Realizado)
-        *   **Archivos:** `components/layout/header.tsx`.
-
-### Iteración 2: Rediseño del Historial de Chats
-
-*   **Objetivo:** Solucionar el problema del historial de chats apretado y darle una apariencia más profesional y útil.
-*   **Pasos:**
-    1.  **[X] Rediseñar `components/chat/chat-history.tsx`:**
-        *   **Diseño de Items:**
-            *   [X] Aumentar el espaciado vertical y padding interno de cada item de chat. (Realizado)
-            *   [X] Mejorar la jerarquía visual: Título del chat más prominente, fecha/hora más sutil. (Realizado)
-            *   [X] Considerar añadir un pequeño fragmento del último mensaje (si la API lo proveyera o si se pudiera inferir, aunque esto roza la lógica). *Alternativa:* Mejorar solo el diseño visual. (Mejorado diseño visual)
-            *   [X] Refinar el estado `:hover` y `:active` / `:focus`. (Realizado)
-            *   [X] Mejorar la interacción y visibilidad del botón de eliminar (quizás hacerlo visible solo al pasar el ratón). (Realizado)
-        *   **Contenedor:**
-            *   [X] Si se integra en el sidebar (layout de 2 columnas), asegurar que use el espacio vertical de forma eficiente con `ScrollArea`. (Realizado)
-            *   [X] Si se convierte en un panel propio (layout de 3 columnas), darle un header claro y asegurar que sea redimensionable. (N/A - Se mantuvo en Sidebar)
-        *   **Estados (Carga, Error, Vacío):**
-            *   [X] Mejorar la presentación visual de estos estados para que sean más claros y estéticamente agradables. (Realizado)
-            *   [X] Usar `Skeleton` de forma más representativa. (Realizado)
-        *   **Archivos:** `components/chat/chat-history.tsx`, `components/ui/skeleton.tsx` (si se necesita customización), `app/globals.css`.
-
-### Iteración 3: Refactorización de la Interfaz de Chat Principal
-
-*   **Objetivo:** Modernizar el área de conversación, mejorar la legibilidad y la presentación de la información (mensajes y fuentes).
-*   **Pasos:**
-    1.  **[X] Refinar `app/(app)/chat/[[...chatId]]/page.tsx`:**
-        *   **Layout Interno:**
-            *   [X] Ajustar el padding y espaciado dentro del `ScrollArea` del chat para evitar que los mensajes se peguen a los bordes. (Realizado)
-            *   [X] Mejorar el estado inicial o vacío del chat (cuando no hay mensajes o solo el de bienvenida). (Realizado, muestra bienvenida)
-            *   [X] Optimizar el uso del espacio vertical. (Realizado con ScrollArea)
-            *   [X] Revisar la posición y estilo del botón para mostrar/ocultar el panel de fuentes (`PanelRightOpen`/`PanelRightClose`). Hacerlo más intuitivo. (Realizado)
-        *   **Indicador de Carga:**
-            *   [X] Mejorar el indicador "Atenex está pensando..." (`BrainCircuit`). Hacerlo más integrado visualmente o usar un `Skeleton` más elaborado para el mensaje entrante. (Realizado, se usa Skeleton)
-        *   **Archivos:** `app/(app)/chat/[[...chatId]]/page.tsx`.
-    2.  **[X] Rediseñar `components/chat/chat-message.tsx`:**
-        *   **Estilo de Burbujas:**
-            *   [X] Refinar el padding, `border-radius`, y sombras para un look más pulido. (Realizado)
-            *   [X] Asegurar un buen contraste entre el fondo de la burbuja y el texto, en todos los temas. (Realizado)
-            *   [X] Mejorar la separación visual entre mensajes consecutivos. (Realizado a través de `space-y` en page.tsx)
-        *   **Contenido:**
-            *   [X] Asegurar que el `Markdown` se renderice correctamente y con estilos consistentes (listas, código, negritas, etc.). Ajustar estilos `prose` en `tailwind.config.js` si es necesario. (Realizado)
-            *   [X] Mejorar la presentación de las `fuentes` dentro del mensaje del asistente. Quizás usar badges más refinados o una lista más estructurada. Hacer el tooltip más informativo y estilizado (`components/ui/tooltip.tsx`). (Realizado, se usan Badges y Tooltip mejorado)
-        *   **Avatares:** Asegurar que los avatares (Usuario y Asistente) estén bien alineados y tengan un estilo consistente. (Realizado)
-        *   **Mensajes de Error:** Asegurar que los mensajes de error sean claramente distinguibles pero sin ser visualmente discordantes. (Realizado)
-        *   **Archivos:** `components/chat/chat-message.tsx`, `tailwind.config.js` (para `prose`), `components/ui/tooltip.tsx`, `app/globals.css`.
-    3.  **[X] Rediseñar `components/chat/retrieved-documents-panel.tsx`:**
-        *   **Diseño de Tarjetas:**
-            *   [X] Mejorar el diseño de cada tarjeta de documento fuente. Mostrar información clave (nombre archivo, score, preview) de forma más clara y organizada. (Realizado)
-            *   [X] Añadir mejores indicadores visuales para interactividad (hover states). (Realizado)
-            *   [X] Refinar el uso de `Badge` para el score. (Realizado)
-        *   **Panel General:**
-            *   [X] Asegurar buen padding y espaciado dentro del panel. (Realizado)
-            *   [X] Mejorar el estado de carga (`Skeleton`) y el estado vacío ("No se encontraron documentos..."). (Realizado)
-        *   **Modal/Dialog de Detalles:** Revisar y pulir el estilo del `Dialog` que muestra los detalles del documento. (Realizado)
-        *   **Archivos:** `components/chat/retrieved-documents-panel.tsx`, `components/ui/card.tsx`, `components/ui/badge.tsx`, `components/ui/dialog.tsx`, `components/ui/skeleton.tsx`.
-    4.  **[X] Refinar `components/chat/chat-input.tsx`:**
-        *   [X] Ajustar el estilo del `Textarea` y el `Button` para que coincidan con el nuevo diseño (bordes, sombras, colores). (Realizado)
-        *   [X] Mejorar el feedback visual cuando está `isLoading`. (Realizado)
-        *   **Archivos:** `components/chat/chat-input.tsx`, `components/ui/textarea.tsx`, `components/ui/button.tsx`.
-
-### Iteración 4: Mejora de Páginas de Gestión (Knowledge Base, Settings)
-
-*   **Objetivo:** Aplicar el nuevo estilo empresarial a las páginas de gestión, mejorando la presentación de formularios y tablas.
-*   **Pasos:**
-    1.  **[X] Refactorizar `app/(app)/knowledge/page.tsx`:**
-        *   **Layout y Cards:**
-            *   [X] Organizar mejor el contenido usando `Card`s con cabeceras (`CardHeader`) y contenido (`CardContent`) bien definidos. (Realizado)
-            *   [X] Mejorar el espaciado general de la página. (Realizado)
-        *   **File Uploader (`components/knowledge/file-uploader.tsx`):**
-            *   [X] Mejorar el diseño visual del área de dropzone (hacerlo menos 'dashed' si no encaja, usar iconos y texto más claros). (Realizado)
-            *   [X] Mejorar el feedback visual durante la carga y al mostrar errores. (Realizado)
-            *   [X] Pulir el estilo del archivo seleccionado y el botón de subida. (Realizado)
-        *   **Lista de Documentos (`components/knowledge/document-status-list.tsx`):**
-            *   [X] Refinar el estilo de la `Table` (bordes, hover states, padding de celdas). (Realizado)
-            *   [X] Mejorar la apariencia de los `Badge` de estado (colores, iconos) para máxima claridad y consistencia con el tema. (Realizado)
-            *   [X] Asegurar que las acciones (Retry, Refresh, Delete) sean claras, accesibles y con tooltips informativos. Usar iconos consistentes. (Realizado)
-            *   [X] Mejorar el estilo del `AlertDialog` de confirmación de borrado. (Realizado)
-            *   [X] Mejorar estado vacío. (Realizado)
-        *   **Archivos:** `app/(app)/knowledge/page.tsx`, `components/knowledge/file-uploader.tsx`, `components/knowledge/document-status-list.tsx`, `components/ui/card.tsx`, `components/ui/table.tsx`, `components/ui/badge.tsx`, `components/ui/button.tsx`, `components/ui/tooltip.tsx`, `components/ui/alert-dialog.tsx`.
-    2.  **[X] Refactorizar `app/(app)/settings/page.tsx`:**
-        *   **Layout y Cards:**
-            *   [X] Utilizar `Card`s de forma efectiva para separar las secciones (Perfil, Empresa). (Realizado)
-        *   **Formularios:**
-            *   [X] Mejorar la disposición de los `Label` e `Input`. (Realizado con grid)
-            *   [X] Asegurar que los estados `disabled` y los mensajes informativos (como "El correo no se puede cambiar") sean claros y estén bien estilizados. (Realizado)
-            *   [X] Pulir el estilo del botón "Guardar Cambios" y su estado de carga/deshabilitado. (Realizado con feedback visual)
-        *   **Archivos:** `app/(app)/settings/page.tsx`, `components/ui/card.tsx`, `components/ui/label.tsx`, `components/ui/input.tsx`, `components/ui/button.tsx`.
-
-### Iteración 5: Pulido de Páginas Públicas y Autenticación
-
-*   **Objetivo:** Asegurar que las páginas públicas y el flujo de autenticación sean coherentes con el nuevo estilo visual.
-*   **Pasos:**
-    1.  **[ ] Refinar `app/page.tsx` (Landing Page):**
-        *   [ ] Evaluar si el diseño actual encaja o necesita una modernización (quizás una imagen/ilustración más corporativa, testimonios, etc., aunque esto puede exceder el "solo UI").
-        *   [ ] Pulir el `Header` y `Footer` específicos de esta página si los tiene (parece usar uno global ahora).
-        *   [ ] Refinar el estilo de las `FeatureCard`s (iconos, texto, fondo, borde, hover).
-        *   [ ] Asegurar consistencia en botones y tipografía.
-        *   **Archivos:** `app/page.tsx`.
-    2.  **[ ] Refinar `app/about/page.tsx`, `app/contact/page.tsx`, `app/help/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx`:**
-        *   [ ] Aplicar estilos consistentes de `Card`, tipografía (`prose` si aplica), títulos y espaciado.
-        *   [ ] Asegurar que los elementos interactivos (links, botones) sigan el nuevo diseño.
-        *   [ ] Mejorar la presentación visual en `About` (equipo, misión) y `Contact` (formulario, información de contacto).
-        *   **Archivos:** `app/about/page.tsx`, `app/contact/page.tsx`, `app/help/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx`.
-    3.  **[ ] Refinar `app/(auth)/layout.tsx` y `app/(auth)/login/page.tsx`:**
-        *   [ ] Asegurar que el layout de autenticación sea limpio y profesional.
-        *   [ ] Pulir el estilo de la `Card` de login y el `LoginForm`.
-        *   [ ] Verificar consistencia de botones, inputs y mensajes de error con el resto de la aplicación.
-        *   **Archivos:** `app/(auth)/layout.tsx`, `app/(auth)/login/page.tsx`, `components/auth/login-form.tsx`.
-
-### Iteración 6: Revisión General y Temas
-
-*   **Objetivo:** Realizar una revisión final de consistencia, responsividad y pulir los detalles en todos los temas.
-*   **Pasos:**
-    1.  **[ ] Revisar la Consistencia General:** Navegar por toda la aplicación verificando que los estilos de componentes comunes (botones, inputs, cards, badges, tooltips, dialogs, etc.) sean coherentes.
-    2.  **[ ] Revisar Responsividad:** Probar la aplicación en diferentes tamaños de pantalla (móvil, tablet, escritorio) y ajustar estilos donde sea necesario para asegurar una buena experiencia en todos los dispositivos.
-    3.  **[ ] Revisar y Ajustar Temas (`globals.css`):**
-        *   [ ] Verificar que los temas existentes (light, dark, blue, green) se apliquen correctamente y de manera profesional en todos los componentes rediseñados.
-        *   [ ] Ajustar las variables de color (`--primary`, `--secondary`, `--muted`, etc.) si es necesario para lograr un look más "empresarial" (quizás colores menos saturados o una paleta más sobria para el tema por defecto/system).
-        *   [ ] Prestar especial atención a los contrastes para la accesibilidad.
-        *   **Archivos:** `app/globals.css`, `tailwind.config.js` (si se ajustan variables o plugins).
-    4.  **[ ] Micro-interacciones y Animaciones:** Añadir transiciones sutiles (`transition-colors`, `duration-150`, etc.) en hovers, focus, etc., para una sensación más pulida. Evitar animaciones excesivas. Usar `tailwindcss-animate` de forma consistente.
-    5.  **[ ] Limpieza Final:** Eliminar clases CSS no utilizadas o redundantes. Asegurar que el código siga las buenas prácticas de Tailwind/shadcn.
 ```

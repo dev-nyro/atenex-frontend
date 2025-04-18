@@ -1,107 +1,120 @@
-// File: lib/hooks/useDocumentStatuses.ts (MODIFICADO - Corregido error y adaptado a API)
+// File: lib/hooks/useDocumentStatuses.ts (REVISADO Y CORREGIDO - Coincide con API y componentes)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     getDocumentStatusList,
-    DocumentStatusResponse, // Usar esta interfaz base
-    DetailedDocumentStatusResponse, // Usar esta para refresco individual
+    DocumentStatusResponse,
+    DetailedDocumentStatusResponse,
     AuthHeaders,
     ApiError,
-    getDocumentStatus // Importar la función individual
+    getDocumentStatus
 } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { toast } from 'sonner'; // Para mostrar errores al refrescar
 
-// Devolver la interfaz base en el hook, ya que la lista puede no tener todos los detalles
+const DEFAULT_LIMIT = 30; // Ajustar límite si es necesario
+
 interface UseDocumentStatusesReturn {
-  documents: DocumentStatusResponse[];
-  isLoading: boolean;
-  error: string | null;
-  fetchDocuments: (reset?: boolean) => Promise<void>;
-  fetchMore: () => void;
-  hasMore: boolean;
-  retryLocalUpdate: (documentId: string) => void;
-  refreshDocument: (documentId: string) => Promise<void>; // Refrescar estado individual
-  deleteLocalDocument: (documentId: string) => void;
+  documents: DocumentStatusResponse[]; // Lista de documentos
+  isLoading: boolean; // Estado general de carga (inicial o cargando más)
+  error: string | null; // Mensaje de error si falla la carga
+  fetchDocuments: (reset?: boolean) => Promise<void>; // Función para (re)cargar documentos
+  fetchMore: () => void; // Función para cargar la siguiente página
+  hasMore: boolean; // Indica si hay más documentos por cargar
+  retryLocalUpdate: (documentId: string) => void; // Actualiza UI para reintento
+  refreshDocument: (documentId: string) => Promise<void>; // Refresca un documento individual
+  deleteLocalDocument: (documentId: string) => void; // Elimina un documento de la UI local
 }
 
 export function useDocumentStatuses(): UseDocumentStatusesReturn {
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const offsetRef = useRef<number>(0);
-  const limit = 50; // Reducir límite por si las verificaciones paralelas son pesadas
-  const [hasMore, setHasMore] = useState<boolean>(true); // Asumir que hay más al inicio
+  const { user, isLoading: isAuthLoading } = useAuth(); // Obtener usuario y estado de auth
+  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]); // Estado para la lista de documentos
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Estado de carga general
+  const [error, setError] = useState<string | null>(null); // Estado de error
+  const offsetRef = useRef<number>(0); // Referencia para el offset de paginación
+  const [hasMore, setHasMore] = useState<boolean>(true); // Estado para saber si hay más páginas
+  const isFetchingRef = useRef<boolean>(false); // Ref para evitar llamadas concurrentes
 
-  const fetchDocuments = useCallback(async (reset: boolean = true) => {
-    if (isAuthLoading || !user?.userId || !user?.companyId) {
-      if (!isAuthLoading) {
+  // Función principal para cargar documentos
+  const fetchDocuments = useCallback(async (reset: boolean = false) => {
+    // Evitar ejecución si ya se está cargando o si no hay usuario/compañía
+    if (isFetchingRef.current || isAuthLoading || !user?.userId || !user?.companyId) {
+      if (!isAuthLoading && !user?.userId) {
+        // Si la autenticación terminó y no hay usuario, limpiar estado
         setDocuments([]); setIsLoading(false); setError(null); setHasMore(false);
       }
       return;
     }
 
+    isFetchingRef.current = true; // Marcar como cargando
+    setIsLoading(true); // Activar estado de carga visual
+    setError(null); // Limpiar errores previos
+
+    // Preparar headers de autenticación
     const authHeaders: AuthHeaders = {
       'X-User-ID': user.userId,
       'X-Company-ID': user.companyId,
     };
 
-    setIsLoading(true);
-    setError(null);
-
     try {
-      const currentOffset = reset ? 0 : offsetRef.current;
-      const data = await getDocumentStatusList(authHeaders, limit, currentOffset);
+      const currentOffset = reset ? 0 : offsetRef.current; // Determinar offset
+      const data = await getDocumentStatusList(authHeaders, DEFAULT_LIMIT, currentOffset);
 
       // Actualizar estado de paginación
-      setHasMore(data.length === limit);
-      offsetRef.current = currentOffset + data.length; // Actualizar offset correctamente
+      setHasMore(data.length === DEFAULT_LIMIT);
+      offsetRef.current = currentOffset + data.length; // Incrementar offset
 
-      // Actualizar documentos (reemplazar o añadir)
+      // Actualizar lista de documentos (reemplazar si reset=true, añadir si reset=false)
       setDocuments(prev => reset ? data : [...prev, ...data]);
 
     } catch (err: any) {
       const errorMessage = err instanceof ApiError ? err.message : (err.message || 'Error al cargar la lista de documentos.');
       setError(errorMessage);
-      // Mantener documentos existentes en caso de error al cargar más? O limpiar? Por ahora limpiamos.
-      if(reset) setDocuments([]);
-      setHasMore(false); // Asumir que no hay más si hay error
+      // Opcional: limpiar documentos en error, o mantener los actuales
+      // if(reset) setDocuments([]);
+      setHasMore(false); // Asumir no más páginas si hay error
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Desactivar estado de carga visual
+      isFetchingRef.current = false; // Desmarcar como cargando
     }
-  }, [user, isAuthLoading]); // Dependencias correctas
+  }, [user, isAuthLoading]); // Dependencias: usuario y estado de auth
 
-  // Carga inicial
+  // Carga inicial de documentos cuando el usuario esté disponible
   useEffect(() => {
-    if (user?.userId && user?.companyId) { // Solo llamar si hay usuario
-        fetchDocuments(true);
-    } else if (!isAuthLoading) { // Si auth terminó y no hay usuario, limpiar
+    if (user?.userId && user?.companyId && documents.length === 0) { // Cargar solo si hay usuario y la lista está vacía
+        fetchDocuments(true); // reset = true
+    } else if (!isAuthLoading && !user?.userId) {
+        // Si auth terminó y no hay usuario, asegurar estado limpio
         setDocuments([]);
         setIsLoading(false);
         setError(null);
         setHasMore(false);
     }
-  }, [user, isAuthLoading, fetchDocuments]); // Depender también de fetchDocuments
+    // No incluir fetchDocuments en dependencias para evitar bucles si cambia rápido
+  }, [user, isAuthLoading]); // Solo depende del usuario y auth
 
+  // Actualiza la UI localmente cuando se inicia un reintento
   const retryLocalUpdate = useCallback((documentId: string) => {
     setDocuments(prevDocs =>
       prevDocs.map(doc =>
         doc.document_id === documentId
-          ? { ...doc, status: 'processing', error_message: null }
+          ? { ...doc, status: 'processing', error_message: null } // Cambiar estado a 'processing'
           : doc
       )
     );
   }, []);
 
+  // Carga la siguiente página de documentos
   const fetchMore = useCallback(() => {
-    if (!isLoading && hasMore) {
-      fetchDocuments(false); // Llamar con reset=false para añadir, no reemplazar
+    if (!isLoading && hasMore && !isFetchingRef.current) {
+      fetchDocuments(false); // reset = false para añadir
     }
   }, [fetchDocuments, isLoading, hasMore]);
 
-  // --- CORRECCIÓN: Pasar authHeaders a getDocumentStatus ---
+  // Refresca el estado de un documento individual desde la API
   const refreshDocument = useCallback(async (documentId: string) => {
     if (!user?.userId || !user?.companyId) {
         console.error("Cannot refresh document: user or company ID missing.");
+        toast.error("Error de autenticación", { description: "No se pudo verificar la sesión." });
         return;
     }
     const authHeaders: AuthHeaders = {
@@ -109,22 +122,23 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
         'X-Company-ID': user.companyId,
       };
     try {
-      // Pasar authHeaders como segundo argumento
-      const updated = await getDocumentStatus(documentId, authHeaders);
-      // Actualizar el documento específico en la lista
-      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updated : doc));
+      const updatedDoc = await getDocumentStatus(documentId, authHeaders); // Llama a la API
+      // Actualiza el documento específico en la lista local
+      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updatedDoc : doc));
+      // Opcional: toast de éxito
+      // toast.success("Estado Actualizado", { description: `Se actualizó el estado de ${updatedDoc.file_name || documentId}.` });
     } catch (error){
       console.error(`Failed to refresh status for document ${documentId}:`, error);
-      // Opcional: mostrar toast de error
-      // toast.error("Error al refrescar estado", { description: error instanceof Error ? error.message : "Error desconocido" });
+      toast.error("Error al refrescar estado", { description: error instanceof Error ? error.message : "Error desconocido" });
     }
-  }, [user]); // Añadir user como dependencia
+  }, [user]); // Depende del usuario para los headers
 
+  // Elimina un documento de la lista local (después de confirmación API exitosa)
   const deleteLocalDocument = useCallback((documentId: string) => {
     setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
-    // Recalcular si hay más después de eliminar? Podría ser complejo.
-    // Por ahora, el usuario puede hacer clic en "Cargar más" si es necesario.
+    // Nota: No recalcula 'hasMore' aquí para simplificar. Podría ser necesario en casos complejos.
   }, []);
 
+  // Devuelve el estado y las funciones del hook
   return { documents, isLoading, error, fetchDocuments, fetchMore, hasMore, retryLocalUpdate, refreshDocument, deleteLocalDocument };
 }
