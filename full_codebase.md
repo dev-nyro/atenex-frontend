@@ -84,12 +84,12 @@ atenex-frontend/
 ├── next-env.d.ts
 ├── next.config.mjs
 ├── package.json
+├── plan-refactorizacion.md
 ├── postcss.config.js
 ├── public
 │   └── icons
 ├── tailwind.config.js
-├── tsconfig.json
-└── ui-refactroring-plan.md
+└── tsconfig.json
 ```
 
 # Full Codebase
@@ -440,7 +440,7 @@ ehthumbs_vista.db
 
 ## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
-// File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO)
+// File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO - Iteración 3.1)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -547,6 +547,7 @@ export default function ChatPage() {
                         return validTimeA - validTimeB;
                     });
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
+                    // Mostrar mensaje de bienvenida solo si el chat está vacío después de cargar
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
                 })
                 .catch(error => {
@@ -558,11 +559,12 @@ export default function ChatPage() {
                         else { toast.error("Fallo al cargar historial", { description: message }); }
                     } else { toast.error("Fallo al cargar historial", { description: "Ocurrió un error inesperado." }); }
                     setHistoryError(message);
-                    setMessages([welcomeMessage]);
+                    setMessages([welcomeMessage]); // Mostrar bienvenida en caso de error
                     fetchedChatIdRef.current = undefined;
                 })
                 .finally(() => setIsLoadingHistory(false));
         } else {
+            // Página de nuevo chat, mostrar bienvenida
             setMessages([welcomeMessage]);
             setRetrievedDocs([]);
             setIsLoadingHistory(false);
@@ -595,8 +597,9 @@ export default function ChatPage() {
             content: text,
             created_at: new Date().toISOString()
         };
-        // Asegurarse de quitar el mensaje de bienvenida si existe
-        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+        // Asegurarse de quitar el mensaje de bienvenida si existe y no es el único mensaje
+        setMessages(prev => prev.length === 1 && prev[0].id === 'initial-welcome' ? [userMessage] : [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+
 
         // --- NUEVO: Manejo local de saludos y consultas meta ---
         if (isGreeting(text)) {
@@ -669,7 +672,7 @@ export default function ChatPage() {
             }
 
             if (mappedSources && mappedSources.length > 0) {
-                setIsSourcesPanelVisible(true);
+                setIsSourcesPanelVisible(true); // Abrir panel si hay fuentes
             }
              console.log(`ChatPage: Query successful. Answer received for chat ${returnedChatId}.`);
 
@@ -688,13 +691,14 @@ export default function ChatPage() {
         } finally {
             setIsSending(false);
         }
-    }, [chatId, isSending, user, router, signOut]); // isSourcesPanelVisible no es dependencia directa
+    }, [chatId, isSending, user, router, signOut]);
 
     const handlePanelToggle = () => { setIsSourcesPanelVisible(!isSourcesPanelVisible); };
 
     const handleNewChat = () => {
         if (pathname !== '/chat') { router.push('/chat'); }
         else {
+             // Resetear estado local para un nuevo chat
              setMessages([welcomeMessage]);
              setRetrievedDocs([]);
              setChatId(undefined);
@@ -704,21 +708,59 @@ export default function ChatPage() {
         }
     };
 
+    // Renderizado del contenido del chat
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory) {
-            return ( <div className="space-y-4 p-4"><Skeleton className="h-16 w-3/4 rounded-lg" /><Skeleton className="h-16 w-1/2 ml-auto rounded-lg" /><Skeleton className="h-16 w-3/4 rounded-lg" /></div> );
+            return (
+                // Skeleton mejorado
+                <div className="space-y-6 p-4">
+                    <div className="flex items-start space-x-3 pr-10">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3 justify-end pl-10">
+                         <div className="flex-1 space-y-2 items-end flex flex-col">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                    </div>
+                     <div className="flex items-start space-x-3 pr-10">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                        </div>
+                    </div>
+                </div>
+            );
         }
         if (historyError) {
-            return ( <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center"><AlertCircle className="h-10 w-10 mb-3" /><p className="text-lg font-semibold mb-1">Error al Cargar el Chat</p><p className="text-sm mb-4">{historyError}</p><Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" />Reintentar Carga</Button></div> );
+            // Mensaje de error mejorado
+            return (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                    <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                    <p className="text-xl font-semibold text-foreground mb-2">Error al Cargar el Chat</p>
+                    <p className="text-sm text-muted-foreground mb-5 max-w-sm">{historyError}</p>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Reintentar Carga
+                    </Button>
+                </div>
+            );
         }
+        // Mostrar mensajes o estado vacío si no hay error ni carga
         return (
-            <div className="space-y-6 pb-4"> {/* Aumentado espaciado */}
+            <div className="space-y-6 pb-6"> {/* Espaciado y padding inferior */}
                 {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
+                {/* Indicador de carga "pensando" */}
                 {isSending && (
-                    <div className="flex items-center justify-center pt-4">
-                        <div className="flex items-center space-x-1.5 text-xs text-muted-foreground">
-                            <BrainCircuit className="h-4 w-4 animate-pulse" /><span>Atenex está pensando...</span>
-                         </div>
+                    <div className="flex items-start space-x-3 pr-10 pt-4">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-primary/10" />
+                        <div className="flex-1 space-y-2 pt-1.5">
+                            <Skeleton className="h-3.5 w-16 rounded" />
+                        </div>
                     </div>
                 )}
             </div>
@@ -726,28 +768,39 @@ export default function ChatPage() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-muted/20 dark:bg-background">
+        // Fondo ligeramente diferente para el área de chat
+        <div className="flex flex-col h-full bg-background">
              <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 70 : 100} minSize={30}>
+                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
                      <div className="flex h-full flex-col relative">
-                         {/* Botón toggle siempre visible */}
+                         {/* Botón toggle más discreto */}
                          <div className="absolute top-3 right-3 z-20">
-                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full" aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
+                             <Button
+                                onClick={handlePanelToggle}
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
+                                data-state={isSourcesPanelVisible ? "open" : "closed"} // Para posible estilo futuro
+                                aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}
+                             >
                                  {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                          </div>
-                         <ScrollArea className="flex-1 px-4 pt-6 pb-6" ref={scrollAreaRef}> {/* Padding ajustado */}
+                         {/* Ajuste de padding en ScrollArea */}
+                         <ScrollArea className="flex-1 px-6 pt-6 pb-2" ref={scrollAreaRef}>
                              {renderChatContent()}
                          </ScrollArea>
-                         <div className="border-t p-4 bg-background shadow-inner shrink-0">
+                         {/* Borde superior más sutil y padding ajustado */}
+                         <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
                          </div>
                      </div>
                  </ResizablePanel>
                  {isSourcesPanelVisible && (
                      <>
-                         <ResizableHandle withHandle className="bg-border" />
-                         <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+                         <ResizableHandle withHandle />
+                         {/* Ajuste de tamaño del panel de fuentes */}
+                         <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
                              <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
                          </ResizablePanel>
                      </>
@@ -760,21 +813,22 @@ export default function ChatPage() {
 
 ## File: `app\(app)\knowledge\page.tsx`
 ```tsx
-// File: app/(app)/knowledge/page.tsx (MODIFICADO)
+// File: app/(app)/knowledge/page.tsx (MODIFICADO - Iteración 4.1)
 'use client';
 import React, { useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 // Importar Card y sus componentes
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
+import { Loader2, AlertTriangle } from 'lucide-react'; // Añadido AlertTriangle
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses';
 import { useUploadDocument } from '@/lib/hooks/useUploadDocument';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { AuthHeaders } from '@/lib/api';
-import { cn } from '@/lib/utils'; // Import cn
+import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Añadir Alert
 
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -798,6 +852,7 @@ export default function KnowledgePage() {
     clearUploadStatus
   } = useUploadDocument(
     () => {
+        // Refrescar la lista un poco después de subir, para dar tiempo a que aparezca
         setTimeout(() => {
             fetchDocuments(true);
         }, 1500);
@@ -806,114 +861,124 @@ export default function KnowledgePage() {
 
   const handleRetrySuccess = (documentId: string) => {
     retryLocalUpdate(documentId);
+    // Opcional: Refrescar el documento específico inmediatamente después del reintento local
+    // refreshDocument(documentId);
   };
 
   const handleDeleteSuccess = useCallback((documentId: string) => {
     deleteLocalDocument(documentId);
-    fetchDocuments(true);
-  }, [deleteLocalDocument, fetchDocuments]);
+    // Podríamos simplemente eliminar localmente o refrescar toda la lista
+    // fetchDocuments(true); // Si queremos asegurar consistencia total
+  }, [deleteLocalDocument]);
 
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
     'X-User-ID': user.userId,
     'X-Company-ID': user.companyId,
   } : null;
 
-  // Estado de carga principal (Autenticación)
+  // Skeleton de carga principal
   if (isAuthLoading) {
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6"> {/* Añadido space-y-6 */}
-          <h1 className="text-2xl font-semibold mb-6">
-             <Skeleton className="h-8 w-1/2" />
-          </h1>
-          {/* Layout simplificado para Skeleton */}
-          <div className="space-y-6">
-             <Skeleton className="h-48 w-full lg:w-1/3" /> {/* Simula Card de Upload */}
-             <Skeleton className="h-64 w-full" /> {/* Simula Card de Lista */}
+        // Usamos grid para un layout más flexible en el skeleton
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 grid gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-3">
+             <Skeleton className="h-10 w-1/3 mb-6" /> {/* Skeleton para el título principal */}
           </div>
+          {/* Skeletons para las cards */}
+          <Skeleton className="h-64 rounded-xl lg:col-span-1" />
+          <Skeleton className="h-80 rounded-xl lg:col-span-2" />
         </div>
     );
   }
 
-  // Renderizado principal
+  // Renderizado principal usando grid layout
   return (
-    // Usar flex flex-col para apilar elementos verticalmente, gap-6 para espaciado
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-8">
-      <h1 className="text-3xl font-bold tracking-tight">Base de Conocimiento</h1>
+    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+        {/* Título de la página */}
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Base de Conocimiento</h1>
 
-      {/* Card para Subir Documento */}
-      <Card className="w-full">
-        {/* Opcional: Usar CardHeader para un título más formal */}
-        {/* <CardHeader>
-             <CardTitle>Subir Nuevo Documento</CardTitle>
-        </CardHeader> */}
-        <CardContent className="pt-6"> {/* Añadir padding top si no se usa CardHeader */}
-          <h2 className="text-xl font-semibold mb-4">Subir Nuevo Documento</h2>
-          {authHeadersForChildren ? (
-            <FileUploader
-              authHeaders={authHeadersForChildren}
-              onUploadFile={uploadFile}
-              isUploading={isUploading}
-              uploadError={uploadError}
-              clearUploadStatus={clearUploadStatus}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
-              Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+        {/* Grid para las dos secciones principales */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
-      {/* Card para Lista de Documentos */}
-      <Card className="w-full">
-        {/* <CardHeader>
-            <CardTitle>Documentos Subidos</CardTitle>
-        </CardHeader> */}
-        <CardContent className="pt-6 space-y-4">
-           <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3'>
-             <h2 className="text-xl font-semibold">Documentos Subidos</h2>
-             {authHeadersForChildren && (
-               <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
-                 {/* Mostrar icono de carga solo cuando está cargando */}
-                 <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
-                 Refrescar Lista
-               </Button>
-             )}
-           </div>
+            {/* Columna Izquierda: Subir Documento */}
+            <Card className="lg:col-span-1 sticky top-20"> {/* Hacemos sticky la card de subida en pantallas grandes */}
+                <CardHeader>
+                    <CardTitle className="text-xl">Subir Nuevo Documento</CardTitle>
+                    <CardDescription>Añade archivos a tu base de conocimiento.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                {authHeadersForChildren ? (
+                    <FileUploader
+                    authHeaders={authHeadersForChildren}
+                    onUploadFile={uploadFile}
+                    isUploading={isUploading}
+                    uploadError={uploadError}
+                    clearUploadStatus={clearUploadStatus}
+                    />
+                ) : (
+                    <Alert variant="default" className="bg-muted/50">
+                         <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
+                        <AlertDescription className="text-xs text-muted-foreground">
+                            Inicia sesión para poder subir nuevos documentos.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                </CardContent>
+            </Card>
 
-          {/* Mostrar error de carga de la lista */}
-          {documentsError && (
-              <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
-                Error al cargar documentos: {documentsError}
-              </div>
-          )}
+            {/* Columna Derecha: Lista de Documentos */}
+            <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                     <div>
+                         <CardTitle className="text-xl">Documentos Subidos</CardTitle>
+                         <CardDescription>Gestiona los documentos de tu organización.</CardDescription>
+                     </div>
+                    {authHeadersForChildren && (
+                        <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
+                            <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
+                            Refrescar
+                        </Button>
+                    )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {/* Mostrar error de carga de la lista */}
+                    {documentsError && (
+                        <Alert variant="destructive">
+                             <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Error al Cargar Documentos</AlertTitle>
+                            <AlertDescription>
+                                {documentsError}
+                                <Button variant="link" size="sm" onClick={() => fetchDocuments(true)} className="p-0 h-auto ml-2 text-destructive underline">Reintentar</Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
 
-          {/* Mostrar estado de carga de la lista */}
-          {isLoadingDocuments && !documentsError && documents.length === 0 ? ( // Mostrar skeleton solo en carga inicial o reset
-             <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-             </div>
-          ) : (
-            // Renderizar la lista solo si hay headers (usuario logueado)
-            authHeadersForChildren ? (
-              <DocumentStatusList
-                documents={documents}
-                authHeaders={authHeadersForChildren}
-                onRetrySuccess={handleRetrySuccess}
-                fetchMore={fetchMore}
-                hasMore={hasMore}
-                refreshDocument={refreshDocument}
-                onDeleteSuccess={handleDeleteSuccess}
-              />
-            ) : (
-                // Mensaje si no está cargando, no hay error y no hay usuario
-                !documentsError && <p className="text-muted-foreground text-center py-6">Inicia sesión para ver tus documentos.</p>
-            )
-          )}
-        </CardContent>
-      </Card>
+                    {/* Mostrar skeleton o lista */}
+                    {isLoadingDocuments && !documentsError && documents.length === 0 ? (
+                        <div className="space-y-2 pt-2">
+                            <Skeleton className="h-12 w-full rounded-md" />
+                            <Skeleton className="h-12 w-full rounded-md" />
+                            <Skeleton className="h-12 w-full rounded-md" />
+                        </div>
+                    ) : (
+                        authHeadersForChildren ? (
+                        <DocumentStatusList
+                            documents={documents}
+                            authHeaders={authHeadersForChildren}
+                            onRetrySuccess={handleRetrySuccess}
+                            fetchMore={fetchMore}
+                            hasMore={hasMore}
+                            refreshDocument={refreshDocument}
+                            onDeleteSuccess={handleDeleteSuccess}
+                        />
+                        ) : (
+                            !documentsError && <p className="text-muted-foreground text-center py-10 text-sm">Inicia sesión para ver tus documentos.</p>
+                        )
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }
@@ -938,6 +1003,8 @@ import { toast } from 'sonner';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
+  // Iniciar colapsado por defecto en pantallas más pequeñas podría ser una opción futura,
+  // pero por ahora empezamos expandido.
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
@@ -1029,22 +1096,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
           <ResizablePanel
-              collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={20}
+              collapsible
+              collapsedSize={4} // Tamaño colapsado (en porcentaje o píxeles si se especifica unit)
+              minSize={15} // Permitir que sea más delgado
+              maxSize={25} // Límite superior
+              defaultSize={18} // Un poco más ancho por defecto
               onCollapse={() => setIsSidebarCollapsed(true)}
               onExpand={() => setIsSidebarCollapsed(false)}
               className={cn(
                   "transition-all duration-300 ease-in-out bg-background dark:bg-card",
-                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]"
+                  // Definimos el tamaño colapsado con clases específicas si collapsedSize no funciona como esperado
+                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[220px]" // Ancho mínimo expandido
               )}
               order={1}
           >
+              {/* Pasamos el estado colapsado al Sidebar */}
               <Sidebar isCollapsed={isSidebarCollapsed} />
           </ResizablePanel>
-          <ResizableHandle withHandle className="bg-border" />
-          <ResizablePanel defaultSize={80} minSize={30} order={2}>
+          {/* Usamos el handle personalizado de ui/resizable */}
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={82} minSize={30} order={2}> {/* Ajustar tamaño restante */}
               <div className="flex h-full flex-col">
                   <Header />
-                  <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
+                  {/* Cambiado el padding para ser consistente */}
+                  <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
                       {children}
                   </main>
               </div>
@@ -1057,111 +1132,145 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 ## File: `app\(app)\settings\page.tsx`
 ```tsx
-// File: app/(app)/settings/page.tsx (MODIFICADO)
+// File: app/(app)/settings/page.tsx (MODIFICADO - Iteración 4.2)
 "use client";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'; // Añadido CardFooter
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner'; // Para notificaciones
+import { toast } from 'sonner';
+import { Loader2, Check } from 'lucide-react'; // Importar iconos
+import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
 
 export default function SettingsPage() {
-    const { user } = useAuth();
-    const [name, setName] = useState(user?.name || '');
+    const { user, isLoading: isAuthLoading } = useAuth(); // Añadir isLoading
+    const [name, setName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
-    // Estado para rastrear si el nombre ha cambiado
     const [hasChanged, setHasChanged] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false); // Estado para feedback visual
 
     useEffect(() => {
         if (user) {
-            const currentName = user.name || '';
-            setName(currentName);
-            // Resetear cambio cuando el usuario cambie o se cargue inicialmente
+            setName(user.name || '');
             setHasChanged(false);
+            setSaveSuccess(false); // Resetear éxito al cargar datos
         }
     }, [user]);
 
     const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const newName = event.target.value;
         setName(newName);
-        // Verificar si el nuevo nombre es diferente al original del usuario
         setHasChanged(newName !== (user?.name || ''));
+        setSaveSuccess(false); // Resetear éxito si cambia de nuevo
     };
 
     const handleSave = async () => {
-        // No hacer nada si no hay cambios
-        if (!hasChanged) return;
-
+        if (!hasChanged || !user) return; // Asegurar que hay usuario
         setIsSaving(true);
+        setSaveSuccess(false);
         console.log('Guardando cambios (simulado):', { name });
         try {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Simular llamada API
+          await new Promise(resolve => setTimeout(resolve, 1200));
+
+          // TODO: Implementar llamada API real para actualizar el nombre del usuario
+          // Ejemplo: await updateUserProfile(user.userId, { name });
+
           toast.success("Perfil Actualizado", { description: "Tu nombre ha sido guardado." });
-          // Una vez guardado, marcar que ya no hay cambios pendientes
           setHasChanged(false);
-          // TODO: Idealmente, actualizar el 'user' en el AuthContext si la API devuelve el usuario actualizado
+          setSaveSuccess(true); // Marcar éxito
+
+          // TODO: Actualizar el objeto 'user' en AuthContext para reflejar el cambio
+          // Esto podría requerir una función adicional en useAuth o recargar datos
+
         } catch (error) {
           console.error("Error al guardar perfil:", error);
           toast.error("Error al Guardar", { description: "No se pudo actualizar el perfil." });
+          setSaveSuccess(false);
         } finally {
            setIsSaving(false);
         }
     };
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Configuración</h1>
+    // Mostrar skeleton mientras carga la autenticación
+    if (isAuthLoading) {
+        return (
+            <div className="space-y-8 max-w-3xl mx-auto">
+                 <Skeleton className="h-10 w-1/4 mb-6" /> {/* Skeleton título */}
+                 <Skeleton className="h-64 w-full rounded-xl" /> {/* Skeleton Card Perfil */}
+                 <Skeleton className="h-48 w-full rounded-xl" /> {/* Skeleton Card Empresa */}
+            </div>
+        )
+    }
 
+  return (
+    // Contenedor principal con espaciado vertical y ancho máximo
+    <div className="space-y-8 max-w-3xl mx-auto">
+      <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
+
+      {/* Card para Perfil */}
       <Card>
         <CardHeader>
-          <CardTitle>Perfil</CardTitle>
-          <CardDescription>Administra tu información personal.</CardDescription>
+          <CardTitle>Perfil de Usuario</CardTitle>
+          <CardDescription>Administra la información de tu cuenta personal.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="space-y-1">
-                 <Label htmlFor="name">Nombre</Label>
+        <CardContent className="space-y-6"> {/* Aumentado space-y */}
+            {/* Campo Nombre */}
+            <div className="grid sm:grid-cols-3 items-center gap-4">
+                 <Label htmlFor="name" className="sm:text-right sm:mt-2">Nombre</Label>
                  <Input
                     id="name"
                     value={name}
                     onChange={handleNameChange}
                     disabled={isSaving}
+                    className="sm:col-span-2" // Input ocupa 2 columnas en SM+
+                    placeholder="Tu nombre completo"
                  />
             </div>
-             <div className="space-y-1">
-                 <Label htmlFor="email">Correo electrónico</Label>
-                 <Input id="email" type="email" defaultValue={user?.email} disabled />
-                 <p className="text-xs text-muted-foreground">El correo electrónico no se puede cambiar.</p>
+             {/* Campo Email (Deshabilitado) */}
+             <div className="grid sm:grid-cols-3 items-start gap-4">
+                 <Label htmlFor="email" className="sm:text-right sm:mt-2">Correo electrónico</Label>
+                 <div className="sm:col-span-2 space-y-1">
+                     <Input id="email" type="email" value={user?.email || ''} disabled />
+                     <p className="text-xs text-muted-foreground">El correo electrónico no se puede cambiar.</p>
+                 </div>
             </div>
-             {/* Deshabilitar si está guardando O si no hay cambios */}
-             <Button onClick={handleSave} disabled={isSaving || !hasChanged}>
-                {isSaving ? "Guardando..." : "Guardar Cambios"}
-             </Button>
         </CardContent>
+        {/* Footer para el botón Guardar */}
+        <CardFooter className="border-t pt-6 justify-end">
+            <Button onClick={handleSave} disabled={isSaving || !hasChanged || saveSuccess}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {saveSuccess && <Check className="mr-2 h-4 w-4" />}
+                {isSaving ? "Guardando..." : saveSuccess ? "Guardado" : "Guardar Cambios"}
+             </Button>
+        </CardFooter>
       </Card>
 
-       <Separator />
-
-       {/* Sección de Empresa Mantenida por ahora, pero marcada como no implementada */}
+      {/* Card para Configuración de Empresa */}
        <Card>
         <CardHeader>
           <CardTitle>Configuración de la Empresa</CardTitle>
-          <CardDescription>Administra la configuración relacionada con tu empresa.</CardDescription>
+          <CardDescription>Información relacionada con tu organización.</CardDescription>
         </CardHeader>
-        <CardContent>
-           <p className="text-sm text-muted-foreground">La gestión de la configuración de la empresa aún no está implementada.</p>
+        <CardContent className="space-y-4">
+           {/* Información de la compañía actual (si existe) */}
+            {user?.companyId ? (
+                 <div className="grid sm:grid-cols-3 items-center gap-4">
+                    <Label htmlFor="companyId" className="sm:text-right">ID de Empresa</Label>
+                    <Input id="companyId" value={user.companyId} readOnly disabled className="sm:col-span-2 font-mono text-xs"/>
+                 </div>
+             ) : (
+                <p className="text-sm text-muted-foreground italic">No hay información de empresa asociada a tu cuenta.</p>
+             )}
+             {/* Placeholder para futuras configuraciones */}
+             <p className="text-sm text-muted-foreground pt-4 border-t">
+                Otras configuraciones de la empresa aparecerán aquí en futuras versiones.
+             </p>
         </CardContent>
       </Card>
-
-       {/* ELIMINADO: Sección de Apariencia Redundante */}
-       {/* <Separator />
-       <Card>
-        <CardHeader>...</CardHeader>
-        <CardContent>...</CardContent>
-      </Card> */}
 
     </div>
   );
@@ -1170,9 +1279,11 @@ export default function SettingsPage() {
 
 ## File: `app\(auth)\layout.tsx`
 ```tsx
+// File: app/(auth)/layout.tsx (MODIFICADO - Iteración 5.3)
 import React from 'react';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
+import { BookOpen } from 'lucide-react'; // Usar el mismo icono que en landing
 
 export default function AuthLayout({
   children,
@@ -1180,11 +1291,12 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-secondary via-background to-secondary p-4">
-       <div className="mb-8 flex items-center space-x-3">
-         {/* Placeholder logo - replace with actual Atenex logo */}
-         {/* <Image src="/placeholder.svg?width=40&height=40" alt={`${APP_NAME} Logo`} width={40} height={40} className="text-primary" /> */}
-         <span className="text-3xl font-bold text-primary">{APP_NAME}</span>
+    // Fondo gradiente más sutil
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+       {/* Logo consistente con landing */}
+       <div className="mb-8 flex items-center space-x-2 text-primary">
+         <BookOpen className="h-7 w-7" />
+         <span className="text-3xl font-bold">{APP_NAME}</span>
        </div>
       {children}
     </div>
@@ -1194,18 +1306,29 @@ export default function AuthLayout({
 
 ## File: `app\(auth)\login\page.tsx`
 ```tsx
+// File: app/(auth)/login/page.tsx (MODIFICADO - Iteración 5.3)
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { APP_NAME } from "@/lib/constants";
 
 export default function LoginPage() {
   return (
-    <Card className="w-full max-w-md shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
-        <CardDescription>Accede a tu cuenta Atenex</CardDescription>
+    // Card con sombra más pronunciada y padding ajustado
+    <Card className="w-full max-w-sm shadow-xl border-border/60">
+      <CardHeader className="text-center space-y-1 pt-8 pb-6"> {/* Ajuste de padding */}
+        <CardTitle className="text-2xl font-semibold tracking-tight">Iniciar Sesión</CardTitle> {/* Ajuste fuente */}
+        <CardDescription>Accede a tu cuenta {APP_NAME}</CardDescription> {/* Nombre App */}
       </CardHeader>
-      <CardContent>
+      {/* Padding inferior en CardContent */}
+      <CardContent className="pb-8">
         <LoginForm />
+        {/* TODO: Añadir enlace a "¿Olvidaste tu contraseña?" o "Registrarse" si aplica */}
+        {/* <p className="mt-4 px-8 text-center text-sm text-muted-foreground">
+             ¿Nuevo en Atenex?{' '}
+             <Link href="/register" className="underline underline-offset-4 hover:text-primary">
+                 Regístrate
+             </Link>
+         </p> */}
       </CardContent>
     </Card>
   );
@@ -1214,36 +1337,39 @@ export default function LoginPage() {
 
 ## File: `app\about\page.tsx`
 ```tsx
+// File: app/about/page.tsx (MODIFICADO - Iteración 5.2)
 "use client";
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { APP_NAME } from '@/lib/constants';
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Añadido AvatarImage
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react'; // Icono para volver
 
 const teamMembers = [
     { name: "Demo User 1", role: "Fundador", imageUrl: null },
     { name: "Demo User 2", role: "Co-Fundador", imageUrl: null },
     { name: "Demo User 3", role: "Ingeniero Líder", imageUrl: null },
-    // Add more team members as needed
-];
-
-const milestones = [
-    { year: 2023, event: "Atenex fundada con una visión de conocimiento accesible." },
-    // Add more milestones
 ];
 
 export default function AboutPage() {
     const router = useRouter();
 
   return (
-      <div className="container mx-auto p-6 space-y-4">
-          <Button variant="link" onClick={() => router.push('/')}>Volver al Inicio</Button>
-          <h1 className="text-3xl font-semibold">Acerca de {APP_NAME}</h1>
+      // Contenedor principal con padding y layout de una columna
+      <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-8">
+          {/* Botón volver mejorado */}
+          <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver al Inicio
+          </Button>
+          {/* Título principal */}
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">Acerca de {APP_NAME}</h1>
 
+          {/* Card Misión */}
           <Card>
               <CardHeader>
                   <CardTitle>Nuestra Misión</CardTitle>
@@ -1251,7 +1377,7 @@ export default function AboutPage() {
                       Empoderar a las organizaciones con acceso fluido a su conocimiento colectivo.
                   </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
                   <p>
                       Estamos comprometidos a proporcionar soluciones innovadoras que optimicen la gestión del conocimiento,
                       faciliten la toma de decisiones informadas y mejoren la productividad del equipo.
@@ -1259,8 +1385,7 @@ export default function AboutPage() {
               </CardContent>
           </Card>
 
-          <Separator />
-
+          {/* Card Visión */}
           <Card>
               <CardHeader>
                   <CardTitle>Nuestra Visión</CardTitle>
@@ -1268,7 +1393,7 @@ export default function AboutPage() {
                       Ser la plataforma líder de consulta de conocimiento, transformando cómo las empresas aprovechan la información.
                   </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
                   <p>
                       Visualizamos un futuro donde las organizaciones pueden aprovechar sin esfuerzo su experiencia interna,
                       fomentando una cultura de aprendizaje y crecimiento continuos.
@@ -1276,17 +1401,16 @@ export default function AboutPage() {
               </CardContent>
           </Card>
 
-          <Separator />
-
+          {/* Card Valores */}
           <Card>
               <CardHeader>
                   <CardTitle>Nuestros Valores</CardTitle>
                   <CardDescription>
-                      Integridad, Innovación, Colaboración y Éxito del Cliente.
+                      Pilares que guían nuestro trabajo diario.
                   </CardDescription>
               </CardHeader>
-              <CardContent>
-                  <ul className="list-disc list-inside space-y-1">
+              <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+                  <ul>
                       <li>
                           <strong>Integridad:</strong> Mantenemos los más altos estándares éticos en todas nuestras operaciones.
                       </li>
@@ -1302,8 +1426,8 @@ export default function AboutPage() {
                   </ul>
               </CardContent>
           </Card>
-          <Separator />
 
+          {/* Card Equipo */}
           <Card>
               <CardHeader>
                   <CardTitle>Conoce a Nuestro Equipo</CardTitle>
@@ -1311,26 +1435,29 @@ export default function AboutPage() {
                       Las talentosas personas detrás de {APP_NAME}.
                   </CardDescription>
               </CardHeader>
-              <CardContent className="flex justify-center">
-                  <div className="grid sm:grid-cols-3 gap-4">
+              <CardContent>
+                  {/* Grid para el equipo */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center">
                     {teamMembers.map((member) => (
-                        <div key={member.name} className="flex flex-col items-center">
-                            <Avatar className="h-16 w-16">
+                        <div key={member.name} className="flex flex-col items-center text-center">
+                            <Avatar className="h-20 w-20 border-2 border-primary/10">
                                 {member.imageUrl ? (
-                                    <img src={member.imageUrl} alt={member.name} />
+                                    <AvatarImage src={member.imageUrl} alt={member.name} />
                                 ) : (
-                                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                    // Fallback con iniciales y fondo suave
+                                    <AvatarFallback className='text-xl bg-muted'>{member.name.charAt(0)}</AvatarFallback>
                                 )}
                             </Avatar>
-                            <div className="mt-2 text-center">
-                                <p className="font-medium">{member.name}</p>
-                                <p className="text-sm text-muted-foreground">{member.role}</p>
+                            <div className="mt-3">
+                                <p className="font-semibold text-foreground">{member.name}</p>
+                                <p className="text-xs text-muted-foreground">{member.role}</p>
                             </div>
                         </div>
                     ))}
-                </div>
+                 </div>
               </CardContent>
           </Card>
+          <Separator />
       </div>
   );
 }
@@ -1338,7 +1465,7 @@ export default function AboutPage() {
 
 ## File: `app\contact\page.tsx`
 ```tsx
-// File: app/contact/page.tsx
+// File: app/contact/page.tsx (MODIFICADO - Iteración 5.2)
 "use client";
 
 import React from 'react';
@@ -1347,95 +1474,135 @@ import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Phone, Linkedin, MessageCircle, Loader2 } from 'lucide-react';
+import { Mail, Phone, Linkedin, MessageCircle, Loader2, Building, MapPin } from 'lucide-react'; // Añadidos Building, MapPin
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import Link from 'next/link'; // Importar Link
+import { Separator } from '@/components/ui/separator'; // Importar Separator
+import { Input } from '@/components/ui/input'; // Para el formulario
+import { Label } from '@/components/ui/label'; // Para el formulario
+import { Textarea } from '@/components/ui/textarea'; // Para el formulario
+
 
 export default function ContactPage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
   const isAuthenticated = !isAuthLoading && !!user;
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
-        <div className="container flex items-center justify-between h-16 py-4 px-4 md:px-6">
-          <button onClick={() => router.push('/')} className="font-bold text-2xl text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm">
-            {APP_NAME}
-          </button>
-          {/* Botones traducidos */}
-          <nav className="flex items-center space-x-2 sm:space-x-4">
+  // Header (similar al de landing page)
+  const renderHeader = () => (
+    <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
+        <div className="container flex items-center justify-between h-16 px-4 md:px-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            aria-label={`${APP_NAME} - Inicio`}
+          >
+             <Building className="w-6 h-6" /> {/* Icono diferente */}
+            <span className='font-bold'>{APP_NAME}</span>
+          </Link>
+          <nav className="flex items-center space-x-1 sm:space-x-2">
             <LinkButton href="/">Inicio</LinkButton>
             <LinkButton href="/about">Nosotros</LinkButton>
             <LinkButton href="/contact" isActive={true}>Contacto</LinkButton>
-             <div className="ml-2">
+            <div className="pl-2 sm:pl-4">
                 {isAuthLoading ? (
-                    <Button variant="secondary" disabled={true} size="sm">
+                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]">
                         <Loader2 className="h-4 w-4 animate-spin" />
                     </Button>
                 ) : isAuthenticated ? (
-                    // Botón traducido
-                    <Button variant="secondary" onClick={() => router.push('/chat')} size="sm">
+                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm">
                         Ir a la App
                     </Button>
                 ) : (
-                    // Botón traducido
-                    <Button onClick={() => router.push('/login')} size="sm" className="transition-colors duration-150 hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px]">
                         Acceder
                     </Button>
                 )}
             </div>
           </nav>
         </div>
-      </header>
+    </header>
+  );
 
-      <main className="container mx-auto px-4 py-16 md:py-24 flex-1">
-        {/* Textos traducidos */}
-        <section className="text-center">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Contáctanos
+  return (
+    <div className="flex flex-col min-h-screen bg-muted/20 dark:bg-background">
+      {renderHeader()}
+
+      {/* Main Content Area */}
+      <main className="container mx-auto px-4 py-12 md:py-20 flex-1">
+        {/* Título y descripción */}
+        <section className="text-center mb-12 md:mb-16">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4">
+            Ponte en Contacto
           </h1>
-          <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto">
-            ¿Tienes preguntas o comentarios? ¡Nos encantaría escucharte! Contáctanos usando el formulario o nuestros canales de contacto.
+          <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto">
+            ¿Tienes preguntas o comentarios? ¡Nos encantaría escucharte! Utiliza el formulario o nuestros canales directos.
           </p>
         </section>
 
-        <section className="max-w-lg mx-auto">
-          <Card className="shadow-lg">
+        {/* Grid para Formulario e Información */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 items-start max-w-6xl mx-auto">
+
+          {/* Columna Izquierda: Formulario */}
+          <Card className="lg:col-span-3 shadow-md">
             <CardHeader>
-              {/* Textos traducidos */}
               <CardTitle>Envíanos un Mensaje</CardTitle>
               <CardDescription>
-                Normalmente respondemos en 1-2 días hábiles.
+                Rellena el formulario y te responderemos lo antes posible.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ContactForm />
             </CardContent>
           </Card>
-        </section>
+
+          {/* Columna Derecha: Información Adicional */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="text-lg">Información de Contacto</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                 <ContactInfoItem Icon={Mail} label="Correo Electrónico:" href="mailto:info@atenex.ai" text="info@atenex.ai" />
+                 <ContactInfoItem Icon={Phone} label="Teléfono:" href="tel:+15551234567" text="+1 (555) 123-4567" />
+                 <Separator className='my-3'/>
+                 <ContactInfoItem Icon={Linkedin} label="LinkedIn:" href="https://linkedin.com/company/atenex" text="Atenex en LinkedIn" targetBlank={true} />
+                 <ContactInfoItem Icon={MessageCircle} label="WhatsApp:" href="https://wa.me/15551234567" text="Chatea por WhatsApp" targetBlank={true}/>
+                 <Separator className='my-3'/>
+                 <ContactInfoItem Icon={MapPin} label="Oficina:" text="Dirección Ficticia, Ciudad, País" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
 
-      <footer className="bg-muted/10 border-t py-8 mt-16">
-        {/* Texto traducido */}
-        <div className="container text-center text-muted-foreground text-sm">
-          © {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.
-        </div>
-      </footer>
+       {/* Footer similar al de landing page */}
+       <footer className="bg-muted/20 border-t border-border/60 py-6 mt-16">
+         <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+           <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+           <div className="flex gap-3">
+              <Link href="/privacy" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Política de Privacidad</Link>
+              <span className='opacity-50'>|</span>
+              <Link href="/terms" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Términos de Servicio</Link>
+           </div>
+         </div>
+       </footer>
     </div>
   );
 }
 
-// Componente traducido
+// Componente LinkButton (sin cambios)
 function LinkButton({ href, children, isActive = false }: { href: string; children: React.ReactNode; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
-        variant="link"
+        variant="ghost"
         onClick={() => router.push(href)}
         className={cn(
-            "text-sm sm:text-base hover:text-primary/80 focus:outline-none focus:ring-2 focus:ring-ring rounded-sm px-1 sm:px-2",
-            isActive ? "text-primary font-medium underline underline-offset-4" : "text-muted-foreground"
+            "text-sm px-2 sm:px-3 py-1 h-8",
+            "hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring rounded",
+            isActive ? "text-primary font-medium bg-accent/50" : "text-muted-foreground hover:text-foreground"
         )}
      >
       {children}
@@ -1443,84 +1610,71 @@ function LinkButton({ href, children, isActive = false }: { href: string; childr
   );
 }
 
-// Formulario de contacto traducido
+
+// Formulario de contacto mejorado
 function ContactForm() {
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       console.log("Formulario de contacto enviado (implementar lógica de envío)");
-      toast.info("Formulario Enviado (Simulado)", { description: "La lógica de envío del formulario de contacto necesita implementación."});
+      toast.info("Formulario Enviado (Simulado)", { description: "La lógica de envío del formulario necesita implementación."});
   }
 
   return (
-    <div className="space-y-6">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">
-            Nombre:
-          </label>
-          <input
-            type="text"
-            id="name"
-            required
-            className="block w-full rounded-md border-input bg-background shadow-sm focus:border-ring focus:ring-ring/50 sm:text-sm p-2"
-            placeholder="Tu Nombre"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Nombre</Label>
+              <Input id="name" required placeholder="Tu Nombre" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Correo Electrónico</Label>
+              <Input id="email" type="email" required placeholder="tu@ejemplo.com" />
+            </div>
         </div>
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
-            Correo Electrónico:
-          </label>
-          <input
-            type="email"
-            id="email"
-            required
-             className="block w-full rounded-md border-input bg-background shadow-sm focus:border-ring focus:ring-ring/50 sm:text-sm p-2"
-            placeholder="tu@ejemplo.com"
-          />
+        <div className="space-y-1.5">
+          <Label htmlFor="subject">Asunto</Label>
+          <Input id="subject" placeholder="Ej: Consulta sobre precios" />
         </div>
-        <div>
-          <label htmlFor="message" className="block text-sm font-medium text-foreground mb-1">
-            Mensaje:
-          </label>
-          <textarea
+        <div className="space-y-1.5">
+          <Label htmlFor="message">Mensaje</Label>
+          <Textarea
             id="message"
-            rows={4}
             required
-            className="block w-full rounded-md border-input bg-background shadow-sm focus:border-ring focus:ring-ring/50 sm:text-sm p-2 min-h-[100px]"
-            placeholder="Tu Mensaje"
+            placeholder="Escribe tu mensaje aquí..."
+            className="min-h-[120px]"
           />
         </div>
-        <Button type="submit" className="w-full">
+        <Button type="submit" className="w-full sm:w-auto">
           Enviar Mensaje
         </Button>
       </form>
-
-      <div className="space-y-3 pt-6 border-t">
-         <h3 className="text-sm font-medium text-muted-foreground mb-2">Otras formas de contactarnos:</h3>
-        {/* Labels y textos traducidos */}
-        <ContactInfoItem Icon={Mail} label="Correo:" href="mailto:info@atenex.ai" text="info@atenex.ai" />
-        <ContactInfoItem Icon={Phone} label="Teléfono:" href="tel:+15551234567" text="+1 (555) 123-4567" />
-        <ContactInfoItem Icon={Linkedin} label="LinkedIn:" href="https://linkedin.com/company/atenex" text="Atenex en LinkedIn" targetBlank={true} />
-        <ContactInfoItem Icon={MessageCircle} label="WhatsApp:" href="https://wa.me/15551234567" text="Chatea por WhatsApp" targetBlank={true}/>
-      </div>
-    </div>
   );
 }
 
-// Componente de item de contacto (sin cambios internos, usa props traducidas)
-function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ElementType, label: string, href: string, text: string, targetBlank?: boolean }) {
+// Componente ContactInfoItem (sin cambios lógicos)
+function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ElementType, label: string, href?: string, text: string, targetBlank?: boolean }) {
+    const content = (
+        <>
+            <Icon className="h-4 w-4 text-primary flex-shrink-0" />
+            <span className="font-medium text-foreground/90">{label}</span>
+            <span className="text-muted-foreground truncate">{text}</span>
+        </>
+    );
+
     return (
         <div className="flex items-center space-x-2 text-sm">
-          <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          <span className="text-muted-foreground">{label}</span>
-          <a
-            href={href}
-            className="text-primary hover:underline truncate"
-            target={targetBlank ? "_blank" : undefined}
-            rel={targetBlank ? "noopener noreferrer" : undefined}
-          >
-            {text}
-          </a>
+            {href ? (
+                 <a
+                    href={href}
+                    className="inline-flex items-center gap-2 group"
+                    target={targetBlank ? "_blank" : undefined}
+                    rel={targetBlank ? "noopener noreferrer" : undefined}
+                >
+                    {content}
+                 </a>
+            ) : (
+                <div className="inline-flex items-center gap-2">{content}</div>
+            )}
         </div>
     );
 }
@@ -1534,83 +1688,86 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
 @import "tailwindcss";
 
 /* 2. Define variables base FUERA del @theme */
-/* Variables para el tema claro (:root) */
+/* Variables para el tema claro (:root) - PODRÍAN AJUSTARSE AQUÍ */
 :root {
-    --radius: 0.625rem;
-    /* Variables OKLCH */
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0); /* Negro por defecto */
-    --primary-foreground: oklch(0.985 0 0); /* Blanco */
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0); /* Color de anillo por defecto */
-    /* Variables de Chart */
+    --radius: 0.625rem; /* Radio de borde general */
+    /* Variables OKLCH para tema claro (Default/System Light) */
+    /* Colores más neutros y profesionales */
+    --background: oklch(0.99 0.01 240); /* Casi blanco, ligero tinte azulado */
+    --foreground: oklch(0.18 0.02 240); /* Gris oscuro azulado */
+    --card: oklch(1 0 0); /* Blanco puro para cards */
+    --card-foreground: oklch(0.18 0.02 240);
+    --popover: oklch(1 0 0); /* Blanco puro para popovers */
+    --popover-foreground: oklch(0.18 0.02 240);
+    --primary: oklch(0.45 0.15 260); /* Un azul/púrpura corporativo */
+    --primary-foreground: oklch(0.98 0.01 260); /* Blanco casi puro */
+    --secondary: oklch(0.96 0.015 240); /* Gris azulado muy claro */
+    --secondary-foreground: oklch(0.35 0.02 240); /* Gris azulado medio */
+    --muted: oklch(0.96 0.015 240); /* Igual que secondary */
+    --muted-foreground: oklch(0.55 0.02 240); /* Gris azulado más oscuro para texto muted */
+    --accent: oklch(0.94 0.02 240); /* Un gris azulado un poco más oscuro para acentos */
+    --accent-foreground: oklch(0.25 0.02 240); /* Gris oscuro para texto de acento */
+    --destructive: oklch(0.65 0.22 25); /* Rojo desaturado */
+    --destructive-foreground: oklch(0.98 0.01 25); /* Blanco */
+    --border: oklch(0.90 0.01 240); /* Borde gris azulado claro */
+    --input: oklch(0.93 0.01 240); /* Borde input ligeramente más oscuro */
+    --ring: oklch(0.6 0.15 260 / 0.5); /* Anillo con color primario semi-transparente */
+    /* Variables de Chart (Mantener o ajustar según necesidad) */
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
-    /* Variables de Sidebar */
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* Variables de Sidebar (Ajustar si se quiere diferente del tema general) */
+    --sidebar: oklch(0.98 0.01 240); /* Ligeramente diferente del fondo principal */
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: oklch(0.92 0.015 240); /* Accent del sidebar */
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
 }
 
-/* Variables para el tema oscuro (.dark) */
+/* Variables para el tema oscuro (.dark) - PODRÍAN AJUSTARSE AQUÍ */
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0); /* Blanco/Gris claro en modo oscuro */
-    --primary-foreground: oklch(0.205 0 0); /* Negro */
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0); /* Color de anillo por defecto */
-    /* Variables de Chart */
+    --background: oklch(0.15 0.02 240); /* Azul muy oscuro */
+    --foreground: oklch(0.95 0.01 240); /* Gris muy claro */
+    --card: oklch(0.18 0.025 240); /* Azul oscuro ligeramente más claro */
+    --card-foreground: oklch(0.95 0.01 240);
+    --popover: oklch(0.12 0.015 240); /* Popover más oscuro */
+    --popover-foreground: oklch(0.95 0.01 240);
+    --primary: oklch(0.75 0.15 260); /* Primario más brillante en dark mode */
+    --primary-foreground: oklch(0.1 0.02 260); /* Texto oscuro para primario brillante */
+    --secondary: oklch(0.25 0.03 240); /* Gris azulado oscuro */
+    --secondary-foreground: oklch(0.9 0.01 240); /* Texto claro para secundario */
+    --muted: oklch(0.25 0.03 240); /* Igual que secondary */
+    --muted-foreground: oklch(0.65 0.02 240); /* Texto muted más claro */
+    --accent: oklch(0.3 0.04 240); /* Accent oscuro */
+    --accent-foreground: oklch(0.95 0.01 240); /* Texto claro para accent */
+    --destructive: oklch(0.7 0.2 25); /* Rojo destructivo más brillante */
+    --destructive-foreground: oklch(0.1 0.01 25); /* Texto oscuro para destructivo */
+    --border: oklch(0.3 0.03 240); /* Borde oscuro */
+    --input: oklch(0.28 0.03 240); /* Input oscuro */
+    --ring: oklch(0.75 0.15 260 / 0.6); /* Anillo primario oscuro semi-transparente */
+    /* Variables de Chart (Ajustar para dark mode) */
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    /* Variables de Sidebar */
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    /* Variables de Sidebar (Ajustar para dark mode) */
+     --sidebar: oklch(0.17 0.02 240); /* Sidebar ligeramente diferente del fondo */
+     --sidebar-foreground: var(--foreground);
+     --sidebar-primary: var(--primary);
+     --sidebar-primary-foreground: var(--primary-foreground);
+     --sidebar-accent: oklch(0.28 0.035 240); /* Accent del sidebar */
+     --sidebar-accent-foreground: var(--accent-foreground);
+     --sidebar-border: var(--border);
+     --sidebar-ring: var(--ring);
 }
 
-/* Variables para el tema blue (.blue) */
+/* Tema blue existente (revisar si necesita ajustes) */
 .blue {
     --background: oklch(0.2 0.05 220); /* Dark Blue */
     --foreground: oklch(0.95 0.02 30);  /* Light Gray */
@@ -1630,9 +1787,12 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --border: oklch(0.3 0.05 220);
     --input: oklch(0.35 0.06 220);
     --ring: oklch(0.7 0.1 240); /* Light Blue Ring */
+    /* Ajustar sidebar si es necesario para tema blue */
+    --sidebar: oklch(0.22 0.055 220);
+    --sidebar-border: oklch(0.35 0.06 220);
 }
 
-/* Variables para el tema green (.green) */
+/* Tema green existente (revisar si necesita ajustes) */
 .green {
     --background: oklch(0.98 0.01 150); /* Very Light Green/Gray - almost white */
     --foreground: oklch(0.10 0.1 150); /* Dark Green - Slightly brighter than pure black for readability */
@@ -1640,72 +1800,131 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --card-foreground: oklch(0.10 0.1 150); /* Dark Green */
     --popover: oklch(0.97 0.03 150); /* Even Lighter - near white */
     --popover-foreground: oklch(0.10 0.1 150); /* Dark Green */
-    --primary: oklch(0.10 0.2 120); /* Medium Green */
-    --primary-foreground: oklch(0.98 0.01 30); /* White */
+    --primary: oklch(0.55 0.18 140); /* Medium Green - Ajustado */
+    --primary-foreground: oklch(0.98 0.01 140); /* White */
     --secondary: oklch(0.95 0.04 150); /* Light Greenish-Gray */
     --secondary-foreground: oklch(0.10 0.1 150); /* Dark Green */
     --muted: oklch(0.94 0.05 150); /* Subtle Light Green */
-    --muted-foreground: oklch(0.2 0.03 30); /* Slightly lighter green for text */
+    --muted-foreground: oklch(0.4 0.03 150); /* Slightly lighter green for text */
     --accent: oklch(0.92 0.06 150); /* Light Green Accent */
     --accent-foreground: oklch(0.10 0.1 150); /* Dark Green */
     --destructive: oklch(0.6 0.2 10); /* Dark Red - for destructive actions */
     --border: oklch(0.90 0.04 150); /* Subtle Light Green Border */
-    --input: oklch(0.85 0.03 150); /* Input background - slightly darker */
-    --ring: oklch(0.10 0.2 120); /* Medium Green Ring */
+    --input: oklch(0.92 0.03 150); /* Input background - slightly darker */
+    --ring: oklch(0.55 0.18 140 / 0.5); /* Medium Green Ring - Ajustado */
+    /* Ajustar sidebar si es necesario para tema green */
+     --sidebar: oklch(0.97 0.015 150);
+     --sidebar-border: oklch(0.92 0.03 150);
 }
+
 
 /* 4. Aplica overrides mínimos en la capa base */
 @layer base {
     body {
-        /* (-) QUITAR ESTA LÍNEA: */
-        /* @apply bg-background text-foreground; */
-
-        /* (+) AÑADIR ESTAS LÍNEAS: */
         background-color: var(--background);
         color: var(--foreground);
-
-        /* Asegúrate que la fuente (inter.variable) se aplique en layout.tsx */
-        /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
+        /* Aplicar antialiasing para mejor legibilidad */
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    /* Asegurar que los elementos deshabilitados tengan cursor not-allowed */
+    [disabled] {
+        cursor: not-allowed !important;
     }
 }
 ```
 
 ## File: `app\help\page.tsx`
 ```tsx
-// filepath: e:/Nyro/AUDIZOR_B2B/atenex-frontend/app/help/page.tsx
+// File: app/privacy/page.tsx (MODIFICADO - Iteración 5.2)
 "use client";
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
+import { APP_NAME } from '@/lib/constants';
+import { ArrowLeft } from 'lucide-react'; // Icono volver
 
-export default function HelpPage() {
+export default function PrivacyPage() {
+    const router = useRouter();
+
   return (
-    <div className="container mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Ayuda y Soporte</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Documentación de la Plataforma</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p>
-            Encuentra guías y respuestas a preguntas frecuentes sobre cómo utilizar Atenex.
-            Visita nuestra <a href="https://docs.atenex.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">documentación oficial</a> para más información.
-          </p>
-          <p>
-            Si necesitas asistencia adicional, contacta al equipo de soporte:
-          </p>
-          <ul className="list-disc list-inside">
-            <li>Email: <a href="mailto:soporte@atenex.com" className="text-primary underline">soporte@atenex.com</a></li>
-            <li>Teléfono: <a href="tel:+34123456789" className="text-primary underline">+34 123 456 789</a></li>
-          </ul>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen bg-background text-foreground">
+        <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-6">
+            {/* Botón volver */}
+            <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver al Inicio
+            </Button>
+            {/* Card principal */}
+            <Card className="shadow-sm border">
+                <CardHeader>
+                <CardTitle className="text-2xl md:text-3xl font-bold">Política de Privacidad</CardTitle>
+                <CardDescription>Última Actualización: [Insertar Fecha]</CardDescription> {/* Fecha aquí */}
+                </CardHeader>
+                <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none pt-0"> {/* prose para estilos de texto */}
+                <p>
+                    {APP_NAME} ("nosotros", "nos", o "nuestro") opera la aplicación {APP_NAME} (el "Servicio"). Esta página le informa de nuestras políticas relativas a la recopilación, uso y divulgación de datos personales cuando utiliza nuestro Servicio y las opciones que tiene asociadas a esos datos.
+                </p>
+
+                <h2>1. Recopilación y Uso de Información</h2>
+                <p>
+                    Recopilamos diferentes tipos de información para diversos fines para proporcionar y mejorar nuestro Servicio para usted.
+                </p>
+                <ul>
+                    <li><strong>Datos Personales:</strong> Al utilizar nuestro Servicio, podemos pedirle que nos proporcione cierta información de identificación personal que puede utilizarse para contactarle o identificarle ("Datos Personales"). La información de identificación personal puede incluir, entre otros: Dirección de correo electrónico, Nombre, Información de la empresa (si aplica).</li>
+                    <li><strong>Datos de Uso:</strong> También podemos recopilar información sobre cómo se accede y utiliza el Servicio ("Datos de Uso"). Estos Datos de Uso pueden incluir información como la dirección de Protocolo de Internet de su ordenador (por ejemplo, dirección IP), tipo de navegador, versión del navegador, las páginas de nuestro Servicio que visita, la hora y fecha de su visita, el tiempo dedicado a esas páginas, identificadores únicos de dispositivos y otros datos de diagnóstico.</li>
+                    <li><strong>Contenido del Usuario:</strong> Procesamos los documentos y datos que usted carga ("Contenido del Usuario") únicamente con el fin de proporcionar las funciones del Servicio, como la indexación y la consulta. Tratamos su Contenido de Usuario como confidencial.</li>
+                </ul>
+
+                <h2>2. Uso de Datos</h2>
+                <p>{APP_NAME} utiliza los datos recopilados para diversos fines:</p>
+                 <ul>
+                    <li>Para proporcionar y mantener el Servicio</li>
+                    <li>Para notificarle cambios en nuestro Servicio</li>
+                    <li>Para permitirle participar en funciones interactivas de nuestro Servicio cuando decida hacerlo</li>
+                    <li>Para proporcionar atención y soporte al cliente</li>
+                    <li>Para proporcionar análisis o información valiosa para que podamos mejorar el Servicio</li>
+                    <li>Para supervisar el uso del Servicio</li>
+                    <li>Para detectar, prevenir y abordar problemas técnicos</li>
+                 </ul>
+
+                <h2>3. Almacenamiento y Seguridad de los Datos</h2>
+                <p>
+                    El Contenido del Usuario se almacena de forma segura utilizando proveedores de almacenamiento en la nube estándar de la industria [Especificar si es posible, ej., AWS S3, Google Cloud Storage, MinIO]. Implementamos medidas de seguridad diseñadas para proteger su información contra el acceso, divulgación, alteración y destrucción no autorizados. Sin embargo, ninguna transmisión por Internet o almacenamiento electrónico es 100% seguro.
+                </p>
+
+                 <h2>4. Proveedores de Servicios</h2>
+                 <p>
+                    Podemos emplear a empresas e individuos terceros para facilitar nuestro Servicio ("Proveedores de Servicios"), para proporcionar el Servicio en nuestro nombre, para realizar servicios relacionados con el Servicio o para ayudarnos a analizar cómo se utiliza nuestro Servicio. Estos terceros tienen acceso a sus Datos Personales sólo para realizar estas tareas en nuestro nombre y están obligados a no divulgarlos ni utilizarlos para ningún otro fin. Ejemplos incluyen: [Listar categorías, ej., Alojamiento en la nube (AWS/GCP/Azure), Proveedores LLM (OpenAI/Google), Autenticación (Supabase)].
+                 </p>
+
+                 <h2>5. Sus Derechos sobre los Datos</h2>
+                 <p>
+                    Dependiendo de su jurisdicción, puede tener ciertos derechos con respecto a sus Datos Personales, como el derecho a acceder, corregir, eliminar o restringir su procesamiento. Póngase en contacto con nosotros para ejercer estos derechos.
+                 </p>
+
+                 <h2>6. Privacidad de los Niños</h2>
+                 <p>
+                    Nuestro Servicio no se dirige a menores de 18 años ("Niños"). No recopilamos conscientemente información de identificación personal de menores de 18 años.
+                 </p>
+
+                 <h2>7. Cambios a esta Política de Privacidad</h2>
+                 <p>
+                    Podemos actualizar nuestra Política de Privacidad de vez en cuando. Le notificaremos cualquier cambio publicando la nueva Política de Privacidad en esta página. Se le aconseja revisar esta Política de Privacidad periódicamente para cualquier cambio.
+                 </p>
+
+                 <h2>8. Contáctenos</h2>
+                 <p>
+                    Si tiene alguna pregunta sobre esta Política de Privacidad, por favor contáctenos: [Su Correo/Enlace de Contacto]
+                 </p>
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }
-
 ```
 
 ## File: `app\layout.tsx`
@@ -1767,23 +1986,24 @@ export default function RootLayout({
 
 ## File: `app\page.tsx`
 ```tsx
-// File: app/page.tsx
-// Purpose: Public home page, shows login/register or go to app based on auth state.
+// File: app/page.tsx (MODIFICADO - Iteración 5.1)
 "use client";
 
 import React from 'react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // No necesitamos buttonVariants aquí
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap } from 'lucide-react';
+import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap, BookOpen } from 'lucide-react'; // Añadido BookOpen
 import Link from 'next/link';
 
+// Mapeo de iconos actualizado
 const iconMap: { [key: string]: React.ElementType } = {
   Search: Search,
-  Library: Library,
+  Library: Library, // Usaremos Library para Conocimiento Centralizado
   Zap: Zap,
+  BookOpen: BookOpen // Icono alternativo
 };
 
 export default function HomePage() {
@@ -1792,42 +2012,43 @@ export default function HomePage() {
   const isAuthenticated = !isAuthLoading && !!user;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
-      <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b border-border/50">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
+      {/* Header de la Landing Page */}
+      <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm"
+          {/* Logo/Nombre App */}
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            aria-label={`${APP_NAME} - Inicio`}
           >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                 <path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.5a.75.75 0 0 0 .5.707A9.716 9.716 0 0 0 6 21a9.707 9.707 0 0 0 5.25-1.533.75.75 0 0 0 .5-.68V5.213a.75.75 0 0 0-.5-.68ZM12.75 4.533A9.707 9.707 0 0 1 18 3a9.735 9.735 0 0 1 3.25.555.75.75 0 0 1 .5.707v14.5a.75.75 0 0 1-.5.707A9.716 9.716 0 0 1 18 21a9.707 9.707 0 0 1-5.25-1.533.75.75 0 0 1-.5-.68V5.213a.75.75 0 0 1-.5-.68Z" />
-             </svg>
-            <span>{APP_NAME}</span>
-          </button>
+             <BookOpen className="w-6 h-6" /> {/* Icono más representativo */}
+            <span className='font-bold'>{APP_NAME}</span>
+          </Link>
 
-          {/* Botones de navegación traducidos */}
+          {/* Navegación y Autenticación */}
           <nav className="flex items-center space-x-1 sm:space-x-2">
+            {/* Links de Navegación */}
             <LinkButton href="/" Icon={HomeIcon} isActive={true}>Inicio</LinkButton>
             <LinkButton href="/about" Icon={Info}>Nosotros</LinkButton>
             <LinkButton href="/contact" Icon={Mail}>Contacto</LinkButton>
 
+            {/* Botón de Acción (Login/Ir a App) */}
             <div className="pl-2 sm:pl-4">
                 {isAuthLoading ? (
-                    <Button variant="secondary" disabled={true} size="sm" className="w-[90px]">
+                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> {/* Ghost para loading */}
                         <Loader2 className="h-4 w-4 animate-spin" />
                     </Button>
                 ) : isAuthenticated ? (
-                    // Botón traducido
-                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[90px]">
+                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> {/* Default para ir a app */}
                         Ir a la App
                     </Button>
                 ) : (
-                    // Botón traducido
                     <Button
                         variant="outline"
                         onClick={() => router.push('/login')}
                         size="sm"
-                        className="w-[90px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="w-[95px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                         Acceder
                     </Button>
@@ -1837,17 +2058,19 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-16 md:py-24 flex-1 flex flex-col items-center justify-center text-center">
-         <section>
-            {/* Textos de Hero Section traducidos */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6 leading-tight">
-                Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
+      {/* Contenido Principal (Hero + Features) */}
+      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center">
+         {/* Hero Section */}
+         <section className="max-w-4xl">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
+                Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-3xl mx-auto">
-                Haz preguntas en lenguaje natural y obtén respuestas instantáneas y precisas, extraídas directamente de los documentos y datos de tu organización.
+            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+                Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
             </p>
+            {/* Botón Principal */}
             {isAuthLoading ? (
-                 <Button size="lg" disabled={true} className="w-48">
+                 <Button size="lg" disabled={true} className="w-48 shadow-md">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando...
                  </Button>
             ) : (
@@ -1855,53 +2078,56 @@ export default function HomePage() {
                   size="lg"
                   onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')}
                   className={cn(
-                      "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
-                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
+                      "w-48 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg" // Sombra más pronunciada
                   )}
               >
-                  {/* Botones traducidos */}
-                  {isAuthenticated ? 'Ir al Chat' : 'Empezar Ahora'}
+                  {isAuthenticated ? 'Ir al Chat' : 'Comenzar Ahora'}
               </Button>
             )}
             {!isAuthenticated && !isAuthLoading && (
-                 // Texto traducido
-                 <p className="text-xs text-muted-foreground mt-3">
-                     ¿Ya tienes cuenta? <Link href="/login" className="text-primary hover:underline">Inicia Sesión</Link>
+                 <p className="text-xs text-muted-foreground mt-4">
+                     ¿Ya tienes cuenta? <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4">Inicia Sesión</Link>
                  </p>
             )}
          </section>
 
-         <section className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl w-full">
-             {/* Textos de Feature Cards traducidos */}
+         {/* Features Section */}
+         <section className="mt-24 md:mt-32 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl w-full">
              <FeatureCard
                  title="Búsqueda Inteligente"
-                 description="Encuentra la información exacta que necesitas al instante usando lenguaje natural. Olvídate de adivinar palabras clave."
+                 description="Encuentra información exacta al instante usando lenguaje natural. Olvídate de adivinar palabras clave."
                  icon="Search"
               />
              <FeatureCard
                  title="Conocimiento Centralizado"
-                 description="Rompe los silos de información. Accede al conocimiento colectivo de toda tu organización en un solo lugar seguro."
-                 icon="Library"
+                 description="Rompe los silos de información. Accede al conocimiento colectivo de tu organización en un solo lugar seguro."
+                 icon="Library" // Mantener Library
              />
              <FeatureCard
                  title="Productividad Mejorada"
-                 description="Empodera a tu equipo con acceso rápido a información relevante, permitiendo decisiones más rápidas y basadas en datos."
+                 description="Empodera a tu equipo con acceso rápido a datos relevantes, permitiendo decisiones más rápidas y fundamentadas."
                   icon="Zap"
              />
          </section>
       </main>
 
-      <footer className="bg-muted/10 border-t py-8 mt-16">
-        {/* Textos de Footer traducidos */}
-        <div className="container text-center text-muted-foreground text-sm">
-          © {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados. | <Link href="/privacy" className="hover:text-primary">Política de Privacidad</Link> | <Link href="/terms" className="hover:text-primary">Términos de Servicio</Link>
+      {/* Footer */}
+      <footer className="bg-muted/20 border-t border-border/60 py-6">
+        <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+          <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+          <div className="flex gap-3">
+             <Link href="/privacy" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Política de Privacidad</Link>
+             <span className='opacity-50'>|</span>
+             <Link href="/terms" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Términos de Servicio</Link>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-// Componente de botón de enlace traducido
+// Componente LinkButton (sin cambios)
 function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
@@ -1914,20 +2140,26 @@ function LinkButton({ href, children, Icon, isActive = false }: { href: string; 
             isActive ? "text-primary font-medium bg-accent/50" : "text-muted-foreground hover:text-foreground"
         )}
      >
-       <Icon className="h-4 w-4 mr-1 hidden sm:inline-block" />
+       <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />
       {children}
     </Button>
   );
 }
 
-// Componente de tarjeta de característica (sin cambios internos, usa props traducidas)
+// Componente FeatureCard con estilo mejorado
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   const IconComponent = iconMap[icon] || Zap;
+   const IconComponent = iconMap[icon] || BookOpen; // Default a BookOpen
   return (
-    <div className="p-6 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:shadow-lg transition-all duration-200 text-left">
-       <IconComponent className="w-8 h-8 mb-3 text-primary" />
+    <div className={cn(
+        "p-6 rounded-xl bg-card/60 backdrop-blur-sm", // Fondo semi-transparente
+        "border border-border/60", // Borde sutil
+        "hover:bg-card/90 hover:shadow-lg hover:-translate-y-1", // Efectos hover
+        "transition-all duration-200 ease-in-out text-left"
+        )}
+    >
+       <IconComponent className="w-8 h-8 mb-4 text-primary" /> {/* Icono más grande y con más margen */}
       <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed">{description}</p> {/* Mejor interlineado */}
     </div>
   );
 }
@@ -2021,84 +2253,91 @@ export default function PrivacyPage() {
 
 ## File: `app\terms\page.tsx`
 ```tsx
-// File: app/terms/page.tsx
-"use client"; // Mark as client component to use hooks like useRouter
+// File: app/terms/page.tsx (MODIFICADO - Iteración 5.2)
+"use client";
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
 import { APP_NAME } from '@/lib/constants';
+import { ArrowLeft } from 'lucide-react'; // Icono volver
 
 export default function TermsPage() {
-    const router = useRouter(); // Initialize router
+    const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
-        <Button variant="link" onClick={() => router.push('/')} className="mb-4">← Back to Home</Button>
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl md:text-3xl">Terms of Service</CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none space-y-4">
-          <p>Last Updated: [Insert Date]</p>
+    <div className="min-h-screen bg-background text-foreground">
+        <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-6">
+             {/* Botón volver */}
+             <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+               <ArrowLeft className="mr-2 h-4 w-4" />
+               Volver al Inicio
+             </Button>
+            {/* Card principal */}
+            <Card className="shadow-sm border">
+                <CardHeader>
+                <CardTitle className="text-2xl md:text-3xl font-bold">Términos de Servicio</CardTitle>
+                 <CardDescription>Última Actualización: [Insertar Fecha]</CardDescription> {/* Fecha aquí */}
+                </CardHeader>
+                <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none pt-0"> {/* prose para estilos de texto */}
+                <h2>1. Aceptación de los Términos</h2>
+                <p>
+                    Al acceder o utilizar el servicio {APP_NAME} ("Servicio"), usted acepta estar sujeto a estos Términos de Servicio ("Términos"). Si no está de acuerdo con alguna parte de los términos, no podrá acceder al Servicio.
+                </p>
 
-          <h2>1. Acceptance of Terms</h2>
-          <p>
-            By accessing or using the {APP_NAME} service ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of the terms, then you may not access the Service.
-          </p>
+                <h2>2. Descripción del Servicio</h2>
+                <p>
+                    {APP_NAME} proporciona una plataforma para consultar bases de conocimiento empresariales utilizando procesamiento de lenguaje natural. Las características incluyen carga, procesamiento, indexación de documentos y consulta en lenguaje natural.
+                </p>
 
-          <h2>2. Service Description</h2>
-          <p>
-            {APP_NAME} provides a platform for querying enterprise knowledge bases using natural language processing. Features include document upload, processing, indexing, and natural language querying.
-          </p>
+                <h2>3. Cuentas de Usuario</h2>
+                <p>
+                    Usted es responsable de salvaguardar sus credenciales de cuenta y de cualquier actividad o acción bajo su cuenta. Debe notificarnos inmediatamente al tener conocimiento de cualquier violación de seguridad o uso no autorizado de su cuenta.
+                </p>
 
-          <h2>3. User Accounts</h2>
-          <p>
-            You are responsible for safeguarding your account credentials and for any activities or actions under your account. You must notify us immediately upon becoming aware of any breach of security or unauthorized use of your account.
-          </p>
+                <h2>4. Contenido del Usuario</h2>
+                <p>
+                    Usted conserva la propiedad de cualquier documento o dato que cargue en el Servicio ("Contenido del Usuario"). Al cargar Contenido del Usuario, usted otorga a {APP_NAME} una licencia mundial, no exclusiva y libre de regalías para usar, procesar, almacenar y mostrar su Contenido del Usuario únicamente con el propósito de proporcionarle el Servicio.
+                </p>
 
-          <h2>4. User Content</h2>
-          <p>
-            You retain ownership of any documents or data you upload to the Service ("User Content"). By uploading User Content, you grant {APP_NAME} a worldwide, non-exclusive, royalty-free license to use, process, store, and display your User Content solely for the purpose of providing the Service to you.
-          </p>
+                <h2>5. Uso Aceptable</h2>
+                <p>
+                    Usted acepta no hacer un mal uso del Servicio. Las actividades prohibidas incluyen, entre otras: [Listar actividades prohibidas, ej., cargar contenido ilegal, intentar violar la seguridad, sobrecargar el sistema].
+                </p>
 
-          <h2>5. Acceptable Use</h2>
-          <p>
-            You agree not to misuse the Service. Prohibited activities include, but are not limited to: [List prohibited activities, e.g., uploading illegal content, attempting to breach security, overloading the system].
-          </p>
+                <h2>6. Terminación</h2>
+                <p>
+                    Podemos terminar o suspender su acceso al Servicio inmediatamente, sin previo aviso ni responsabilidad, por cualquier motivo, incluido, entre otros, si incumple los Términos.
+                </p>
 
-          <h2>6. Termination</h2>
-          <p>
-            We may terminate or suspend your access to the Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.
-          </p>
+                <h2>7. Exclusión de Garantías</h2>
+                <p>
+                    El Servicio se proporciona "TAL CUAL" y "SEGÚN DISPONIBILIDAD". {APP_NAME} no ofrece garantías, expresas o implícitas, y por la presente renuncia a todas las demás garantías, incluidas, entre otras, las garantías implícitas de comerciabilidad, idoneidad para un propósito particular o no infracción.
+                </p>
 
-          <h2>7. Disclaimer of Warranties</h2>
-          <p>
-            The Service is provided on an "AS IS" and "AS AVAILABLE" basis. {APP_NAME} makes no warranties, expressed or implied, and hereby disclaims all other warranties including, without limitation, implied warranties of merchantability, fitness for a particular purpose, or non-infringement.
-          </p>
+                 <h2>8. Limitación de Responsabilidad</h2>
+                 <p>
+                    En ningún caso {APP_NAME}, ni sus directores, empleados, socios, agentes, proveedores o afiliados, serán responsables de ningún daño indirecto, incidental, especial, consecuente o punitivo, incluidos, entre otros, la pérdida de beneficios, datos, uso, fondo de comercio u otras pérdidas intangibles, resultantes de su acceso o uso o incapacidad para acceder o usar el Servicio.
+                 </p>
 
-          <h2>8. Limitation of Liability</h2>
-          <p>
-            In no event shall {APP_NAME}, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
-          </p>
+                 <h2>9. Ley Aplicable</h2>
+                 <p>
+                    Estos Términos se regirán e interpretarán de acuerdo con las leyes de [Su Jurisdicción], sin tener en cuenta sus disposiciones sobre conflicto de leyes.
+                 </p>
 
-          <h2>9. Governing Law</h2>
-          <p>
-            These Terms shall be governed and construed in accordance with the laws of [Your Jurisdiction], without regard to its conflict of law provisions.
-          </p>
+                 <h2>10. Cambios a los Términos</h2>
+                 <p>
+                    Nos reservamos el derecho, a nuestra entera discreción, de modificar o reemplazar estos Términos en cualquier momento. Le notificaremos cualquier cambio publicando los nuevos Términos en esta página.
+                 </p>
 
-          <h2>10. Changes to Terms</h2>
-          <p>
-            We reserve the right, at our sole discretion, to modify or replace these Terms at any time. We will provide notice of any changes by posting the new Terms on this page.
-          </p>
-
-          <h2>11. Contact Us</h2>
-          <p>
-            If you have any questions about these Terms, please contact us at [Your Contact Email/Link].
-          </p>
-        </CardContent>
-      </Card>
+                 <h2>11. Contáctenos</h2>
+                 <p>
+                    Si tiene alguna pregunta sobre estos Términos, contáctenos en [Su Correo/Enlace de Contacto].
+                 </p>
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }
@@ -2106,7 +2345,7 @@ export default function TermsPage() {
 
 ## File: `components\auth\login-form.tsx`
 ```tsx
-// File: components/auth/login-form.tsx
+// File: components/auth/login-form.tsx (MODIFICADO - Iteración 5.3, solo estilo)
 "use client";
 
 import React, { useState } from 'react';
@@ -2119,8 +2358,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { cn } from '@/lib/utils'; // Importar cn
 
-// Esquema Zod con mensajes en español
+// Esquema Zod (sin cambios)
 const loginSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce una dirección de correo válida.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
@@ -2135,34 +2375,31 @@ export function LoginForm() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
-    mode: 'onChange', // Validar al cambiar
+    mode: 'onChange',
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setError(null);
     try {
       await signIn(data.email, data.password);
-      // Éxito: redirección manejada por AuthProvider
     } catch (err: any) {
-      // Usar el mensaje de error de la API si está disponible, si no, uno genérico en español
       setError(err.message || 'Inicio de sesión fallido. Revisa tus credenciales e inténtalo de nuevo.');
     }
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    // Aumentar espaciado entre elementos del formulario
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
       {/* Alerta de Error */}
       {error && (
         <Alert variant="destructive" role="alert" aria-live="assertive">
           <AlertCircle className="h-4 w-4" />
-          {/* Título de Alerta Traducido */}
-          <AlertTitle>Inicio de Sesión Fallido</AlertTitle>
+          <AlertTitle>Error de Inicio de Sesión</AlertTitle> {/* Título más genérico */}
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       {/* Campo Email */}
-      <div className="space-y-1">
-        {/* Label Traducido */}
+      <div className="space-y-1.5"> {/* Ajuste espaciado label/input */}
         <Label htmlFor="email">Correo Electrónico</Label>
         <Input
           id="email"
@@ -2174,15 +2411,14 @@ export function LoginForm() {
           aria-required="true"
           {...form.register('email')}
           aria-invalid={form.formState.errors.email ? 'true' : 'false'}
+          className={cn(form.formState.errors.email && "border-destructive focus-visible:ring-destructive/50")} // Highlight error
         />
-        {/* Mensaje de error de validación (ya en español por el schema) */}
         {form.formState.errors.email && (
-          <p className="text-sm text-destructive" role="alert">{form.formState.errors.email.message}</p>
+          <p className="text-xs text-destructive pt-1" role="alert">{form.formState.errors.email.message}</p> // Texto más pequeño
         )}
       </div>
       {/* Campo Contraseña */}
-      <div className="space-y-1">
-        {/* Label Traducido */}
+      <div className="space-y-1.5">
         <Label htmlFor="password">Contraseña</Label>
         <Input
           id="password"
@@ -2193,15 +2429,22 @@ export function LoginForm() {
           aria-required="true"
           {...form.register('password')}
           aria-invalid={form.formState.errors.password ? 'true' : 'false'}
+           className={cn(form.formState.errors.password && "border-destructive focus-visible:ring-destructive/50")} // Highlight error
         />
-        {/* Mensaje de error de validación (ya en español por el schema) */}
         {form.formState.errors.password && (
-          <p className="text-sm text-destructive" role="alert">{form.formState.errors.password.message}</p>
+          <p className="text-xs text-destructive pt-1" role="alert">{form.formState.errors.password.message}</p>
         )}
+        {/* TODO: Añadir enlace "¿Olvidaste tu contraseña?" aquí si es necesario */}
+        {/* <div className="flex items-center justify-end pt-1">
+            <Link href="#" className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2">
+                ¿Olvidaste tu contraseña?
+            </Link>
+        </div> */}
       </div>
-      {/* Botón de Envío Traducido */}
-      <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
-        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Iniciar Sesión'}
+      {/* Botón de Envío */}
+      <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isDirty || !form.formState.isValid}>
+        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        {isLoading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
       </Button>
     </form>
   );
@@ -2210,7 +2453,7 @@ export function LoginForm() {
 
 ## File: `components\chat\chat-history.tsx`
 ```tsx
-// File: components/chat/chat-history.tsx
+// File: components/chat/chat-history.tsx (MODIFICADO - Iteración 2)
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -2218,7 +2461,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { MessageSquareText, Trash2, Loader2, AlertCircle, RefreshCw, History } from 'lucide-react'; // Añadido History icon
 import { cn } from '@/lib/utils';
 import { getChats, deleteChat, ChatSummary, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -2253,7 +2496,6 @@ export function ChatHistory() {
         const isAuthenticated = !!user || bypassAuth;
 
         if (!isAuthLoading && !isAuthenticated) {
-            console.log("ChatHistory: Not authenticated, clearing history.");
             setChats([]);
             setError(null);
             setIsLoading(false);
@@ -2261,12 +2503,10 @@ export function ChatHistory() {
         }
 
         if (!bypassAuth && isAuthLoading) {
-            console.log("ChatHistory: Waiting for auth state...");
             setIsLoading(true);
             return;
         }
 
-        console.log("ChatHistory: Auth ready. Fetching chat list...");
         setIsLoading(true);
         setError(null);
 
@@ -2274,21 +2514,13 @@ export function ChatHistory() {
             const fetchedChats = await getChats();
             fetchedChats.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
             setChats(fetchedChats);
-            console.log(`ChatHistory: Fetched ${fetchedChats.length} chats.`);
-            // MODIFICADO: Toast traducido
             if (showToast) toast.success("Historial de chats actualizado");
         } catch (err) {
-            console.error("ChatHistory: Failed to fetch chat history:", err);
-            // MODIFICADO: Mensajes de error traducidos
             let message = "No se pudo cargar el historial de chats.";
             if (err instanceof ApiError) {
                 message = err.message || message;
-                if (err.status === 401 || err.status === 403) {
-                    message = "Sesión expirada o inválida. Por favor, inicia sesión de nuevo.";
-                    signOut();
-                } else if (err.status === 422) {
-                    message = `Fallo al procesar la solicitud: ${err.message}`;
-                }
+                if (err.status === 401 || err.status === 403) { message = "Sesión expirada o inválida. Por favor, inicia sesión de nuevo."; signOut(); }
+                else if (err.status === 422) { message = `Fallo al procesar la solicitud: ${err.message}`; }
             } else if (err instanceof Error) { message = err.message; }
             setError(message);
             setChats([]);
@@ -2315,16 +2547,12 @@ export function ChatHistory() {
         try {
             await deleteChat(chatToDelete.id);
             setChats(prev => prev.filter(chat => chat.id !== chatToDelete.id));
-            // MODIFICADO: Toast traducido
             toast.success("Chat Eliminado", { description: `Chat "${chatToDelete.title || chatToDelete.id.substring(0, 8)}" eliminado.` });
-
             const currentChatId = pathname.split('/').pop();
             if (currentChatId === chatToDelete.id) {
                 router.push('/chat');
             }
         } catch (err) {
-            console.error("ChatHistory: Failed to delete chat:", err);
-            // MODIFICADO: Mensajes de error traducidos
             let message = "No se pudo eliminar el chat.";
             if (err instanceof ApiError) {
                 message = err.message || message;
@@ -2343,19 +2571,19 @@ export function ChatHistory() {
         const isAuthenticated = !!user || bypassAuth;
 
         if (isLoading || (!bypassAuth && isAuthLoading)) {
+            // Skeleton más representativo
             return (
-                <div className="space-y-1 p-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                         <Skeleton key={i} className="h-8 w-full rounded" />
-                    ))}
-                 </div>
+                <div className="space-y-2 p-2">
+                    <Skeleton className="h-10 w-full rounded-md" />
+                    <Skeleton className="h-10 w-full rounded-md" />
+                    <Skeleton className="h-10 w-full rounded-md" />
+                </div>
             );
         }
 
         if (!isAuthenticated) {
             return (
-                <div className="px-2 py-4 text-center text-muted-foreground">
-                    {/* MODIFICADO: Texto traducido */}
+                <div className="px-2 py-6 text-center text-muted-foreground">
                     <p className="text-xs mb-2">Inicia sesión para ver el historial.</p>
                 </div>
             );
@@ -2363,59 +2591,73 @@ export function ChatHistory() {
 
         if (error) {
             return (
-                <div className="px-2 py-4 text-center text-destructive">
-                    <AlertCircle className="mx-auto h-5 w-5 mb-1" />
-                    <p className="text-xs mb-2">{error}</p>
-                    {/* MODIFICADO: Texto traducido */}
-                    <Button variant="outline" size="sm" onClick={() => fetchChatHistory(true)}>
-                        <RefreshCw className="mr-1 h-3 w-3"/> Reintentar
+                <div className="px-3 py-6 text-center text-destructive-foreground bg-destructive/10 rounded-md m-2">
+                    <AlertCircle className="mx-auto h-6 w-6 mb-2 text-destructive" />
+                    <p className="text-sm font-medium mb-1">Error al Cargar</p>
+                    <p className="text-xs mb-3">{error}</p>
+                    <Button variant="destructive" size="sm" onClick={() => fetchChatHistory(true)} className="bg-destructive/80 hover:bg-destructive">
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5"/> Reintentar
                     </Button>
                 </div>
             );
         }
 
         if (chats.length === 0) {
-            // MODIFICADO: Texto traducido
-            return <p className="text-xs text-muted-foreground px-2 py-4 text-center">No se encontraron chats anteriores.</p>;
+            return (
+                <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-6">
+                    <History className="h-8 w-8 mb-3 opacity-50"/>
+                    <p className="text-sm font-medium mb-1">Sin chats anteriores</p>
+                    <p className="text-xs">Inicia una nueva conversación para verla aquí.</p>
+                </div>
+            );
         }
 
         return chats.map((chat) => {
             const isActive = pathname === `/chat/${chat.id}`;
             const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
-            const displayDate = new Date(chat.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            const displayDate = new Date(chat.updated_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }); // Formato español
 
             return (
-                <div key={chat.id} className="relative group w-full pr-8">
+                <div key={chat.id} className="relative group w-full"> {/* Quitamos pr-8 */}
                     <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
                         <a
                             className={cn(
-                                buttonVariants({ variant: isActive ? "secondary" : "ghost", size: "sm" }),
-                                "w-full justify-start h-auto py-1.5 px-2 overflow-hidden text-left rounded",
-                                isActive ? "bg-muted hover:bg-muted font-medium" : "hover:bg-muted/50"
+                                buttonVariants({ variant: "ghost", size: "default" }), // Usamos ghost
+                                "w-full justify-start h-auto py-2.5 px-3 overflow-hidden text-left rounded-md text-sm", // Padding y altura ajustados
+                                isActive
+                                ? "bg-primary/10 dark:bg-primary/20 text-primary font-medium" // Estado activo mejorado
+                                : "text-foreground/70 hover:text-foreground hover:bg-accent/50 dark:hover:bg-accent/30" // Estado inactivo
                             )}
                             title={displayTitle}
                         >
-                            <MessageSquareText className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <span className="truncate flex-1 text-sm">{displayTitle}</span>
-                            <span className="text-xs text-muted-foreground/70 ml-2 flex-shrink-0">{displayDate}</span>
+                            {/* Icono principal */}
+                            <MessageSquareText className="h-4 w-4 mr-2.5 flex-shrink-0 opacity-80" />
+                            {/* Contenedor para título y fecha */}
+                            <div className="flex flex-col flex-1 min-w-0">
+                                <span className="truncate font-medium text-foreground group-hover:text-foreground">{displayTitle}</span>
+                                <span className="text-xs text-muted-foreground/80">{displayDate}</span>
+                            </div>
                         </a>
                     </Link>
+                    {/* Botón Eliminar aparece en hover */}
                     <AlertDialogTrigger asChild>
                         <Button
                             variant="ghost" size="icon"
                             className={cn(
-                                "absolute right-0 top-1/2 -translate-y-1/2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex-shrink-0 focus-visible:opacity-100",
+                                "absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 p-0 rounded-md",
+                                "opacity-0 group-hover:opacity-60 focus-visible:opacity-100 hover:!opacity-100", // Control de opacidad
+                                "transition-opacity duration-150 flex-shrink-0",
+                                "hover:bg-destructive/10 hover:text-destructive", // Estilo hover
                                 isDeleting && chatToDelete?.id === chat.id ? "opacity-50 cursor-not-allowed" : ""
                             )}
                             onClick={(e) => openDeleteConfirmation(chat, e)}
-                            // MODIFICADO: aria-label traducido
                             aria-label={`Eliminar chat: ${displayTitle}`}
                             disabled={isDeleting && chatToDelete?.id === chat.id}
                         >
                             {isDeleting && chatToDelete?.id === chat.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             ) : (
-                                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                                <Trash2 className="h-4 w-4" />
                             )}
                         </Button>
                     </AlertDialogTrigger>
@@ -2427,35 +2669,34 @@ export function ChatHistory() {
     return (
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
             <div className="flex flex-col h-full">
-                 <div className="flex justify-between items-center p-2 border-b shrink-0">
-                     {/* MODIFICADO: Texto traducido */}
-                     <h3 className="px-1 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
-                         Historial de Chats
+                 {/* Header del historial */}
+                 <div className="flex justify-between items-center px-2 pt-1 pb-2 border-b shrink-0 mb-1">
+                     <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
+                         Historial
                      </h3>
                      <Button
                          variant="ghost"
-                         size="sm"
-                         className="p-1 h-6 w-6"
+                         size="icon" // Cambiado a icon
+                         className="h-7 w-7 text-muted-foreground hover:text-foreground" // Tamaño y color ajustados
                          onClick={() => fetchChatHistory(true)}
                          disabled={isLoading || isAuthLoading}
-                         // MODIFICADO: Texto traducido
-                         title="Actualizar historial de chats"
+                         title="Actualizar historial"
                      >
-                         <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isAuthLoading) && "animate-spin")} />
-                         {/* MODIFICADO: Texto traducido */}
+                         <RefreshCw className={cn("h-4 w-4", (isLoading || isAuthLoading) && "animate-spin")} />
                          <span className="sr-only">Actualizar Historial</span>
                      </Button>
                  </div>
-                 <ScrollArea className="flex-1">
-                     <div className="flex flex-col gap-0.5 p-2">
+                 {/* ScrollArea para el contenido */}
+                 <ScrollArea className="flex-1 -mx-2"> {/* Padding negativo para compensar el padding del contenedor padre */}
+                     <div className="flex flex-col gap-1 p-2"> {/* Padding interno y gap */}
                          {renderContent()}
                      </div>
                  </ScrollArea>
             </div>
 
+            {/* AlertDialog se mantiene igual */}
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    {/* MODIFICADO: Textos traducidos */}
                     <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
                     <AlertDialogDescription>
                         Esta acción no se puede deshacer. Esto eliminará permanentemente el chat
@@ -2463,7 +2704,6 @@ export function ChatHistory() {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    {/* MODIFICADO: Textos traducidos */}
                     <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
                         onClick={handleDeleteConfirmed}
@@ -2482,13 +2722,14 @@ export function ChatHistory() {
 
 ## File: `components\chat\chat-input.tsx`
 ```tsx
-// File: components/chat/chat-input.tsx
+// File: components/chat/chat-input.tsx (MODIFICADO - Iteración 3.4)
 "use client";
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { SendHorizonal, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -2501,22 +2742,23 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(event.target.value);
-    // Auto-resize textarea (optional)
-    if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'; // Reset height
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
   };
+
+  // Auto-resize logic in useEffect to handle external value changes too (e.g., clearing)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; // Reset height first
+      // Set height based on scroll height, but enforce max-height via CSS
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`; // 160px = 10rem (max-h-40)
+    }
+  }, [inputValue]); // Re-run when input value changes
 
   const handleSubmit = (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
-    if (inputValue.trim() && !isLoading) {
-      onSendMessage(inputValue);
-      setInputValue('');
-      // Reset textarea height after sending
-      if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-      }
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue && !isLoading) {
+      onSendMessage(trimmedValue);
+      setInputValue(''); // Clear input after sending
     }
   };
 
@@ -2528,33 +2770,41 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end space-x-2">
+    <form onSubmit={handleSubmit} className="relative flex items-end space-x-2">
       <Textarea
         ref={textareaRef}
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        // MODIFICADO: Placeholder traducido
         placeholder="Pregúntale a Atenex..."
-        className="flex-1 resize-none max-h-40 min-h-[40px] overflow-y-auto rounded-lg border p-2 pr-12 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-primary" // Added padding right for button
-        rows={1}
+        className={cn(
+            "flex-1 resize-none min-h-[40px] max-h-40", // min/max height
+            "py-2 pr-12 pl-3", // Ajuste de padding (más a la derecha para botón)
+            "rounded-lg border border-input", // Estilo de borde
+            "text-sm shadow-sm placeholder:text-muted-foreground",
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-ring", // Estilo focus
+            "disabled:cursor-not-allowed disabled:opacity-50" // Estilo disabled
+        )}
+        rows={1} // Empezar con una sola fila
         disabled={isLoading}
-        // MODIFICADO: aria-label traducido
         aria-label="Entrada de chat"
       />
+      {/* Botón posicionado absolutamente dentro del form */}
       <Button
         type="submit"
         size="icon"
-        className="h-10 w-10 flex-shrink-0" // Ensure button size is consistent
+        className={cn(
+            "absolute right-2 bottom-2 h-8 w-8 flex-shrink-0 rounded-lg", // Posición y tamaño
+            "transition-colors duration-150"
+        )}
         disabled={isLoading || !inputValue.trim()}
+        aria-label="Enviar mensaje"
       >
         {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <SendHorizonal className="h-5 w-5" />
+          <SendHorizonal className="h-4 w-4" />
         )}
-        {/* MODIFICADO: sr-only traducido */}
-        <span className="sr-only">Enviar mensaje</span>
       </Button>
     </form>
   );
@@ -2759,7 +3009,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
 ## File: `components\chat\chat-message.tsx`
 ```tsx
-// File: components/chat/chat-message.tsx (MODIFICADO - Estilo burbujas)
+// File: components/chat/chat-message.tsx (MODIFICADO - Iteración 3.2)
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -2774,6 +3024,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Badge } from '@/components/ui/badge'; // Importar Badge
 
 export interface Message {
   id: string;
@@ -2793,57 +3044,70 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isError = message.isError ?? false;
 
   return (
-    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end pl-10' : 'pr-10')}>
+    // Aumentar espaciado vertical entre mensajes (controlado en page.tsx con space-y-6)
+    <div className={cn(
+        'flex w-full items-start gap-3', // Usar gap en lugar de space-x
+        isUser ? 'justify-end pl-10 sm:pl-16' : 'pr-10 sm:pr-16' // Más padding en pantallas pequeñas
+    )}>
+      {/* Avatar Asistente */}
       {!isUser && (
-        <Avatar className="h-8 w-8 border flex-shrink-0 bg-primary/10 text-primary">
-           <AvatarFallback className="bg-transparent">
+        <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground"> {/* Fondo card */}
+           <AvatarFallback className="bg-transparent text-muted-foreground"> {/* Color icono muted */}
                 {isError ? <AlertTriangle className="h-5 w-5 text-destructive" /> : <BrainCircuit className="h-5 w-5" /> }
            </AvatarFallback>
         </Avatar>
       )}
+
+      {/* Contenedor de la Burbuja */}
       <div
         className={cn(
-          'max-w-[80%] rounded-2xl p-3.5 text-sm shadow-md', // Mantenemos redondeado, padding, sombra
+          'max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm', // Padding y shadow ajustados
           isUser
-            ? 'bg-primary/90 text-primary-foreground border border-primary/30' // Añadido borde sutil para usuario también
+            ? 'bg-primary text-primary-foreground rounded-br-lg' // Estilo usuario, esquina redondeada diferente
             : isError
-              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30' // Estilo error con borde
-              // MODIFICADO: Volvemos a bg-muted para asistente, quitamos borde explícito aquí
-              : 'bg-muted'
+              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30 rounded-bl-lg' // Estilo error con borde y esquina
+              // Estilo asistente, esquina redondeada diferente
+              : 'bg-muted text-foreground rounded-bl-lg'
         )}
       >
-         <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+         {/* Contenido Markdown */}
+         <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
             </Markdown>
          </div>
 
+         {/* Sección de Fuentes */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
-            <div className="mt-3 pt-2.5 border-t border-border/50">
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">Fuentes:</p>
-                <div className="flex flex-wrap gap-1.5">
+            // Separador más sutil
+            <div className="mt-3 pt-2.5 border-t border-border/40">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Fuentes:</p>
+                {/* Usar flex-wrap para las fuentes */}
+                <div className="flex flex-wrap items-center gap-1.5">
                  {message.sources.map((doc, index) => (
-                    <TooltipProvider key={doc.id || `source-${index}`} delayDuration={100}>
+                    <TooltipProvider key={doc.id || `source-${index}`} delayDuration={150}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button
+                                {/* Botón reemplazado por Badge para look más integrado */}
+                                <Badge
                                     variant="outline"
-                                    size="sm"
-                                    className="h-auto px-2 py-0.5 text-xs border-dashed"
+                                    className="cursor-pointer border-dashed hover:border-solid hover:bg-accent/50 py-0.5 px-1.5"
                                     onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
+                                    tabIndex={0} // Make it focusable
                                 >
-                                    <FileText className="h-3 w-3 mr-1 flex-shrink-0" />
-                                    <span className='truncate max-w-[150px]'>
+                                    <FileText className="h-3 w-3 mr-1 flex-shrink-0 text-muted-foreground" />
+                                    <span className='truncate max-w-[120px] sm:max-w-[150px] text-xs font-normal text-foreground/80'>
                                      {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
                                     </span>
-                                </Button>
+                                </Badge>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                <p><b>Archivo:</b> {doc.file_name || 'N/D'}</p>
-                                <p><b>ID Fragmento:</b> {doc.id}</p>
-                                {doc.document_id && <p><b>ID Doc:</b> {doc.document_id}</p>}
-                                {doc.score != null && <p><b>Score:</b> {doc.score.toFixed(4)}</p>}
-                                {doc.content_preview && <p className="mt-1 pt-1 border-t border-border/50 line-clamp-3"><b>Vista previa:</b> {doc.content_preview}</p>}
+                            {/* Tooltip mejorado */}
+                            <TooltipContent side="bottom" className="max-w-xs text-xs p-2 shadow-lg" sideOffset={4}>
+                                <p className="font-medium mb-0.5">Archivo: <span className="font-normal text-muted-foreground">{doc.file_name || 'N/D'}</span></p>
+                                {doc.document_id && <p className="font-medium">ID Doc: <span className="font-normal text-muted-foreground font-mono text-[11px]">{doc.document_id}</span></p>}
+                                <p className="font-medium">ID Frag: <span className="font-normal text-muted-foreground font-mono text-[11px]">{doc.id}</span></p>
+                                {doc.score != null && <p className="font-medium">Score: <span className="font-normal text-muted-foreground">{doc.score.toFixed(4)}</span></p>}
+                                {doc.content_preview && <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium">Vista previa: <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview}</span></p>}
                             </TooltipContent>
                         </Tooltip>
                    </TooltipProvider>
@@ -2852,9 +3116,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
          )}
       </div>
+
+       {/* Avatar Usuario */}
       {isUser && (
-         <Avatar className="h-8 w-8 border flex-shrink-0 bg-secondary text-secondary-foreground">
-           <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
+         <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground"> {/* Fondo card */}
+           <AvatarFallback className="bg-transparent text-muted-foreground"><User className="h-5 w-5" /></AvatarFallback>
          </Avatar>
       )}
     </div>
@@ -2864,11 +3130,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
-// File: components/chat/retrieved-documents-panel.tsx (MODIFICADO - Ajuste padding contenedor)
+// File: components/chat/retrieved-documents-panel.tsx (MODIFICADO - Iteración 3.3)
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Loader2, Eye } from 'lucide-react';
+import { FileText, AlertCircle, Download, Loader2, Eye, Info } from 'lucide-react'; // Añadido Info
 import { ApiError, request, RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -2884,6 +3150,7 @@ import {
     DialogClose
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { cn } from '@/lib/utils'; // Importar cn
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -2895,7 +3162,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const handleViewDocument = (doc: RetrievedDoc) => {
-        console.log("Viendo detalles del documento:", doc.document_id || doc.id);
         setSelectedDoc(doc);
         setIsDialogOpen(true);
     };
@@ -2911,56 +3177,73 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <div className="flex h-full flex-col border-l bg-muted/30">
-            <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
-                <CardTitle className="text-lg flex items-center">
-                    <FileText className="mr-2 h-5 w-5" /> Fuentes Recuperadas
+        {/* Panel principal con estilo mejorado */}
+        <div className="flex h-full flex-col border-l bg-background/50 dark:bg-muted/30">
+            {/* Header del panel */}
+            <CardHeader className="sticky top-0 z-10 border-b bg-background p-4 shadow-sm">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" /> Fuentes Recuperadas
                 </CardTitle>
-                <CardDescription className="text-xs">
-                    Documentos usados para generar la respuesta. Haz clic para ver detalles.
+                <CardDescription className="text-xs mt-1">
+                    Documentos relevantes usados para generar la respuesta.
                 </CardDescription>
             </CardHeader>
 
-            {/* MODIFICADO: Envolver contenido en un div con padding dentro de ScrollArea */}
+            {/* Contenedor scrollable con padding */}
             <ScrollArea className="flex-1">
-                <div className="p-4 space-y-3">
+                {/* Espaciado y padding interno */}
+                <div className="p-3 space-y-2">
+                    {/* Estado de Carga con Skeleton */}
                     {isLoading && documents.length === 0 && (
-                        <>
-                            <Skeleton className="h-20 w-full rounded-md" />
-                            <Skeleton className="h-20 w-full rounded-md" />
-                            <Skeleton className="h-20 w-full rounded-md" />
-                        </>
-                    )}
-                    {!isLoading && documents.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground">
-                            <AlertCircle className="h-8 w-8 mb-2" />
-                            <p className="text-sm">No se encontraron documentos relevantes para la última consulta.</p>
+                        <div className='space-y-2'>
+                            <Skeleton className="h-20 w-full rounded-lg" />
+                            <Skeleton className="h-20 w-full rounded-lg" />
+                            <Skeleton className="h-20 w-full rounded-lg" />
                         </div>
                     )}
+                    {/* Estado Vacío mejorado */}
+                    {!isLoading && documents.length === 0 && (
+                        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4">
+                            <Info className="h-8 w-8 mb-3 opacity-50" />
+                            <p className="text-sm font-medium mb-1">Sin documentos relevantes</p>
+                            <p className="text-xs">No se encontraron fuentes específicas para la última consulta.</p>
+                        </div>
+                    )}
+                    {/* Lista de Documentos */}
                     {documents.map((doc, index) => (
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
+                            {/* Tarjeta de Documento */}
                             <Card
-                                className="cursor-pointer hover:shadow-md transition-shadow duration-150 bg-card" // Asegurar fondo card
+                                className={cn(
+                                    "cursor-pointer transition-all duration-150 bg-card",
+                                    "border border-border hover:border-primary/30 hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/30"
+                                )}
                                 onClick={() => handleViewDocument(doc)}
-                                title={`Haz clic para ver detalles de ${doc.file_name || 'documento'}`}
+                                onKeyDown={(e) => e.key === 'Enter' && handleViewDocument(doc)}
+                                tabIndex={0}
+                                title={`Ver detalles de: ${doc.file_name || 'documento'}`}
                             >
-                                <CardContent className="p-3 space-y-1 text-sm">
-                                    <div className="flex justify-between items-start">
-                                        <p className="font-medium text-primary truncate pr-2">
-                                            {index + 1}. {doc.file_name || doc.document_id?.substring(0, 8) || `Fragmento ${doc.id.substring(0, 8)}`}
+                                <CardContent className="p-3 space-y-1.5 text-sm">
+                                    {/* Header de la tarjeta: Título y Score */}
+                                    <div className="flex justify-between items-start gap-2">
+                                        <p className="font-medium text-foreground/90 truncate flex-1">
+                                            {index + 1}. {doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}
                                         </p>
+                                        {/* Badge de Score más refinado */}
                                         {doc.score != null && (
-                                            <Badge variant="secondary" title={`Puntuación Relevancia: ${doc.score.toFixed(4)}`}>
+                                            <Badge variant="secondary" className="px-1.5 py-0 font-mono text-xs rounded-sm">
                                                 {doc.score.toFixed(2)}
                                             </Badge>
                                         )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                    {/* Preview del contenido */}
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                                         {doc.content_preview || 'Vista previa no disponible.'}
                                     </p>
-                                    <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
+                                    {/* Footer de la tarjeta: ID y icono */}
+                                    <div className="text-[11px] text-muted-foreground/70 pt-1 flex justify-between items-center font-mono">
                                         <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
-                                        <Eye className="h-3 w-3 text-muted-foreground/50" />
+                                        <Eye className="h-3 w-3" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -2969,37 +3252,48 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Contenido del Dialog (sin cambios) */}
+            {/* Dialog de Detalles (mejorado) */}
             {selectedDoc && (
-                 <DialogContent className="sm:max-w-lg">
+                 <DialogContent className="sm:max-w-xl"> {/* Un poco más ancho */}
                     <DialogHeader>
-                        <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
-                            {selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}
+                        <DialogTitle className="truncate text-lg" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
+                            <FileText className="inline-block h-5 w-5 mr-2 align-text-bottom text-primary" />
+                            {selectedDoc.file_name || 'Detalles del Documento'}
                         </DialogTitle>
                         <DialogDescription>
-                            Detalles del fragmento recuperado del documento.
+                            Detalles del fragmento recuperado y su contexto.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4 space-y-3 text-sm">
-                        <div className="flex justify-between"><span className="font-medium text-muted-foreground">ID Documento:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/D'}</span></div>
-                        <div className="flex justify-between"><span className="font-medium text-muted-foreground">ID Fragmento:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.id}</span></div>
-                        <div className="flex justify-between"><span className="font-medium text-muted-foreground">Puntuación Relevancia:</span><span>{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></div>
-                        <div>
-                            <span className="font-medium text-muted-foreground block mb-1">Vista Previa Contenido:</span>
-                            <ScrollArea className="max-h-[250px] border rounded p-2 bg-muted/50 text-xs"><pre className="whitespace-pre-wrap break-words">{selectedDoc.content_preview || 'Vista previa no disponible.'}</pre></ScrollArea>
+                    {/* Contenido del Dialog con mejor estructura */}
+                    <div className="grid gap-3 py-4 text-sm max-h-[60vh] overflow-y-auto px-1 -mx-1">
+                        {/* Información Clave */}
+                        <div className='grid grid-cols-3 gap-x-4 gap-y-1 text-xs border-b pb-3 mb-2'>
+                            <div><span className="font-medium text-muted-foreground block">ID Documento</span><span className="font-mono text-[11px] block truncate">{selectedDoc.document_id || 'N/D'}</span></div>
+                            <div><span className="font-medium text-muted-foreground block">ID Fragmento</span><span className="font-mono text-[11px] block truncate">{selectedDoc.id}</span></div>
+                            <div><span className="font-medium text-muted-foreground block">Score</span><span>{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></div>
                         </div>
+                        {/* Vista previa */}
+                        <div>
+                            <Label className="text-xs font-semibold text-muted-foreground">Vista Previa Contenido:</Label>
+                            <ScrollArea className="mt-1 max-h-[200px] w-full rounded-md border bg-muted/30 p-3 text-xs">
+                                <pre className="whitespace-pre-wrap break-words font-sans">{selectedDoc.content_preview || 'Vista previa no disponible.'}</pre>
+                            </ScrollArea>
+                        </div>
+                        {/* Metadatos */}
                         {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                              <div>
-                                <span className="font-medium text-muted-foreground block mb-1">Metadatos:</span>
-                                <ScrollArea className="max-h-[100px] border rounded p-2 bg-muted/50 text-xs"><pre className="whitespace-pre-wrap break-words">{JSON.stringify(selectedDoc.metadata, null, 2)}</pre></ScrollArea>
+                                <Label className="text-xs font-semibold text-muted-foreground">Metadatos:</Label>
+                                <ScrollArea className="mt-1 max-h-[100px] w-full rounded-md border bg-muted/30 p-3 text-[11px]">
+                                    <pre className="whitespace-pre-wrap break-words font-mono">{JSON.stringify(selectedDoc.metadata, null, 2)}</pre>
+                                </ScrollArea>
                             </div>
                         )}
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
+                    <DialogFooter className="sm:justify-between">
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)}>
                             <Download className="mr-2 h-4 w-4" />Descargar Original (N/D)
                         </Button>
-                        <DialogClose asChild><Button variant="secondary">Cerrar</Button></DialogClose>
+                        <DialogClose asChild><Button variant="secondary" size="sm">Cerrar</Button></DialogClose>
                     </DialogFooter>
                 </DialogContent>
             )}
@@ -3007,11 +3301,18 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     </Dialog>
   );
 }
+
+// Helper Label component (si no existe o para simplificar)
+const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
+    <label className={cn("block text-sm font-medium text-foreground", className)} {...props}>
+        {children}
+    </label>
+);
 ```
 
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (MODIFICADO)
+// File: components/knowledge/document-status-list.tsx (MODIFICADO - Iteración 4.1)
 "use client";
 
 import React from 'react';
@@ -3034,6 +3335,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
+import { Info } from 'lucide-react'; // Importar Info
 
 type DocumentStatus = DocumentStatusResponse;
 
@@ -3048,7 +3351,6 @@ export interface DocumentStatusListProps {
 }
 
 const getStatusAttributes = (status: DocumentStatus['status']) => {
-    // Mismos atributos que antes
     switch (status) {
         case 'uploaded': return { icon: Loader2, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true };
         case 'processing': return { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true };
@@ -3063,16 +3365,18 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
 
+  // Funciones handleRetry, handleRefresh, openDeleteConfirmation, handleDeleteConfirmed (sin cambios lógicos)
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
     const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
     try {
-      // La API real de reintento debe ser implementada y llamada aquí
+      // TODO: Implementar llamada API real si existe
       // await retryIngestDocument(documentId, authHeaders);
-      await new Promise(res => setTimeout(res, 500)); // Simular llamada
+      await new Promise(res => setTimeout(res, 700)); // Simular llamada
       toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` });
-      onRetrySuccess(documentId);
+      onRetrySuccess(documentId); // Actualizar UI localmente
+      refreshDocument(documentId); // Refrescar estado desde API
     } catch (error: any) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       toast.error("Error al Reintentar", { id: toastId, description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}` });
@@ -3097,7 +3401,7 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
     const toastId = toast.loading(`Eliminando "${display}"...`);
     try {
       await deleteIngestDocument(docToDelete.document_id, authHeaders);
-      onDeleteSuccess(docToDelete.document_id);
+      onDeleteSuccess(docToDelete.document_id); // Actualiza UI localmente
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
     } catch (e: any) {
       const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
@@ -3109,80 +3413,83 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
     }
   };
 
+  // Estado vacío mejorado
   if (!documents || documents.length === 0) {
-    return <p className="text-center text-muted-foreground p-5 italic">No hay documentos subidos aún.</p>;
+    return (
+        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border rounded-lg bg-muted/30 mt-4">
+            <Info className="h-8 w-8 mb-3 opacity-50"/>
+            <p className="text-sm font-medium mb-1">Sin Documentos</p>
+            <p className="text-xs">Aún no se han subido documentos a la base de conocimiento.</p>
+        </div>
+    );
   }
 
   return (
     <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
       <TooltipProvider>
-        {/* Leyenda de Estados */}
-        <div className="flex flex-wrap gap-2 mb-4 text-xs">
-          <span className="font-medium mr-2">Estados:</span>
-          {['uploaded', 'processing', 'processed', 'error'].map((status) => {
-            const { text, className } = getStatusAttributes(status as DocumentStatus['status']);
-            return <Badge key={status} variant="outline" className={cn("border", className)}>{text}</Badge>;
-          })}
-        </div>
+        {/* Leyenda de Estados (opcional, si se quiere mantener) */}
+        {/* <div className="flex flex-wrap gap-2 mb-4 text-xs">...</div> */}
 
-        {/* Quitar el borde y overflow-hidden del div exterior si la tabla está dentro de CardContent */}
-        <div className="relative w-full overflow-auto">
-          <Table>
+        {/* Contenedor de la tabla con borde y overflow */}
+        <div className="border rounded-lg overflow-hidden">
+          <Table className='w-full'> {/* Asegurar ancho completo */}
             <TableHeader>
-              {/* Añadir sticky top-0 y bg-background para cabecera fija si ScrollArea externa lo permite */}
-              <TableRow className="border-b hover:bg-transparent">
-                <TableHead className="w-[35%] pl-4">Nombre Archivo</TableHead>
-                <TableHead className="w-[15%]">Estado</TableHead>
-                <TableHead className="w-[10%] text-center hidden sm:table-cell">Chunks</TableHead>
-                <TableHead className="w-[25%] hidden md:table-cell">Última Actualización</TableHead>
-                <TableHead className="w-[15%] text-right pr-4">Acciones</TableHead>
+              {/* Cabecera con fondo y borde */}
+              <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
+                <TableHead className="w-[40%] pl-4 pr-2 py-2.5">Nombre Archivo</TableHead>
+                <TableHead className="w-[15%] px-2 py-2.5">Estado</TableHead>
+                <TableHead className="w-[10%] text-center px-2 py-2.5 hidden sm:table-cell">Chunks</TableHead>
+                <TableHead className="w-[20%] px-2 py-2.5 hidden md:table-cell">Actualización</TableHead>
+                <TableHead className="w-[15%] text-right pr-4 pl-2 py-2.5">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {documents.map((doc, index) => {
+              {documents.map((doc) => {
                 const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
                 const dateToShow = doc.last_updated;
-                const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
+                const displayDate = dateToShow ? new Date(dateToShow).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short'}) : 'N/D';
                 const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
-                const displayChunks = doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : 'N/D';
+                const displayChunks = doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : '-'; // Usar guión en lugar de N/D
 
                 return (
-                  // Aplicar estilo de fila alternada
-                  <TableRow key={doc.document_id} className="group hover:bg-muted/50 data-[state=selected]:bg-muted [&:nth-child(even)]:bg-muted/30 dark:[&:nth-child(even)]:bg-muted/10">
-                    <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate pl-4" title={displayFileName}>
+                  // Fila con hover sutil
+                  <TableRow key={doc.document_id} className="group hover:bg-accent/50 data-[state=selected]:bg-accent">
+                    {/* Celda Nombre Archivo */}
+                    <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs truncate pl-4 pr-2 py-2" title={displayFileName}>
                       {displayFileName}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant='outline' className={cn("border font-medium", statusClassName)}>
-                        <Icon className={cn("h-3.5 w-3.5 mr-1.5", animate && "animate-spin")} />
+                    {/* Celda Estado */}
+                    <TableCell className="px-2 py-2">
+                      <Badge variant='outline' className={cn("border text-xs font-medium whitespace-nowrap", statusClassName)}>
+                        <Icon className={cn("h-3.5 w-3.5 mr-1", animate && "animate-spin")} />
                         {statusText}
                         {doc.status === 'error' && doc.error_message && (
                           <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
-                              <AlertCircle className="h-3.5 w-3.5 ml-1.5 cursor-help opacity-70 hover:opacity-100" />
+                               <Button variant="ghost" size="icon" className='h-4 w-4 p-0 ml-1 cursor-help opacity-70 hover:opacity-100'>
+                                 <AlertCircle className="h-3.5 w-3.5" />
+                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs break-words bg-destructive text-destructive-foreground">
+                            <TooltipContent side="top" className="max-w-xs break-words bg-destructive text-destructive-foreground p-2 text-xs shadow-lg">
                               <p>Error: {doc.error_message}</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-center hidden sm:table-cell">
-                      {displayChunks === 'N/D' ? (
-                        <Tooltip delayDuration={100}>
-                          <TooltipTrigger className='cursor-default text-muted-foreground'>N/D</TooltipTrigger>
-                          <TooltipContent>Conteo de chunks no disponible aún.</TooltipContent>
-                        </Tooltip>
-                      ) : displayChunks}
+                    {/* Celda Chunks */}
+                    <TableCell className="text-center text-muted-foreground text-xs px-2 py-2 hidden sm:table-cell">
+                      {displayChunks}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
-                    <TableCell className="text-right space-x-1 pr-4">
+                    {/* Celda Fecha */}
+                    <TableCell className="text-muted-foreground text-xs px-2 py-2 hidden md:table-cell">{displayDate}</TableCell>
+                    {/* Celda Acciones */}
+                    <TableCell className="text-right space-x-0.5 pr-4 pl-2 py-1"> {/* Reducido space */}
                       {/* Botón Reintentar */}
                       {doc.status === 'error' && (
                         <Tooltip delayDuration={100}>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta">
                               <RefreshCw className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
@@ -3192,16 +3499,16 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
                       {/* Botón Actualizar */}
                       <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-500 hover:bg-gray-100" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado">
-                             <RefreshCw className="h-4 w-4" /> {/* Cambiado a RefreshCw para consistencia */}
+                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado">
+                             <RefreshCw className="h-4 w-4" />
                            </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Actualizar Estado</p></TooltipContent>
                       </Tooltip>
-                      {/* Botón Eliminar (Usa AlertDialogTrigger) */}
+                      {/* Botón Eliminar */}
                       <Tooltip delayDuration={100}>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmation(doc)} aria-label="Eliminar documento">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmation(doc)} aria-label="Eliminar documento">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -3213,22 +3520,27 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
               })}
             </TableBody>
           </Table>
-        </div> {/* Fin del div contenedor de la tabla */}
+        </div>
+
+        {/* Botón Cargar Más */}
         {hasMore && (
-          <div className="p-4 text-center">
-            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting}>Cargar más documentos</Button>
+          <div className="pt-4 text-center">
+            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting || isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Cargar más
+            </Button>
           </div>
         )}
       </TooltipProvider>
 
-      {/* Diálogo de Confirmación de Eliminación */}
+      {/* AlertDialog de Confirmación (mejorado) */}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Confirmar Eliminación?</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta acción no se puede deshacer. Se eliminará permanentemente el documento
-            <span className="font-medium"> "{docToDelete?.file_name || docToDelete?.document_id.substring(0, 8)}"</span>,
-            su archivo original y todos sus datos asociados de la base de conocimiento.
+            Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados de la base de conocimiento:
+            <br />
+            <span className="font-semibold text-foreground mt-2 block">"{docToDelete?.file_name || docToDelete?.document_id}"</span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -3238,7 +3550,7 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
             disabled={isDeleting}
             className={buttonVariants({ variant: "destructive" })}
           >
-            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
             Eliminar Permanentemente
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -3250,18 +3562,19 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
 
 ## File: `components\knowledge\file-uploader.tsx`
 ```tsx
-// File: components/knowledge/file-uploader.tsx (MODIFICADO)
+// File: components/knowledge/file-uploader.tsx (MODIFICADO - Iteración 4.1)
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useDropzone, FileRejection } from 'react-dropzone'; // Importar FileRejection
+import { useDropzone, FileRejection } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress'; // Progress podría usarse si el hook diera progreso
+// Progress ya no se usa directamente aquí
 import { toast } from 'sonner';
-import { UploadCloud, File as FileIcon, X, Loader2 } from 'lucide-react';
+import { UploadCloud, File as FileIcon, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'; // Añadidos iconos
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge'; // Para mostrar tipo archivo
 
-// Tipos de archivo aceptados (sin cambios)
+// Tipos de archivo aceptados
 const acceptedFileTypes = {
   'application/pdf': ['.pdf'],
   'application/msword': ['.doc'],
@@ -3270,13 +3583,15 @@ const acceptedFileTypes = {
   'text/markdown': ['.md', '.markdown'],
   'text/html': ['.html', '.htm'],
 };
+// Lista para mostrar al usuario
+const allowedExtensions = Object.values(acceptedFileTypes).flat().map(ext => ext.substring(1).toUpperCase()).join(', ');
 
 interface FileUploaderProps {
-  authHeaders: import('@/lib/api').AuthHeaders; // Necesario para pasarlo a uploadFile
-  onUploadFile: (file: File, authHeaders: import('@/lib/api').AuthHeaders) => Promise<boolean>; // Función del hook
-  isUploading: boolean; // Estado de carga del hook
-  uploadError: string | null; // Error del hook
-  clearUploadStatus: () => void; // Función para limpiar estado del hook
+  authHeaders: import('@/lib/api').AuthHeaders;
+  onUploadFile: (file: File, authHeaders: import('@/lib/api').AuthHeaders) => Promise<boolean>;
+  isUploading: boolean;
+  uploadError: string | null;
+  clearUploadStatus: () => void;
 }
 
 export function FileUploader({
@@ -3287,33 +3602,33 @@ export function FileUploader({
     clearUploadStatus
 }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [dropzoneError, setDropzoneError] = useState<string | null>(null); // Error específico del dropzone
+  const [dropzoneError, setDropzoneError] = useState<string | null>(null);
+  const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null); // Para feedback visual post-subida
 
-  // Limpiar errores cuando el archivo cambia o se quita
   useEffect(() => {
-    setDropzoneError(null); // Limpiar error del dropzone si cambia el archivo
+    setDropzoneError(null);
+    setLocalUploadSuccess(null); // Limpiar éxito/error visual si cambia el archivo
     if (uploadError) {
-        // Opcional: Limpiar error de subida del hook si el usuario interactúa de nuevo
-        // clearUploadStatus();
+        // No limpiar el error de subida automáticamente, dejar que el usuario lo vea
     }
-  }, [file, uploadError, clearUploadStatus]);
+  }, [file]); // Solo depende del archivo seleccionado
 
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
-    setDropzoneError(null); // Limpiar error previo del dropzone
-    clearUploadStatus(); // Limpiar error previo de subida del hook
-    setFile(null); // Limpiar selección previa
+    setDropzoneError(null);
+    setLocalUploadSuccess(null);
+    clearUploadStatus(); // Limpiar error de subida previo
+    setFile(null);
 
     if (fileRejections.length > 0) {
         const firstRejection = fileRejections[0];
         const errorMessages = firstRejection.errors.map((e) => e.message).join(', ');
         let customError = `Error: ${errorMessages}`;
         if (firstRejection.errors.some((e) => e.code === 'file-invalid-type')) {
-             customError = `Tipo de archivo no permitido. Permitidos: PDF, DOC, DOCX, TXT, MD, HTML.`;
+             customError = `Tipo de archivo no permitido. Permitidos: ${allowedExtensions}.`;
         } else if (firstRejection.errors.some((e) => e.code === 'file-too-large')) {
-            customError = `El archivo es demasiado grande.`;
+            customError = `El archivo es demasiado grande (límite no especificado).`; // TODO: Añadir límite si se conoce
         }
-        setDropzoneError(customError); // Mostrar error del dropzone
-        // No usamos toast aquí, el error se muestra en la UI
+        setDropzoneError(customError);
         return;
     }
 
@@ -3326,23 +3641,26 @@ export function FileUploader({
     onDrop,
     accept: acceptedFileTypes,
     multiple: false,
-    disabled: isUploading, // Deshabilitar dropzone mientras se sube
+    disabled: isUploading,
   });
 
   const handleUploadClick = async () => {
     if (!file || !authHeaders || isUploading) return;
+    setLocalUploadSuccess(null); // Resetear estado visual
 
     const success = await onUploadFile(file, authHeaders);
+    setLocalUploadSuccess(success); // Guardar estado de éxito/fallo para UI
     if (success) {
-        setFile(null); // Limpiar selección solo si la subida fue exitosa (no error 409)
+        setFile(null); // Limpiar selección si fue exitosa
     }
-    // El hook `useUploadDocument` se encarga de las notificaciones toast
+    // Los toasts son manejados por el hook useUploadDocument
   };
 
   const removeFile = () => {
     setFile(null);
-    setDropzoneError(null); // Limpiar error del dropzone al quitar archivo
-    clearUploadStatus(); // Limpiar error de subida del hook al quitar archivo
+    setDropzoneError(null);
+    setLocalUploadSuccess(null);
+    clearUploadStatus(); // Limpiar cualquier error de subida previo
   }
 
   // Combinar error del dropzone y del hook de subida
@@ -3350,47 +3668,62 @@ export function FileUploader({
 
   return (
     <div className="space-y-4">
+      {/* Dropzone Area */}
       <div
         {...getRootProps()}
-        className={cn(`p-6 border-2 border-dashed rounded-md text-center transition-colors`,
-            isUploading ? 'cursor-not-allowed bg-muted/50 border-muted/30' : 'cursor-pointer',
-            isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/50 hover:border-primary/70',
-            displayError ? 'border-destructive' : ''
+        className={cn(
+            `relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg text-center transition-colors duration-200 ease-in-out`,
+            isUploading
+                ? 'cursor-not-allowed bg-muted/30 border-muted/50 text-muted-foreground'
+                : 'cursor-pointer border-muted-foreground/30 hover:border-primary/50 hover:bg-accent/50 dark:hover:bg-accent/10',
+            isDragActive ? 'border-primary bg-primary/10 border-solid' : '',
+            displayError ? 'border-destructive bg-destructive/5 border-solid' : '', // Estilo error más claro
+            localUploadSuccess === true ? 'border-green-500 bg-green-500/10 border-solid' : '', // Estilo éxito
+            localUploadSuccess === false && !displayError ? 'border-destructive bg-destructive/5 border-solid' : '' // Estilo fallo (si no hay otro error)
         )}
       >
         <input {...getInputProps()} disabled={isUploading} />
-        <UploadCloud className={cn("mx-auto h-10 w-10 mb-2", isUploading ? "text-muted-foreground/50" : "text-muted-foreground")} />
+
+        {/* Icono central */}
+        <div className={cn("mb-2 transition-transform duration-200", isDragActive ? "scale-110" : "")}>
+            {localUploadSuccess === true && <CheckCircle2 className="h-10 w-10 text-green-600" />}
+            {localUploadSuccess === false && !displayError && <AlertTriangle className="h-10 w-10 text-destructive" />}
+            {displayError && <AlertTriangle className="h-10 w-10 text-destructive" />}
+            {localUploadSuccess === null && !displayError && <UploadCloud className={cn("h-10 w-10", isUploading ? "text-muted-foreground/60" : "text-muted-foreground/80")} />}
+        </div>
+
+        {/* Texto del Dropzone */}
         {isDragActive ? (
-          // Texto traducido
-          <p>Suelta el archivo aquí...</p>
+          <p className="text-sm font-medium text-primary">Suelta el archivo aquí...</p>
         ) : (
-          <p className={cn(isUploading ? "text-muted-foreground/80" : "")}>
-            Arrastra y suelta un archivo, o haz clic para seleccionar
-            <span className="block text-xs text-muted-foreground mt-1">(PDF, DOC, DOCX, TXT, MD, HTML)</span>
+          <p className={cn("text-sm", isUploading ? "text-muted-foreground/80" : "text-foreground/90")}>
+            Arrastra y suelta un archivo, o{' '}
+            <span className="font-medium text-primary underline underline-offset-2">haz clic para seleccionar</span>
+            <span className="mt-1 block text-xs text-muted-foreground">(Permitidos: {allowedExtensions})</span>
           </p>
         )}
       </div>
 
-      {/* Mostrar error (del dropzone o de la subida) */}
-      {displayError && <p className="text-sm text-destructive px-1">{displayError}</p>}
+      {/* Mensaje de Error (si existe) */}
+      {displayError && <p className="text-sm text-destructive px-1 flex items-center gap-1.5"><AlertTriangle className="h-4 w-4"/>{displayError}</p>}
 
+      {/* Preview del Archivo Seleccionado */}
       {file && (
-        <div className="p-3 border rounded-md flex items-center justify-between space-x-2">
-            <div className="flex items-center space-x-2 overflow-hidden">
-                 <FileIcon className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                 <span className="text-sm truncate" title={file.name}>{file.name}</span>
-                 <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40">
+            <div className="flex items-center space-x-3 overflow-hidden">
+                 <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
+                 <div className='flex flex-col min-w-0'>
+                    <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
+                    <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB) - <Badge variant="outline" className='ml-1 py-0 px-1'>{file.type || 'desconocido'}</Badge></span>
+                 </div>
             </div>
-          {/* Permitir quitar archivo incluso si está subiendo (cancela la subida implícitamente) */}
-          <Button variant="ghost" size="sm" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
             <X className="h-4 w-4" />
           </Button>
         </div>
       )}
 
-      {/* Ya no se muestra la barra de progreso aquí, el toast de carga lo indica */}
-      {/* {isUploading && ( <Progress value={uploadProgress} className="w-full" /> )} */}
-
+      {/* Botón de Subida */}
       <Button
         onClick={handleUploadClick}
         disabled={!file || isUploading}
@@ -3401,7 +3734,7 @@ export function FileUploader({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Subiendo...
             </>
-         ) : 'Subir Archivo'}
+         ) : 'Subir y Procesar Archivo'}
       </Button>
     </div>
   );
@@ -3410,12 +3743,13 @@ export function FileUploader({
 
 ## File: `components\layout\header.tsx`
 ```tsx
-// File: components/layout/header.tsx (MODIFICADO - Espaciado iconos derecha)
+// File: components/layout/header.tsx (MODIFICADO)
 "use client";
 
 import React from 'react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -3454,26 +3788,35 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shrink-0">
+       {/* Espacio Izquierdo (Podría tener Breadcrumbs o Título de página en el futuro) */}
        <div className="flex items-center gap-2">
-         <Button variant="ghost" size="icon" onClick={() => router.push('/chat')} aria-label="Ir al Chat">
+         {/* Eliminamos el botón Home aquí, ya que está en el Sidebar */}
+         {/* <Button variant="ghost" size="icon" onClick={() => router.push('/chat')} aria-label="Ir al Chat">
              <Home className="h-5 w-5" />
-         </Button>
+         </Button> */}
+         {/* Placeholder para título de página si se necesita */}
+         {/* <h1 className="text-lg font-semibold text-foreground">Chat</h1> */}
       </div>
 
-      {/* MODIFICADO: Ajustado espaciado a space-x-2 */}
-      <div className="flex items-center space-x-2">
+      {/* Iconos y Menú de Usuario a la Derecha */}
+      {/* Ajustado espaciado a space-x-1 y padding en botones icon */}
+      <div className="flex items-center space-x-1">
+        {/* Botón de Tema */}
         <ThemePaletteButton />
 
-         <Button variant="ghost" size="icon" onClick={() => router.push('/help')} aria-label="Ayuda y Soporte">
+         {/* Botón de Ayuda */}
+         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => router.push('/help')} aria-label="Ayuda y Soporte">
              <HelpCircle className="h-5 w-5" />
          </Button>
 
+        {/* Menú de Usuario */}
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <Avatar className="h-9 w-9 border">
-                  <AvatarFallback className="bg-secondary text-secondary-foreground font-medium text-sm">
+                  {/* Fuente ligeramente más pequeña para iniciales */}
+                  <AvatarFallback className="bg-secondary text-secondary-foreground font-medium text-xs">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -3481,26 +3824,30 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-60" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
+              <DropdownMenuLabel className="font-normal p-2"> {/* Añadido padding */}
+                <div className="flex flex-col space-y-1.5"> {/* Aumentado space-y */}
                   <p className="text-sm font-medium leading-none truncate" title={user.name || 'Usuario'}>
                     {user.name || 'Usuario'}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground truncate" title={user.email}>
                     {user.email}
                   </p>
+                  {/* Info Empresa y Rol con iconos */}
                   {user.companyId && (
-                    <p className="text-xs leading-none text-muted-foreground/80 mt-1 flex items-center gap-1" title={`ID Empresa: ${user.companyId}`}>
-                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-                           <path fillRule="evenodd" d="M4 1.75A2.25 2.25 0 0 0 1.75 4v1.5a.75.75 0 0 0 1.5 0V4c0-.414.336-.75.75-.75h8.5c.414 0 .75.336.75.75v1.5a.75.75 0 0 0 1.5 0V4A2.25 2.25 0 0 0 12 1.75H4ZM1.75 8.5A.75.75 0 0 0 1 9.25v2.25A2.25 2.25 0 0 0 3.25 14h9.5A2.25 2.25 0 0 0 15 11.5V9.25a.75.75 0 0 0-1.5 0v2.25c0 .414-.336.75-.75.75h-9.5c-.414 0-.75-.336-.75-.75V9.25a.75.75 0 0 0-.75-.75Z" clipRule="evenodd" />
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground/80 pt-1" title={`ID Empresa: ${user.companyId}`}>
+                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+                         <path fillRule="evenodd" d="M4 1.75A2.25 2.25 0 0 0 1.75 4v1.5a.75.75 0 0 0 1.5 0V4c0-.414.336-.75.75-.75h8.5c.414 0 .75.336.75.75v1.5a.75.75 0 0 0 1.5 0V4A2.25 2.25 0 0 0 12 1.75H4ZM1.75 8.5A.75.75 0 0 0 1 9.25v2.25A2.25 2.25 0 0 0 3.25 14h9.5A2.25 2.25 0 0 0 15 11.5V9.25a.75.75 0 0 0-1.5 0v2.25c0 .414-.336.75-.75.75h-9.5c-.414 0-.75-.336-.75-.75V9.25a.75.75 0 0 0-.75-.75Z" clipRule="evenodd" />
                        </svg>
                       <span className="truncate">Empresa: {user.companyId.substring(0, 8)}...</span>
-                    </p>
+                    </div>
                   )}
                    {user.roles && user.roles.length > 0 && (
-                     <p className="text-xs leading-none text-muted-foreground/80 mt-1" title={`Roles: ${user.roles.join(', ')}`}>
-                       Rol(es): {user.roles.join(', ')}
-                     </p>
+                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground/80" title={`Roles: ${user.roles.join(', ')}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0">
+                         <path fillRule="evenodd" d="M8 1a.75.75 0 0 1 .75.75V3h3.75A1.75 1.75 0 0 1 14.25 4.75v3.51a.75.75 0 0 1-1.5 0V5.76L8 8.41l-4.75-2.65v6.01c0 .17.02.338.059.497l1.49-.497a.75.75 0 1 1 .502 1.414l-2.08 1.04A2.25 2.25 0 0 1 3.25 11H.75a.75.75 0 0 1 0-1.5h1.77a.75.75 0 0 0 .75-.75V4.75A1.75 1.75 0 0 1 5 3h3V1.75A.75.75 0 0 1 8 1Z" clipRule="evenodd" />
+                       </svg>
+                       <span className="truncate">Rol(es): {user.roles.join(', ')}</span>
+                     </div>
                    )}
                 </div>
               </DropdownMenuLabel>
@@ -3510,13 +3857,17 @@ export function Header() {
                 <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+              {/* Estilo destructivo más claro */}
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        ) : null}
+        ) : (
+          // Placeholder si no hay usuario (aunque no debería pasar en este layout)
+          <Skeleton className="h-9 w-9 rounded-full" />
+        )}
       </div>
     </header>
   );
@@ -3534,9 +3885,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BotMessageSquare, FileUp, Settings, BarChartHorizontalBig, CircleHelp, PlusCircle } from 'lucide-react';
+import { BotMessageSquare, FileUp, Settings, PlusCircle } from 'lucide-react'; // Quitados iconos no usados
 import { APP_NAME } from '@/lib/constants';
 import { ChatHistory } from '@/components/chat/chat-history';
+import { Separator } from '@/components/ui/separator'; // Importar Separator
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -3546,8 +3898,6 @@ const navItems = [
   { href: '/chat', label: 'Chat', icon: BotMessageSquare },
   { href: '/knowledge', label: 'Base de Conocimiento', icon: FileUp },
   { href: '/settings', label: 'Configuración', icon: Settings },
-  // { href: '/analytics', label: 'Analíticas', icon: BarChartHorizontalBig },
-  // { href: '/help', label: 'Ayuda y Soporte', icon: CircleHelp },
 ];
 
 export function Sidebar({ isCollapsed }: SidebarProps) {
@@ -3555,35 +3905,47 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   const router = useRouter ? useRouter() : undefined;
 
   const handleNewChat = React.useCallback(() => {
-    if (router) router.push('/chat');
+    if (router) router.push('/chat'); // Simplificado, siempre va a /chat para nuevo
     else window.location.href = '/chat';
   }, [router]);
 
   return (
+    // Ajustamos padding general y gap
     <aside className={cn(
-        "flex h-full flex-col border-r bg-muted/40 transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-[50px] items-center pt-4" : "w-full p-4" // Añadido padding top cuando colapsado
+        "flex h-full flex-col border-r bg-muted/40 dark:bg-background", // Fondo más integrado en dark mode
+        isCollapsed ? "w-[60px] items-center p-2" : "w-full p-3" // Ancho colapsado y padding ajustados
       )}
       >
       {/* Sección Superior: Logo y Nuevo Chat */}
-      <div className={cn("flex flex-col gap-2", isCollapsed ? "items-center" : "")}>
-        <div className={cn("flex items-center", isCollapsed ? "h-12 justify-center" : "h-16 justify-start")}> {/* Altura ajustada */}
+      <div className={cn(
+          "flex flex-col", // Sin gap aquí, el margen se controla abajo
+          isCollapsed ? "items-center" : "items-stretch"
+        )}
+      >
+        {/* Logo */}
+        <div className={cn(
+            "flex items-center mb-4", // Margen inferior
+            isCollapsed ? "h-10 justify-center" : "h-12 justify-start pl-1" // Altura y padding ajustados
+            )}
+        >
           <BotMessageSquare className={cn("h-6 w-6 text-primary", !isCollapsed && "mr-2")} />
           {!isCollapsed && (
-            <span className="text-lg font-bold text-primary">{APP_NAME}</span>
+            <span className="text-lg font-semibold text-primary">{APP_NAME}</span> // font-semibold
           )}
         </div>
+
+        {/* Botón Nuevo Chat */}
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 onClick={handleNewChat}
-                variant="default"
+                variant="default" // Mantenemos default, pero podríamos crear uno específico
                 size={isCollapsed ? "icon" : "default"}
                 className={cn(
                   "w-full transition-colors duration-150",
-                  isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start mt-1 font-semibold text-base", // Ajustado margen
-                  "bg-primary hover:bg-primary/90 text-primary-foreground shadow" // Sombra ligeramente más suave
+                  isCollapsed ? "h-10 w-10 rounded-lg mb-4" : "justify-start py-2.5 text-base font-medium mb-4", // Tamaño y margen ajustados
+                  "shadow-sm" // Sombra más sutil
                 )}
                 aria-label="Nuevo chat"
               >
@@ -3598,33 +3960,44 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
         </TooltipProvider>
       </div>
 
+      {/* Separador antes de la navegación */}
+      {!isCollapsed && <Separator className="my-2" />}
+
       {/* Navegación Principal */}
       <nav className={cn(
-          "flex flex-col gap-1 mt-6", // Aumentado margen superior, reducido gap
-          isCollapsed ? "items-center" : "flex-1"
+          "flex flex-col gap-1", // Espaciado entre items reducido
+          isCollapsed ? "items-center mt-2" : "flex-1 mt-1" // Margen superior ajustado
         )}
-        >
+      >
         <TooltipProvider delayDuration={0}>
           {navItems.map((item) => {
-             const isActive = pathname.startsWith(item.href);
+             // Usar startsWith para que rutas anidadas también activen el ítem
+             const isActive = pathname === item.href || (item.href !== '/chat' && pathname.startsWith(item.href));
              return (
                 <Tooltip key={item.href}>
                   <TooltipTrigger asChild>
                     <Link
                         href={item.href}
                         className={cn(
-                            buttonVariants({ variant: isActive ? 'secondary' : 'ghost', size: isCollapsed ? "icon" : "default" }),
-                            "w-full transition-colors duration-150 ease-in-out relative", // Añadido relative
-                            isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start pl-3 py-2 text-sm", // Ajustado padding/tamaño
-                            isActive ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground'
+                            buttonVariants({ variant: 'ghost', size: isCollapsed ? "icon" : "default" }), // Usar ghost siempre
+                            "w-full transition-colors duration-150 ease-in-out relative group", // Añadido group
+                            isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start pl-3 py-2 text-sm h-10", // Padding y tamaño
+                            isActive
+                                ? 'font-medium text-primary bg-primary/10 dark:bg-primary/20' // Estilo activo más claro
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 dark:hover:bg-accent/30' // Estilo inactivo
                         )}
                         aria-label={item.label}
                     >
-                      {/* Indicador activo como borde izquierdo */}
+                      {/* Indicador activo (solo visible si está activo y expandido) */}
                       {isActive && !isCollapsed && (
-                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"></span>
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary rounded-r-md transition-all duration-200"></span>
                       )}
-                      <item.icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+                      <item.icon className={cn(
+                          "h-5 w-5 transition-colors",
+                          isCollapsed ? "" : "mr-3",
+                          isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground" // Color icono
+                          )}
+                       />
                       {!isCollapsed && <span className="truncate">{item.label}</span>}
                     </Link>
                   </TooltipTrigger>
@@ -3641,8 +4014,14 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 
       {/* Historial de Chats (Solo si no está colapsado) */}
       {!isCollapsed && (
-         <div className="mt-auto flex flex-col gap-2 border-t pt-4">
-             <ChatHistory />
+         // Contenedor para el historial con borde superior
+         <div className="mt-auto flex flex-col border-t pt-3 -mx-3 px-3"> {/* Padding negativo/positivo para borde completo */}
+             {/* Aquí irá el ChatHistory rediseñado en Iteración 2 */}
+             {/* Placeholder temporal: */}
+              <div className='flex-1 overflow-hidden'>
+                 <ChatHistory />
+              </div>
+
          </div>
       )}
     </aside>
@@ -4767,10 +5146,13 @@ function ResizableHandle({
     <ResizablePrimitive.PanelResizeHandle
       data-slot="resizable-handle"
       className={cn(
-        // MODIFICADO: Más sutil, opacidad en hover
-        "relative flex w-px items-center justify-center bg-border opacity-50 transition-opacity hover:opacity-100 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full",
-        // Estilos para el after (línea visual)
-        "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0",
+        // Más sutil: opacidad baja, aumenta en hover/focus
+        "relative flex w-px items-center justify-center bg-border", // Mantiene la línea de 1px
+        "opacity-40 transition-all duration-200 ease-in-out hover:opacity-100 hover:bg-primary/20", // Aumenta opacidad y muestra área sutil en hover
+        "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none focus-visible:opacity-100 focus-visible:bg-primary/10", // Resalta en focus
+        "data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full",
+        // Estilos para el after (línea visual) - Se puede quitar si se prefiere sin línea extra
+        // "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0",
         // Estilos para el div del handle si withHandle es true
         "[&[data-panel-group-direction=vertical]>div]:rotate-90",
         className
@@ -4778,9 +5160,10 @@ function ResizableHandle({
       {...props}
     >
       {withHandle && (
-        // MODIFICADO: Quitamos el borde del handle visual
-        <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm bg-border">
-          <GripVerticalIcon className="h-2.5 w-2.5" />
+        // Más sutil: sin fondo explícito, solo el icono sobre el área resaltada en hover/focus
+        <div className="z-10 flex h-5 w-2.5 items-center justify-center rounded-sm">
+          {/* Icono más pequeño y con color muted */}
+          <GripVerticalIcon className="h-3 w-3 text-muted-foreground" />
         </div>
       )}
     </ResizablePrimitive.PanelResizeHandle>
@@ -5080,6 +5463,7 @@ export { Textarea }
 
 ## File: `components\ui\tooltip.tsx`
 ```tsx
+// File: components/ui/tooltip.tsx (MODIFICADO - Iteración 3)
 "use client"
 
 import * as React from "react"
@@ -5104,9 +5488,10 @@ function Tooltip({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
   return (
-    <TooltipProvider>
+    // No necesitamos un Provider anidado aquí si ya se usa en ChatMessage
+    // <TooltipProvider>
       <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipProvider>
+    // </TooltipProvider>
   )
 }
 
@@ -5118,7 +5503,7 @@ function TooltipTrigger({
 
 function TooltipContent({
   className,
-  sideOffset = 0,
+  sideOffset = 4, // Aumentar ligeramente el offset
   children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
@@ -5128,20 +5513,25 @@ function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "bg-primary text-primary-foreground animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
+          // Cambiado a popover para consistencia con otros menús flotantes
+          "bg-popover text-popover-foreground border shadow-md", // Añadido borde y sombra
+          "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-2 text-xs", // Ajustado padding y tamaño de texto
+          "text-balance", // Mejorar balance de texto si es largo
           className
         )}
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="bg-primary fill-primary z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+        {/* La flecha puede quitarse para un look más limpio o estilizarse diferente */}
+        {/* <TooltipPrimitive.Arrow className="fill-popover border-t border-l border-popover z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" /> */}
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )
 }
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
-
 ```
 
 ## File: `components.json`
@@ -6243,46 +6633,166 @@ Simplemente hazme una pregunta sobre el contenido que esperas encontrar.`;
 
 ```
 
-## File: `ui-refactroring-plan.md`
+## File: `plan-refactorizacion.md`
 ```md
-# Plan de Refactorización de UI - Atenex Frontend
+## Plan de Refactorización de UI/UX para Atenex Frontend
 
-## Objetivo General
-Modernizar la interfaz de usuario (UI) de Atenex para que sea más profesional, limpia, intuitiva y visualmente atractiva, eliminando elementos que rompen la cohesión visual y mejorando la presentación de la información en todas las secciones principales (Chat, Knowledge, Settings).
+Este plan detalla los pasos para modernizar la interfaz de usuario y mejorar la experiencia de usuario de la aplicación Atenex Frontend. El objetivo es lograr un diseño más limpio, profesional y eficiente, adecuado para un SaaS B2B, sin alterar la funcionalidad principal.
 
-## Problemas Específicos Detectados (Basado en Screenshots y Análisis Previo)
-1.  **Líneas Divisorias Fuertes:** Fragmentan la vista. (Mejorado)
-2.  **Layout de Knowledge Page:** División en dos columnas ineficiente. (Corregido)
-3.  **Falta de Jerarquía Visual / Contenedores:** Contenido directo sin `Card`. (Mejorado en Knowledge)
-4.  **Consistencia y Pulido:** Refinar espaciados, bordes, fondos. (En progreso)
-5.  **Indicador de Navegación Activa:** Resaltado en Sidebar podría mejorar. (Mejorado)
+**Principios Generales a Aplicar:**
 
-## Propuesta de Refactorización UI (Checklist)
+*   **Consistencia:** Asegurar que los estilos (colores, tipografía, espaciado, bordes, sombras) sean coherentes en toda la aplicación.
+*   **Claridad Visual:** Mejorar la jerarquía de la información, usar el espacio en blanco de manera efectiva y reducir el desorden visual.
+*   **Profesionalismo:** Utilizar una paleta de colores refinada (ajustar los temas existentes si es necesario), tipografía legible y animaciones sutiles y significativas.
+*   **Eficiencia:** Optimizar los flujos de usuario dentro de lo posible a través del diseño (mejor navegación, feedback claro).
+*   **Adaptabilidad:** Asegurar que los nuevos diseños sean responsivos y funcionen bien en diferentes tamaños de pantalla.
 
-**Iteración 1: Layout Knowledge Page y Estilo Tabla**
-- [x] 1.1. **Reestructurar `app/(app)/knowledge/page.tsx`:** Layout de una columna con Cards.
-- [x] 1.2. **Refinar `components/knowledge/document-status-list.tsx`:** Filas alternadas, sin borde exterior, padding ajustado, leyenda.
+**Checklist de Refactorización:**
 
-**Iteración 2: Chat View y Paneles Laterales**
-- [x] 2.1. **Suavizar `ResizableHandle`:** Reducida opacidad, visible en hover, sin borde en el grip.
-- [x] 2.2. **Pulir `RetrievedDocumentsPanel`:** Asegurado uso de Card, padding interno ajustado.
-- [x] 2.3. **Ajustar `ChatMessage`:** Revisados fondos (muted para asistente), bordes y sombras.
+### Iteración 1: Estructura Principal y Layout del Dashboard
 
-**Iteración 3: Sidebar y Header**
-- [x] 3.1. **Mejorar Indicador Activo en `Sidebar`:** Añadido borde izquierdo y ajustado estilo `secondary` por `default` para ítem activo.
-- [x] 3.2. **Refinar `Header`:** Asegurado espaciado consistente (`space-x-2`) entre iconos derechos.
+*   **Objetivo:** Replantear la disposición general del layout autenticado para optimizar el espacio y mejorar la navegación, especialmente abordando la sección apretada del historial de chats.
+*   **Pasos:**
+    1.  **[X] Revisar y Refactorizar `app/(app)/layout.tsx`:**
+        *   [X] Considerar una estructura de 3 columnas para el `ResizablePanelGroup` si se decide separar el historial de chats: `Sidebar Navegación | Panel Historial Chats | Panel Contenido Principal`. (Se mantuvo 2 columnas por ahora)
+        *   [X] *Alternativa:* Mantener 2 columnas pero mejorar significativamente cómo se integra `ChatHistory` dentro de la `Sidebar`. (Realizado)
+        *   [X] Ajustar `defaultSize`, `minSize`, `maxSize` de los `ResizablePanel` para un estado inicial más equilibrado. (Realizado)
+        *   [X] Mejorar visualmente el `ResizableHandle` para que sea más sutil pero claro (modificar `components/ui/resizable.tsx` si es necesario, o aplicar clases CSS directamente). (Realizado)
+        *   **Archivos:** `app/(app)/layout.tsx`, `components/ui/resizable.tsx`.
+    2.  **[X] Rediseñar `components/layout/sidebar.tsx`:**
+        *   **Navegación Principal:**
+            *   [X] Mejorar el estilo de los ítems de navegación (padding, iconos, tipografía). (Realizado)
+            *   [X] Refinar el indicador visual del ítem activo (quizás un borde izquierdo más prominente o un fondo más distintivo pero sutil). (Realizado)
+            *   [X] Ajustar el espaciado general dentro de la barra lateral. (Realizado)
+            *   [X] Mejorar la apariencia en estado colapsado (`isCollapsed={true}`), asegurando que los iconos estén bien centrados y el tooltip sea claro. (Realizado)
+        *   **Botón "Nuevo Chat":**
+            *   [X] Revisar su prominencia y estilo. Quizás integrarlo de forma más elegante o darle un estilo más acorde al look empresarial. (Realizado)
+            *   [X] Asegurar que funcione bien tanto en estado expandido como colapsado. (Realizado)
+        *   **Integración del Historial (si no se separa en 3 columnas):** Preparar el espacio donde se integrará el `ChatHistory` rediseñado (ver Iteración 2). (Realizado)
+        *   **Archivos:** `components/layout/sidebar.tsx`, `app/globals.css` (para posibles variables de color/estilo del sidebar).
+    3.  **[X] Refinar `components/layout/header.tsx`:**
+        *   [X] Ajustar el espaciado y alineación de los iconos de la derecha (Palette, Help, User Menu) para que se sientan más cohesionados. (Realizado)
+        *   [X] Revisar el estilo del `DropdownMenu` del usuario para coherencia con el nuevo diseño. (Realizado)
+        *   **Archivos:** `components/layout/header.tsx`.
 
-**Iteración 4: Layout Settings Page**
-- [ ] 4.1. **Aplicar `Card` a Secciones:**
-    - [ ] Envolver las secciones "Perfil" y "Configuración de la Empresa" en `Card` con `CardHeader` y `CardContent`.
-    - [ ] Asegurar espaciado vertical consistente entre las `Card`.
+### Iteración 2: Rediseño del Historial de Chats
 
-**Iteración 5: Revisión Global y Consistencia**
-- [ ] 5.1. **Revisar Bordes:** Eliminar bordes redundantes o inconsistentes.
-- [ ] 5.2. **Revisar Padding/Márgenes:** Asegurar uso consistente.
-- [ ] 5.3. **Validación Responsiva:** Verificar cambios en diferentes tamaños.
-- [ ] 5.4. **Validación Temas:** Probar exhaustivamente en temas claro, oscuro, blue, green.
+*   **Objetivo:** Solucionar el problema del historial de chats apretado y darle una apariencia más profesional y útil.
+*   **Pasos:**
+    1.  **[X] Rediseñar `components/chat/chat-history.tsx`:**
+        *   **Diseño de Items:**
+            *   [X] Aumentar el espaciado vertical y padding interno de cada item de chat. (Realizado)
+            *   [X] Mejorar la jerarquía visual: Título del chat más prominente, fecha/hora más sutil. (Realizado)
+            *   [X] Considerar añadir un pequeño fragmento del último mensaje (si la API lo proveyera o si se pudiera inferir, aunque esto roza la lógica). *Alternativa:* Mejorar solo el diseño visual. (Mejorado diseño visual)
+            *   [X] Refinar el estado `:hover` y `:active` / `:focus`. (Realizado)
+            *   [X] Mejorar la interacción y visibilidad del botón de eliminar (quizás hacerlo visible solo al pasar el ratón). (Realizado)
+        *   **Contenedor:**
+            *   [X] Si se integra en el sidebar (layout de 2 columnas), asegurar que use el espacio vertical de forma eficiente con `ScrollArea`. (Realizado)
+            *   [X] Si se convierte en un panel propio (layout de 3 columnas), darle un header claro y asegurar que sea redimensionable. (N/A - Se mantuvo en Sidebar)
+        *   **Estados (Carga, Error, Vacío):**
+            *   [X] Mejorar la presentación visual de estos estados para que sean más claros y estéticamente agradables. (Realizado)
+            *   [X] Usar `Skeleton` de forma más representativa. (Realizado)
+        *   **Archivos:** `components/chat/chat-history.tsx`, `components/ui/skeleton.tsx` (si se necesita customización), `app/globals.css`.
 
----
-_Este plan se enfoca exclusivamente en la UI. La lógica de datos y las llamadas API permanecen sin cambios._
+### Iteración 3: Refactorización de la Interfaz de Chat Principal
+
+*   **Objetivo:** Modernizar el área de conversación, mejorar la legibilidad y la presentación de la información (mensajes y fuentes).
+*   **Pasos:**
+    1.  **[X] Refinar `app/(app)/chat/[[...chatId]]/page.tsx`:**
+        *   **Layout Interno:**
+            *   [X] Ajustar el padding y espaciado dentro del `ScrollArea` del chat para evitar que los mensajes se peguen a los bordes. (Realizado)
+            *   [X] Mejorar el estado inicial o vacío del chat (cuando no hay mensajes o solo el de bienvenida). (Realizado, muestra bienvenida)
+            *   [X] Optimizar el uso del espacio vertical. (Realizado con ScrollArea)
+            *   [X] Revisar la posición y estilo del botón para mostrar/ocultar el panel de fuentes (`PanelRightOpen`/`PanelRightClose`). Hacerlo más intuitivo. (Realizado)
+        *   **Indicador de Carga:**
+            *   [X] Mejorar el indicador "Atenex está pensando..." (`BrainCircuit`). Hacerlo más integrado visualmente o usar un `Skeleton` más elaborado para el mensaje entrante. (Realizado, se usa Skeleton)
+        *   **Archivos:** `app/(app)/chat/[[...chatId]]/page.tsx`.
+    2.  **[X] Rediseñar `components/chat/chat-message.tsx`:**
+        *   **Estilo de Burbujas:**
+            *   [X] Refinar el padding, `border-radius`, y sombras para un look más pulido. (Realizado)
+            *   [X] Asegurar un buen contraste entre el fondo de la burbuja y el texto, en todos los temas. (Realizado)
+            *   [X] Mejorar la separación visual entre mensajes consecutivos. (Realizado a través de `space-y` en page.tsx)
+        *   **Contenido:**
+            *   [X] Asegurar que el `Markdown` se renderice correctamente y con estilos consistentes (listas, código, negritas, etc.). Ajustar estilos `prose` en `tailwind.config.js` si es necesario. (Realizado)
+            *   [X] Mejorar la presentación de las `fuentes` dentro del mensaje del asistente. Quizás usar badges más refinados o una lista más estructurada. Hacer el tooltip más informativo y estilizado (`components/ui/tooltip.tsx`). (Realizado, se usan Badges y Tooltip mejorado)
+        *   **Avatares:** Asegurar que los avatares (Usuario y Asistente) estén bien alineados y tengan un estilo consistente. (Realizado)
+        *   **Mensajes de Error:** Asegurar que los mensajes de error sean claramente distinguibles pero sin ser visualmente discordantes. (Realizado)
+        *   **Archivos:** `components/chat/chat-message.tsx`, `tailwind.config.js` (para `prose`), `components/ui/tooltip.tsx`, `app/globals.css`.
+    3.  **[X] Rediseñar `components/chat/retrieved-documents-panel.tsx`:**
+        *   **Diseño de Tarjetas:**
+            *   [X] Mejorar el diseño de cada tarjeta de documento fuente. Mostrar información clave (nombre archivo, score, preview) de forma más clara y organizada. (Realizado)
+            *   [X] Añadir mejores indicadores visuales para interactividad (hover states). (Realizado)
+            *   [X] Refinar el uso de `Badge` para el score. (Realizado)
+        *   **Panel General:**
+            *   [X] Asegurar buen padding y espaciado dentro del panel. (Realizado)
+            *   [X] Mejorar el estado de carga (`Skeleton`) y el estado vacío ("No se encontraron documentos..."). (Realizado)
+        *   **Modal/Dialog de Detalles:** Revisar y pulir el estilo del `Dialog` que muestra los detalles del documento. (Realizado)
+        *   **Archivos:** `components/chat/retrieved-documents-panel.tsx`, `components/ui/card.tsx`, `components/ui/badge.tsx`, `components/ui/dialog.tsx`, `components/ui/skeleton.tsx`.
+    4.  **[X] Refinar `components/chat/chat-input.tsx`:**
+        *   [X] Ajustar el estilo del `Textarea` y el `Button` para que coincidan con el nuevo diseño (bordes, sombras, colores). (Realizado)
+        *   [X] Mejorar el feedback visual cuando está `isLoading`. (Realizado)
+        *   **Archivos:** `components/chat/chat-input.tsx`, `components/ui/textarea.tsx`, `components/ui/button.tsx`.
+
+### Iteración 4: Mejora de Páginas de Gestión (Knowledge Base, Settings)
+
+*   **Objetivo:** Aplicar el nuevo estilo empresarial a las páginas de gestión, mejorando la presentación de formularios y tablas.
+*   **Pasos:**
+    1.  **[X] Refactorizar `app/(app)/knowledge/page.tsx`:**
+        *   **Layout y Cards:**
+            *   [X] Organizar mejor el contenido usando `Card`s con cabeceras (`CardHeader`) y contenido (`CardContent`) bien definidos. (Realizado)
+            *   [X] Mejorar el espaciado general de la página. (Realizado)
+        *   **File Uploader (`components/knowledge/file-uploader.tsx`):**
+            *   [X] Mejorar el diseño visual del área de dropzone (hacerlo menos 'dashed' si no encaja, usar iconos y texto más claros). (Realizado)
+            *   [X] Mejorar el feedback visual durante la carga y al mostrar errores. (Realizado)
+            *   [X] Pulir el estilo del archivo seleccionado y el botón de subida. (Realizado)
+        *   **Lista de Documentos (`components/knowledge/document-status-list.tsx`):**
+            *   [X] Refinar el estilo de la `Table` (bordes, hover states, padding de celdas). (Realizado)
+            *   [X] Mejorar la apariencia de los `Badge` de estado (colores, iconos) para máxima claridad y consistencia con el tema. (Realizado)
+            *   [X] Asegurar que las acciones (Retry, Refresh, Delete) sean claras, accesibles y con tooltips informativos. Usar iconos consistentes. (Realizado)
+            *   [X] Mejorar el estilo del `AlertDialog` de confirmación de borrado. (Realizado)
+            *   [X] Mejorar estado vacío. (Realizado)
+        *   **Archivos:** `app/(app)/knowledge/page.tsx`, `components/knowledge/file-uploader.tsx`, `components/knowledge/document-status-list.tsx`, `components/ui/card.tsx`, `components/ui/table.tsx`, `components/ui/badge.tsx`, `components/ui/button.tsx`, `components/ui/tooltip.tsx`, `components/ui/alert-dialog.tsx`.
+    2.  **[X] Refactorizar `app/(app)/settings/page.tsx`:**
+        *   **Layout y Cards:**
+            *   [X] Utilizar `Card`s de forma efectiva para separar las secciones (Perfil, Empresa). (Realizado)
+        *   **Formularios:**
+            *   [X] Mejorar la disposición de los `Label` e `Input`. (Realizado con grid)
+            *   [X] Asegurar que los estados `disabled` y los mensajes informativos (como "El correo no se puede cambiar") sean claros y estén bien estilizados. (Realizado)
+            *   [X] Pulir el estilo del botón "Guardar Cambios" y su estado de carga/deshabilitado. (Realizado con feedback visual)
+        *   **Archivos:** `app/(app)/settings/page.tsx`, `components/ui/card.tsx`, `components/ui/label.tsx`, `components/ui/input.tsx`, `components/ui/button.tsx`.
+
+### Iteración 5: Pulido de Páginas Públicas y Autenticación
+
+*   **Objetivo:** Asegurar que las páginas públicas y el flujo de autenticación sean coherentes con el nuevo estilo visual.
+*   **Pasos:**
+    1.  **[ ] Refinar `app/page.tsx` (Landing Page):**
+        *   [ ] Evaluar si el diseño actual encaja o necesita una modernización (quizás una imagen/ilustración más corporativa, testimonios, etc., aunque esto puede exceder el "solo UI").
+        *   [ ] Pulir el `Header` y `Footer` específicos de esta página si los tiene (parece usar uno global ahora).
+        *   [ ] Refinar el estilo de las `FeatureCard`s (iconos, texto, fondo, borde, hover).
+        *   [ ] Asegurar consistencia en botones y tipografía.
+        *   **Archivos:** `app/page.tsx`.
+    2.  **[ ] Refinar `app/about/page.tsx`, `app/contact/page.tsx`, `app/help/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx`:**
+        *   [ ] Aplicar estilos consistentes de `Card`, tipografía (`prose` si aplica), títulos y espaciado.
+        *   [ ] Asegurar que los elementos interactivos (links, botones) sigan el nuevo diseño.
+        *   [ ] Mejorar la presentación visual en `About` (equipo, misión) y `Contact` (formulario, información de contacto).
+        *   **Archivos:** `app/about/page.tsx`, `app/contact/page.tsx`, `app/help/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx`.
+    3.  **[ ] Refinar `app/(auth)/layout.tsx` y `app/(auth)/login/page.tsx`:**
+        *   [ ] Asegurar que el layout de autenticación sea limpio y profesional.
+        *   [ ] Pulir el estilo de la `Card` de login y el `LoginForm`.
+        *   [ ] Verificar consistencia de botones, inputs y mensajes de error con el resto de la aplicación.
+        *   **Archivos:** `app/(auth)/layout.tsx`, `app/(auth)/login/page.tsx`, `components/auth/login-form.tsx`.
+
+### Iteración 6: Revisión General y Temas
+
+*   **Objetivo:** Realizar una revisión final de consistencia, responsividad y pulir los detalles en todos los temas.
+*   **Pasos:**
+    1.  **[ ] Revisar la Consistencia General:** Navegar por toda la aplicación verificando que los estilos de componentes comunes (botones, inputs, cards, badges, tooltips, dialogs, etc.) sean coherentes.
+    2.  **[ ] Revisar Responsividad:** Probar la aplicación en diferentes tamaños de pantalla (móvil, tablet, escritorio) y ajustar estilos donde sea necesario para asegurar una buena experiencia en todos los dispositivos.
+    3.  **[ ] Revisar y Ajustar Temas (`globals.css`):**
+        *   [ ] Verificar que los temas existentes (light, dark, blue, green) se apliquen correctamente y de manera profesional en todos los componentes rediseñados.
+        *   [ ] Ajustar las variables de color (`--primary`, `--secondary`, `--muted`, etc.) si es necesario para lograr un look más "empresarial" (quizás colores menos saturados o una paleta más sobria para el tema por defecto/system).
+        *   [ ] Prestar especial atención a los contrastes para la accesibilidad.
+        *   **Archivos:** `app/globals.css`, `tailwind.config.js` (si se ajustan variables o plugins).
+    4.  **[ ] Micro-interacciones y Animaciones:** Añadir transiciones sutiles (`transition-colors`, `duration-150`, etc.) en hovers, focus, etc., para una sensación más pulida. Evitar animaciones excesivas. Usar `tailwindcss-animate` de forma consistente.
+    5.  **[ ] Limpieza Final:** Eliminar clases CSS no utilizadas o redundantes. Asegurar que el código siga las buenas prácticas de Tailwind/shadcn.
 ```

@@ -1,82 +1,89 @@
-// File: app/privacy/page.tsx
-"use client"; // Mark as client component to use hooks like useRouter
+// File: app/privacy/page.tsx (MODIFICADO - Iteración 5.2)
+"use client";
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Añadido CardDescription
 import { APP_NAME } from '@/lib/constants';
+import { ArrowLeft } from 'lucide-react'; // Icono volver
 
 export default function PrivacyPage() {
-    const router = useRouter(); // Initialize router
+    const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <Button variant="link" onClick={() => router.push('/')} className="mb-4">← Back to Home</Button>
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl md:text-3xl">Privacy Policy</CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none space-y-4">
-          <p>Last Updated: [Insert Date]</p>
+    <div className="min-h-screen bg-background text-foreground">
+        <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-6">
+            {/* Botón volver */}
+            <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver al Inicio
+            </Button>
+            {/* Card principal */}
+            <Card className="shadow-sm border">
+                <CardHeader>
+                <CardTitle className="text-2xl md:text-3xl font-bold">Política de Privacidad</CardTitle>
+                <CardDescription>Última Actualización: [Insertar Fecha]</CardDescription> {/* Fecha aquí */}
+                </CardHeader>
+                <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none pt-0"> {/* prose para estilos de texto */}
+                <p>
+                    {APP_NAME} ("nosotros", "nos", o "nuestro") opera la aplicación {APP_NAME} (el "Servicio"). Esta página le informa de nuestras políticas relativas a la recopilación, uso y divulgación de datos personales cuando utiliza nuestro Servicio y las opciones que tiene asociadas a esos datos.
+                </p>
 
-          <p>
-            {APP_NAME} ("us", "we", or "our") operates the {APP_NAME} application (the "Service"). This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service and the choices you have associated with that data.
-          </p>
+                <h2>1. Recopilación y Uso de Información</h2>
+                <p>
+                    Recopilamos diferentes tipos de información para diversos fines para proporcionar y mejorar nuestro Servicio para usted.
+                </p>
+                <ul>
+                    <li><strong>Datos Personales:</strong> Al utilizar nuestro Servicio, podemos pedirle que nos proporcione cierta información de identificación personal que puede utilizarse para contactarle o identificarle ("Datos Personales"). La información de identificación personal puede incluir, entre otros: Dirección de correo electrónico, Nombre, Información de la empresa (si aplica).</li>
+                    <li><strong>Datos de Uso:</strong> También podemos recopilar información sobre cómo se accede y utiliza el Servicio ("Datos de Uso"). Estos Datos de Uso pueden incluir información como la dirección de Protocolo de Internet de su ordenador (por ejemplo, dirección IP), tipo de navegador, versión del navegador, las páginas de nuestro Servicio que visita, la hora y fecha de su visita, el tiempo dedicado a esas páginas, identificadores únicos de dispositivos y otros datos de diagnóstico.</li>
+                    <li><strong>Contenido del Usuario:</strong> Procesamos los documentos y datos que usted carga ("Contenido del Usuario") únicamente con el fin de proporcionar las funciones del Servicio, como la indexación y la consulta. Tratamos su Contenido de Usuario como confidencial.</li>
+                </ul>
 
-          <h2>1. Information Collection and Use</h2>
-          <p>
-            We collect several different types of information for various purposes to provide and improve our Service to you.
-          </p>
-          <ul>
-            <li><strong>Personal Data:</strong> While using our Service, we may ask you to provide us with certain personally identifiable information that can be used to contact or identify you ("Personal Data"). Personally identifiable information may include, but is not limited to: Email address, Name, Company Information (if applicable).</li>
-            <li><strong>Usage Data:</strong> We may also collect information on how the Service is accessed and used ("Usage Data"). This Usage Data may include information such as your computer's Internet Protocol address (e.g., IP address), browser type, browser version, the pages of our Service that you visit, the time and date of your visit, the time spent on those pages, unique device identifiers and other diagnostic data.</li>
-            <li><strong>User Content:</strong> We process the documents and data you upload ("User Content") solely for the purpose of providing the Service features, such as indexing and querying. We treat your User Content as confidential.</li>
-          </ul>
+                <h2>2. Uso de Datos</h2>
+                <p>{APP_NAME} utiliza los datos recopilados para diversos fines:</p>
+                 <ul>
+                    <li>Para proporcionar y mantener el Servicio</li>
+                    <li>Para notificarle cambios en nuestro Servicio</li>
+                    <li>Para permitirle participar en funciones interactivas de nuestro Servicio cuando decida hacerlo</li>
+                    <li>Para proporcionar atención y soporte al cliente</li>
+                    <li>Para proporcionar análisis o información valiosa para que podamos mejorar el Servicio</li>
+                    <li>Para supervisar el uso del Servicio</li>
+                    <li>Para detectar, prevenir y abordar problemas técnicos</li>
+                 </ul>
 
-          <h2>2. Use of Data</h2>
-          <p>{APP_NAME} uses the collected data for various purposes:</p>
-          <ul>
-            <li>To provide and maintain the Service</li>
-            <li>To notify you about changes to our Service</li>
-            <li>To allow you to participate in interactive features of our Service when you choose to do so</li>
-            <li>To provide customer care and support</li>
-            <li>To provide analysis or valuable information so that we can improve the Service</li>
-            <li>To monitor the usage of the Service</li>
-            <li>To detect, prevent and address technical issues</li>
-          </ul>
+                <h2>3. Almacenamiento y Seguridad de los Datos</h2>
+                <p>
+                    El Contenido del Usuario se almacena de forma segura utilizando proveedores de almacenamiento en la nube estándar de la industria [Especificar si es posible, ej., AWS S3, Google Cloud Storage, MinIO]. Implementamos medidas de seguridad diseñadas para proteger su información contra el acceso, divulgación, alteración y destrucción no autorizados. Sin embargo, ninguna transmisión por Internet o almacenamiento electrónico es 100% seguro.
+                </p>
 
-          <h2>3. Data Storage and Security</h2>
-          <p>
-            User Content is stored securely using industry-standard cloud storage providers [Specify if possible, e.g., AWS S3, Google Cloud Storage, MinIO]. We implement security measures designed to protect your information from unauthorized access, disclosure, alteration, and destruction. However, no internet transmission or electronic storage is 100% secure.
-          </p>
+                 <h2>4. Proveedores de Servicios</h2>
+                 <p>
+                    Podemos emplear a empresas e individuos terceros para facilitar nuestro Servicio ("Proveedores de Servicios"), para proporcionar el Servicio en nuestro nombre, para realizar servicios relacionados con el Servicio o para ayudarnos a analizar cómo se utiliza nuestro Servicio. Estos terceros tienen acceso a sus Datos Personales sólo para realizar estas tareas en nuestro nombre y están obligados a no divulgarlos ni utilizarlos para ningún otro fin. Ejemplos incluyen: [Listar categorías, ej., Alojamiento en la nube (AWS/GCP/Azure), Proveedores LLM (OpenAI/Google), Autenticación (Supabase)].
+                 </p>
 
-          <h2>4. Service Providers</h2>
-          <p>
-            We may employ third-party companies and individuals to facilitate our Service ("Service Providers"), to provide the Service on our behalf, to perform Service-related services or to assist us in analyzing how our Service is used. These third parties have access to your Personal Data only to perform these tasks on our behalf and are obligated not to disclose or use it for any other purpose. Examples include: [List categories, e.g., Cloud hosting (AWS/GCP/Azure), LLM providers (OpenAI/Google), Authentication (Supabase)].
-          </p>
+                 <h2>5. Sus Derechos sobre los Datos</h2>
+                 <p>
+                    Dependiendo de su jurisdicción, puede tener ciertos derechos con respecto a sus Datos Personales, como el derecho a acceder, corregir, eliminar o restringir su procesamiento. Póngase en contacto con nosotros para ejercer estos derechos.
+                 </p>
 
-          <h2>5. Your Data Rights</h2>
-          <p>
-            Depending on your jurisdiction, you may have certain rights regarding your Personal Data, such as the right to access, correct, delete, or restrict its processing. Please contact us to exercise these rights.
-          </p>
+                 <h2>6. Privacidad de los Niños</h2>
+                 <p>
+                    Nuestro Servicio no se dirige a menores de 18 años ("Niños"). No recopilamos conscientemente información de identificación personal de menores de 18 años.
+                 </p>
 
-          <h2>6. Children's Privacy</h2>
-          <p>
-            Our Service does not address anyone under the age of 18 ("Children"). We do not knowingly collect personally identifiable information from anyone under the age of 18.
-          </p>
+                 <h2>7. Cambios a esta Política de Privacidad</h2>
+                 <p>
+                    Podemos actualizar nuestra Política de Privacidad de vez en cuando. Le notificaremos cualquier cambio publicando la nueva Política de Privacidad en esta página. Se le aconseja revisar esta Política de Privacidad periódicamente para cualquier cambio.
+                 </p>
 
-          <h2>7. Changes to This Privacy Policy</h2>
-          <p>
-            We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.
-          </p>
-
-          <h2>8. Contact Us</h2>
-          <p>
-            If you have any questions about this Privacy Policy, please contact us: [Your Contact Email/Link]
-          </p>
-        </CardContent>
-      </Card>
+                 <h2>8. Contáctenos</h2>
+                 <p>
+                    Si tiene alguna pregunta sobre esta Política de Privacidad, por favor contáctenos: [Su Correo/Enlace de Contacto]
+                 </p>
+                </CardContent>
+            </Card>
+        </div>
     </div>
   );
 }

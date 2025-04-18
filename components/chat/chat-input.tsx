@@ -1,10 +1,11 @@
-// File: components/chat/chat-input.tsx
+// File: components/chat/chat-input.tsx (MODIFICADO - Iteración 3.4)
 "use client";
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { SendHorizonal, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -17,22 +18,23 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(event.target.value);
-    // Auto-resize textarea (optional)
-    if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'; // Reset height
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
   };
+
+  // Auto-resize logic in useEffect to handle external value changes too (e.g., clearing)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'; // Reset height first
+      // Set height based on scroll height, but enforce max-height via CSS
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`; // 160px = 10rem (max-h-40)
+    }
+  }, [inputValue]); // Re-run when input value changes
 
   const handleSubmit = (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
-    if (inputValue.trim() && !isLoading) {
-      onSendMessage(inputValue);
-      setInputValue('');
-      // Reset textarea height after sending
-      if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-      }
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue && !isLoading) {
+      onSendMessage(trimmedValue);
+      setInputValue(''); // Clear input after sending
     }
   };
 
@@ -44,33 +46,41 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end space-x-2">
+    <form onSubmit={handleSubmit} className="relative flex items-end space-x-2">
       <Textarea
         ref={textareaRef}
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        // MODIFICADO: Placeholder traducido
         placeholder="Pregúntale a Atenex..."
-        className="flex-1 resize-none max-h-40 min-h-[40px] overflow-y-auto rounded-lg border p-2 pr-12 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-primary" // Added padding right for button
-        rows={1}
+        className={cn(
+            "flex-1 resize-none min-h-[40px] max-h-40", // min/max height
+            "py-2 pr-12 pl-3", // Ajuste de padding (más a la derecha para botón)
+            "rounded-lg border border-input", // Estilo de borde
+            "text-sm shadow-sm placeholder:text-muted-foreground",
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-ring", // Estilo focus
+            "disabled:cursor-not-allowed disabled:opacity-50" // Estilo disabled
+        )}
+        rows={1} // Empezar con una sola fila
         disabled={isLoading}
-        // MODIFICADO: aria-label traducido
         aria-label="Entrada de chat"
       />
+      {/* Botón posicionado absolutamente dentro del form */}
       <Button
         type="submit"
         size="icon"
-        className="h-10 w-10 flex-shrink-0" // Ensure button size is consistent
+        className={cn(
+            "absolute right-2 bottom-2 h-8 w-8 flex-shrink-0 rounded-lg", // Posición y tamaño
+            "transition-colors duration-150"
+        )}
         disabled={isLoading || !inputValue.trim()}
+        aria-label="Enviar mensaje"
       >
         {isLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <SendHorizonal className="h-5 w-5" />
+          <SendHorizonal className="h-4 w-4" />
         )}
-        {/* MODIFICADO: sr-only traducido */}
-        <span className="sr-only">Enviar mensaje</span>
       </Button>
     </form>
   );

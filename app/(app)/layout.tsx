@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
+  // Iniciar colapsado por defecto en pantallas más pequeñas podría ser una opción futura,
+  // pero por ahora empezamos expandido.
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
 
@@ -106,22 +108,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
       <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
           <ResizablePanel
-              collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={20}
+              collapsible
+              collapsedSize={4} // Tamaño colapsado (en porcentaje o píxeles si se especifica unit)
+              minSize={15} // Permitir que sea más delgado
+              maxSize={25} // Límite superior
+              defaultSize={18} // Un poco más ancho por defecto
               onCollapse={() => setIsSidebarCollapsed(true)}
               onExpand={() => setIsSidebarCollapsed(false)}
               className={cn(
                   "transition-all duration-300 ease-in-out bg-background dark:bg-card",
-                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[200px]"
+                  // Definimos el tamaño colapsado con clases específicas si collapsedSize no funciona como esperado
+                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[220px]" // Ancho mínimo expandido
               )}
               order={1}
           >
+              {/* Pasamos el estado colapsado al Sidebar */}
               <Sidebar isCollapsed={isSidebarCollapsed} />
           </ResizablePanel>
-          <ResizableHandle withHandle className="bg-border" />
-          <ResizablePanel defaultSize={80} minSize={30} order={2}>
+          {/* Usamos el handle personalizado de ui/resizable */}
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={82} minSize={30} order={2}> {/* Ajustar tamaño restante */}
               <div className="flex h-full flex-col">
                   <Header />
-                  <main className="flex-1 overflow-y-auto bg-background p-4 md:p-6 lg:p-8">
+                  {/* Cambiado el padding para ser consistente */}
+                  <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
                       {children}
                   </main>
               </div>

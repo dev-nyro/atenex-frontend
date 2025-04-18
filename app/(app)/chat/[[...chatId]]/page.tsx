@@ -1,4 +1,4 @@
-// File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO)
+// File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO - Iteración 3.1)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -105,6 +105,7 @@ export default function ChatPage() {
                         return validTimeA - validTimeB;
                     });
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
+                    // Mostrar mensaje de bienvenida solo si el chat está vacío después de cargar
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
                 })
                 .catch(error => {
@@ -116,11 +117,12 @@ export default function ChatPage() {
                         else { toast.error("Fallo al cargar historial", { description: message }); }
                     } else { toast.error("Fallo al cargar historial", { description: "Ocurrió un error inesperado." }); }
                     setHistoryError(message);
-                    setMessages([welcomeMessage]);
+                    setMessages([welcomeMessage]); // Mostrar bienvenida en caso de error
                     fetchedChatIdRef.current = undefined;
                 })
                 .finally(() => setIsLoadingHistory(false));
         } else {
+            // Página de nuevo chat, mostrar bienvenida
             setMessages([welcomeMessage]);
             setRetrievedDocs([]);
             setIsLoadingHistory(false);
@@ -153,8 +155,9 @@ export default function ChatPage() {
             content: text,
             created_at: new Date().toISOString()
         };
-        // Asegurarse de quitar el mensaje de bienvenida si existe
-        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+        // Asegurarse de quitar el mensaje de bienvenida si existe y no es el único mensaje
+        setMessages(prev => prev.length === 1 && prev[0].id === 'initial-welcome' ? [userMessage] : [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+
 
         // --- NUEVO: Manejo local de saludos y consultas meta ---
         if (isGreeting(text)) {
@@ -227,7 +230,7 @@ export default function ChatPage() {
             }
 
             if (mappedSources && mappedSources.length > 0) {
-                setIsSourcesPanelVisible(true);
+                setIsSourcesPanelVisible(true); // Abrir panel si hay fuentes
             }
              console.log(`ChatPage: Query successful. Answer received for chat ${returnedChatId}.`);
 
@@ -246,13 +249,14 @@ export default function ChatPage() {
         } finally {
             setIsSending(false);
         }
-    }, [chatId, isSending, user, router, signOut]); // isSourcesPanelVisible no es dependencia directa
+    }, [chatId, isSending, user, router, signOut]);
 
     const handlePanelToggle = () => { setIsSourcesPanelVisible(!isSourcesPanelVisible); };
 
     const handleNewChat = () => {
         if (pathname !== '/chat') { router.push('/chat'); }
         else {
+             // Resetear estado local para un nuevo chat
              setMessages([welcomeMessage]);
              setRetrievedDocs([]);
              setChatId(undefined);
@@ -262,21 +266,59 @@ export default function ChatPage() {
         }
     };
 
+    // Renderizado del contenido del chat
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory) {
-            return ( <div className="space-y-4 p-4"><Skeleton className="h-16 w-3/4 rounded-lg" /><Skeleton className="h-16 w-1/2 ml-auto rounded-lg" /><Skeleton className="h-16 w-3/4 rounded-lg" /></div> );
+            return (
+                // Skeleton mejorado
+                <div className="space-y-6 p-4">
+                    <div className="flex items-start space-x-3 pr-10">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3 justify-end pl-10">
+                         <div className="flex-1 space-y-2 items-end flex flex-col">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                    </div>
+                     <div className="flex items-start space-x-3 pr-10">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                        </div>
+                    </div>
+                </div>
+            );
         }
         if (historyError) {
-            return ( <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center"><AlertCircle className="h-10 w-10 mb-3" /><p className="text-lg font-semibold mb-1">Error al Cargar el Chat</p><p className="text-sm mb-4">{historyError}</p><Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" />Reintentar Carga</Button></div> );
+            // Mensaje de error mejorado
+            return (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                    <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                    <p className="text-xl font-semibold text-foreground mb-2">Error al Cargar el Chat</p>
+                    <p className="text-sm text-muted-foreground mb-5 max-w-sm">{historyError}</p>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Reintentar Carga
+                    </Button>
+                </div>
+            );
         }
+        // Mostrar mensajes o estado vacío si no hay error ni carga
         return (
-            <div className="space-y-6 pb-4"> {/* Aumentado espaciado */}
+            <div className="space-y-6 pb-6"> {/* Espaciado y padding inferior */}
                 {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
+                {/* Indicador de carga "pensando" */}
                 {isSending && (
-                    <div className="flex items-center justify-center pt-4">
-                        <div className="flex items-center space-x-1.5 text-xs text-muted-foreground">
-                            <BrainCircuit className="h-4 w-4 animate-pulse" /><span>Atenex está pensando...</span>
-                         </div>
+                    <div className="flex items-start space-x-3 pr-10 pt-4">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-primary/10" />
+                        <div className="flex-1 space-y-2 pt-1.5">
+                            <Skeleton className="h-3.5 w-16 rounded" />
+                        </div>
                     </div>
                 )}
             </div>
@@ -284,28 +326,39 @@ export default function ChatPage() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-muted/20 dark:bg-background">
+        // Fondo ligeramente diferente para el área de chat
+        <div className="flex flex-col h-full bg-background">
              <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 70 : 100} minSize={30}>
+                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
                      <div className="flex h-full flex-col relative">
-                         {/* Botón toggle siempre visible */}
+                         {/* Botón toggle más discreto */}
                          <div className="absolute top-3 right-3 z-20">
-                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full" aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
+                             <Button
+                                onClick={handlePanelToggle}
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
+                                data-state={isSourcesPanelVisible ? "open" : "closed"} // Para posible estilo futuro
+                                aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}
+                             >
                                  {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                          </div>
-                         <ScrollArea className="flex-1 px-4 pt-6 pb-6" ref={scrollAreaRef}> {/* Padding ajustado */}
+                         {/* Ajuste de padding en ScrollArea */}
+                         <ScrollArea className="flex-1 px-6 pt-6 pb-2" ref={scrollAreaRef}>
                              {renderChatContent()}
                          </ScrollArea>
-                         <div className="border-t p-4 bg-background shadow-inner shrink-0">
+                         {/* Borde superior más sutil y padding ajustado */}
+                         <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
                          </div>
                      </div>
                  </ResizablePanel>
                  {isSourcesPanelVisible && (
                      <>
-                         <ResizableHandle withHandle className="bg-border" />
-                         <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
+                         <ResizableHandle withHandle />
+                         {/* Ajuste de tamaño del panel de fuentes */}
+                         <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
                              <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
                          </ResizablePanel>
                      </>

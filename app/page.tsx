@@ -1,20 +1,21 @@
-// File: app/page.tsx
-// Purpose: Public home page, shows login/register or go to app based on auth state.
+// File: app/page.tsx (MODIFICADO - Iteración 5.1)
 "use client";
 
 import React from 'react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button'; // No necesitamos buttonVariants aquí
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap } from 'lucide-react';
+import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap, BookOpen } from 'lucide-react'; // Añadido BookOpen
 import Link from 'next/link';
 
+// Mapeo de iconos actualizado
 const iconMap: { [key: string]: React.ElementType } = {
   Search: Search,
-  Library: Library,
+  Library: Library, // Usaremos Library para Conocimiento Centralizado
   Zap: Zap,
+  BookOpen: BookOpen // Icono alternativo
 };
 
 export default function HomePage() {
@@ -23,42 +24,43 @@ export default function HomePage() {
   const isAuthenticated = !isAuthLoading && !!user;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-background via-background to-secondary/30 dark:to-muted/30">
-      <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b border-border/50">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
+      {/* Header de la Landing Page */}
+      <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2 text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring rounded-sm"
+          {/* Logo/Nombre App */}
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            aria-label={`${APP_NAME} - Inicio`}
           >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                 <path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.5a.75.75 0 0 0 .5.707A9.716 9.716 0 0 0 6 21a9.707 9.707 0 0 0 5.25-1.533.75.75 0 0 0 .5-.68V5.213a.75.75 0 0 0-.5-.68ZM12.75 4.533A9.707 9.707 0 0 1 18 3a9.735 9.735 0 0 1 3.25.555.75.75 0 0 1 .5.707v14.5a.75.75 0 0 1-.5.707A9.716 9.716 0 0 1 18 21a9.707 9.707 0 0 1-5.25-1.533.75.75 0 0 1-.5-.68V5.213a.75.75 0 0 1-.5-.68Z" />
-             </svg>
-            <span>{APP_NAME}</span>
-          </button>
+             <BookOpen className="w-6 h-6" /> {/* Icono más representativo */}
+            <span className='font-bold'>{APP_NAME}</span>
+          </Link>
 
-          {/* Botones de navegación traducidos */}
+          {/* Navegación y Autenticación */}
           <nav className="flex items-center space-x-1 sm:space-x-2">
+            {/* Links de Navegación */}
             <LinkButton href="/" Icon={HomeIcon} isActive={true}>Inicio</LinkButton>
             <LinkButton href="/about" Icon={Info}>Nosotros</LinkButton>
             <LinkButton href="/contact" Icon={Mail}>Contacto</LinkButton>
 
+            {/* Botón de Acción (Login/Ir a App) */}
             <div className="pl-2 sm:pl-4">
                 {isAuthLoading ? (
-                    <Button variant="secondary" disabled={true} size="sm" className="w-[90px]">
+                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> {/* Ghost para loading */}
                         <Loader2 className="h-4 w-4 animate-spin" />
                     </Button>
                 ) : isAuthenticated ? (
-                    // Botón traducido
-                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[90px]">
+                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> {/* Default para ir a app */}
                         Ir a la App
                     </Button>
                 ) : (
-                    // Botón traducido
                     <Button
                         variant="outline"
                         onClick={() => router.push('/login')}
                         size="sm"
-                        className="w-[90px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="w-[95px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                         Acceder
                     </Button>
@@ -68,17 +70,19 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-16 md:py-24 flex-1 flex flex-col items-center justify-center text-center">
-         <section>
-            {/* Textos de Hero Section traducidos */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-foreground mb-6 leading-tight">
-                Desbloquea el Conocimiento de tu Empresa con <span className="text-primary">{APP_NAME}</span>
+      {/* Contenido Principal (Hero + Features) */}
+      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center">
+         {/* Hero Section */}
+         <section className="max-w-4xl">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
+                Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-3xl mx-auto">
-                Haz preguntas en lenguaje natural y obtén respuestas instantáneas y precisas, extraídas directamente de los documentos y datos de tu organización.
+            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+                Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
             </p>
+            {/* Botón Principal */}
             {isAuthLoading ? (
-                 <Button size="lg" disabled={true} className="w-48">
+                 <Button size="lg" disabled={true} className="w-48 shadow-md">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando...
                  </Button>
             ) : (
@@ -86,79 +90,90 @@ export default function HomePage() {
                   size="lg"
                   onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')}
                   className={cn(
-                      "w-48 transition-all duration-150 ease-in-out transform hover:scale-105",
-                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none"
+                      "w-48 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]",
+                      "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg" // Sombra más pronunciada
                   )}
               >
-                  {/* Botones traducidos */}
-                  {isAuthenticated ? 'Ir al Chat' : 'Empezar Ahora'}
+                  {isAuthenticated ? 'Ir al Chat' : 'Comenzar Ahora'}
               </Button>
             )}
             {!isAuthenticated && !isAuthLoading && (
-                 // Texto traducido
-                 <p className="text-xs text-muted-foreground mt-3">
-                     ¿Ya tienes cuenta? <Link href="/login" className="text-primary hover:underline">Inicia Sesión</Link>
+                 <p className="text-xs text-muted-foreground mt-4">
+                     ¿Ya tienes cuenta? <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4">Inicia Sesión</Link>
                  </p>
             )}
          </section>
 
-         <section className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl w-full">
-             {/* Textos de Feature Cards traducidos */}
+         {/* Features Section */}
+         <section className="mt-24 md:mt-32 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl w-full">
              <FeatureCard
                  title="Búsqueda Inteligente"
-                 description="Encuentra la información exacta que necesitas al instante usando lenguaje natural. Olvídate de adivinar palabras clave."
+                 description="Encuentra información exacta al instante usando lenguaje natural. Olvídate de adivinar palabras clave."
                  icon="Search"
               />
              <FeatureCard
                  title="Conocimiento Centralizado"
-                 description="Rompe los silos de información. Accede al conocimiento colectivo de toda tu organización en un solo lugar seguro."
-                 icon="Library"
+                 description="Rompe los silos de información. Accede al conocimiento colectivo de tu organización en un solo lugar seguro."
+                 icon="Library" // Mantener Library
              />
              <FeatureCard
                  title="Productividad Mejorada"
-                 description="Empodera a tu equipo con acceso rápido a información relevante, permitiendo decisiones más rápidas y basadas en datos."
+                 description="Empodera a tu equipo con acceso rápido a datos relevantes, permitiendo decisiones más rápidas y fundamentadas."
                   icon="Zap"
              />
          </section>
       </main>
 
-      <footer className="bg-muted/10 border-t py-8 mt-16">
-        {/* Textos de Footer traducidos */}
-        <div className="container text-center text-muted-foreground text-sm">
-          © {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados. | <Link href="/privacy" className="hover:text-primary">Política de Privacidad</Link> | <Link href="/terms" className="hover:text-primary">Términos de Servicio</Link>
+      {/* Footer */}
+      <footer className="bg-muted/20 border-t border-border/60 py-6">
+        <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+          <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+          <div className="flex gap-3">
+             <Link href="/privacy" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Política de Privacidad</Link>
+             <span className='opacity-50'>|</span>
+             <Link href="/terms" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Términos de Servicio</Link>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-// Componente de botón de enlace traducido
-function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon: React.ElementType; isActive?: boolean }) {
+// Componente LinkButton (Revisado para consistencia)
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
         variant="ghost"
         onClick={() => router.push(href)}
         className={cn(
-            "text-sm px-2 sm:px-3 py-1 h-8",
-            "hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring rounded",
-            isActive ? "text-primary font-medium bg-accent/50" : "text-muted-foreground hover:text-foreground"
+            "text-sm px-2 sm:px-3 py-1 h-8", // Tamaño consistente
+            "rounded-md", // Borde redondeado consistente
+            "hover:bg-accent hover:text-accent-foreground", // Hover consistente
+            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", // Focus consistente
+            isActive ? "text-primary font-semibold bg-primary/10" : "text-muted-foreground" // Estilo activo/inactivo
         )}
      >
-       <Icon className="h-4 w-4 mr-1 hidden sm:inline-block" />
+       {Icon && <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />}
       {children}
     </Button>
   );
 }
 
-// Componente de tarjeta de característica (sin cambios internos, usa props traducidas)
+// Componente FeatureCard con estilo mejorado
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   const IconComponent = iconMap[icon] || Zap;
+   const IconComponent = iconMap[icon] || BookOpen; // Default a BookOpen
   return (
-    <div className="p-6 rounded-lg bg-card/50 hover:bg-card border border-border/50 hover:shadow-lg transition-all duration-200 text-left">
-       <IconComponent className="w-8 h-8 mb-3 text-primary" />
+    <div className={cn(
+        "p-6 rounded-xl bg-card/60 backdrop-blur-sm", // Fondo semi-transparente
+        "border border-border/60", // Borde sutil
+        "hover:bg-card/90 hover:shadow-lg hover:-translate-y-1", // Efectos hover
+        "transition-all duration-200 ease-in-out text-left"
+        )}
+    >
+       <IconComponent className="w-8 h-8 mb-4 text-primary" /> {/* Icono más grande y con más margen */}
       <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed">{description}</p> {/* Mejor interlineado */}
     </div>
   );
 }
