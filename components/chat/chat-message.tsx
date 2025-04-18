@@ -1,9 +1,9 @@
-// File: components/chat/chat-message.tsx
+// File: components/chat/chat-message.tsx (MODIFICADO)
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button'; // Importar Button
-import { User, BrainCircuit, AlertTriangle, FileText } from 'lucide-react'; // Importar FileText
+import { Button } from '@/components/ui/button';
+import { User, BrainCircuit, AlertTriangle, FileText } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { RetrievedDoc } from '@/lib/api';
@@ -32,7 +32,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isError = message.isError ?? false;
 
   return (
-    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end' : '')}>
+    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end pl-10' : 'pr-10')}> {/* Añadir padding opuesto */}
       {!isUser && (
         <Avatar className="h-8 w-8 border flex-shrink-0 bg-primary/10 text-primary">
            <AvatarFallback className="bg-transparent">
@@ -42,43 +42,41 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
       <div
         className={cn(
-          'max-w-[75%] rounded-xl p-3.5 text-sm shadow-sm', // MODIFICADO: Más redondeado y padding
+          'max-w-[80%] rounded-2xl p-3.5 text-sm shadow-md border', // Más redondeado, padding, sombra, borde
           isUser
-            ? 'bg-primary/90 text-primary-foreground' // MODIFICADO: Ligeramente más suave
+            ? 'bg-primary/90 text-primary-foreground border-primary/50' // Color y borde usuario
             : isError
-              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/20'
-              : 'bg-muted border border-border/50' // MODIFICADO: Añadido borde sutil
+              ? 'bg-destructive/10 text-destructive-foreground border-destructive/30' // Estilo error
+              : 'bg-background border-border' // Estilo asistente (fondo background para mejor contraste con muted)
         )}
       >
-         {/* El contenedor prose maneja bien el estilo del markdown */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
             </Markdown>
          </div>
 
-         {/* MODIFICADO: Sección de fuentes rediseñada */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
-            <div className="mt-3 pt-2.5 border-t border-border/50"> {/* Añadido margen superior */}
+            <div className="mt-3 pt-2.5 border-t border-border/50">
                 <p className="text-xs font-medium text-muted-foreground mb-1.5">Fuentes:</p>
-                <div className="flex flex-wrap gap-1.5"> {/* Usar flex-wrap para badges */}
+                <div className="flex flex-wrap gap-1.5">
                  {message.sources.map((doc, index) => (
                     <TooltipProvider key={doc.id || `source-${index}`} delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                {/* Usar un Button pequeño como fuente clickable */}
                                 <Button
-                                    variant="secondary"
-                                    size="sm" // Tamaño más pequeño
-                                    className="h-auto px-2 py-0.5 text-xs" // Ajustar padding y altura
+                                    variant="outline" // Cambiado a outline para mejor contraste
+                                    size="sm"
+                                    className="h-auto px-2 py-0.5 text-xs border-dashed" // Borde discontinuo
                                     onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
                                 >
-                                    <FileText className="h-3 w-3 mr-1" /> {/* Icono más pequeño */}
-                                    {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
+                                    <FileText className="h-3 w-3 mr-1 flex-shrink-0" />
+                                    <span className='truncate max-w-[150px]'> {/* Truncar texto largo */}
+                                     {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
+                                    </span>
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                {/* MODIFICADO: Contenido del tooltip traducido y más informativo */}
                                 <p><b>Archivo:</b> {doc.file_name || 'N/D'}</p>
                                 <p><b>ID Fragmento:</b> {doc.id}</p>
                                 {doc.document_id && <p><b>ID Doc:</b> {doc.document_id}</p>}
@@ -91,8 +89,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 </div>
             </div>
          )}
-         {/* FIN MODIFICACIÓN SECCIÓN FUENTES */}
-
       </div>
       {isUser && (
          <Avatar className="h-8 w-8 border flex-shrink-0 bg-secondary text-secondary-foreground">

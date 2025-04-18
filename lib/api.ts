@@ -1,10 +1,9 @@
-// File: lib/api.ts
+// File: lib/api.ts (MODIFICADO - Añadida deleteIngestDocument)
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
-import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
-import { AUTH_TOKEN_KEY } from './constants'; // Importar la clave para localStorage
+import type { Message } from '@/components/chat/chat-message';
+import { AUTH_TOKEN_KEY } from './constants';
 
-// --- ApiError Class (sin cambios) ---
 interface ApiErrorDataDetail {
     msg: string;
     type: string;
@@ -27,7 +26,6 @@ export class ApiError extends Error {
     }
 }
 
-// --- Core Request Function (sin cambios en lógica principal, solo logs y manejo de token desde localStorage) ---
 export async function request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -52,11 +50,9 @@ export async function request<T>(
         throw new ApiError(message, 500);
     }
 
-    // Obtener token desde localStorage
     let token: string | null = null;
-    if (typeof window !== 'undefined') { // Asegurarse que se ejecuta en el cliente
+    if (typeof window !== 'undefined') {
         token = localStorage.getItem(AUTH_TOKEN_KEY);
-        // console.log(`API Request to ${cleanEndpoint}: Token from localStorage ${token ? 'Present' : 'Absent'}`);
     } else {
         console.warn(`API Request: localStorage not available for ${cleanEndpoint} (SSR/Server Context?). Cannot get auth token.`);
     }
@@ -71,15 +67,12 @@ export async function request<T>(
              headers.set('Content-Type', 'application/json');
         }
     } else {
-        // Browsers usually set the correct Content-Type for FormData automatically, including the boundary.
-        // Explicitly setting it can sometimes cause issues. Let's remove it if body is FormData.
         headers.delete('Content-Type');
     }
 
-    // Añadir token al header si existe
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
-    } else if (!cleanEndpoint.includes('/api/v1/users/login')) { // No advertir para login
+    } else if (!cleanEndpoint.includes('/api/v1/users/login')) {
         console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
     }
 
@@ -93,7 +86,6 @@ export async function request<T>(
     try {
         const response = await fetch(apiUrl, config);
 
-        // --- Manejo de Errores ---
         if (!response.ok) {
             let errorData: ApiErrorData | null = null;
             let errorText = '';
@@ -104,22 +96,20 @@ export async function request<T>(
                 } else { errorText = await response.text(); }
             } catch (parseError) {
                  console.warn(`API Request: Could not parse error response body for ${response.status} ${response.statusText} from ${apiUrl}`, parseError);
-                 try { errorText = await response.text(); } catch {} // Try reading as text as fallback
+                 try { errorText = await response.text(); } catch {}
             }
 
             let errorMessage = `API Error (${response.status})`;
-            // Extraer mensaje significativo de la respuesta de error
             if (errorData) {
                 if (typeof errorData.detail === 'string') {
                     errorMessage = errorData.detail;
                 } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') {
-                    // Handle FastAPI validation errors
                     errorMessage = errorData.detail.map(d => `${d.loc ? d.loc.join('.')+': ' : ''}${d.msg}`).join('; ');
                 } else if (typeof errorData.message === 'string') {
                     errorMessage = errorData.message;
                 }
             } else if (errorText) {
-                errorMessage = errorText.substring(0, 200); // Limit length if it's HTML or long text
+                errorMessage = errorText.substring(0, 200);
             } else {
                 errorMessage = response.statusText || `Request failed with status ${response.status}`;
             }
@@ -128,27 +118,26 @@ export async function request<T>(
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
-        // --- Manejo de respuestas exitosas ---
+        // Manejo correcto de 204 No Content
         if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return null as T;
+            return null as T; // Devuelve null explícitamente para respuestas sin contenido
         }
 
         try {
             const data: T = await response.json();
             return data;
         } catch (jsonError) {
-             const responseText = await response.text().catch(() => "Could not read response text."); // Try reading text if JSON fails
+             const responseText = await response.text().catch(() => "Could not read response text.");
              console.error(`API Request: Invalid JSON response from ${apiUrl}. Status: ${response.status}. Response Text: ${responseText}`, jsonError);
              throw new ApiError(`Invalid JSON response received from server.`, response.status);
         }
 
     } catch (error) {
-        if (error instanceof ApiError) {
-             throw error; // Re-throw known API errors
-        } else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+        if (error instanceof ApiError) { throw error; }
+        else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
              const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
              console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
-             throw new ApiError(networkErrorMsg, 0); // Use 0 or a specific code for network errors
+             throw new ApiError(networkErrorMsg, 0);
         } else {
              console.error(`API Request: Unexpected error during fetch to ${apiUrl}`, error);
              const message = error instanceof Error ? error.message : 'An unknown fetch error occurred.';
@@ -156,8 +145,6 @@ export async function request<T>(
         }
     }
 }
-
-// --- API Function Definitions ---
 
 // --- Ingest Service ---
 export interface IngestResponse {
@@ -167,122 +154,121 @@ export interface IngestResponse {
     message: string;
 }
 
-// Define AuthHeaders type for clarity
 export interface AuthHeaders {
   'X-Company-ID': string;
   'X-User-ID': string;
 }
 
-export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
   const formData = new FormData();
   formData.append('file', file);
-
   try {
-    // Pass auth headers directly to the request options
     const response = await request<IngestResponse>('/api/v1/ingest/upload', {
       method: 'POST',
-      headers: {
-        // Content-Type is handled by request for FormData
-        ...auth, // Spread the auth headers
-      },
+      headers: { ...auth },
       body: formData,
     });
     return response;
   } catch (error) {
     console.error('Error uploading document:', error);
-    // Re-throw the error (ApiError or other) for the caller to handle
-    // The request function already formats ApiError messages
     throw error;
   }
 }
 
+// Interfaz para la respuesta de la lista de estados
 export interface DocumentStatusResponse {
     document_id: string;
-    status: string;
-    file_name?: string;
-    file_type?: string;
-    chunk_count?: number;
+    status: string; // 'uploaded', 'processing', 'processed', 'error'
+    file_name?: string | null;
+    file_type?: string | null;
+    chunk_count?: number | null; // Desde DB, puede ser actualizado por /status individual
     error_message?: string | null;
-    last_updated: string;
+    created_at?: string;
+    last_updated: string; // Timestamp de última actualización (más útil)
+    // Campos adicionales que pueden venir de la verificación en GET /status
+    minio_exists?: boolean;
+    milvus_chunk_count?: number;
 }
+
+// Interfaz para la respuesta detallada de un documento individual
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
+    minio_exists: boolean; // Garantizado por el endpoint individual
+    milvus_chunk_count: number; // Garantizado por el endpoint individual
+    message?: string; // Mensaje detallado del backend
+}
+
 
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
   try {
-    // Pass auth headers directly to the request options
     const response = await request<DocumentStatusResponse[]>(endpoint, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...auth, // Spread the auth headers
+        ...auth,
       },
     });
-    // Handle potential null response if API could return 204, though unlikely for a list
     return response || [];
   } catch (error) {
     console.error('Error fetching document status list:', error);
-    // Re-throw the error (ApiError or other) for the caller to handle
     throw error;
   }
 }
 
-export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
-    return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
+
+export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
+    return request<DetailedDocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
+        method: 'GET',
+        headers: { ...auth } as Record<string, string>
+    });
 };
 
-export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+
+export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> {
   const endpoint = `/api/v1/ingest/retry/${documentId}`;
   try {
-    // Pass auth headers directly to the request options
     const response = await request<IngestResponse>(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...auth, // Spread the auth headers
+        ...auth,
       },
-      // No body needed for this request
     });
-    // The request function handles 202 correctly if the API returns JSON
-    // If the API returns 202 with no body, request returns null. We might need to adjust
-    // based on actual API behavior for 202.
-    // Assuming the API returns the standard IngestResponse on 202 as per docs:
     if (!response) {
-        // This case might happen if the API returns 202 No Content, which contradicts the docs
-        // Returning a synthetic response or throwing an error might be needed.
-        // For now, let's assume the docs are correct and response is IngestResponse.
         console.warn(`Retry endpoint ${endpoint} returned unexpected null response.`);
         throw new ApiError('Retry initiated but no confirmation received.', 202);
     }
     return response;
   } catch (error) {
     console.error(`Error retrying ingest for document ${documentId}:`, error);
-    // Re-throw the error (ApiError or other) for the caller to handle
     throw error;
   }
 }
+
 
 /**
  * Elimina un documento de la base de conocimiento (Milvus, MinIO y registro).
  * Endpoint: DELETE /api/v1/ingest/{document_id}
  */
 export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
+  // request devuelve null para 204, que es el tipo esperado para void
   await request<null>(`/api/v1/ingest/${documentId}`, {
     method: 'DELETE',
     headers: { ...auth } as Record<string, string>,
   });
 }
 
+
 // --- Query Service ---
 export interface RetrievedDocApi {
-    id: string; // Chunk ID
-    document_id: string; // ID del documento original
+    id: string;
+    document_id: string;
     file_name: string;
-    content: string; // Contenido completo del chunk (puede ser largo)
-    content_preview: string; // Vista previa corta del contenido
-    metadata: Record<string, any> | null; // Metadata asociada al chunk/documento
-    score: number; // Puntuación de relevancia
+    content: string;
+    content_preview: string;
+    metadata: Record<string, any> | null;
+    score: number;
 }
-// El tipo frontend puede ser igual al de la API por ahora
 export type RetrievedDoc = RetrievedDocApi;
 
 export interface ChatSummary {
@@ -303,9 +289,9 @@ export interface ChatMessageApi {
         document_id: string;
         file_name: string;
         score: number;
-        preview: string; // Este campo está en la API de mensajes, usarlo en el mapeo si es necesario
+        preview: string;
     }> | null;
-    created_at: string; // La API garantiza este campo para mensajes
+    created_at: string;
 }
 
 export interface QueryPayload {
@@ -316,35 +302,32 @@ export interface QueryPayload {
 
 export interface QueryApiResponse {
     answer: string;
-    retrieved_documents: RetrievedDocApi[]; // Usa la interfaz definida arriba
-    query_log_id: string | null; // Puede ser null
-    chat_id: string; // La API de Ask garantiza devolver esto
+    retrieved_documents: RetrievedDocApi[];
+    query_log_id: string | null;
+    chat_id: string;
 }
 
 export const getChats = async (limit: number = 50, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     return request<ChatSummary[]>(endpoint);
+     try { return await request<ChatSummary[]>(endpoint); }
+     catch (error) { console.error("Error fetching chats:", error); throw error; }
 };
 
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     return request<ChatMessageApi[]>(endpoint);
+     try { return await request<ChatMessageApi[]>(endpoint); }
+     catch (error) { console.error(`Error fetching messages for chat ${chatId}:`, error); throw error; }
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     const body = {
-         ...payload,
-         chat_id: payload.chat_id || null
-     };
+     const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' }
+        method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }
      });
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
-     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
+    await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
 // --- Auth Service ---
@@ -354,7 +337,7 @@ interface LoginPayload {
 }
 export interface LoginResponse {
     access_token: string;
-    token_type: string; // "bearer"
+    token_type: string;
     user_id: string;
     email: string;
     full_name: string;
@@ -362,32 +345,19 @@ export interface LoginResponse {
     company_id: string;
 }
 
-export const mapApiSourcesToFrontend = (
-    apiSources: ChatMessageApi['sources']
-): RetrievedDoc[] | undefined => {
-    if (!apiSources) {
-        return undefined;
-    }
+// --- Type Mapping Helpers ---
+export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
+    if (!apiSources) return undefined;
     return apiSources.map(source => ({
-        id: source.chunk_id,
-        document_id: source.document_id,
-        file_name: source.file_name,
-        content: source.preview,
-        content_preview: source.preview,
-        metadata: null,
-        score: source.score,
+        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name,
+        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
     }));
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
-
     return {
-        id: apiMessage.id,
-        role: apiMessage.role,
-        content: apiMessage.content,
-        sources: mappedSources,
-        isError: false,
-        created_at: apiMessage.created_at,
+        id: apiMessage.id, role: apiMessage.role, content: apiMessage.content,
+        sources: mappedSources, isError: false, created_at: apiMessage.created_at,
     };
 };

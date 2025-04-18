@@ -12,13 +12,14 @@ import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils';
 
 interface ChatInterfaceProps {
   chatId?: string; // Receive chatId from the page
 }
 
 const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
+  { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' },
 ];
 
 export function ChatInterface({ chatId }: ChatInterfaceProps) {
@@ -41,7 +42,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       const storedMessages = localStorage.getItem(`chat-${chatId}`);
       if (storedMessages) {
         try {
-          const parsedMessages: Message[] = JSON.parse(storedMessages);
+          const parsedMessages = JSON.parse(storedMessages);
           setMessages(parsedMessages);
         } catch (error) {
           console.error("Error parsing chat history from local storage:", error);
@@ -83,20 +84,33 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }, [messages]);
 
   const handleSendMessage = useCallback(async (query: string) => {
-    if (!query.trim() || isLoading) return;
+    const text = query.trim();
+    if (!text || isLoading) return;
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
+    // Local greeting
+    if (isGreeting(text)) {
+      setMessages(prev => [...prev, { id: `assistant-${Date.now()}`, role: 'assistant', content: '¡Hola! ¿En qué puedo ayudarte hoy?' } as Message]);
+      return;
+    }
+
+    // Local meta query
+    if (isMetaQuery(text)) {
+      setMessages(prev => [...prev, { id: `assistant-meta-${Date.now()}`, role: 'assistant', content: getMetaResponse() } as Message]);
+      return;
+    }
+
+    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setRetrievedDocs([]); // Clear previous docs
 
     try {
-      const response = await postQuery({ query });
+      const response = await postQuery({ query: text });
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: response.answer,
-        sources: response.retrieved_documents // Attach sources to the message
+        sources: response.retrieved_documents, // Attach sources to the message
       };
       setMessages(prev => [...prev, assistantMessage]);
       setRetrievedDocs(response.retrieved_documents || []);
@@ -142,7 +156,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
                     <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
                         <div className="space-y-4 pr-4"> {/* Add padding right */}
-                            {messages.map((message) => (
+                            {messages.map(message => (
                                 <ChatMessage key={message.id} message={message} />
                             ))}
                             {isLoading && messages[messages.length - 1]?.role === 'user' && (

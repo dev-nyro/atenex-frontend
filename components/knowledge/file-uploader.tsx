@@ -1,4 +1,3 @@
-// File: components/knowledge/file-uploader.tsx
 // File: components/knowledge/file-uploader.tsx (MODIFICADO)
 "use client";
 

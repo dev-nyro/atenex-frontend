@@ -1,5 +1,4 @@
-// File: app/(app)/chat/[[...chatId]]/page.tsx
-// Purpose: Main chat interface page, using useAuth for state and API calls via lib/api.
+// File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -23,10 +22,10 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, PlusCircle, RefreshCw } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { cn } from '@/lib/utils';
+import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils'; // Importar helpers
 
 const welcomeMessage: Message = {
     id: 'initial-welcome',
@@ -68,14 +67,12 @@ export default function ChatPage() {
         const currentFetchTarget = chatId || 'welcome';
 
         if (!bypassAuth && isAuthLoading) {
-            console.log("ChatPage: Waiting for authentication...");
             setIsLoadingHistory(true);
             setMessages([]);
             return;
         }
 
         if (!bypassAuth && !user) {
-            console.log("ChatPage: User not authenticated. Cannot fetch history.");
             setMessages([welcomeMessage]);
             setIsLoadingHistory(false);
             fetchedChatIdRef.current = 'welcome';
@@ -87,7 +84,6 @@ export default function ChatPage() {
             return;
         }
 
-        console.log(`ChatPage: Fetching history for target: ${currentFetchTarget}`);
         setIsLoadingHistory(true);
         setHistoryError(null);
         setMessages([]);
@@ -108,39 +104,23 @@ export default function ChatPage() {
                         if (validTimeB === 0) return 1;
                         return validTimeA - validTimeB;
                     });
-
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
-                    console.log(`ChatPage: History loaded successfully for ${chatId}. ${mappedMessages.length} messages.`);
                 })
                 .catch(error => {
-                    console.error(`ChatPage: Error loading history for chat ${chatId}:`, error);
                     let message = "Fallo al cargar el historial del chat.";
                     if (error instanceof ApiError) {
                         message = error.message || `Error API (${error.status})`;
-                        if (error.status === 401 || error.status === 403) {
-                            message = "Sesión expirada o inválida. Por favor, inicia sesión de nuevo.";
-                            toast.error("Error de Autenticación", { description: message });
-                            signOut();
-                        } else if (error.status === 404) {
-                            message = "Chat no encontrado o no tienes permiso para acceder a él.";
-                            router.replace('/chat');
-                        } else {
-                            toast.error("Fallo al cargar historial", { description: message });
-                        }
-                    } else {
-                        toast.error("Fallo al cargar historial", { description: "Ocurrió un error inesperado." });
-                    }
+                        if (error.status === 401 || error.status === 403) { message = "Sesión expirada o inválida. Por favor, inicia sesión de nuevo."; toast.error("Error de Autenticación", { description: message }); signOut(); }
+                        else if (error.status === 404) { message = "Chat no encontrado o no tienes permiso para acceder a él."; router.replace('/chat'); }
+                        else { toast.error("Fallo al cargar historial", { description: message }); }
+                    } else { toast.error("Fallo al cargar historial", { description: "Ocurrió un error inesperado." }); }
                     setHistoryError(message);
                     setMessages([welcomeMessage]);
                     fetchedChatIdRef.current = undefined;
                 })
-                .finally(() => {
-                    setIsLoadingHistory(false);
-                    console.log(`ChatPage: Finished loading attempt for ${chatId}`);
-                });
+                .finally(() => setIsLoadingHistory(false));
         } else {
-            console.log("ChatPage: No chatId provided, showing welcome message.");
             setMessages([welcomeMessage]);
             setRetrievedDocs([]);
             setIsLoadingHistory(false);
@@ -160,26 +140,48 @@ export default function ChatPage() {
     }, [messages, isSending]);
 
     const handleSendMessage = useCallback(async (query: string) => {
-        const greetingRegex = /^(hola|hello|hi|buenos días|buenas tardes|buenas noches)$/i; // Detect simple greetings
-        if (greetingRegex.test(query.trim())) {
-            // Respond locally to greetings
+        const text = query.trim();
+        if (!text) {
+            toast.warning("No se puede enviar un mensaje vacío.");
+            return;
+        }
+
+        // Añadir mensaje del usuario inmediatamente
+        const userMessage: Message = {
+            id: `client-user-${Date.now()}`,
+            role: 'user',
+            content: text,
+            created_at: new Date().toISOString()
+        };
+        // Asegurarse de quitar el mensaje de bienvenida si existe
+        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+
+        // --- NUEVO: Manejo local de saludos y consultas meta ---
+        if (isGreeting(text)) {
             const greetingResponse: Message = {
                 id: `assistant-greet-${Date.now()}`,
                 role: 'assistant',
-                content: '¡Hola! ¿En qué puedo ayudarte con tus documentos hoy?',
+                content: '¡Hola! ¿En qué puedo ayudarte hoy?',
                 created_at: new Date().toISOString()
             };
-            setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), greetingResponse]);
-            return; // Skip API call
+            setMessages(prev => [...prev, greetingResponse]);
+            return; // No llamar a la API
         }
+        if (isMetaQuery(text)) {
+             const metaResponse: Message = {
+                 id: `assistant-meta-${Date.now()}`,
+                 role: 'assistant',
+                 content: getMetaResponse(),
+                 created_at: new Date().toISOString()
+             };
+             setMessages(prev => [...prev, metaResponse]);
+             return; // No llamar a la API
+        }
+        // --- FIN Manejo local ---
 
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
         const isAuthenticated = !!user || bypassAuth;
 
-        if (!query.trim()) {
-            toast.warning("No se puede enviar un mensaje vacío.");
-            return;
-        }
         if (!isAuthenticated) {
             toast.error("No Autenticado", { description: "Por favor, inicia sesión para enviar mensajes."});
             signOut();
@@ -190,13 +192,6 @@ export default function ChatPage() {
             return;
         }
 
-        const userMessage: Message = {
-            id: `client-user-${Date.now()}`,
-            role: 'user',
-            content: query,
-            created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
         setIsSending(true);
         setRetrievedDocs([]);
 
@@ -205,7 +200,7 @@ export default function ChatPage() {
 
         try {
             const response: QueryApiResponse = await postQuery({
-                query,
+                query: text, // Usar texto limpio
                 chat_id: currentChatIdForApi,
             });
 
@@ -224,12 +219,11 @@ export default function ChatPage() {
             setRetrievedDocs(mappedSources || []);
 
             if (!currentChatIdForApi && returnedChatId) {
-                console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL and state.`);
                 setChatId(returnedChatId);
                 fetchedChatIdRef.current = returnedChatId;
                 router.replace(`/chat/${returnedChatId}`, { scroll: false });
             } else if (currentChatIdForApi && currentChatIdForApi !== returnedChatId) {
-                 console.warn(`ChatPage: API returned a different chat ID (${returnedChatId}) than expected (${currentChatIdForApi}) for an existing chat.`);
+                 console.warn(`ChatPage: API returned different chat ID (${returnedChatId}) than expected (${currentChatIdForApi}).`);
             }
 
             if (mappedSources && mappedSources.length > 0) {
@@ -238,44 +232,27 @@ export default function ChatPage() {
              console.log(`ChatPage: Query successful. Answer received for chat ${returnedChatId}.`);
 
         } catch (error) {
-            console.error("ChatPage: Query failed:", error);
             let errorMessage = "Lo siento, ocurrió un error al procesar tu solicitud.";
              if (error instanceof ApiError) {
                  errorMessage = error.message || `Error API (${error.status})`;
-                 if (error.status === 401 || error.status === 403) {
-                     errorMessage = "Error de autenticación. Por favor, inicia sesión de nuevo.";
-                     signOut();
-                 } else {
-                      toast.error("Consulta Fallida", { description: errorMessage });
-                 }
-             } else if (error instanceof Error) {
-                 errorMessage = `Error: ${error.message}`;
-                 toast.error("Consulta Fallida", { description: errorMessage });
-             } else {
-                  toast.error("Consulta Fallida", { description: "Ocurrió un error desconocido." });
-             }
+                 if (error.status === 401 || error.status === 403) { errorMessage = "Error de autenticación. Por favor, inicia sesión de nuevo."; signOut(); }
+                 else { toast.error("Consulta Fallida", { description: errorMessage }); }
+             } else if (error instanceof Error) { errorMessage = `Error: ${error.message}`; toast.error("Consulta Fallida", { description: errorMessage }); }
+             else { toast.error("Consulta Fallida", { description: "Ocurrió un error desconocido." }); }
 
-            const errorMsgObj: Message = {
-                id: `error-${Date.now()}`,
-                role: 'assistant',
-                content: errorMessage,
-                isError: true,
-                created_at: new Date().toISOString()
-            };
+            const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true, created_at: new Date().toISOString() };
             setMessages(prev => [...prev, errorMsgObj]);
 
         } finally {
             setIsSending(false);
         }
-    }, [chatId, isSending, user, router, signOut]);
+    }, [chatId, isSending, user, router, signOut]); // isSourcesPanelVisible no es dependencia directa
 
     const handlePanelToggle = () => { setIsSourcesPanelVisible(!isSourcesPanelVisible); };
 
     const handleNewChat = () => {
-        if (pathname !== '/chat') {
-             console.log("ChatPage: Starting new chat.");
-             router.push('/chat');
-        } else {
+        if (pathname !== '/chat') { router.push('/chat'); }
+        else {
              setMessages([welcomeMessage]);
              setRetrievedDocs([]);
              setChatId(undefined);
@@ -287,41 +264,18 @@ export default function ChatPage() {
 
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory) {
-            return (
-                <div className="space-y-4 p-4">
-                    <Skeleton className="h-16 w-3/4 rounded-lg" />
-                    <Skeleton className="h-16 w-1/2 ml-auto rounded-lg" />
-                    <Skeleton className="h-16 w-3/4 rounded-lg" />
-                </div>
-            );
+            return ( <div className="space-y-4 p-4"><Skeleton className="h-16 w-3/4 rounded-lg" /><Skeleton className="h-16 w-1/2 ml-auto rounded-lg" /><Skeleton className="h-16 w-3/4 rounded-lg" /></div> );
         }
-
         if (historyError) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center">
-                    <AlertCircle className="h-10 w-10 mb-3" />
-                    <p className="text-lg font-semibold mb-1">Error al Cargar el Chat</p>
-                    <p className="text-sm mb-4">{historyError}</p>
-                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4">
-                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Reintentar Carga
-                    </Button>
-                </div>
-            );
+            return ( <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center"><AlertCircle className="h-10 w-10 mb-3" /><p className="text-lg font-semibold mb-1">Error al Cargar el Chat</p><p className="text-sm mb-4">{historyError}</p><Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" />Reintentar Carga</Button></div> );
         }
-
         return (
-            // MODIFICADO: Aumentado espaciado vertical entre mensajes
-            <div className="space-y-6 pb-4">
-                {messages.map((message) => (
-                     <ChatMessage key={message.id} message={message} />
-                ))}
+            <div className="space-y-6 pb-4"> {/* Aumentado espaciado */}
+                {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
                 {isSending && (
-                    // MODIFICADO: Estilo "pensando" más sutil
                     <div className="flex items-center justify-center pt-4">
                         <div className="flex items-center space-x-1.5 text-xs text-muted-foreground">
-                            <BrainCircuit className="h-4 w-4 animate-pulse" />
-                            <span>Atenex está pensando...</span>
+                            <BrainCircuit className="h-4 w-4 animate-pulse" /><span>Atenex está pensando...</span>
                          </div>
                     </div>
                 )}
@@ -334,40 +288,25 @@ export default function ChatPage() {
              <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                  <ResizablePanel defaultSize={isSourcesPanelVisible ? 70 : 100} minSize={30}>
                      <div className="flex h-full flex-col relative">
+                         {/* Botón toggle siempre visible */}
                          <div className="absolute top-3 right-3 z-20">
-                             <Button
-                                onClick={handlePanelToggle}
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full"
-                                aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}
-                             >
+                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full" aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                  {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                          </div>
-
-                         {/* MODIFICADO: Padding superior e inferior ajustados */}
-                         <ScrollArea className="flex-1 px-4 pt-6 pb-6" ref={scrollAreaRef}>
+                         <ScrollArea className="flex-1 px-4 pt-6 pb-6" ref={scrollAreaRef}> {/* Padding ajustado */}
                              {renderChatContent()}
                          </ScrollArea>
-
                          <div className="border-t p-4 bg-background shadow-inner shrink-0">
-                             <ChatInput
-                                 onSendMessage={handleSendMessage}
-                                 isLoading={isSending || isLoadingHistory || isAuthLoading}
-                             />
+                             <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
                          </div>
                      </div>
                  </ResizablePanel>
-
                  {isSourcesPanelVisible && (
                      <>
                          <ResizableHandle withHandle className="bg-border" />
                          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-                             <RetrievedDocumentsPanel
-                                 documents={retrievedDocs}
-                                 isLoading={isSending}
-                             />
+                             <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
                          </ResizablePanel>
                      </>
                  )}

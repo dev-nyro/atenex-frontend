@@ -1,6 +1,6 @@
 // File: app/(app)/knowledge/page.tsx (MODIFICADO)
 'use client';
-import React from 'react'; // No se necesita useState, useEffect, useCallback aquí
+import React, { useCallback } from 'react'; // Import useCallback
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; // Import Button
 import { Card, CardContent } from '@/components/ui/card'; // Wrap panels in Cards
@@ -50,6 +50,12 @@ export default function KnowledgePage() {
     // Opcional: refrescar toda la lista después de un tiempo
     // setTimeout(fetchDocuments, 5000);
   };
+
+  // Callback para manejar eliminación de documento y refrescar lista
+  const handleDeleteSuccess = useCallback((documentId: string) => {
+    deleteLocalDocument(documentId);
+    fetchDocuments(true);
+  }, [deleteLocalDocument, fetchDocuments]);
 
   // Construir headers solo si el usuario está autenticado
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
@@ -144,7 +150,7 @@ export default function KnowledgePage() {
                   fetchMore={fetchMore}
                   hasMore={hasMore}
                   refreshDocument={refreshDocument}
-                  deleteLocalDocument={deleteLocalDocument}
+                  onDeleteSuccess={handleDeleteSuccess}
                 />
               ) : (
                 // Mensaje si no está cargando, no hay error y no hay usuario

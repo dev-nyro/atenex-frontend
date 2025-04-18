@@ -87,6 +87,7 @@ atenex-frontend/
 ├── postcss.config.js
 ├── public
 │   └── icons
+├── refactorizacion.md
 ├── tailwind.config.js
 └── tsconfig.json
 ```
@@ -109,7 +110,6 @@ const nextConfig = {
 
 ## File: `package.json`
 ```json
-
 {
   "name": "atenex-frontend",
   "version": "0.1.0",
@@ -155,6 +155,10 @@ const nextConfig = {
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.14",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
@@ -162,11 +166,15 @@ const nextConfig = {
     "autoprefixer": "^10.4.21",
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.4",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.0.17",
+    "ts-jest": "^29.3.2",
     "typescript": "^5.8.2"
   }
 }
+
 ```
 
 ## File: `tsconfig.json`
@@ -432,8 +440,7 @@ ehthumbs_vista.db
 
 ## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
-// File: app/(app)/chat/[[...chatId]]/page.tsx
-// Purpose: Main chat interface page, using useAuth for state and API calls via lib/api.
+// File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -457,10 +464,10 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, PlusCircle, RefreshCw } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { cn } from '@/lib/utils';
+import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils'; // Importar helpers
 
 const welcomeMessage: Message = {
     id: 'initial-welcome',
@@ -502,14 +509,12 @@ export default function ChatPage() {
         const currentFetchTarget = chatId || 'welcome';
 
         if (!bypassAuth && isAuthLoading) {
-            console.log("ChatPage: Waiting for authentication...");
             setIsLoadingHistory(true);
             setMessages([]);
             return;
         }
 
         if (!bypassAuth && !user) {
-            console.log("ChatPage: User not authenticated. Cannot fetch history.");
             setMessages([welcomeMessage]);
             setIsLoadingHistory(false);
             fetchedChatIdRef.current = 'welcome';
@@ -521,7 +526,6 @@ export default function ChatPage() {
             return;
         }
 
-        console.log(`ChatPage: Fetching history for target: ${currentFetchTarget}`);
         setIsLoadingHistory(true);
         setHistoryError(null);
         setMessages([]);
@@ -542,39 +546,23 @@ export default function ChatPage() {
                         if (validTimeB === 0) return 1;
                         return validTimeA - validTimeB;
                     });
-
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
-                    console.log(`ChatPage: History loaded successfully for ${chatId}. ${mappedMessages.length} messages.`);
                 })
                 .catch(error => {
-                    console.error(`ChatPage: Error loading history for chat ${chatId}:`, error);
                     let message = "Fallo al cargar el historial del chat.";
                     if (error instanceof ApiError) {
                         message = error.message || `Error API (${error.status})`;
-                        if (error.status === 401 || error.status === 403) {
-                            message = "Sesión expirada o inválida. Por favor, inicia sesión de nuevo.";
-                            toast.error("Error de Autenticación", { description: message });
-                            signOut();
-                        } else if (error.status === 404) {
-                            message = "Chat no encontrado o no tienes permiso para acceder a él.";
-                            router.replace('/chat');
-                        } else {
-                            toast.error("Fallo al cargar historial", { description: message });
-                        }
-                    } else {
-                        toast.error("Fallo al cargar historial", { description: "Ocurrió un error inesperado." });
-                    }
+                        if (error.status === 401 || error.status === 403) { message = "Sesión expirada o inválida. Por favor, inicia sesión de nuevo."; toast.error("Error de Autenticación", { description: message }); signOut(); }
+                        else if (error.status === 404) { message = "Chat no encontrado o no tienes permiso para acceder a él."; router.replace('/chat'); }
+                        else { toast.error("Fallo al cargar historial", { description: message }); }
+                    } else { toast.error("Fallo al cargar historial", { description: "Ocurrió un error inesperado." }); }
                     setHistoryError(message);
                     setMessages([welcomeMessage]);
                     fetchedChatIdRef.current = undefined;
                 })
-                .finally(() => {
-                    setIsLoadingHistory(false);
-                    console.log(`ChatPage: Finished loading attempt for ${chatId}`);
-                });
+                .finally(() => setIsLoadingHistory(false));
         } else {
-            console.log("ChatPage: No chatId provided, showing welcome message.");
             setMessages([welcomeMessage]);
             setRetrievedDocs([]);
             setIsLoadingHistory(false);
@@ -594,26 +582,48 @@ export default function ChatPage() {
     }, [messages, isSending]);
 
     const handleSendMessage = useCallback(async (query: string) => {
-        const greetingRegex = /^(hola|hello|hi|buenos días|buenas tardes|buenas noches)$/i; // Detect simple greetings
-        if (greetingRegex.test(query.trim())) {
-            // Respond locally to greetings
+        const text = query.trim();
+        if (!text) {
+            toast.warning("No se puede enviar un mensaje vacío.");
+            return;
+        }
+
+        // Añadir mensaje del usuario inmediatamente
+        const userMessage: Message = {
+            id: `client-user-${Date.now()}`,
+            role: 'user',
+            content: text,
+            created_at: new Date().toISOString()
+        };
+        // Asegurarse de quitar el mensaje de bienvenida si existe
+        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
+
+        // --- NUEVO: Manejo local de saludos y consultas meta ---
+        if (isGreeting(text)) {
             const greetingResponse: Message = {
                 id: `assistant-greet-${Date.now()}`,
                 role: 'assistant',
-                content: '¡Hola! ¿En qué puedo ayudarte con tus documentos hoy?',
+                content: '¡Hola! ¿En qué puedo ayudarte hoy?',
                 created_at: new Date().toISOString()
             };
-            setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), greetingResponse]);
-            return; // Skip API call
+            setMessages(prev => [...prev, greetingResponse]);
+            return; // No llamar a la API
         }
+        if (isMetaQuery(text)) {
+             const metaResponse: Message = {
+                 id: `assistant-meta-${Date.now()}`,
+                 role: 'assistant',
+                 content: getMetaResponse(),
+                 created_at: new Date().toISOString()
+             };
+             setMessages(prev => [...prev, metaResponse]);
+             return; // No llamar a la API
+        }
+        // --- FIN Manejo local ---
 
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
         const isAuthenticated = !!user || bypassAuth;
 
-        if (!query.trim()) {
-            toast.warning("No se puede enviar un mensaje vacío.");
-            return;
-        }
         if (!isAuthenticated) {
             toast.error("No Autenticado", { description: "Por favor, inicia sesión para enviar mensajes."});
             signOut();
@@ -624,13 +634,6 @@ export default function ChatPage() {
             return;
         }
 
-        const userMessage: Message = {
-            id: `client-user-${Date.now()}`,
-            role: 'user',
-            content: query,
-            created_at: new Date().toISOString()
-        };
-        setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
         setIsSending(true);
         setRetrievedDocs([]);
 
@@ -639,7 +642,7 @@ export default function ChatPage() {
 
         try {
             const response: QueryApiResponse = await postQuery({
-                query,
+                query: text, // Usar texto limpio
                 chat_id: currentChatIdForApi,
             });
 
@@ -658,12 +661,11 @@ export default function ChatPage() {
             setRetrievedDocs(mappedSources || []);
 
             if (!currentChatIdForApi && returnedChatId) {
-                console.log(`ChatPage: New chat created with ID: ${returnedChatId}. Updating URL and state.`);
                 setChatId(returnedChatId);
                 fetchedChatIdRef.current = returnedChatId;
                 router.replace(`/chat/${returnedChatId}`, { scroll: false });
             } else if (currentChatIdForApi && currentChatIdForApi !== returnedChatId) {
-                 console.warn(`ChatPage: API returned a different chat ID (${returnedChatId}) than expected (${currentChatIdForApi}) for an existing chat.`);
+                 console.warn(`ChatPage: API returned different chat ID (${returnedChatId}) than expected (${currentChatIdForApi}).`);
             }
 
             if (mappedSources && mappedSources.length > 0) {
@@ -672,44 +674,27 @@ export default function ChatPage() {
              console.log(`ChatPage: Query successful. Answer received for chat ${returnedChatId}.`);
 
         } catch (error) {
-            console.error("ChatPage: Query failed:", error);
             let errorMessage = "Lo siento, ocurrió un error al procesar tu solicitud.";
              if (error instanceof ApiError) {
                  errorMessage = error.message || `Error API (${error.status})`;
-                 if (error.status === 401 || error.status === 403) {
-                     errorMessage = "Error de autenticación. Por favor, inicia sesión de nuevo.";
-                     signOut();
-                 } else {
-                      toast.error("Consulta Fallida", { description: errorMessage });
-                 }
-             } else if (error instanceof Error) {
-                 errorMessage = `Error: ${error.message}`;
-                 toast.error("Consulta Fallida", { description: errorMessage });
-             } else {
-                  toast.error("Consulta Fallida", { description: "Ocurrió un error desconocido." });
-             }
+                 if (error.status === 401 || error.status === 403) { errorMessage = "Error de autenticación. Por favor, inicia sesión de nuevo."; signOut(); }
+                 else { toast.error("Consulta Fallida", { description: errorMessage }); }
+             } else if (error instanceof Error) { errorMessage = `Error: ${error.message}`; toast.error("Consulta Fallida", { description: errorMessage }); }
+             else { toast.error("Consulta Fallida", { description: "Ocurrió un error desconocido." }); }
 
-            const errorMsgObj: Message = {
-                id: `error-${Date.now()}`,
-                role: 'assistant',
-                content: errorMessage,
-                isError: true,
-                created_at: new Date().toISOString()
-            };
+            const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true, created_at: new Date().toISOString() };
             setMessages(prev => [...prev, errorMsgObj]);
 
         } finally {
             setIsSending(false);
         }
-    }, [chatId, isSending, user, router, signOut]);
+    }, [chatId, isSending, user, router, signOut]); // isSourcesPanelVisible no es dependencia directa
 
     const handlePanelToggle = () => { setIsSourcesPanelVisible(!isSourcesPanelVisible); };
 
     const handleNewChat = () => {
-        if (pathname !== '/chat') {
-             console.log("ChatPage: Starting new chat.");
-             router.push('/chat');
-        } else {
+        if (pathname !== '/chat') { router.push('/chat'); }
+        else {
              setMessages([welcomeMessage]);
              setRetrievedDocs([]);
              setChatId(undefined);
@@ -721,41 +706,18 @@ export default function ChatPage() {
 
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory) {
-            return (
-                <div className="space-y-4 p-4">
-                    <Skeleton className="h-16 w-3/4 rounded-lg" />
-                    <Skeleton className="h-16 w-1/2 ml-auto rounded-lg" />
-                    <Skeleton className="h-16 w-3/4 rounded-lg" />
-                </div>
-            );
+            return ( <div className="space-y-4 p-4"><Skeleton className="h-16 w-3/4 rounded-lg" /><Skeleton className="h-16 w-1/2 ml-auto rounded-lg" /><Skeleton className="h-16 w-3/4 rounded-lg" /></div> );
         }
-
         if (historyError) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center">
-                    <AlertCircle className="h-10 w-10 mb-3" />
-                    <p className="text-lg font-semibold mb-1">Error al Cargar el Chat</p>
-                    <p className="text-sm mb-4">{historyError}</p>
-                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4">
-                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Reintentar Carga
-                    </Button>
-                </div>
-            );
+            return ( <div className="flex flex-col items-center justify-center h-full text-destructive p-4 text-center"><AlertCircle className="h-10 w-10 mb-3" /><p className="text-lg font-semibold mb-1">Error al Cargar el Chat</p><p className="text-sm mb-4">{historyError}</p><Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" />Reintentar Carga</Button></div> );
         }
-
         return (
-            // MODIFICADO: Aumentado espaciado vertical entre mensajes
-            <div className="space-y-6 pb-4">
-                {messages.map((message) => (
-                     <ChatMessage key={message.id} message={message} />
-                ))}
+            <div className="space-y-6 pb-4"> {/* Aumentado espaciado */}
+                {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
                 {isSending && (
-                    // MODIFICADO: Estilo "pensando" más sutil
                     <div className="flex items-center justify-center pt-4">
                         <div className="flex items-center space-x-1.5 text-xs text-muted-foreground">
-                            <BrainCircuit className="h-4 w-4 animate-pulse" />
-                            <span>Atenex está pensando...</span>
+                            <BrainCircuit className="h-4 w-4 animate-pulse" /><span>Atenex está pensando...</span>
                          </div>
                     </div>
                 )}
@@ -768,40 +730,25 @@ export default function ChatPage() {
              <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                  <ResizablePanel defaultSize={isSourcesPanelVisible ? 70 : 100} minSize={30}>
                      <div className="flex h-full flex-col relative">
+                         {/* Botón toggle siempre visible */}
                          <div className="absolute top-3 right-3 z-20">
-                             <Button
-                                onClick={handlePanelToggle}
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full"
-                                aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}
-                             >
+                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 bg-background/50 hover:bg-muted rounded-full" aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                  {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                          </div>
-
-                         {/* MODIFICADO: Padding superior e inferior ajustados */}
-                         <ScrollArea className="flex-1 px-4 pt-6 pb-6" ref={scrollAreaRef}>
+                         <ScrollArea className="flex-1 px-4 pt-6 pb-6" ref={scrollAreaRef}> {/* Padding ajustado */}
                              {renderChatContent()}
                          </ScrollArea>
-
                          <div className="border-t p-4 bg-background shadow-inner shrink-0">
-                             <ChatInput
-                                 onSendMessage={handleSendMessage}
-                                 isLoading={isSending || isLoadingHistory || isAuthLoading}
-                             />
+                             <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
                          </div>
                      </div>
                  </ResizablePanel>
-
                  {isSourcesPanelVisible && (
                      <>
                          <ResizableHandle withHandle className="bg-border" />
                          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
-                             <RetrievedDocumentsPanel
-                                 documents={retrievedDocs}
-                                 isLoading={isSending}
-                             />
+                             <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
                          </ResizablePanel>
                      </>
                  )}
@@ -815,7 +762,7 @@ export default function ChatPage() {
 ```tsx
 // File: app/(app)/knowledge/page.tsx (MODIFICADO)
 'use client';
-import React from 'react'; // No se necesita useState, useEffect, useCallback aquí
+import React, { useCallback } from 'react'; // Import useCallback
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; // Import Button
 import { Card, CardContent } from '@/components/ui/card'; // Wrap panels in Cards
@@ -865,6 +812,12 @@ export default function KnowledgePage() {
     // Opcional: refrescar toda la lista después de un tiempo
     // setTimeout(fetchDocuments, 5000);
   };
+
+  // Callback para manejar eliminación de documento y refrescar lista
+  const handleDeleteSuccess = useCallback((documentId: string) => {
+    deleteLocalDocument(documentId);
+    fetchDocuments(true);
+  }, [deleteLocalDocument, fetchDocuments]);
 
   // Construir headers solo si el usuario está autenticado
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
@@ -959,7 +912,7 @@ export default function KnowledgePage() {
                   fetchMore={fetchMore}
                   hasMore={hasMore}
                   refreshDocument={refreshDocument}
-                  deleteLocalDocument={deleteLocalDocument}
+                  onDeleteSuccess={handleDeleteSuccess}
                 />
               ) : (
                 // Mensaje si no está cargando, no hay error y no hay usuario
@@ -1112,7 +1065,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 ## File: `app\(app)\settings\page.tsx`
 ```tsx
-// File: app/(app)/settings/page.tsx
+// File: app/(app)/settings/page.tsx (MODIFICADO)
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -1127,29 +1080,38 @@ import { toast } from 'sonner'; // Para notificaciones
 export default function SettingsPage() {
     const { user } = useAuth();
     const [name, setName] = useState(user?.name || '');
-    const [isSaving, setIsSaving] = useState(false); // Estado para el botón
+    const [isSaving, setIsSaving] = useState(false);
+    // Estado para rastrear si el nombre ha cambiado
+    const [hasChanged, setHasChanged] = useState(false);
 
     useEffect(() => {
         if (user) {
-            setName(user.name || '');
+            const currentName = user.name || '';
+            setName(currentName);
+            // Resetear cambio cuando el usuario cambie o se cargue inicialmente
+            setHasChanged(false);
         }
     }, [user]);
 
     const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setName(event.target.value);
+        const newName = event.target.value;
+        setName(newName);
+        // Verificar si el nuevo nombre es diferente al original del usuario
+        setHasChanged(newName !== (user?.name || ''));
     };
 
     const handleSave = async () => {
+        // No hacer nada si no hay cambios
+        if (!hasChanged) return;
+
         setIsSaving(true);
-        // TODO: Implementar llamada API real a /users/me/update o similar
         console.log('Guardando cambios (simulado):', { name });
         try {
-          // Simular llamada a API
           await new Promise(resolve => setTimeout(resolve, 1000));
-          // Aquí iría la llamada real: await updateUserProfile({ name });
           toast.success("Perfil Actualizado", { description: "Tu nombre ha sido guardado." });
-          // Opcional: actualizar el estado global del usuario si el nombre cambia
-          // (requeriría una función updateUser en useAuth)
+          // Una vez guardado, marcar que ya no hay cambios pendientes
+          setHasChanged(false);
+          // TODO: Idealmente, actualizar el 'user' en el AuthContext si la API devuelve el usuario actualizado
         } catch (error) {
           console.error("Error al guardar perfil:", error);
           toast.error("Error al Guardar", { description: "No se pudo actualizar el perfil." });
@@ -1182,7 +1144,8 @@ export default function SettingsPage() {
                  <Input id="email" type="email" defaultValue={user?.email} disabled />
                  <p className="text-xs text-muted-foreground">El correo electrónico no se puede cambiar.</p>
             </div>
-             <Button onClick={handleSave} disabled={isSaving || name === (user?.name || '')}>
+             {/* Deshabilitar si está guardando O si no hay cambios */}
+             <Button onClick={handleSave} disabled={isSaving || !hasChanged}>
                 {isSaving ? "Guardando..." : "Guardar Cambios"}
              </Button>
         </CardContent>
@@ -1190,6 +1153,7 @@ export default function SettingsPage() {
 
        <Separator />
 
+       {/* Sección de Empresa Mantenida por ahora, pero marcada como no implementada */}
        <Card>
         <CardHeader>
           <CardTitle>Configuración de la Empresa</CardTitle>
@@ -1197,15 +1161,15 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
            <p className="text-sm text-muted-foreground">La gestión de la configuración de la empresa aún no está implementada.</p>
-           {/* Placeholder para futuras opciones */}
-           {/* <div className="space-y-2 mt-4">
-                <Label htmlFor="companyName">Nombre de la Empresa</Label>
-                <Input id="companyName" defaultValue={user?.companyId} disabled/>
-           </div> */}
         </CardContent>
       </Card>
 
-       <Separator />
+       {/* ELIMINADO: Sección de Apariencia Redundante */}
+       {/* <Separator />
+       <Card>
+        <CardHeader>...</CardHeader>
+        <CardContent>...</CardContent>
+      </Card> */}
 
     </div>
   );
@@ -2621,13 +2585,14 @@ import { postQuery, RetrievedDoc, ApiError } from '@/lib/api';
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, BrainCircuit, FileText } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils';
 
 interface ChatInterfaceProps {
   chatId?: string; // Receive chatId from the page
 }
 
 const initialMessages: Message[] = [
-    { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' }
+  { id: 'initial-1', role: 'assistant', content: 'Hello! How can I help you query your knowledge base today?' },
 ];
 
 export function ChatInterface({ chatId }: ChatInterfaceProps) {
@@ -2650,7 +2615,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       const storedMessages = localStorage.getItem(`chat-${chatId}`);
       if (storedMessages) {
         try {
-          const parsedMessages: Message[] = JSON.parse(storedMessages);
+          const parsedMessages = JSON.parse(storedMessages);
           setMessages(parsedMessages);
         } catch (error) {
           console.error("Error parsing chat history from local storage:", error);
@@ -2692,20 +2657,33 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }, [messages]);
 
   const handleSendMessage = useCallback(async (query: string) => {
-    if (!query.trim() || isLoading) return;
+    const text = query.trim();
+    if (!text || isLoading) return;
 
-    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
+    // Local greeting
+    if (isGreeting(text)) {
+      setMessages(prev => [...prev, { id: `assistant-${Date.now()}`, role: 'assistant', content: '¡Hola! ¿En qué puedo ayudarte hoy?' } as Message]);
+      return;
+    }
+
+    // Local meta query
+    if (isMetaQuery(text)) {
+      setMessages(prev => [...prev, { id: `assistant-meta-${Date.now()}`, role: 'assistant', content: getMetaResponse() } as Message]);
+      return;
+    }
+
+    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: text };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setRetrievedDocs([]); // Clear previous docs
 
     try {
-      const response = await postQuery({ query });
+      const response = await postQuery({ query: text });
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: response.answer,
-        sources: response.retrieved_documents // Attach sources to the message
+        sources: response.retrieved_documents, // Attach sources to the message
       };
       setMessages(prev => [...prev, assistantMessage]);
       setRetrievedDocs(response.retrieved_documents || []);
@@ -2751,7 +2729,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
                     <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
                         <div className="space-y-4 pr-4"> {/* Add padding right */}
-                            {messages.map((message) => (
+                            {messages.map(message => (
                                 <ChatMessage key={message.id} message={message} />
                             ))}
                             {isLoading && messages[messages.length - 1]?.role === 'user' && (
@@ -2789,12 +2767,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
 ## File: `components\chat\chat-message.tsx`
 ```tsx
-// File: components/chat/chat-message.tsx
+// File: components/chat/chat-message.tsx (MODIFICADO)
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button'; // Importar Button
-import { User, BrainCircuit, AlertTriangle, FileText } from 'lucide-react'; // Importar FileText
+import { Button } from '@/components/ui/button';
+import { User, BrainCircuit, AlertTriangle, FileText } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { RetrievedDoc } from '@/lib/api';
@@ -2823,7 +2801,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isError = message.isError ?? false;
 
   return (
-    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end' : '')}>
+    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end pl-10' : 'pr-10')}> {/* Añadir padding opuesto */}
       {!isUser && (
         <Avatar className="h-8 w-8 border flex-shrink-0 bg-primary/10 text-primary">
            <AvatarFallback className="bg-transparent">
@@ -2833,43 +2811,41 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
       <div
         className={cn(
-          'max-w-[75%] rounded-xl p-3.5 text-sm shadow-sm', // MODIFICADO: Más redondeado y padding
+          'max-w-[80%] rounded-2xl p-3.5 text-sm shadow-md border', // Más redondeado, padding, sombra, borde
           isUser
-            ? 'bg-primary/90 text-primary-foreground' // MODIFICADO: Ligeramente más suave
+            ? 'bg-primary/90 text-primary-foreground border-primary/50' // Color y borde usuario
             : isError
-              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/20'
-              : 'bg-muted border border-border/50' // MODIFICADO: Añadido borde sutil
+              ? 'bg-destructive/10 text-destructive-foreground border-destructive/30' // Estilo error
+              : 'bg-background border-border' // Estilo asistente (fondo background para mejor contraste con muted)
         )}
       >
-         {/* El contenedor prose maneja bien el estilo del markdown */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
             </Markdown>
          </div>
 
-         {/* MODIFICADO: Sección de fuentes rediseñada */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
-            <div className="mt-3 pt-2.5 border-t border-border/50"> {/* Añadido margen superior */}
+            <div className="mt-3 pt-2.5 border-t border-border/50">
                 <p className="text-xs font-medium text-muted-foreground mb-1.5">Fuentes:</p>
-                <div className="flex flex-wrap gap-1.5"> {/* Usar flex-wrap para badges */}
+                <div className="flex flex-wrap gap-1.5">
                  {message.sources.map((doc, index) => (
                     <TooltipProvider key={doc.id || `source-${index}`} delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                {/* Usar un Button pequeño como fuente clickable */}
                                 <Button
-                                    variant="secondary"
-                                    size="sm" // Tamaño más pequeño
-                                    className="h-auto px-2 py-0.5 text-xs" // Ajustar padding y altura
+                                    variant="outline" // Cambiado a outline para mejor contraste
+                                    size="sm"
+                                    className="h-auto px-2 py-0.5 text-xs border-dashed" // Borde discontinuo
                                     onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
                                 >
-                                    <FileText className="h-3 w-3 mr-1" /> {/* Icono más pequeño */}
-                                    {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
+                                    <FileText className="h-3 w-3 mr-1 flex-shrink-0" />
+                                    <span className='truncate max-w-[150px]'> {/* Truncar texto largo */}
+                                     {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
+                                    </span>
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="max-w-xs text-xs">
-                                {/* MODIFICADO: Contenido del tooltip traducido y más informativo */}
                                 <p><b>Archivo:</b> {doc.file_name || 'N/D'}</p>
                                 <p><b>ID Fragmento:</b> {doc.id}</p>
                                 {doc.document_id && <p><b>ID Doc:</b> {doc.document_id}</p>}
@@ -2882,8 +2858,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 </div>
             </div>
          )}
-         {/* FIN MODIFICACIÓN SECCIÓN FUENTES */}
-
       </div>
       {isUser && (
          <Avatar className="h-8 w-8 border flex-shrink-0 bg-secondary text-secondary-foreground">
@@ -3073,14 +3047,14 @@ import { cn } from '@/lib/utils';
 // Interfaz local renombrada para claridad (usa la de la API)
 type DocumentStatus = DocumentStatusResponse;
 
-interface DocumentStatusListProps {
+export interface DocumentStatusListProps {
   documents: DocumentStatus[];
   authHeaders: AuthHeaders;
   onRetrySuccess: (documentId: string) => void;
   fetchMore: () => void;
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
-  deleteLocalDocument: (documentId: string) => void;
+  onDeleteSuccess: (documentId: string) => void;
 }
 
 // Helper con textos y estilos actualizados
@@ -3100,7 +3074,7 @@ const getStatusAttributes = (status: DocumentStatus['status']) => {
       }
 };
 
-export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, deleteLocalDocument }: DocumentStatusListProps) {
+export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, onDeleteSuccess }: DocumentStatusListProps) {
 
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
@@ -3133,7 +3107,7 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
     const id = toast.loading(`Eliminando ${display}...`);
     try {
       await deleteIngestDocument(documentId, authHeaders);
-      deleteLocalDocument(documentId);
+      onDeleteSuccess(documentId);
       toast.success('Documento eliminado', { id });
     } catch(e:any) {
       toast.error('Error al eliminar', { id, description: e.message || '' });
@@ -5291,7 +5265,7 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: lib/api.ts
+// File: lib/api.ts (MODIFICADO)
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
@@ -5345,11 +5319,9 @@ export async function request<T>(
         throw new ApiError(message, 500);
     }
 
-    // Obtener token desde localStorage
     let token: string | null = null;
-    if (typeof window !== 'undefined') { // Asegurarse que se ejecuta en el cliente
+    if (typeof window !== 'undefined') {
         token = localStorage.getItem(AUTH_TOKEN_KEY);
-        // console.log(`API Request to ${cleanEndpoint}: Token from localStorage ${token ? 'Present' : 'Absent'}`);
     } else {
         console.warn(`API Request: localStorage not available for ${cleanEndpoint} (SSR/Server Context?). Cannot get auth token.`);
     }
@@ -5364,15 +5336,12 @@ export async function request<T>(
              headers.set('Content-Type', 'application/json');
         }
     } else {
-        // Browsers usually set the correct Content-Type for FormData automatically, including the boundary.
-        // Explicitly setting it can sometimes cause issues. Let's remove it if body is FormData.
         headers.delete('Content-Type');
     }
 
-    // Añadir token al header si existe
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
-    } else if (!cleanEndpoint.includes('/api/v1/users/login')) { // No advertir para login
+    } else if (!cleanEndpoint.includes('/api/v1/users/login')) {
         console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
     }
 
@@ -5386,7 +5355,6 @@ export async function request<T>(
     try {
         const response = await fetch(apiUrl, config);
 
-        // --- Manejo de Errores ---
         if (!response.ok) {
             let errorData: ApiErrorData | null = null;
             let errorText = '';
@@ -5397,22 +5365,20 @@ export async function request<T>(
                 } else { errorText = await response.text(); }
             } catch (parseError) {
                  console.warn(`API Request: Could not parse error response body for ${response.status} ${response.statusText} from ${apiUrl}`, parseError);
-                 try { errorText = await response.text(); } catch {} // Try reading as text as fallback
+                 try { errorText = await response.text(); } catch {}
             }
 
             let errorMessage = `API Error (${response.status})`;
-            // Extraer mensaje significativo de la respuesta de error
             if (errorData) {
                 if (typeof errorData.detail === 'string') {
                     errorMessage = errorData.detail;
                 } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') {
-                    // Handle FastAPI validation errors
                     errorMessage = errorData.detail.map(d => `${d.loc ? d.loc.join('.')+': ' : ''}${d.msg}`).join('; ');
                 } else if (typeof errorData.message === 'string') {
                     errorMessage = errorData.message;
                 }
             } else if (errorText) {
-                errorMessage = errorText.substring(0, 200); // Limit length if it's HTML or long text
+                errorMessage = errorText.substring(0, 200);
             } else {
                 errorMessage = response.statusText || `Request failed with status ${response.status}`;
             }
@@ -5421,7 +5387,6 @@ export async function request<T>(
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
-        // --- Manejo de respuestas exitosas ---
         if (response.status === 204 || response.headers.get('content-length') === '0') {
             return null as T;
         }
@@ -5430,18 +5395,18 @@ export async function request<T>(
             const data: T = await response.json();
             return data;
         } catch (jsonError) {
-             const responseText = await response.text().catch(() => "Could not read response text."); // Try reading text if JSON fails
+             const responseText = await response.text().catch(() => "Could not read response text.");
              console.error(`API Request: Invalid JSON response from ${apiUrl}. Status: ${response.status}. Response Text: ${responseText}`, jsonError);
              throw new ApiError(`Invalid JSON response received from server.`, response.status);
         }
 
     } catch (error) {
         if (error instanceof ApiError) {
-             throw error; // Re-throw known API errors
+             throw error;
         } else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
              const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
              console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
-             throw new ApiError(networkErrorMsg, 0); // Use 0 or a specific code for network errors
+             throw new ApiError(networkErrorMsg, 0);
         } else {
              console.error(`API Request: Unexpected error during fetch to ${apiUrl}`, error);
              const message = error instanceof Error ? error.message : 'An unknown fetch error occurred.';
@@ -5449,8 +5414,6 @@ export async function request<T>(
         }
     }
 }
-
-// --- API Function Definitions ---
 
 // --- Ingest Service ---
 export interface IngestResponse {
@@ -5460,96 +5423,88 @@ export interface IngestResponse {
     message: string;
 }
 
-// Define AuthHeaders type for clarity
 export interface AuthHeaders {
   'X-Company-ID': string;
   'X-User-ID': string;
 }
 
-export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
   const formData = new FormData();
   formData.append('file', file);
-
   try {
-    // Pass auth headers directly to the request options
     const response = await request<IngestResponse>('/api/v1/ingest/upload', {
       method: 'POST',
-      headers: {
-        // Content-Type is handled by request for FormData
-        ...auth, // Spread the auth headers
-      },
+      headers: { ...auth },
       body: formData,
     });
     return response;
   } catch (error) {
     console.error('Error uploading document:', error);
-    // Re-throw the error (ApiError or other) for the caller to handle
-    // The request function already formats ApiError messages
     throw error;
   }
 }
 
 export interface DocumentStatusResponse {
     document_id: string;
-    status: string;
-    file_name?: string;
-    file_type?: string;
-    chunk_count?: number;
+    status: string; // 'uploaded', 'processing', 'processed', 'error'
+    file_name?: string | null;
+    file_type?: string | null;
+    chunk_count?: number | null; // Provided by backend after processing
     error_message?: string | null;
-    last_updated: string;
+    created_at?: string; // Add created_at for sorting/display
+    last_updated: string; // Backend provides this, use instead of updated_at
 }
 
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
   try {
-    // Pass auth headers directly to the request options
     const response = await request<DocumentStatusResponse[]>(endpoint, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...auth, // Spread the auth headers
+        ...auth,
       },
     });
-    // Handle potential null response if API could return 204, though unlikely for a list
     return response || [];
   } catch (error) {
     console.error('Error fetching document status list:', error);
-    // Re-throw the error (ApiError or other) for the caller to handle
     throw error;
   }
 }
 
-export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
-    return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
+// Función para obtener el estado detallado de UN documento (incluye conteos reales)
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
+    minio_exists?: boolean; // Flag desde backend verificando MinIO
+    milvus_chunk_count?: number; // Conteo real desde backend verificando Milvus
+    message?: string; // Mensaje detallado del backend
+}
+
+export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
+    // Pasar headers de autenticación necesarios para el endpoint individual
+    return request<DetailedDocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
+        method: 'GET',
+        headers: { ...auth } as Record<string, string> // Asegurar que los headers son Record<string, string>
+    });
 };
 
-export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
+
+export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> {
   const endpoint = `/api/v1/ingest/retry/${documentId}`;
   try {
-    // Pass auth headers directly to the request options
     const response = await request<IngestResponse>(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...auth, // Spread the auth headers
+        ...auth,
       },
-      // No body needed for this request
     });
-    // The request function handles 202 correctly if the API returns JSON
-    // If the API returns 202 with no body, request returns null. We might need to adjust
-    // based on actual API behavior for 202.
-    // Assuming the API returns the standard IngestResponse on 202 as per docs:
     if (!response) {
-        // This case might happen if the API returns 202 No Content, which contradicts the docs
-        // Returning a synthetic response or throwing an error might be needed.
-        // For now, let's assume the docs are correct and response is IngestResponse.
         console.warn(`Retry endpoint ${endpoint} returned unexpected null response.`);
         throw new ApiError('Retry initiated but no confirmation received.', 202);
     }
     return response;
   } catch (error) {
     console.error(`Error retrying ingest for document ${documentId}:`, error);
-    // Re-throw the error (ApiError or other) for the caller to handle
     throw error;
   }
 }
@@ -5561,21 +5516,21 @@ export async function retryIngestDocument(documentId: string, auth: AuthHeaders)
 export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
   await request<null>(`/api/v1/ingest/${documentId}`, {
     method: 'DELETE',
-    headers: { ...auth } as Record<string, string>,
+    headers: { ...auth } as Record<string, string>, // Asegurar tipo correcto para headers
   });
 }
 
+
 // --- Query Service ---
 export interface RetrievedDocApi {
-    id: string; // Chunk ID
-    document_id: string; // ID del documento original
+    id: string;
+    document_id: string;
     file_name: string;
-    content: string; // Contenido completo del chunk (puede ser largo)
-    content_preview: string; // Vista previa corta del contenido
-    metadata: Record<string, any> | null; // Metadata asociada al chunk/documento
-    score: number; // Puntuación de relevancia
+    content: string;
+    content_preview: string;
+    metadata: Record<string, any> | null;
+    score: number;
 }
-// El tipo frontend puede ser igual al de la API por ahora
 export type RetrievedDoc = RetrievedDocApi;
 
 export interface ChatSummary {
@@ -5596,9 +5551,9 @@ export interface ChatMessageApi {
         document_id: string;
         file_name: string;
         score: number;
-        preview: string; // Este campo está en la API de mensajes, usarlo en el mapeo si es necesario
+        preview: string;
     }> | null;
-    created_at: string; // La API garantiza este campo para mensajes
+    created_at: string;
 }
 
 export interface QueryPayload {
@@ -5609,19 +5564,32 @@ export interface QueryPayload {
 
 export interface QueryApiResponse {
     answer: string;
-    retrieved_documents: RetrievedDocApi[]; // Usa la interfaz definida arriba
-    query_log_id: string | null; // Puede ser null
-    chat_id: string; // La API de Ask garantiza devolver esto
+    retrieved_documents: RetrievedDocApi[];
+    query_log_id: string | null;
+    chat_id: string;
 }
 
 export const getChats = async (limit: number = 50, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     return request<ChatSummary[]>(endpoint);
+     // Añadir try-catch para manejar errores específicos de getChats si es necesario
+     try {
+        return await request<ChatSummary[]>(endpoint);
+     } catch (error) {
+         console.error("Error fetching chats:", error);
+         // Podrías devolver [] o re-lanzar el error según prefieras
+         // if (error instanceof ApiError && error.status === 401) // ...
+         throw error;
+     }
 };
 
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     return request<ChatMessageApi[]>(endpoint);
+     try {
+        return await request<ChatMessageApi[]>(endpoint);
+     } catch (error) {
+         console.error(`Error fetching messages for chat ${chatId}:`, error);
+         throw error;
+     }
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
@@ -5629,6 +5597,7 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
          ...payload,
          chat_id: payload.chat_id || null
      };
+     // No es necesario un try-catch aquí si request ya maneja errores
      return request<QueryApiResponse>('/api/v1/query/ask', {
         method: 'POST',
         body: JSON.stringify(body),
@@ -5637,7 +5606,8 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
-     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
+    // No es necesario un try-catch aquí si request ya maneja errores
+    await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
 // --- Auth Service ---
@@ -5647,7 +5617,7 @@ interface LoginPayload {
 }
 export interface LoginResponse {
     access_token: string;
-    token_type: string; // "bearer"
+    token_type: string;
     user_id: string;
     email: string;
     full_name: string;
@@ -5655,12 +5625,11 @@ export interface LoginResponse {
     company_id: string;
 }
 
+// --- Type Mapping Helpers ---
 export const mapApiSourcesToFrontend = (
     apiSources: ChatMessageApi['sources']
 ): RetrievedDoc[] | undefined => {
-    if (!apiSources) {
-        return undefined;
-    }
+    if (!apiSources) return undefined;
     return apiSources.map(source => ({
         id: source.chunk_id,
         document_id: source.document_id,
@@ -5674,7 +5643,6 @@ export const mapApiSourcesToFrontend = (
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
-
     return {
         id: apiMessage.id,
         role: apiMessage.role,
@@ -5963,7 +5931,7 @@ export const useAuth = (): AuthContextType => {
 
 ## File: `lib\hooks\useDocumentStatuses.ts`
 ```ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getDocumentStatusList, DocumentStatusResponse, AuthHeaders, ApiError, getDocumentStatus } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 
@@ -6040,17 +6008,13 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
   }, [fetchDocuments, isLoading, hasMore]);
 
   const refreshDocument = useCallback(async (documentId: string) => {
-    const authHeaders: AuthHeaders = {
-      'X-User-ID': user?.userId || '',
-      'X-Company-ID': user?.companyId || '',
-    };
     try {
-      const updated = await getDocumentStatus(documentId, authHeaders);
+      const updated = await getDocumentStatus(documentId);
       setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updated : doc));
     } catch {
       // ignore errors
     }
-  }, [user]);
+  }, []);
 
   const deleteLocalDocument = useCallback((documentId: string) => {
     setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
@@ -6147,7 +6111,7 @@ export function useUploadDocument(onSuccess?: (response: IngestResponse) => void
 
 ## File: `lib\utils.ts`
 ```ts
-// File: lib/utils.ts
+// File: lib/utils.ts (MODIFICADO)
 // Purpose: General utility functions, including CN for classnames and API URL retrieval.
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
@@ -6165,39 +6129,73 @@ export function cn(...inputs: ClassValue[]) {
 export function getApiGatewayUrl(): string {
     const apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL;
 
-    // Log para depuración: muestra la URL que está obteniendo del entorno
     console.log(`getApiGatewayUrl: NEXT_PUBLIC_API_GATEWAY_URL = ${apiUrl}`);
 
     if (!apiUrl) {
         const errorMessage = "CRITICAL: NEXT_PUBLIC_API_GATEWAY_URL environment variable is not set.";
         console.error(errorMessage);
 
-        // Throw error in production/staging environments
-        // process.env.NODE_ENV is reliable for this check in Next.js
         if (process.env.NODE_ENV === 'production') {
-             // En Vercel, usa VERCEL_ENV para distinguir preview de production si es necesario
-             // if (process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview') {
              console.error("API Gateway URL must be set in production environment variables.");
              throw new Error("API Gateway URL is not configured for production.");
-             // }
         }
 
-        // Provide a default for local development ONLY, with a clear warning.
-        // Usa la URL de Ngrok que SÍ funciona según los logs del frontend.
         const defaultDevUrl = "https://1942-2001-1388-53a1-a7c9-241c-4a44-2b12-938f.ngrok-free.app";
         console.warn(`⚠️ ${errorMessage} Using default development Ngrok URL: ${defaultDevUrl}. Make sure this matches your current ngrok tunnel!`);
-        return defaultDevUrl; // Return default for local dev only
+        return defaultDevUrl;
     }
 
-    // Ensure URL format is valid (basic check)
     if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
         console.error(`Invalid API Gateway URL format: ${apiUrl}. Must start with http:// or https://`);
         throw new Error(`Invalid API Gateway URL format: ${apiUrl}`);
     }
 
-     // Remove trailing slash if exists to prevent double slashes in requests
     return apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 }
+
+// --- NUEVO: Helpers para manejo local de queries ---
+
+/**
+ * Detecta saludos comunes en español o inglés.
+ * @param text - El texto de entrada.
+ * @returns `true` si es un saludo, `false` en caso contrario.
+ */
+export function isGreeting(text: string): boolean {
+  const msg = text.trim().toLowerCase();
+  // Regex mejorada para cubrir más variaciones y evitar falsos positivos
+  return /^\s*(hola|hello|hi|hey|buen(os)?\s+(d[íi]as?|tardes?|noches?))\s*[!¡?.]*\s*$/i.test(msg);
+}
+
+/**
+ * Detecta preguntas sobre las capacidades o información del asistente.
+ * @param text - El texto de entrada.
+ * @returns `true` si es una consulta meta, `false` en caso contrario.
+ */
+export function isMetaQuery(text: string): boolean {
+  const msg = text.trim().toLowerCase();
+  const patterns = [
+    /\b(qu[ée] puedes hacer|cu[áa]les son tus func|capacidades|capabilities)\b/i, // Qué puedes hacer, capacidades
+    /\b(qui[ée]n eres|what are you)\b/i, // Quién eres
+    /\b(qu[ée] informaci[óo]n (tienes|posees)|what info)\b/i, // Qué información tienes
+    /\b(ayuda|help|soporte|support)\b/i, // Ayuda/Soporte
+  ];
+  return patterns.some(pattern => pattern.test(msg));
+}
+
+/**
+ * Genera una respuesta estándar para consultas meta.
+ * @returns Una cadena con la respuesta predefinida.
+ */
+export function getMetaResponse(): string {
+  // Respuesta más elaborada y útil
+  return `Soy Atenex, tu asistente de inteligencia artificial diseñado para ayudarte a explorar y consultar la base de conocimiento de tu organización. Puedo:
+- Buscar información específica dentro de los documentos cargados.
+- Responder preguntas basadas en el contenido de esos documentos.
+- Mostrarte las fuentes de donde extraje la información.
+
+Simplemente hazme una pregunta sobre el contenido que esperas encontrar.`;
+}
+// --- FIN Helpers ---
 ```
 
 ## File: `next-env.d.ts`
@@ -6207,5 +6205,129 @@ export function getApiGatewayUrl(): string {
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+```
+
+## File: `refactorizacion.md`
+```md
+# Plan de Refactorización - Atenex Frontend
+
+## 1. Objetivos Generales
+
+- Mejorar la mantenibilidad y escalabilidad del código.
+- Resolver incidencias críticas detectadas en UI/UX y flujos principales.
+- Optimizar la experiencia de usuario (chat, historial, base de conocimiento, ajustes).
+- Modernizar el diseño según buenas prácticas actuales.
+
+## 2. Alcance y Contexto
+
+Este plan contempla cambios en los siguientes ámbitos:
+
+- Interfaz de Chat y Gestión de Historial (`/app/(app)/chat`, `components/chat`).
+- Gestión de la Base de Conocimiento (`/app/(app)/knowledge`, `components/knowledge`).
+- Página de Ajustes (`/app/(app)/settings`).
+- Diseño global y componentes UI (`components/ui`, `globals.css`, `theme-provider`).
+
+Se alineará con la arquitectura de rutas de Next.js App Router y el Query Service del backend.
+
+## 3. Áreas Clave a Refactorizar
+
+### 3.1 Chat Interface & Historial
+
+- Añadir acción de eliminación de chat con:
+  - Icono/trash en cada entry del historial (`components/chat/chat-history.tsx`).
+  - Diálogo de confirmación (`AlertDialog`).
+  - Lógica de `deleteChat` y gestión de estado local y redirección.
+- Refactorizar carga de historial y estado de borrado (`isDeleting`).
+- Handling de saludos y consultas meta: extraer lógica en helper reutilizable.
+
+### 3.2 Base de Conocimiento
+
+- Corregir endpoint de eliminación de documento (422). Verificar payload en `deleteIngestDocument`.
+- Feedback UX: toasts de éxito y actualización automática de lista.
+- Añadir leyenda/tooltips para estados, "Chunks" y "Última actualización".
+- Consolidar lógica de retry/reload de estado en hook `useDocumentStatuses`.
+
+### 3.3 Ajustes y Perfil de Usuario
+
+- Clarificar editabilidad de campos en `SettingsPage`.
+- Habilitar o deshabilitar botón "Guardar" según cambios reales.
+- Eliminar secciones no implementadas hasta su desarrollo.
+
+### 3.4 UI/UX Modernización
+
+- Revisar paleta de colores y tipografía en `globals.css` y `tailwind.config.js`.
+- Uniformizar estilo de burbujas de chat (`ChatMessage`): esquinas, sombras.
+- Añadir micro-interacciones en apertura/cierre de paneles y botones.
+- Mejorar legibilidad de tablas (`DocumentStatusList`): filas alternadas, paddings.
+- Validar consistencia de iconografía (Lucide) y componentes de shadcn/ui.
+
+## 4. Plan de Iteraciones y Checklist
+
+### Iteración 1: Scaffolding y Preparación
+- [x] Crear archivo `refactorizacion.md` con plan detallado.
+- [x] Configurar ramas git y naming conventions (`feature/refactor-chat`, etc.).
+
+### Iteración 2: Chat Deletion UI + Lógica
+- [x] Implementar icono `Trash2` en `ChatHistory`.
+- [x] Añadir `AlertDialog` para confirmar eliminación.
+- [x] Integrar llamada a `deleteChat` y manejo de estados.
+
+### Iteración 3: Arreglo de Document Deletion
+- [x] Depurar payload de `deleteIngestDocument` en `lib/api.ts`.
+- [x] Ajustar `DocumentStatusList` y `KnowledgePage` para refrescar lista tras eliminación.
+- [x] Renombrar prop `deleteLocalDocument` a `onDeleteSuccess` en `KnowledgePage`.
+- [x] Añadir toasts de éxito.
+
+### Iteración 4: Mejoras en Lógica de RAG/Greetings
+- [x] Extraer función `isGreeting` en util genérica.
+- [x] Ajustar `handleSendMessage` en `ChatPage` para distinguir meta-consultas y manejar saludos.
+- [x] Mostrar mensaje meta-informativo configurable.
+- [ ] Validar con mocks de API.
+
+### Iteración 5: Leyendas y Datos en Knowledge Table
+- [x] Añadir leyenda de colores y tooltips explicativos.
+- [x] Mostrar contabilización real de chunks y timestamp de `last_updated`.
+- [ ] Refactor en hook `useDocumentStatuses` para exponer metadata.
+
+### Iteración 6: Refinar Página de Ajustes
+- [x] Hacer campo "Nombre" editable o read-only.
+- [x] Habilitar/deshabilitar botón "Guardar" dinámicamente.
+- [x] Eliminar secciones vacías hasta su implementación.
+
+### Iteración 7: Modernización de UI/UX
+- [ ] Revisar espaciados y tipografía de componentes base.
+- [ ] Añadir transiciones CSS en apertura de paneles.
+- [ ] Ajustar estilo de burbujas en `ChatMessage`.
+- [ ] Aplicar alternancia de colores de fila en tablas.
+
+### Iteración 8: QA y Documentación
+- [ ] Actualizar `README.md` con nuevas instrucciones de uso.
+- [ ] Documentar nuevas props, hooks y utilidades en `refactorizacion.md`.
+
+## 5. Componentes y Rutas Afectados
+
+| Área                         | Archivo / Ruta                                          |
+| ---------------------------- | ------------------------------------------------------- |
+| Chat History                 | `components/chat/chat-history.tsx`                      |
+| Chat Interface               | `app/(app)/chat/[[...chatId]]/page.tsx`                 |
+| Knowledge List               | `components/knowledge/document-status-list.tsx`         |
+| FileUploader                 | `components/knowledge/file-uploader.tsx`                |
+| Settings Page                | `app/(app)/settings/page.tsx`                          |
+| API Client (delete endpoints)| `lib/api.ts`                                            |
+| Global Styles & Themes       | `globals.css`, `tailwind.config.js`, `theme-provider.tsx` |
+
+## 6. Buenas Prácticas y Consejos
+
+- Mantener hooks puros y enfocados (una responsabilidad).
+- Usar React Query o SWR para gestión de caché en futuras iteraciones.
+- Centralizar lógica de toasts y diálogos en servicios/utilities.
+- Seguir convenciones de nombres y estructura de rutas de Next.js.
+- Escribir tests paralelos a la implementación para prevenir regresiones.
+- Realizar code reviews y pair programming en bloqueos críticos.
+
+---
+
+> _Este archivo sirve como guía de alto nivel. Cada iteración debe incluir PRs atómicos y validación visual de UI/UX según diseño._
 
 ```

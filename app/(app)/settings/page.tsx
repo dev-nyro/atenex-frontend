@@ -1,4 +1,4 @@
-// File: app/(app)/settings/page.tsx
+// File: app/(app)/settings/page.tsx (MODIFICADO)
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -13,29 +13,38 @@ import { toast } from 'sonner'; // Para notificaciones
 export default function SettingsPage() {
     const { user } = useAuth();
     const [name, setName] = useState(user?.name || '');
-    const [isSaving, setIsSaving] = useState(false); // Estado para el botón
+    const [isSaving, setIsSaving] = useState(false);
+    // Estado para rastrear si el nombre ha cambiado
+    const [hasChanged, setHasChanged] = useState(false);
 
     useEffect(() => {
         if (user) {
-            setName(user.name || '');
+            const currentName = user.name || '';
+            setName(currentName);
+            // Resetear cambio cuando el usuario cambie o se cargue inicialmente
+            setHasChanged(false);
         }
     }, [user]);
 
     const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setName(event.target.value);
+        const newName = event.target.value;
+        setName(newName);
+        // Verificar si el nuevo nombre es diferente al original del usuario
+        setHasChanged(newName !== (user?.name || ''));
     };
 
     const handleSave = async () => {
+        // No hacer nada si no hay cambios
+        if (!hasChanged) return;
+
         setIsSaving(true);
-        // TODO: Implementar llamada API real a /users/me/update o similar
         console.log('Guardando cambios (simulado):', { name });
         try {
-          // Simular llamada a API
           await new Promise(resolve => setTimeout(resolve, 1000));
-          // Aquí iría la llamada real: await updateUserProfile({ name });
           toast.success("Perfil Actualizado", { description: "Tu nombre ha sido guardado." });
-          // Opcional: actualizar el estado global del usuario si el nombre cambia
-          // (requeriría una función updateUser en useAuth)
+          // Una vez guardado, marcar que ya no hay cambios pendientes
+          setHasChanged(false);
+          // TODO: Idealmente, actualizar el 'user' en el AuthContext si la API devuelve el usuario actualizado
         } catch (error) {
           console.error("Error al guardar perfil:", error);
           toast.error("Error al Guardar", { description: "No se pudo actualizar el perfil." });
@@ -68,7 +77,8 @@ export default function SettingsPage() {
                  <Input id="email" type="email" defaultValue={user?.email} disabled />
                  <p className="text-xs text-muted-foreground">El correo electrónico no se puede cambiar.</p>
             </div>
-             <Button onClick={handleSave} disabled={isSaving || name === (user?.name || '')}>
+             {/* Deshabilitar si está guardando O si no hay cambios */}
+             <Button onClick={handleSave} disabled={isSaving || !hasChanged}>
                 {isSaving ? "Guardando..." : "Guardar Cambios"}
              </Button>
         </CardContent>
@@ -76,6 +86,7 @@ export default function SettingsPage() {
 
        <Separator />
 
+       {/* Sección de Empresa Mantenida por ahora, pero marcada como no implementada */}
        <Card>
         <CardHeader>
           <CardTitle>Configuración de la Empresa</CardTitle>
@@ -83,15 +94,15 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
            <p className="text-sm text-muted-foreground">La gestión de la configuración de la empresa aún no está implementada.</p>
-           {/* Placeholder para futuras opciones */}
-           {/* <div className="space-y-2 mt-4">
-                <Label htmlFor="companyName">Nombre de la Empresa</Label>
-                <Input id="companyName" defaultValue={user?.companyId} disabled/>
-           </div> */}
         </CardContent>
       </Card>
 
-       <Separator />
+       {/* ELIMINADO: Sección de Apariencia Redundante */}
+       {/* <Separator />
+       <Card>
+        <CardHeader>...</CardHeader>
+        <CardContent>...</CardContent>
+      </Card> */}
 
     </div>
   );
