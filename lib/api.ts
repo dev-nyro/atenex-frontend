@@ -231,16 +231,14 @@ export async function uploadDocument(file: File, auth: AuthHeaders): Promise<Ing
 
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // string como fallback. 'indexed' eliminado por ahora.
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
-    error_message?: string | null;
-    created_at?: string; // Timestamp de creación
-    updated_at?: string; // Timestamp de última actualización (más útil que last_updated)
-    // file_path?: string | null; // Probablemente no necesario en el frontend listado
-    // message?: string | null; // Mensaje específico de /status/{id}, no garantizado en la lista
-    // metadata?: Record<string, any> | null; // No esencial para la lista de estado
+    status: 'uploaded' | 'processing' | 'processed' | 'error';
+    file_name: string;
+    file_type: string;
+    chunk_count: number;
+    error_message: string | null;
+    minio_exists?: boolean;
+    milvus_chunk_count?: number;
+    last_updated: string;
 }
 
 // --- MODIFICACIÓN: Usar request y añadir params --- 

@@ -3,6 +3,7 @@
 import React from 'react'; // No se necesita useState, useEffect, useCallback aquí
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; // Import Button
+import { Card, CardContent } from '@/components/ui/card'; // Wrap panels in Cards
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses'; // Hook para estados
@@ -83,66 +84,69 @@ export default function KnowledgePage() {
       <h1 className="text-2xl font-semibold">Gestionar Base de Conocimiento</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8"> {/* Aumentado gap */}
-        {/* Columna de subida */}
-        <div className="lg:col-span-1 space-y-4"> {/* Añadido space-y */}
-          <h2 className="text-lg font-medium">Subir Nuevo Documento</h2>
-          {authHeadersForChildren ? (
-            <FileUploader
-              authHeaders={authHeadersForChildren}
-              onUploadFile={uploadFile} // Pasar la función de subida del hook
-              isUploading={isUploading} // Pasar estado de carga del hook
-              uploadError={uploadError} // Pasar error de subida del hook
-              clearUploadStatus={clearUploadStatus} // Pasar función para limpiar estado
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
-              Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
-            </p>
-          )}
-        </div>
+        {/* Panel de Subida */}
+        <Card className="lg:col-span-1">
+          <CardContent className="space-y-4">
+            <h2 className="text-lg font-medium">Subir Nuevo Documento</h2>
+            {authHeadersForChildren ? (
+              <FileUploader
+                authHeaders={authHeadersForChildren}
+                onUploadFile={uploadFile}
+                isUploading={isUploading}
+                uploadError={uploadError}
+                clearUploadStatus={clearUploadStatus}
+              />
+            ) : (
+              <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
+                Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Columna de listado */}
-        <div className="lg:col-span-2 space-y-4"> {/* Wrap list column content */}
-           <div className='flex justify-between items-center'>
+        {/* Panel de Lista de Documentos */}
+        <Card className="lg:col-span-2">
+          <CardContent className="space-y-4">
+            <div className='flex justify-between items-center'>
               <h2 className="text-lg font-medium">Documentos Subidos</h2>
-              {/* Botón opcional para refrescar manualmente */}
               {authHeadersForChildren && (
-                 <Button variant="outline" size="sm" onClick={fetchDocuments} disabled={isLoadingDocuments}>
-                    <Loader2 className={`mr-2 h-4 w-4 ${isLoadingDocuments ? 'animate-spin' : 'hidden'}`} /> {/* Use template literal for class */}
-                    Refrescar Lista
-                 </Button>
-             )}
-          </div>
+                <Button variant="outline" size="sm" onClick={fetchDocuments} disabled={isLoadingDocuments}>
+                  <Loader2 className={isLoadingDocuments ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
+                  Refrescar Lista
+                </Button>
+              )}
+            </div>
 
-          {/* Mostrar error de carga de la lista */}
-          {documentsError && (
-              <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
-                Error al cargar documentos: {documentsError}
-              </div>
-          )}
+            {/* Mostrar error de carga de la lista */}
+            {documentsError && (
+                <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
+                  Error al cargar documentos: {documentsError}
+                </div>
+            )}
 
-          {/* Mostrar estado de carga de la lista */}
-          {isLoadingDocuments ? (
-             <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-             </div>
-          ) : (
-            // Renderizar la lista solo si hay headers (usuario logueado)
-            authHeadersForChildren ? (
+            {/* Mostrar estado de carga de la lista */}
+            {isLoadingDocuments ? (
+               <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+               </div>
+            ) : (
+              // Renderizar la lista solo si hay headers (usuario logueado)
+              authHeadersForChildren ? (
                 <DocumentStatusList
                   documents={documents}
                   isLoading={false}
                   onRetrySuccess={handleRetrySuccess}
-                  authHeaders={authHeadersForChildren} // Pasar headers por si se necesitan dentro
+                  authHeaders={authHeadersForChildren}
                 />
-            ) : (
+              ) : (
                 // Mensaje si no está cargando, no hay error y no hay usuario
                 !documentsError && <p className="text-muted-foreground text-center py-6">Inicia sesión para ver tus documentos.</p>
-            )
-          )}
-        </div> {/* Close list column wrapper */}
+              )
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
