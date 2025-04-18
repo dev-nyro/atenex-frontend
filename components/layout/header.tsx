@@ -1,4 +1,4 @@
-// File: components/layout/header.tsx
+// File: components/layout/header.tsx (MODIFICADO - Espaciado iconos derecha)
 "use client";
 
 import React from 'react';
@@ -35,7 +35,6 @@ export function Header() {
       console.log("Header: Initiating logout...");
       try {
           await signOut();
-          // Mensajes de Toast ya traducidos en useAuth
       } catch (error) {
           console.error("Header: Logout failed unexpectedly.", error);
       }
@@ -49,7 +48,8 @@ export function Header() {
          </Button>
       </div>
 
-      <div className="flex items-center space-x-2 md:space-x-4">
+      {/* MODIFICADO: Ajustado espaciado a space-x-2 */}
+      <div className="flex items-center space-x-2">
         <ThemePaletteButton />
 
          <Button variant="ghost" size="icon" onClick={() => router.push('/help')} aria-label="Ayuda y Soporte">

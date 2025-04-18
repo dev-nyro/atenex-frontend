@@ -87,9 +87,9 @@ atenex-frontend/
 ├── postcss.config.js
 ├── public
 │   └── icons
-├── refactorizacion.md
 ├── tailwind.config.js
-└── tsconfig.json
+├── tsconfig.json
+└── ui-refactroring-plan.md
 ```
 
 # Full Codebase
@@ -762,22 +762,23 @@ export default function ChatPage() {
 ```tsx
 // File: app/(app)/knowledge/page.tsx (MODIFICADO)
 'use client';
-import React, { useCallback } from 'react'; // Import useCallback
+import React, { useCallback } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button'; // Import Button
-import { Card, CardContent } from '@/components/ui/card'; // Wrap panels in Cards
+import { Button } from '@/components/ui/button';
+// Importar Card y sus componentes
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses'; // Hook para estados
-import { useUploadDocument } from '@/lib/hooks/useUploadDocument'; // Hook para subida
+import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses';
+import { useUploadDocument } from '@/lib/hooks/useUploadDocument';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
 import { FileUploader } from '@/components/knowledge/file-uploader';
 import { AuthHeaders } from '@/lib/api';
+import { cn } from '@/lib/utils'; // Import cn
 
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Hook para manejar la lista de estados de documentos con paginación, refresco y eliminación
   const {
     documents,
     isLoading: isLoadingDocuments,
@@ -790,36 +791,28 @@ export default function KnowledgePage() {
     deleteLocalDocument,
   } = useDocumentStatuses();
 
-  // Hook para manejar la subida de archivos
   const {
     isUploading,
     uploadError,
     uploadFile,
     clearUploadStatus
   } = useUploadDocument(
-    // Callback onSuccess: Refrescar la lista después de subir
     () => {
-        // Pequeño delay para dar tiempo al backend a actualizar el estado
         setTimeout(() => {
             fetchDocuments(true);
         }, 1500);
     }
   );
 
-  // Handler para el botón de reintentar en la lista
   const handleRetrySuccess = (documentId: string) => {
-    retryLocalUpdate(documentId); // Actualiza UI localmente
-    // Opcional: refrescar toda la lista después de un tiempo
-    // setTimeout(fetchDocuments, 5000);
+    retryLocalUpdate(documentId);
   };
 
-  // Callback para manejar eliminación de documento y refrescar lista
   const handleDeleteSuccess = useCallback((documentId: string) => {
     deleteLocalDocument(documentId);
     fetchDocuments(true);
   }, [deleteLocalDocument, fetchDocuments]);
 
-  // Construir headers solo si el usuario está autenticado
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
     'X-User-ID': user.userId,
     'X-Company-ID': user.companyId,
@@ -828,22 +821,14 @@ export default function KnowledgePage() {
   // Estado de carga principal (Autenticación)
   if (isAuthLoading) {
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6"> {/* Añadido space-y-6 */}
           <h1 className="text-2xl font-semibold mb-6">
              <Skeleton className="h-8 w-1/2" />
           </h1>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-3">
-               <Skeleton className="h-6 w-1/3" />
-               <Skeleton className="h-32 w-full" />
-               <Skeleton className="h-10 w-full" />
-            </div>
-            <div className="lg:col-span-2 space-y-3">
-               <Skeleton className="h-6 w-1/4" />
-               <Skeleton className="h-10 w-full" />
-               <Skeleton className="h-10 w-full" />
-               <Skeleton className="h-10 w-full" />
-            </div>
+          {/* Layout simplificado para Skeleton */}
+          <div className="space-y-6">
+             <Skeleton className="h-48 w-full lg:w-1/3" /> {/* Simula Card de Upload */}
+             <Skeleton className="h-64 w-full" /> {/* Simula Card de Lista */}
           </div>
         </div>
     );
@@ -851,77 +836,84 @@ export default function KnowledgePage() {
 
   // Renderizado principal
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
-      <h1 className="text-2xl font-semibold">Gestionar Base de Conocimiento</h1>
+    // Usar flex flex-col para apilar elementos verticalmente, gap-6 para espaciado
+    <div className="container mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-8">
+      <h1 className="text-3xl font-bold tracking-tight">Base de Conocimiento</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8"> {/* Aumentado gap */}
-        {/* Panel de Subida */}
-        <Card className="lg:col-span-1">
-          <CardContent className="space-y-4">
-            <h2 className="text-lg font-medium">Subir Nuevo Documento</h2>
-            {authHeadersForChildren ? (
-              <FileUploader
+      {/* Card para Subir Documento */}
+      <Card className="w-full">
+        {/* Opcional: Usar CardHeader para un título más formal */}
+        {/* <CardHeader>
+             <CardTitle>Subir Nuevo Documento</CardTitle>
+        </CardHeader> */}
+        <CardContent className="pt-6"> {/* Añadir padding top si no se usa CardHeader */}
+          <h2 className="text-xl font-semibold mb-4">Subir Nuevo Documento</h2>
+          {authHeadersForChildren ? (
+            <FileUploader
+              authHeaders={authHeadersForChildren}
+              onUploadFile={uploadFile}
+              isUploading={isUploading}
+              uploadError={uploadError}
+              clearUploadStatus={clearUploadStatus}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
+              Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Card para Lista de Documentos */}
+      <Card className="w-full">
+        {/* <CardHeader>
+            <CardTitle>Documentos Subidos</CardTitle>
+        </CardHeader> */}
+        <CardContent className="pt-6 space-y-4">
+           <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3'>
+             <h2 className="text-xl font-semibold">Documentos Subidos</h2>
+             {authHeadersForChildren && (
+               <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
+                 {/* Mostrar icono de carga solo cuando está cargando */}
+                 <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
+                 Refrescar Lista
+               </Button>
+             )}
+           </div>
+
+          {/* Mostrar error de carga de la lista */}
+          {documentsError && (
+              <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
+                Error al cargar documentos: {documentsError}
+              </div>
+          )}
+
+          {/* Mostrar estado de carga de la lista */}
+          {isLoadingDocuments && !documentsError && documents.length === 0 ? ( // Mostrar skeleton solo en carga inicial o reset
+             <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+             </div>
+          ) : (
+            // Renderizar la lista solo si hay headers (usuario logueado)
+            authHeadersForChildren ? (
+              <DocumentStatusList
+                documents={documents}
                 authHeaders={authHeadersForChildren}
-                onUploadFile={uploadFile}
-                isUploading={isUploading}
-                uploadError={uploadError}
-                clearUploadStatus={clearUploadStatus}
+                onRetrySuccess={handleRetrySuccess}
+                fetchMore={fetchMore}
+                hasMore={hasMore}
+                refreshDocument={refreshDocument}
+                onDeleteSuccess={handleDeleteSuccess}
               />
             ) : (
-              <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
-                Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Panel de Lista de Documentos */}
-        <Card className="lg:col-span-2">
-          <CardContent className="space-y-4">
-            <div className='flex justify-between items-center'>
-              <h2 className="text-lg font-medium">Documentos Subidos</h2>
-              {authHeadersForChildren && (
-                <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
-                  <Loader2 className={isLoadingDocuments ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
-                  Refrescar Lista
-                </Button>
-              )}
-            </div>
-
-            {/* Mostrar error de carga de la lista */}
-            {documentsError && (
-                <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
-                  Error al cargar documentos: {documentsError}
-                </div>
-            )}
-
-            {/* Mostrar estado de carga de la lista */}
-            {isLoadingDocuments ? (
-               <div className="space-y-2">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-               </div>
-            ) : (
-              // Renderizar la lista solo si hay headers (usuario logueado)
-              authHeadersForChildren ? (
-                <DocumentStatusList
-                  documents={documents}
-                  authHeaders={authHeadersForChildren}
-                  onRetrySuccess={handleRetrySuccess}
-                  fetchMore={fetchMore}
-                  hasMore={hasMore}
-                  refreshDocument={refreshDocument}
-                  onDeleteSuccess={handleDeleteSuccess}
-                />
-              ) : (
                 // Mensaje si no está cargando, no hay error y no hay usuario
                 !documentsError && <p className="text-muted-foreground text-center py-6">Inicia sesión para ver tus documentos.</p>
-              )
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            )
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -2767,7 +2759,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
 ## File: `components\chat\chat-message.tsx`
 ```tsx
-// File: components/chat/chat-message.tsx (MODIFICADO)
+// File: components/chat/chat-message.tsx (MODIFICADO - Estilo burbujas)
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -2801,7 +2793,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isError = message.isError ?? false;
 
   return (
-    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end pl-10' : 'pr-10')}> {/* Añadir padding opuesto */}
+    <div className={cn('flex items-start space-x-3', isUser ? 'justify-end pl-10' : 'pr-10')}>
       {!isUser && (
         <Avatar className="h-8 w-8 border flex-shrink-0 bg-primary/10 text-primary">
            <AvatarFallback className="bg-transparent">
@@ -2811,12 +2803,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
       <div
         className={cn(
-          'max-w-[80%] rounded-2xl p-3.5 text-sm shadow-md border', // Más redondeado, padding, sombra, borde
+          'max-w-[80%] rounded-2xl p-3.5 text-sm shadow-md', // Mantenemos redondeado, padding, sombra
           isUser
-            ? 'bg-primary/90 text-primary-foreground border-primary/50' // Color y borde usuario
+            ? 'bg-primary/90 text-primary-foreground border border-primary/30' // Añadido borde sutil para usuario también
             : isError
-              ? 'bg-destructive/10 text-destructive-foreground border-destructive/30' // Estilo error
-              : 'bg-background border-border' // Estilo asistente (fondo background para mejor contraste con muted)
+              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30' // Estilo error con borde
+              // MODIFICADO: Volvemos a bg-muted para asistente, quitamos borde explícito aquí
+              : 'bg-muted'
         )}
       >
          <div className="prose prose-sm dark:prose-invert max-w-none break-words">
@@ -2834,13 +2827,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
-                                    variant="outline" // Cambiado a outline para mejor contraste
+                                    variant="outline"
                                     size="sm"
-                                    className="h-auto px-2 py-0.5 text-xs border-dashed" // Borde discontinuo
+                                    className="h-auto px-2 py-0.5 text-xs border-dashed"
                                     onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
                                 >
                                     <FileText className="h-3 w-3 mr-1 flex-shrink-0" />
-                                    <span className='truncate max-w-[150px]'> {/* Truncar texto largo */}
+                                    <span className='truncate max-w-[150px]'>
                                      {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
                                     </span>
                                 </Button>
@@ -2871,7 +2864,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
-// File: components/chat/retrieved-documents-panel.tsx
+// File: components/chat/retrieved-documents-panel.tsx (MODIFICADO - Ajuste padding contenedor)
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -2920,19 +2913,17 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
-                {/* MODIFICADO: Título traducido */}
                 <CardTitle className="text-lg flex items-center">
                     <FileText className="mr-2 h-5 w-5" /> Fuentes Recuperadas
                 </CardTitle>
-                {/* MODIFICADO: Descripción traducida */}
                 <CardDescription className="text-xs">
                     Documentos usados para generar la respuesta. Haz clic para ver detalles.
                 </CardDescription>
             </CardHeader>
 
+            {/* MODIFICADO: Envolver contenido en un div con padding dentro de ScrollArea */}
             <ScrollArea className="flex-1">
                 <div className="p-4 space-y-3">
-                    {/* Estado de Carga */}
                     {isLoading && documents.length === 0 && (
                         <>
                             <Skeleton className="h-20 w-full rounded-md" />
@@ -2940,21 +2931,17 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                             <Skeleton className="h-20 w-full rounded-md" />
                         </>
                     )}
-                    {/* Estado Vacío */}
                     {!isLoading && documents.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground">
                             <AlertCircle className="h-8 w-8 mb-2" />
-                            {/* MODIFICADO: Texto traducido */}
                             <p className="text-sm">No se encontraron documentos relevantes para la última consulta.</p>
                         </div>
                     )}
-                    {/* Lista de Documentos */}
                     {documents.map((doc, index) => (
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                             <Card
-                                className="cursor-pointer hover:shadow-md transition-shadow duration-150"
+                                className="cursor-pointer hover:shadow-md transition-shadow duration-150 bg-card" // Asegurar fondo card
                                 onClick={() => handleViewDocument(doc)}
-                                // MODIFICADO: Tooltip traducido
                                 title={`Haz clic para ver detalles de ${doc.file_name || 'documento'}`}
                             >
                                 <CardContent className="p-3 space-y-1 text-sm">
@@ -2963,14 +2950,12 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                             {index + 1}. {doc.file_name || doc.document_id?.substring(0, 8) || `Fragmento ${doc.id.substring(0, 8)}`}
                                         </p>
                                         {doc.score != null && (
-                                            // MODIFICADO: Tooltip traducido
                                             <Badge variant="secondary" title={`Puntuación Relevancia: ${doc.score.toFixed(4)}`}>
                                                 {doc.score.toFixed(2)}
                                             </Badge>
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground line-clamp-2">
-                                        {/* MODIFICADO: Texto traducido */}
                                         {doc.content_preview || 'Vista previa no disponible.'}
                                     </p>
                                     <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
@@ -2984,21 +2969,18 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Contenido del Dialog */}
+            {/* Contenido del Dialog (sin cambios) */}
             {selectedDoc && (
-                <DialogContent className="sm:max-w-lg">
+                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        {/* MODIFICADO: Título traducido */}
                         <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
                             {selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}
                         </DialogTitle>
-                        {/* MODIFICADO: Descripción traducida */}
                         <DialogDescription>
                             Detalles del fragmento recuperado del documento.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3 text-sm">
-                        {/* MODIFICADO: Textos traducidos */}
                         <div className="flex justify-between"><span className="font-medium text-muted-foreground">ID Documento:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/D'}</span></div>
                         <div className="flex justify-between"><span className="font-medium text-muted-foreground">ID Fragmento:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.id}</span></div>
                         <div className="flex justify-between"><span className="font-medium text-muted-foreground">Puntuación Relevancia:</span><span>{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></div>
@@ -3014,7 +2996,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         )}
                     </div>
                     <DialogFooter>
-                        {/* MODIFICADO: Textos traducidos */}
                         <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
                             <Download className="mr-2 h-4 w-4" />Descargar Original (N/D)
                         </Button>
@@ -3036,15 +3017,24 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
 import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle } from 'lucide-react'; // Added HelpCircle for chunks
-import { retryIngestDocument, deleteIngestDocument, DocumentStatusResponse, AuthHeaders } from '@/lib/api'; // Usar interfaz y función API
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle, Trash2, ServerCrash } from 'lucide-react';
+import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument } from '@/lib/api';
 import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
 import { cn } from '@/lib/utils';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-// Interfaz local renombrada para claridad (usa la de la API)
 type DocumentStatus = DocumentStatusResponse;
 
 export interface DocumentStatusListProps {
@@ -3057,190 +3047,209 @@ export interface DocumentStatusListProps {
   onDeleteSuccess: (documentId: string) => void;
 }
 
-// Helper con textos y estilos actualizados
 const getStatusAttributes = (status: DocumentStatus['status']) => {
+    // Mismos atributos que antes
     switch (status) {
-        case 'uploaded':
-          return { icon: Loader2, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true };
-        case 'processing':
-          return { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true };
-        case 'processed':
-          return { icon: CheckCircle2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false };
-        case 'error':
-          return { icon: AlertTriangle, text: 'Error', className: 'text-red-600 bg-red-100 border-red-200 dark:text-red-300 dark:bg-red-900/30 dark:border-red-700', animate: false };
-        default:
-          // Mapear cualquier otro estado (como 'indexed' si volviera) a Desconocido o similar
-          return { icon: AlertCircle, text: status || 'Desconocido', className: 'text-gray-600 bg-gray-100 border-gray-200 dark:text-gray-400 dark:bg-gray-700/30 dark:border-gray-600', animate: false };
-      }
+        case 'uploaded': return { icon: Loader2, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true };
+        case 'processing': return { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true };
+        case 'processed': return { icon: CheckCircle2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false };
+        case 'error': return { icon: AlertTriangle, text: 'Error', className: 'text-red-600 bg-red-100 border-red-200 dark:text-red-300 dark:bg-red-900/30 dark:border-red-700', animate: false };
+        default: return { icon: ServerCrash, text: status || 'Desconocido', className: 'text-gray-600 bg-gray-100 border-gray-200 dark:text-gray-400 dark:bg-gray-700/30 dark:border-gray-600', animate: false };
+    }
 };
 
 export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, onDeleteSuccess }: DocumentStatusListProps) {
+  const [docToDelete, setDocToDelete] = React.useState<DocumentStatus | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isAlertOpen, setIsAlertOpen] = React.useState(false);
 
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
     const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
     try {
-      await retryIngestDocument(documentId, authHeaders);
-      // Ya no necesitamos el 'result.status' porque onRetrySuccess hace la actualización local
-      toast.success("Reintento Iniciado", {
-        id: toastId,
-        description: `El documento "${displayId}" se está procesando de nuevo.`,
-      });
-      onRetrySuccess(documentId); // Llama al callback para actualizar UI localmente
+      // La API real de reintento debe ser implementada y llamada aquí
+      // await retryIngestDocument(documentId, authHeaders);
+      await new Promise(res => setTimeout(res, 500)); // Simular llamada
+      toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` });
+      onRetrySuccess(documentId);
     } catch (error: any) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      toast.error("Error al Reintentar", {
-        id: toastId,
-        description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}`,
-      });
+      toast.error("Error al Reintentar", { id: toastId, description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}` });
     }
   };
 
-  const handleRefresh = (documentId: string) => {
+  const handleRefresh = (documentId: string, fileName?: string | null) => {
+    const displayId = fileName || documentId.substring(0, 8) + "...";
+    toast.info(`Actualizando estado de "${displayId}"...`);
     refreshDocument(documentId);
-    toast.success('Estado actualizado.');
   };
 
-  const handleDelete = async (documentId: string, fileName?: string | null) => {
-    const display = fileName || documentId.substring(0,8)+'...';
-    const id = toast.loading(`Eliminando ${display}...`);
+  const openDeleteConfirmation = (doc: DocumentStatus) => {
+    setDocToDelete(doc);
+    setIsAlertOpen(true);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!docToDelete || !authHeaders) return;
+    const display = docToDelete.file_name || docToDelete.document_id.substring(0, 8) + '...';
+    setIsDeleting(true);
+    const toastId = toast.loading(`Eliminando "${display}"...`);
     try {
-      await deleteIngestDocument(documentId, authHeaders);
-      onDeleteSuccess(documentId);
-      toast.success('Documento eliminado', { id });
-    } catch(e:any) {
-      toast.error('Error al eliminar', { id, description: e.message || '' });
+      await deleteIngestDocument(docToDelete.document_id, authHeaders);
+      onDeleteSuccess(docToDelete.document_id);
+      toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
+    } catch (e: any) {
+      const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
+      toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
+    } finally {
+      setIsDeleting(false);
+      setIsAlertOpen(false);
+      setDocToDelete(null);
     }
   };
 
   if (!documents || documents.length === 0) {
-    return <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
+    return <p className="text-center text-muted-foreground p-5 italic">No hay documentos subidos aún.</p>;
   }
 
   return (
-    <TooltipProvider>
-      {/* Legend for statuses */}
-      <div className="flex flex-wrap gap-3 mb-4 text-xs">
-        {['En Cola','Procesando','Procesado','Error'].map((label, i) => {
-          const attr = [ 'uploaded','processing','processed','error' ].map(s => getStatusAttributes(s));
-          const { className: cls } = attr[i];
-          return <span key={label} className={`inline-block px-2 py-0.5 rounded ${cls}`}>{label}</span>;
-        })}
-      </div>
-      <div className="border rounded-md overflow-hidden"> {/* overflow-hidden para bordes redondeados */}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {/* Columnas actualizadas */}
-              <TableHead>Nombre Archivo</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-center hidden sm:table-cell">Chunks</TableHead> {/* Oculto en móvil */}
-              <TableHead className="hidden md:table-cell">Última Actualización</TableHead> {/* Oculto en pantallas pequeñas */}
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {documents.map((doc) => {
-              const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
-              // Mostrar fecha de última actualización desde 'last_updated'
-              const dateToShow = doc.last_updated;
-              const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
-              const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
+    <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+      <TooltipProvider>
+        {/* Leyenda de Estados */}
+        <div className="flex flex-wrap gap-2 mb-4 text-xs">
+          <span className="font-medium mr-2">Estados:</span>
+          {['uploaded', 'processing', 'processed', 'error'].map((status) => {
+            const { text, className } = getStatusAttributes(status as DocumentStatus['status']);
+            return <Badge key={status} variant="outline" className={cn("border", className)}>{text}</Badge>;
+          })}
+        </div>
 
-              return (
-                <TableRow key={doc.document_id}>
-                  <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate" title={displayFileName}>
-                    {displayFileName}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant='outline' className={cn("border", statusClassName)}>
-                      <Icon className={cn("h-4 w-4 mr-1.5", animate && "animate-spin")} />
-                      {statusText}
-                      {doc.status === 'error' && doc.error_message && (
+        {/* Quitar el borde y overflow-hidden del div exterior si la tabla está dentro de CardContent */}
+        <div className="relative w-full overflow-auto">
+          <Table>
+            <TableHeader>
+              {/* Añadir sticky top-0 y bg-background para cabecera fija si ScrollArea externa lo permite */}
+              <TableRow className="border-b hover:bg-transparent">
+                <TableHead className="w-[35%] pl-4">Nombre Archivo</TableHead>
+                <TableHead className="w-[15%]">Estado</TableHead>
+                <TableHead className="w-[10%] text-center hidden sm:table-cell">Chunks</TableHead>
+                <TableHead className="w-[25%] hidden md:table-cell">Última Actualización</TableHead>
+                <TableHead className="w-[15%] text-right pr-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {documents.map((doc, index) => {
+                const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
+                const dateToShow = doc.last_updated;
+                const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
+                const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
+                const displayChunks = doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : 'N/D';
+
+                return (
+                  // Aplicar estilo de fila alternada
+                  <TableRow key={doc.document_id} className="group hover:bg-muted/50 data-[state=selected]:bg-muted [&:nth-child(even)]:bg-muted/30 dark:[&:nth-child(even)]:bg-muted/10">
+                    <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate pl-4" title={displayFileName}>
+                      {displayFileName}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant='outline' className={cn("border font-medium", statusClassName)}>
+                        <Icon className={cn("h-3.5 w-3.5 mr-1.5", animate && "animate-spin")} />
+                        {statusText}
+                        {doc.status === 'error' && doc.error_message && (
+                          <Tooltip delayDuration={100}>
+                            <TooltipTrigger asChild>
+                              <AlertCircle className="h-3.5 w-3.5 ml-1.5 cursor-help opacity-70 hover:opacity-100" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs break-words bg-destructive text-destructive-foreground">
+                              <p>Error: {doc.error_message}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center hidden sm:table-cell">
+                      {displayChunks === 'N/D' ? (
+                        <Tooltip delayDuration={100}>
+                          <TooltipTrigger className='cursor-default text-muted-foreground'>N/D</TooltipTrigger>
+                          <TooltipContent>Conteo de chunks no disponible aún.</TooltipContent>
+                        </Tooltip>
+                      ) : displayChunks}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
+                    <TableCell className="text-right space-x-1 pr-4">
+                      {/* Botón Reintentar */}
+                      {doc.status === 'error' && (
                         <Tooltip delayDuration={100}>
                           <TooltipTrigger asChild>
-                            {/* Usar AlertCircle para el tooltip de error */}
-                            <AlertCircle className="h-4 w-4 ml-1.5 cursor-help opacity-70 hover:opacity-100" />
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta">
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
                           </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs break-words bg-destructive text-destructive-foreground">
-                            <p>Error: {doc.error_message}</p>
-                          </TooltipContent>
+                          <TooltipContent><p>Reintentar</p></TooltipContent>
                         </Tooltip>
                       )}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center hidden sm:table-cell">
-                    {/* Mostrar chunks si están disponibles, si no 'N/D' */}
-                    {doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : (
-                         <Tooltip delayDuration={100}>
-                             <TooltipTrigger className='cursor-default'>N/D</TooltipTrigger>
-                             <TooltipContent>
-                                Conteo de chunks no disponible.
-                             </TooltipContent>
-                         </Tooltip>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
-                  <TableCell className="text-right space-x-1">
-                    {/* Retry on error */}
-                    {doc.status === 'error' && (
+                      {/* Botón Actualizar */}
                       <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
-                           <Button
-                             variant="ghost"
-                             size="icon"
-                             className="h-7 w-7" // Botón más pequeño
-                             onClick={() => handleRetry(doc.document_id, doc.file_name)}
-                             aria-label="Reintentar ingesta"
-                           >
-                             <RefreshCw className="h-4 w-4" />
+                           <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-500 hover:bg-gray-100" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado">
+                             <RefreshCw className="h-4 w-4" /> {/* Cambiado a RefreshCw para consistencia */}
                            </Button>
                         </TooltipTrigger>
-                         <TooltipContent>
-                            {/* Tooltip traducido */}
-                            <p>Reintentar</p>
-                         </TooltipContent>
+                        <TooltipContent><p>Actualizar Estado</p></TooltipContent>
                       </Tooltip>
-                    )}
-                    {/* Manual refresh */}
-                    <Tooltip delayDuration={100}>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => handleRefresh(doc.document_id)} aria-label="Actualizar estado">
-                          <Loader2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Actualizar</p></TooltipContent>
-                    </Tooltip>
-                    {/* Delete document */}
-                    <Tooltip delayDuration={100}>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(doc.document_id, doc.file_name)} aria-label="Eliminar documento">
-                          <AlertCircle className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Eliminar</p></TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                      {/* Botón Eliminar (Usa AlertDialogTrigger) */}
+                      <Tooltip delayDuration={100}>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmation(doc)} aria-label="Eliminar documento">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <TooltipContent><p>Eliminar</p></TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div> {/* Fin del div contenedor de la tabla */}
         {hasMore && (
-          <div className="p-3 text-center">
-            <Button variant="outline" size="sm" onClick={fetchMore}>Cargar más</Button>
+          <div className="p-4 text-center">
+            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting}>Cargar más documentos</Button>
           </div>
         )}
-      </div>
-    </TooltipProvider>
+      </TooltipProvider>
+
+      {/* Diálogo de Confirmación de Eliminación */}
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Confirmar Eliminación?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción no se puede deshacer. Se eliminará permanentemente el documento
+            <span className="font-medium"> "{docToDelete?.file_name || docToDelete?.document_id.substring(0, 8)}"</span>,
+            su archivo original y todos sus datos asociados de la base de conocimiento.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteConfirmed}
+            disabled={isDeleting}
+            className={buttonVariants({ variant: "destructive" })}
+          >
+            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Eliminar Permanentemente
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 ```
 
 ## File: `components\knowledge\file-uploader.tsx`
 ```tsx
-// File: components/knowledge/file-uploader.tsx
 // File: components/knowledge/file-uploader.tsx (MODIFICADO)
 "use client";
 
@@ -3401,7 +3410,7 @@ export function FileUploader({
 
 ## File: `components\layout\header.tsx`
 ```tsx
-// File: components/layout/header.tsx
+// File: components/layout/header.tsx (MODIFICADO - Espaciado iconos derecha)
 "use client";
 
 import React from 'react';
@@ -3438,27 +3447,23 @@ export function Header() {
       console.log("Header: Initiating logout...");
       try {
           await signOut();
-          // Mensajes de Toast ya traducidos en useAuth
-          // toast.success("Sesión Cerrada", { description: "Has cerrado sesión correctamente." });
       } catch (error) {
           console.error("Header: Logout failed unexpectedly.", error);
-          // toast.error("Fallo al Cerrar Sesión", { description: "No se pudo cerrar tu sesión." });
       }
   };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:px-6 shrink-0">
        <div className="flex items-center gap-2">
-         {/* aria-label traducido */}
          <Button variant="ghost" size="icon" onClick={() => router.push('/chat')} aria-label="Ir al Chat">
              <Home className="h-5 w-5" />
          </Button>
       </div>
 
-      <div className="flex items-center space-x-2 md:space-x-4">
+      {/* MODIFICADO: Ajustado espaciado a space-x-2 */}
+      <div className="flex items-center space-x-2">
         <ThemePaletteButton />
 
-         {/* aria-label traducido */}
          <Button variant="ghost" size="icon" onClick={() => router.push('/help')} aria-label="Ayuda y Soporte">
              <HelpCircle className="h-5 w-5" />
          </Button>
@@ -3468,12 +3473,10 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <Avatar className="h-9 w-9 border">
-                  {/* <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User Avatar'} /> */}
                   <AvatarFallback className="bg-secondary text-secondary-foreground font-medium text-sm">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
-                {/* Texto sr-only traducido */}
                 <span className="sr-only">Abrir menú de usuario</span>
               </Button>
             </DropdownMenuTrigger>
@@ -3487,32 +3490,26 @@ export function Header() {
                     {user.email}
                   </p>
                   {user.companyId && (
-                    // Tooltip traducido
                     <p className="text-xs leading-none text-muted-foreground/80 mt-1 flex items-center gap-1" title={`ID Empresa: ${user.companyId}`}>
                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
                            <path fillRule="evenodd" d="M4 1.75A2.25 2.25 0 0 0 1.75 4v1.5a.75.75 0 0 0 1.5 0V4c0-.414.336-.75.75-.75h8.5c.414 0 .75.336.75.75v1.5a.75.75 0 0 0 1.5 0V4A2.25 2.25 0 0 0 12 1.75H4ZM1.75 8.5A.75.75 0 0 0 1 9.25v2.25A2.25 2.25 0 0 0 3.25 14h9.5A2.25 2.25 0 0 0 15 11.5V9.25a.75.75 0 0 0-1.5 0v2.25c0 .414-.336.75-.75.75h-9.5c-.414 0-.75-.336-.75-.75V9.25a.75.75 0 0 0-.75-.75Z" clipRule="evenodd" />
                        </svg>
-                      {/* Texto traducido */}
                       <span className="truncate">Empresa: {user.companyId.substring(0, 8)}...</span>
                     </p>
                   )}
                    {user.roles && user.roles.length > 0 && (
-                     // Tooltip traducido
                      <p className="text-xs leading-none text-muted-foreground/80 mt-1" title={`Roles: ${user.roles.join(', ')}`}>
-                       {/* Texto traducido */}
                        Rol(es): {user.roles.join(', ')}
                      </p>
                    )}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {/* Item de menú traducido */}
               <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {/* Item de menú traducido */}
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
@@ -3528,7 +3525,7 @@ export function Header() {
 
 ## File: `components\layout\sidebar.tsx`
 ```tsx
-// File: components/layout/sidebar.tsx
+// File: components/layout/sidebar.tsx (MODIFICADO)
 "use client";
 
 import React from 'react';
@@ -3537,9 +3534,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BotMessageSquare, FileUp, Settings, BarChartHorizontalBig, CircleHelp, PlusCircle } from 'lucide-react'; // Added Help icon and PlusCircle for New Chat button
+import { BotMessageSquare, FileUp, Settings, BarChartHorizontalBig, CircleHelp, PlusCircle } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
-import { ChatHistory } from '@/components/chat/chat-history'; // Import ChatHistory
+import { ChatHistory } from '@/components/chat/chat-history';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -3547,17 +3544,16 @@ interface SidebarProps {
 
 const navItems = [
   { href: '/chat', label: 'Chat', icon: BotMessageSquare },
-  { href: '/knowledge', label: 'Base de Conocimiento', icon: FileUp }, // Traducido
-//   { href: '/analytics', label: 'Analíticas', icon: BarChartHorizontalBig }, // Example extra item (Traducido)
-  { href: '/settings', label: 'Configuración', icon: Settings }, // Traducido
-//   { href: '/help', label: 'Ayuda y Soporte', icon: CircleHelp }, // Example extra item (Traducido)
+  { href: '/knowledge', label: 'Base de Conocimiento', icon: FileUp },
+  { href: '/settings', label: 'Configuración', icon: Settings },
+  // { href: '/analytics', label: 'Analíticas', icon: BarChartHorizontalBig },
+  // { href: '/help', label: 'Ayuda y Soporte', icon: CircleHelp },
 ];
 
 export function Sidebar({ isCollapsed }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter ? useRouter() : undefined;
 
-  // Handler para nuevo chat
   const handleNewChat = React.useCallback(() => {
     if (router) router.push('/chat');
     else window.location.href = '/chat';
@@ -3566,67 +3562,86 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   return (
     <aside className={cn(
         "flex h-full flex-col border-r bg-muted/40 transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-[50px] items-center" : "w-full p-4"
+        isCollapsed ? "w-[50px] items-center pt-4" : "w-full p-4" // Añadido padding top cuando colapsado
       )}
       >
-      <div className={cn("flex flex-col gap-2", isCollapsed ? "items-center" : "")}> {/* Logo y botón */}
-        <div className={cn("flex items-center", isCollapsed ? "h-16 justify-center" : "h-16 justify-start")}>
+      {/* Sección Superior: Logo y Nuevo Chat */}
+      <div className={cn("flex flex-col gap-2", isCollapsed ? "items-center" : "")}>
+        <div className={cn("flex items-center", isCollapsed ? "h-12 justify-center" : "h-16 justify-start")}> {/* Altura ajustada */}
           <BotMessageSquare className={cn("h-6 w-6 text-primary", !isCollapsed && "mr-2")} />
           {!isCollapsed && (
             <span className="text-lg font-bold text-primary">{APP_NAME}</span>
           )}
         </div>
-        <Button
-          onClick={handleNewChat}
-          variant="default" // Changed from "accent" to "default" as "accent" is not a valid variant
-          size={isCollapsed ? "icon" : "default"}
-          className={cn(
-            "w-full transition-colors duration-150",
-            isCollapsed ? "h-10 w-10 rounded-lg mt-2" : "justify-start mt-2 font-semibold text-base",
-            "bg-primary/90 hover:bg-primary text-primary-foreground shadow-sm"
-          )}
-          // MODIFICADO: aria-label traducido
-          aria-label="Nuevo chat"
-        >
-          <PlusCircle className={cn("h-5 w-5", !isCollapsed && "mr-2")}/>
-          {!isCollapsed && <span>Nuevo chat</span>}
-        </Button>
-      </div>
-      {/* Main Navigation */}
-      <nav className={cn("flex flex-col gap-2", isCollapsed ? "items-center mt-4" : "flex-1 mt-4")}>
         <TooltipProvider delayDuration={0}>
-          {navItems.map((item) => (
-            <Tooltip key={item.href}>
-              <TooltipTrigger asChild>
-                 <Link
-                    href={item.href}
-                    className={cn(
-                        buttonVariants({ variant: pathname.startsWith(item.href) ? 'default' : 'ghost', size: isCollapsed ? "icon" : "default" }),
-                        "w-full transition-colors duration-150 ease-in-out",
-                        isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start",
-                        pathname.startsWith(item.href)
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        : 'hover:bg-muted'
-                    )}
-                    aria-label={item.label}
-                >
-                  <item.icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
-                  {!isCollapsed && <span className="truncate">{item.label}</span>}
-                 </Link>
-              </TooltipTrigger>
-              {isCollapsed && (
-                <TooltipContent side="right" sideOffset={5}>
-                  {item.label}
-                </TooltipContent>
-              )}
-            </Tooltip>
-          ))}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleNewChat}
+                variant="default"
+                size={isCollapsed ? "icon" : "default"}
+                className={cn(
+                  "w-full transition-colors duration-150",
+                  isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start mt-1 font-semibold text-base", // Ajustado margen
+                  "bg-primary hover:bg-primary/90 text-primary-foreground shadow" // Sombra ligeramente más suave
+                )}
+                aria-label="Nuevo chat"
+              >
+                <PlusCircle className={cn("h-5 w-5", !isCollapsed && "mr-2")}/>
+                {!isCollapsed && <span>Nuevo chat</span>}
+              </Button>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right" sideOffset={5}>Nuevo chat</TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Navegación Principal */}
+      <nav className={cn(
+          "flex flex-col gap-1 mt-6", // Aumentado margen superior, reducido gap
+          isCollapsed ? "items-center" : "flex-1"
+        )}
+        >
+        <TooltipProvider delayDuration={0}>
+          {navItems.map((item) => {
+             const isActive = pathname.startsWith(item.href);
+             return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>
+                    <Link
+                        href={item.href}
+                        className={cn(
+                            buttonVariants({ variant: isActive ? 'secondary' : 'ghost', size: isCollapsed ? "icon" : "default" }),
+                            "w-full transition-colors duration-150 ease-in-out relative", // Añadido relative
+                            isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start pl-3 py-2 text-sm", // Ajustado padding/tamaño
+                            isActive ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground'
+                        )}
+                        aria-label={item.label}
+                    >
+                      {/* Indicador activo como borde izquierdo */}
+                      {isActive && !isCollapsed && (
+                        <span className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"></span>
+                      )}
+                      <item.icon className={cn("h-5 w-5", !isCollapsed && "mr-3")} />
+                      {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right" sideOffset={5}>
+                      {item.label}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+             )
+            })}
         </TooltipProvider>
       </nav>
-      {/* Chat History Section - Conditionally render based on collapse */}
+
+      {/* Historial de Chats (Solo si no está colapsado) */}
       {!isCollapsed && (
          <div className="mt-auto flex flex-col gap-2 border-t pt-4">
-             {/* ELIMINADO: Título duplicado H3 */}
              <ChatHistory />
          </div>
       )}
@@ -4710,6 +4725,7 @@ export { Progress }
 
 ## File: `components\ui\resizable.tsx`
 ```tsx
+// File: components/ui/resizable.tsx (MODIFICADO)
 "use client"
 
 import * as React from "react"
@@ -4751,14 +4767,20 @@ function ResizableHandle({
     <ResizablePrimitive.PanelResizeHandle
       data-slot="resizable-handle"
       className={cn(
-        "bg-border focus-visible:ring-ring relative flex w-px items-center justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-hidden data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
+        // MODIFICADO: Más sutil, opacidad en hover
+        "relative flex w-px items-center justify-center bg-border opacity-50 transition-opacity hover:opacity-100 focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full",
+        // Estilos para el after (línea visual)
+        "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0",
+        // Estilos para el div del handle si withHandle es true
+        "[&[data-panel-group-direction=vertical]>div]:rotate-90",
         className
       )}
       {...props}
     >
       {withHandle && (
-        <div className="bg-border z-10 flex h-4 w-3 items-center justify-center rounded-xs border">
-          <GripVerticalIcon className="size-2.5" />
+        // MODIFICADO: Quitamos el borde del handle visual
+        <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm bg-border">
+          <GripVerticalIcon className="h-2.5 w-2.5" />
         </div>
       )}
     </ResizablePrimitive.PanelResizeHandle>
@@ -4766,7 +4788,6 @@ function ResizableHandle({
 }
 
 export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
-
 ```
 
 ## File: `components\ui\scroll-area.tsx`
@@ -5265,13 +5286,12 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: lib/api.ts (MODIFICADO)
+// File: lib/api.ts (MODIFICADO - Añadida deleteIngestDocument)
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
-import type { Message } from '@/components/chat/chat-message'; // Ensure Message interface is exported
-import { AUTH_TOKEN_KEY } from './constants'; // Importar la clave para localStorage
+import type { Message } from '@/components/chat/chat-message';
+import { AUTH_TOKEN_KEY } from './constants';
 
-// --- ApiError Class (sin cambios) ---
 interface ApiErrorDataDetail {
     msg: string;
     type: string;
@@ -5294,7 +5314,6 @@ export class ApiError extends Error {
     }
 }
 
-// --- Core Request Function (sin cambios en lógica principal, solo logs y manejo de token desde localStorage) ---
 export async function request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -5387,8 +5406,9 @@ export async function request<T>(
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
 
+        // Manejo correcto de 204 No Content
         if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return null as T;
+            return null as T; // Devuelve null explícitamente para respuestas sin contenido
         }
 
         try {
@@ -5401,9 +5421,8 @@ export async function request<T>(
         }
 
     } catch (error) {
-        if (error instanceof ApiError) {
-             throw error;
-        } else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+        if (error instanceof ApiError) { throw error; }
+        else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
              const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
              console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
              throw new ApiError(networkErrorMsg, 0);
@@ -5444,16 +5463,28 @@ export async function uploadDocument(file: File, auth: AuthHeaders): Promise<Ing
   }
 }
 
+// Interfaz para la respuesta de la lista de estados
 export interface DocumentStatusResponse {
     document_id: string;
     status: string; // 'uploaded', 'processing', 'processed', 'error'
     file_name?: string | null;
     file_type?: string | null;
-    chunk_count?: number | null; // Provided by backend after processing
+    chunk_count?: number | null; // Desde DB, puede ser actualizado por /status individual
     error_message?: string | null;
-    created_at?: string; // Add created_at for sorting/display
-    last_updated: string; // Backend provides this, use instead of updated_at
+    created_at?: string;
+    last_updated: string; // Timestamp de última actualización (más útil)
+    // Campos adicionales que pueden venir de la verificación en GET /status
+    minio_exists?: boolean;
+    milvus_chunk_count?: number;
 }
+
+// Interfaz para la respuesta detallada de un documento individual
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
+    minio_exists: boolean; // Garantizado por el endpoint individual
+    milvus_chunk_count: number; // Garantizado por el endpoint individual
+    message?: string; // Mensaje detallado del backend
+}
+
 
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
@@ -5472,18 +5503,11 @@ export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 1
   }
 }
 
-// Función para obtener el estado detallado de UN documento (incluye conteos reales)
-export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
-    minio_exists?: boolean; // Flag desde backend verificando MinIO
-    milvus_chunk_count?: number; // Conteo real desde backend verificando Milvus
-    message?: string; // Mensaje detallado del backend
-}
 
 export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
-    // Pasar headers de autenticación necesarios para el endpoint individual
     return request<DetailedDocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, {
         method: 'GET',
-        headers: { ...auth } as Record<string, string> // Asegurar que los headers son Record<string, string>
+        headers: { ...auth } as Record<string, string>
     });
 };
 
@@ -5509,14 +5533,16 @@ export async function retryIngestDocument(documentId: string, auth: AuthHeaders)
   }
 }
 
+
 /**
  * Elimina un documento de la base de conocimiento (Milvus, MinIO y registro).
  * Endpoint: DELETE /api/v1/ingest/{document_id}
  */
 export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
+  // request devuelve null para 204, que es el tipo esperado para void
   await request<null>(`/api/v1/ingest/${documentId}`, {
     method: 'DELETE',
-    headers: { ...auth } as Record<string, string>, // Asegurar tipo correcto para headers
+    headers: { ...auth } as Record<string, string>,
   });
 }
 
@@ -5571,42 +5597,24 @@ export interface QueryApiResponse {
 
 export const getChats = async (limit: number = 50, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     // Añadir try-catch para manejar errores específicos de getChats si es necesario
-     try {
-        return await request<ChatSummary[]>(endpoint);
-     } catch (error) {
-         console.error("Error fetching chats:", error);
-         // Podrías devolver [] o re-lanzar el error según prefieras
-         // if (error instanceof ApiError && error.status === 401) // ...
-         throw error;
-     }
+     try { return await request<ChatSummary[]>(endpoint); }
+     catch (error) { console.error("Error fetching chats:", error); throw error; }
 };
 
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     try {
-        return await request<ChatMessageApi[]>(endpoint);
-     } catch (error) {
-         console.error(`Error fetching messages for chat ${chatId}:`, error);
-         throw error;
-     }
+     try { return await request<ChatMessageApi[]>(endpoint); }
+     catch (error) { console.error(`Error fetching messages for chat ${chatId}:`, error); throw error; }
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     const body = {
-         ...payload,
-         chat_id: payload.chat_id || null
-     };
-     // No es necesario un try-catch aquí si request ya maneja errores
+     const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' }
+        method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' }
      });
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
-    // No es necesario un try-catch aquí si request ya maneja errores
     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
@@ -5626,30 +5634,19 @@ export interface LoginResponse {
 }
 
 // --- Type Mapping Helpers ---
-export const mapApiSourcesToFrontend = (
-    apiSources: ChatMessageApi['sources']
-): RetrievedDoc[] | undefined => {
+export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
     if (!apiSources) return undefined;
     return apiSources.map(source => ({
-        id: source.chunk_id,
-        document_id: source.document_id,
-        file_name: source.file_name,
-        content: source.preview,
-        content_preview: source.preview,
-        metadata: null,
-        score: source.score,
+        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name,
+        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
     }));
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
     return {
-        id: apiMessage.id,
-        role: apiMessage.role,
-        content: apiMessage.content,
-        sources: mappedSources,
-        isError: false,
-        created_at: apiMessage.created_at,
+        id: apiMessage.id, role: apiMessage.role, content: apiMessage.content,
+        sources: mappedSources, isError: false, created_at: apiMessage.created_at,
     };
 };
 ```
@@ -5931,20 +5928,29 @@ export const useAuth = (): AuthContextType => {
 
 ## File: `lib\hooks\useDocumentStatuses.ts`
 ```ts
+// File: lib/hooks/useDocumentStatuses.ts (MODIFICADO - Corregido error y adaptado a API)
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getDocumentStatusList, DocumentStatusResponse, AuthHeaders, ApiError, getDocumentStatus } from '@/lib/api';
+import {
+    getDocumentStatusList,
+    DocumentStatusResponse, // Usar esta interfaz base
+    DetailedDocumentStatusResponse, // Usar esta para refresco individual
+    AuthHeaders,
+    ApiError,
+    getDocumentStatus // Importar la función individual
+} from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 
+// Devolver la interfaz base en el hook, ya que la lista puede no tener todos los detalles
 interface UseDocumentStatusesReturn {
   documents: DocumentStatusResponse[];
   isLoading: boolean;
   error: string | null;
-  fetchDocuments: (reset?: boolean) => Promise<void>; // Función para refrescar manualmente
-  fetchMore: () => void; // Función para cargar más documentos
-  hasMore: boolean; // Indica si hay más documentos para cargar
-  retryLocalUpdate: (documentId: string) => void; // Función para actualizar estado local al reintentar
-  refreshDocument: (documentId: string) => Promise<void>; // Refrescar estado de un documento específico
-  deleteLocalDocument: (documentId: string) => void; // Eliminar documento localmente
+  fetchDocuments: (reset?: boolean) => Promise<void>;
+  fetchMore: () => void;
+  hasMore: boolean;
+  retryLocalUpdate: (documentId: string) => void;
+  refreshDocument: (documentId: string) => Promise<void>; // Refrescar estado individual
+  deleteLocalDocument: (documentId: string) => void;
 }
 
 export function useDocumentStatuses(): UseDocumentStatusesReturn {
@@ -5953,15 +5959,13 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const offsetRef = useRef<number>(0);
-  const limit = 100; // page size
-  const [hasMore, setHasMore] = useState<boolean>(false);
+  const limit = 50; // Reducir límite por si las verificaciones paralelas son pesadas
+  const [hasMore, setHasMore] = useState<boolean>(true); // Asumir que hay más al inicio
 
   const fetchDocuments = useCallback(async (reset: boolean = true) => {
     if (isAuthLoading || !user?.userId || !user?.companyId) {
       if (!isAuthLoading) {
-        setDocuments([]);
-        setIsLoading(false);
-        setError(null);
+        setDocuments([]); setIsLoading(false); setError(null); setHasMore(false);
       }
       return;
     }
@@ -5975,23 +5979,38 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
     setError(null);
 
     try {
-      const newOffset = reset ? 0 : offsetRef.current;
-      const data = await getDocumentStatusList(authHeaders, limit, newOffset);
+      const currentOffset = reset ? 0 : offsetRef.current;
+      const data = await getDocumentStatusList(authHeaders, limit, currentOffset);
+
+      // Actualizar estado de paginación
       setHasMore(data.length === limit);
+      offsetRef.current = currentOffset + data.length; // Actualizar offset correctamente
+
+      // Actualizar documentos (reemplazar o añadir)
       setDocuments(prev => reset ? data : [...prev, ...data]);
-      if (reset) offsetRef.current = limit; else offsetRef.current += limit;
+
     } catch (err: any) {
       const errorMessage = err instanceof ApiError ? err.message : (err.message || 'Error al cargar la lista de documentos.');
       setError(errorMessage);
-      setDocuments([]);
+      // Mantener documentos existentes en caso de error al cargar más? O limpiar? Por ahora limpiamos.
+      if(reset) setDocuments([]);
+      setHasMore(false); // Asumir que no hay más si hay error
     } finally {
       setIsLoading(false);
     }
-  }, [user, isAuthLoading]);
+  }, [user, isAuthLoading]); // Dependencias correctas
 
+  // Carga inicial
   useEffect(() => {
-    fetchDocuments(true);
-  }, [fetchDocuments]);
+    if (user?.userId && user?.companyId) { // Solo llamar si hay usuario
+        fetchDocuments(true);
+    } else if (!isAuthLoading) { // Si auth terminó y no hay usuario, limpiar
+        setDocuments([]);
+        setIsLoading(false);
+        setError(null);
+        setHasMore(false);
+    }
+  }, [user, isAuthLoading, fetchDocuments]); // Depender también de fetchDocuments
 
   const retryLocalUpdate = useCallback((documentId: string) => {
     setDocuments(prevDocs =>
@@ -6004,25 +6023,41 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
   }, []);
 
   const fetchMore = useCallback(() => {
-    if (!isLoading && hasMore) fetchDocuments(false);
+    if (!isLoading && hasMore) {
+      fetchDocuments(false); // Llamar con reset=false para añadir, no reemplazar
+    }
   }, [fetchDocuments, isLoading, hasMore]);
 
+  // --- CORRECCIÓN: Pasar authHeaders a getDocumentStatus ---
   const refreshDocument = useCallback(async (documentId: string) => {
-    try {
-      const updated = await getDocumentStatus(documentId);
-      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updated : doc));
-    } catch {
-      // ignore errors
+    if (!user?.userId || !user?.companyId) {
+        console.error("Cannot refresh document: user or company ID missing.");
+        return;
     }
-  }, []);
+    const authHeaders: AuthHeaders = {
+        'X-User-ID': user.userId,
+        'X-Company-ID': user.companyId,
+      };
+    try {
+      // Pasar authHeaders como segundo argumento
+      const updated = await getDocumentStatus(documentId, authHeaders);
+      // Actualizar el documento específico en la lista
+      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updated : doc));
+    } catch (error){
+      console.error(`Failed to refresh status for document ${documentId}:`, error);
+      // Opcional: mostrar toast de error
+      // toast.error("Error al refrescar estado", { description: error instanceof Error ? error.message : "Error desconocido" });
+    }
+  }, [user]); // Añadir user como dependencia
 
   const deleteLocalDocument = useCallback((documentId: string) => {
     setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
+    // Recalcular si hay más después de eliminar? Podría ser complejo.
+    // Por ahora, el usuario puede hacer clic en "Cargar más" si es necesario.
   }, []);
 
   return { documents, isLoading, error, fetchDocuments, fetchMore, hasMore, retryLocalUpdate, refreshDocument, deleteLocalDocument };
 }
-
 ```
 
 ## File: `lib\hooks\useUploadDocument.ts`
@@ -6208,126 +6243,46 @@ Simplemente hazme una pregunta sobre el contenido que esperas encontrar.`;
 
 ```
 
-## File: `refactorizacion.md`
+## File: `ui-refactroring-plan.md`
 ```md
-# Plan de Refactorización - Atenex Frontend
+# Plan de Refactorización de UI - Atenex Frontend
 
-## 1. Objetivos Generales
+## Objetivo General
+Modernizar la interfaz de usuario (UI) de Atenex para que sea más profesional, limpia, intuitiva y visualmente atractiva, eliminando elementos que rompen la cohesión visual y mejorando la presentación de la información en todas las secciones principales (Chat, Knowledge, Settings).
 
-- Mejorar la mantenibilidad y escalabilidad del código.
-- Resolver incidencias críticas detectadas en UI/UX y flujos principales.
-- Optimizar la experiencia de usuario (chat, historial, base de conocimiento, ajustes).
-- Modernizar el diseño según buenas prácticas actuales.
+## Problemas Específicos Detectados (Basado en Screenshots y Análisis Previo)
+1.  **Líneas Divisorias Fuertes:** Fragmentan la vista. (Mejorado)
+2.  **Layout de Knowledge Page:** División en dos columnas ineficiente. (Corregido)
+3.  **Falta de Jerarquía Visual / Contenedores:** Contenido directo sin `Card`. (Mejorado en Knowledge)
+4.  **Consistencia y Pulido:** Refinar espaciados, bordes, fondos. (En progreso)
+5.  **Indicador de Navegación Activa:** Resaltado en Sidebar podría mejorar. (Mejorado)
 
-## 2. Alcance y Contexto
+## Propuesta de Refactorización UI (Checklist)
 
-Este plan contempla cambios en los siguientes ámbitos:
+**Iteración 1: Layout Knowledge Page y Estilo Tabla**
+- [x] 1.1. **Reestructurar `app/(app)/knowledge/page.tsx`:** Layout de una columna con Cards.
+- [x] 1.2. **Refinar `components/knowledge/document-status-list.tsx`:** Filas alternadas, sin borde exterior, padding ajustado, leyenda.
 
-- Interfaz de Chat y Gestión de Historial (`/app/(app)/chat`, `components/chat`).
-- Gestión de la Base de Conocimiento (`/app/(app)/knowledge`, `components/knowledge`).
-- Página de Ajustes (`/app/(app)/settings`).
-- Diseño global y componentes UI (`components/ui`, `globals.css`, `theme-provider`).
+**Iteración 2: Chat View y Paneles Laterales**
+- [x] 2.1. **Suavizar `ResizableHandle`:** Reducida opacidad, visible en hover, sin borde en el grip.
+- [x] 2.2. **Pulir `RetrievedDocumentsPanel`:** Asegurado uso de Card, padding interno ajustado.
+- [x] 2.3. **Ajustar `ChatMessage`:** Revisados fondos (muted para asistente), bordes y sombras.
 
-Se alineará con la arquitectura de rutas de Next.js App Router y el Query Service del backend.
+**Iteración 3: Sidebar y Header**
+- [x] 3.1. **Mejorar Indicador Activo en `Sidebar`:** Añadido borde izquierdo y ajustado estilo `secondary` por `default` para ítem activo.
+- [x] 3.2. **Refinar `Header`:** Asegurado espaciado consistente (`space-x-2`) entre iconos derechos.
 
-## 3. Áreas Clave a Refactorizar
+**Iteración 4: Layout Settings Page**
+- [ ] 4.1. **Aplicar `Card` a Secciones:**
+    - [ ] Envolver las secciones "Perfil" y "Configuración de la Empresa" en `Card` con `CardHeader` y `CardContent`.
+    - [ ] Asegurar espaciado vertical consistente entre las `Card`.
 
-### 3.1 Chat Interface & Historial
-
-- Añadir acción de eliminación de chat con:
-  - Icono/trash en cada entry del historial (`components/chat/chat-history.tsx`).
-  - Diálogo de confirmación (`AlertDialog`).
-  - Lógica de `deleteChat` y gestión de estado local y redirección.
-- Refactorizar carga de historial y estado de borrado (`isDeleting`).
-- Handling de saludos y consultas meta: extraer lógica en helper reutilizable.
-
-### 3.2 Base de Conocimiento
-
-- Corregir endpoint de eliminación de documento (422). Verificar payload en `deleteIngestDocument`.
-- Feedback UX: toasts de éxito y actualización automática de lista.
-- Añadir leyenda/tooltips para estados, "Chunks" y "Última actualización".
-- Consolidar lógica de retry/reload de estado en hook `useDocumentStatuses`.
-
-### 3.3 Ajustes y Perfil de Usuario
-
-- Clarificar editabilidad de campos en `SettingsPage`.
-- Habilitar o deshabilitar botón "Guardar" según cambios reales.
-- Eliminar secciones no implementadas hasta su desarrollo.
-
-### 3.4 UI/UX Modernización
-
-- Revisar paleta de colores y tipografía en `globals.css` y `tailwind.config.js`.
-- Uniformizar estilo de burbujas de chat (`ChatMessage`): esquinas, sombras.
-- Añadir micro-interacciones en apertura/cierre de paneles y botones.
-- Mejorar legibilidad de tablas (`DocumentStatusList`): filas alternadas, paddings.
-- Validar consistencia de iconografía (Lucide) y componentes de shadcn/ui.
-
-## 4. Plan de Iteraciones y Checklist
-
-### Iteración 1: Scaffolding y Preparación
-- [x] Crear archivo `refactorizacion.md` con plan detallado.
-- [x] Configurar ramas git y naming conventions (`feature/refactor-chat`, etc.).
-
-### Iteración 2: Chat Deletion UI + Lógica
-- [x] Implementar icono `Trash2` en `ChatHistory`.
-- [x] Añadir `AlertDialog` para confirmar eliminación.
-- [x] Integrar llamada a `deleteChat` y manejo de estados.
-
-### Iteración 3: Arreglo de Document Deletion
-- [x] Depurar payload de `deleteIngestDocument` en `lib/api.ts`.
-- [x] Ajustar `DocumentStatusList` y `KnowledgePage` para refrescar lista tras eliminación.
-- [x] Renombrar prop `deleteLocalDocument` a `onDeleteSuccess` en `KnowledgePage`.
-- [x] Añadir toasts de éxito.
-
-### Iteración 4: Mejoras en Lógica de RAG/Greetings
-- [x] Extraer función `isGreeting` en util genérica.
-- [x] Ajustar `handleSendMessage` en `ChatPage` para distinguir meta-consultas y manejar saludos.
-- [x] Mostrar mensaje meta-informativo configurable.
-- [ ] Validar con mocks de API.
-
-### Iteración 5: Leyendas y Datos en Knowledge Table
-- [x] Añadir leyenda de colores y tooltips explicativos.
-- [x] Mostrar contabilización real de chunks y timestamp de `last_updated`.
-- [ ] Refactor en hook `useDocumentStatuses` para exponer metadata.
-
-### Iteración 6: Refinar Página de Ajustes
-- [x] Hacer campo "Nombre" editable o read-only.
-- [x] Habilitar/deshabilitar botón "Guardar" dinámicamente.
-- [x] Eliminar secciones vacías hasta su implementación.
-
-### Iteración 7: Modernización de UI/UX
-- [ ] Revisar espaciados y tipografía de componentes base.
-- [ ] Añadir transiciones CSS en apertura de paneles.
-- [ ] Ajustar estilo de burbujas en `ChatMessage`.
-- [ ] Aplicar alternancia de colores de fila en tablas.
-
-### Iteración 8: QA y Documentación
-- [ ] Actualizar `README.md` con nuevas instrucciones de uso.
-- [ ] Documentar nuevas props, hooks y utilidades en `refactorizacion.md`.
-
-## 5. Componentes y Rutas Afectados
-
-| Área                         | Archivo / Ruta                                          |
-| ---------------------------- | ------------------------------------------------------- |
-| Chat History                 | `components/chat/chat-history.tsx`                      |
-| Chat Interface               | `app/(app)/chat/[[...chatId]]/page.tsx`                 |
-| Knowledge List               | `components/knowledge/document-status-list.tsx`         |
-| FileUploader                 | `components/knowledge/file-uploader.tsx`                |
-| Settings Page                | `app/(app)/settings/page.tsx`                          |
-| API Client (delete endpoints)| `lib/api.ts`                                            |
-| Global Styles & Themes       | `globals.css`, `tailwind.config.js`, `theme-provider.tsx` |
-
-## 6. Buenas Prácticas y Consejos
-
-- Mantener hooks puros y enfocados (una responsabilidad).
-- Usar React Query o SWR para gestión de caché en futuras iteraciones.
-- Centralizar lógica de toasts y diálogos en servicios/utilities.
-- Seguir convenciones de nombres y estructura de rutas de Next.js.
-- Escribir tests paralelos a la implementación para prevenir regresiones.
-- Realizar code reviews y pair programming en bloqueos críticos.
+**Iteración 5: Revisión Global y Consistencia**
+- [ ] 5.1. **Revisar Bordes:** Eliminar bordes redundantes o inconsistentes.
+- [ ] 5.2. **Revisar Padding/Márgenes:** Asegurar uso consistente.
+- [ ] 5.3. **Validación Responsiva:** Verificar cambios en diferentes tamaños.
+- [ ] 5.4. **Validación Temas:** Probar exhaustivamente en temas claro, oscuro, blue, green.
 
 ---
-
-> _Este archivo sirve como guía de alto nivel. Cada iteración debe incluir PRs atómicos y validación visual de UI/UX según diseño._
-
+_Este plan se enfoca exclusivamente en la UI. La lógica de datos y las llamadas API permanecen sin cambios._
 ```

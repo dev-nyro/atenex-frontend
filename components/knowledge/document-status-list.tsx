@@ -1,4 +1,4 @@
-// File: components/knowledge/document-status-list.tsx (MODIFICADO - Añadida leyenda, delete, uso de last_updated)
+// File: components/knowledge/document-status-list.tsx (MODIFICADO)
 "use client";
 
 import React from 'react';
@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle, Trash2, ServerCrash } from 'lucide-react'; // Importar Trash2, ServerCrash
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle, Trash2, ServerCrash } from 'lucide-react';
 import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -19,8 +19,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger, // Importar AlertDialogTrigger
-} from "@/components/ui/alert-dialog"; // Importar AlertDialog
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type DocumentStatus = DocumentStatusResponse;
 
@@ -31,10 +31,11 @@ export interface DocumentStatusListProps {
   fetchMore: () => void;
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
-  onDeleteSuccess: (documentId: string) => void; // Callback para notificar eliminación exitosa
+  onDeleteSuccess: (documentId: string) => void;
 }
 
 const getStatusAttributes = (status: DocumentStatus['status']) => {
+    // Mismos atributos que antes
     switch (status) {
         case 'uploaded': return { icon: Loader2, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true };
         case 'processing': return { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true };
@@ -44,7 +45,6 @@ const getStatusAttributes = (status: DocumentStatus['status']) => {
     }
 };
 
-// Componente principal de la lista
 export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, onDeleteSuccess }: DocumentStatusListProps) {
   const [docToDelete, setDocToDelete] = React.useState<DocumentStatus | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -55,8 +55,9 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
     const displayId = fileName || documentId.substring(0, 8) + "...";
     const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
     try {
-      // La llamada a la API de reintento ya está en lib/api
-      // await retryIngestDocument(documentId, authHeaders); // Suponiendo que existe
+      // La API real de reintento debe ser implementada y llamada aquí
+      // await retryIngestDocument(documentId, authHeaders);
+      await new Promise(res => setTimeout(res, 500)); // Simular llamada
       toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` });
       onRetrySuccess(documentId);
     } catch (error: any) {
@@ -68,16 +69,14 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
   const handleRefresh = (documentId: string, fileName?: string | null) => {
     const displayId = fileName || documentId.substring(0, 8) + "...";
     toast.info(`Actualizando estado de "${displayId}"...`);
-    refreshDocument(documentId); // Llama a la función del hook
+    refreshDocument(documentId);
   };
 
-  // Abre el diálogo de confirmación para eliminar
   const openDeleteConfirmation = (doc: DocumentStatus) => {
     setDocToDelete(doc);
     setIsAlertOpen(true);
   };
 
-  // Maneja la confirmación de eliminación
   const handleDeleteConfirmed = async () => {
     if (!docToDelete || !authHeaders) return;
     const display = docToDelete.file_name || docToDelete.document_id.substring(0, 8) + '...';
@@ -85,20 +84,20 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
     const toastId = toast.loading(`Eliminando "${display}"...`);
     try {
       await deleteIngestDocument(docToDelete.document_id, authHeaders);
-      onDeleteSuccess(docToDelete.document_id); // Notifica al hook/página padre
+      onDeleteSuccess(docToDelete.document_id);
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
     } catch (e: any) {
       const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
     } finally {
       setIsDeleting(false);
-      setIsAlertOpen(false); // Cierra el diálogo
+      setIsAlertOpen(false);
       setDocToDelete(null);
     }
   };
 
   if (!documents || documents.length === 0) {
-    return <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
+    return <p className="text-center text-muted-foreground p-5 italic">No hay documentos subidos aún.</p>;
   }
 
   return (
@@ -113,30 +112,31 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
           })}
         </div>
 
-        <div className="border rounded-lg overflow-hidden shadow-sm"> {/* Contenedor con borde y sombra */}
+        {/* Quitar el borde y overflow-hidden del div exterior si la tabla está dentro de CardContent */}
+        <div className="relative w-full overflow-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-[35%]">Nombre Archivo</TableHead>
+              {/* Añadir sticky top-0 y bg-background para cabecera fija si ScrollArea externa lo permite */}
+              <TableRow className="border-b hover:bg-transparent">
+                <TableHead className="w-[35%] pl-4">Nombre Archivo</TableHead>
                 <TableHead className="w-[15%]">Estado</TableHead>
                 <TableHead className="w-[10%] text-center hidden sm:table-cell">Chunks</TableHead>
                 <TableHead className="w-[25%] hidden md:table-cell">Última Actualización</TableHead>
-                <TableHead className="w-[15%] text-right">Acciones</TableHead>
+                <TableHead className="w-[15%] text-right pr-4">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {documents.map((doc) => {
+              {documents.map((doc, index) => {
                 const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
-                // Usar last_updated que ahora viene del backend
                 const dateToShow = doc.last_updated;
                 const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
                 const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
-                // Mostrar chunk_count del backend, o N/D
                 const displayChunks = doc.chunk_count !== undefined && doc.chunk_count !== null ? doc.chunk_count : 'N/D';
 
                 return (
-                  <TableRow key={doc.document_id}>
-                    <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate" title={displayFileName}>
+                  // Aplicar estilo de fila alternada
+                  <TableRow key={doc.document_id} className="group hover:bg-muted/50 data-[state=selected]:bg-muted [&:nth-child(even)]:bg-muted/30 dark:[&:nth-child(even)]:bg-muted/10">
+                    <TableCell className="font-medium max-w-[150px] sm:max-w-xs truncate pl-4" title={displayFileName}>
                       {displayFileName}
                     </TableCell>
                     <TableCell>
@@ -164,7 +164,7 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
                       ) : displayChunks}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
-                    <TableCell className="text-right space-x-1">
+                    <TableCell className="text-right space-x-1 pr-4">
                       {/* Botón Reintentar */}
                       {doc.status === 'error' && (
                         <Tooltip delayDuration={100}>
@@ -179,9 +179,9 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
                       {/* Botón Actualizar */}
                       <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-500 hover:bg-gray-100" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado">
-                            <Loader2 className="h-4 w-4" /> {/* Usamos Loader2 para indicar refresco */}
-                          </Button>
+                           <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-500 hover:bg-gray-100" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado">
+                             <RefreshCw className="h-4 w-4" /> {/* Cambiado a RefreshCw para consistencia */}
+                           </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>Actualizar Estado</p></TooltipContent>
                       </Tooltip>
@@ -200,12 +200,12 @@ export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fet
               })}
             </TableBody>
           </Table>
-          {hasMore && (
-            <div className="p-4 text-center border-t">
-              <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting}>Cargar más documentos</Button>
-            </div>
-          )}
-        </div>
+        </div> {/* Fin del div contenedor de la tabla */}
+        {hasMore && (
+          <div className="p-4 text-center">
+            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isDeleting}>Cargar más documentos</Button>
+          </div>
+        )}
       </TooltipProvider>
 
       {/* Diálogo de Confirmación de Eliminación */}

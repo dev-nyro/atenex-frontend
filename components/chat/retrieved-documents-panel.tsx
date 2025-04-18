@@ -1,4 +1,4 @@
-// File: components/chat/retrieved-documents-panel.tsx
+// File: components/chat/retrieved-documents-panel.tsx (MODIFICADO - Ajuste padding contenedor)
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -47,19 +47,17 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/30">
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4">
-                {/* MODIFICADO: Título traducido */}
                 <CardTitle className="text-lg flex items-center">
                     <FileText className="mr-2 h-5 w-5" /> Fuentes Recuperadas
                 </CardTitle>
-                {/* MODIFICADO: Descripción traducida */}
                 <CardDescription className="text-xs">
                     Documentos usados para generar la respuesta. Haz clic para ver detalles.
                 </CardDescription>
             </CardHeader>
 
+            {/* MODIFICADO: Envolver contenido en un div con padding dentro de ScrollArea */}
             <ScrollArea className="flex-1">
                 <div className="p-4 space-y-3">
-                    {/* Estado de Carga */}
                     {isLoading && documents.length === 0 && (
                         <>
                             <Skeleton className="h-20 w-full rounded-md" />
@@ -67,21 +65,17 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                             <Skeleton className="h-20 w-full rounded-md" />
                         </>
                     )}
-                    {/* Estado Vacío */}
                     {!isLoading && documents.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-40 text-center text-muted-foreground">
                             <AlertCircle className="h-8 w-8 mb-2" />
-                            {/* MODIFICADO: Texto traducido */}
                             <p className="text-sm">No se encontraron documentos relevantes para la última consulta.</p>
                         </div>
                     )}
-                    {/* Lista de Documentos */}
                     {documents.map((doc, index) => (
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                             <Card
-                                className="cursor-pointer hover:shadow-md transition-shadow duration-150"
+                                className="cursor-pointer hover:shadow-md transition-shadow duration-150 bg-card" // Asegurar fondo card
                                 onClick={() => handleViewDocument(doc)}
-                                // MODIFICADO: Tooltip traducido
                                 title={`Haz clic para ver detalles de ${doc.file_name || 'documento'}`}
                             >
                                 <CardContent className="p-3 space-y-1 text-sm">
@@ -90,14 +84,12 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                             {index + 1}. {doc.file_name || doc.document_id?.substring(0, 8) || `Fragmento ${doc.id.substring(0, 8)}`}
                                         </p>
                                         {doc.score != null && (
-                                            // MODIFICADO: Tooltip traducido
                                             <Badge variant="secondary" title={`Puntuación Relevancia: ${doc.score.toFixed(4)}`}>
                                                 {doc.score.toFixed(2)}
                                             </Badge>
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground line-clamp-2">
-                                        {/* MODIFICADO: Texto traducido */}
                                         {doc.content_preview || 'Vista previa no disponible.'}
                                     </p>
                                     <div className="text-xs text-muted-foreground/80 pt-1 flex justify-between items-center">
@@ -111,21 +103,18 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Contenido del Dialog */}
+            {/* Contenido del Dialog (sin cambios) */}
             {selectedDoc && (
-                <DialogContent className="sm:max-w-lg">
+                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        {/* MODIFICADO: Título traducido */}
                         <DialogTitle className="truncate" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
                             {selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}
                         </DialogTitle>
-                        {/* MODIFICADO: Descripción traducida */}
                         <DialogDescription>
                             Detalles del fragmento recuperado del documento.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-3 text-sm">
-                        {/* MODIFICADO: Textos traducidos */}
                         <div className="flex justify-between"><span className="font-medium text-muted-foreground">ID Documento:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.document_id || 'N/D'}</span></div>
                         <div className="flex justify-between"><span className="font-medium text-muted-foreground">ID Fragmento:</span><span className="font-mono text-xs bg-muted px-1 rounded">{selectedDoc.id}</span></div>
                         <div className="flex justify-between"><span className="font-medium text-muted-foreground">Puntuación Relevancia:</span><span>{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></div>
@@ -141,7 +130,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         )}
                     </div>
                     <DialogFooter>
-                        {/* MODIFICADO: Textos traducidos */}
                         <Button variant="outline" onClick={() => handleDownloadDocument(selectedDoc)}>
                             <Download className="mr-2 h-4 w-4" />Descargar Original (N/D)
                         </Button>
