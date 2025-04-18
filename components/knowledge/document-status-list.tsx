@@ -87,8 +87,8 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
           <TableBody>
             {documents.map((doc) => {
               const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
-              // Usar updated_at si existe, si no created_at
-              const dateToShow = doc.updated_at || doc.created_at;
+              // Mostrar fecha de última actualización desde 'last_updated'
+              const dateToShow = doc.last_updated;
               const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
               const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
 
