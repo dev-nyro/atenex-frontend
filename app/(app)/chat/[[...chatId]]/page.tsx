@@ -160,6 +160,19 @@ export default function ChatPage() {
     }, [messages, isSending]);
 
     const handleSendMessage = useCallback(async (query: string) => {
+        const greetingRegex = /^(hola|hello|hi|buenos días|buenas tardes|buenas noches)$/i; // Detect simple greetings
+        if (greetingRegex.test(query.trim())) {
+            // Respond locally to greetings
+            const greetingResponse: Message = {
+                id: `assistant-greet-${Date.now()}`,
+                role: 'assistant',
+                content: '¡Hola! ¿En qué puedo ayudarte con tus documentos hoy?',
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), greetingResponse]);
+            return; // Skip API call
+        }
+
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
         const isAuthenticated = !!user || bypassAuth;
 

@@ -173,42 +173,10 @@ export interface AuthHeaders {
   'X-User-ID': string;
 }
 
-// --- MODIFICACIÓN: Eliminar fetchWithAuth y usar request directamente ---
-// Base fetch function to include auth headers
-/* // Eliminado fetchWithAuth
-async function fetchWithAuth(path: string, options: RequestInit & { auth: AuthHeaders }) { // Changed first arg to path
-    const { auth, ...restOptions } = options;
-    const headers = {
-        ...restOptions.headers,
-        'X-Company-ID': auth['X-Company-ID'],
-        'X-User-ID': auth['X-User-ID'],
-    };
-
-    // Construct the full URL
-    const baseUrl = getApiGatewayUrl(); // Get base URL
-    const fullUrl = `${baseUrl}${path}`; // Concatenate base URL and path
-
-    // Need to handle FormData correctly here if used
-    let body = restOptions.body;
-    if (!(body instanceof FormData)) {
-        if (!headers['Content-Type']) {
-            headers['Content-Type'] = 'application/json';
-        }
-    } else {
-        // Let the browser set the Content-Type for FormData
-        delete headers['Content-Type'];
-    }
-
-    return fetch(fullUrl, { ...restOptions, headers, body });
-}
-*/
-// -------------------------------------------------------------------
-
 export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
   const formData = new FormData();
   formData.append('file', file);
 
-  // --- MODIFICACIÓN: Usar request --- 
   try {
     // Pass auth headers directly to the request options
     const response = await request<IngestResponse>('/api/v1/ingest/upload', {
@@ -226,22 +194,18 @@ export async function uploadDocument(file: File, auth: AuthHeaders): Promise<Ing
     // The request function already formats ApiError messages
     throw error;
   }
-  // ----------------------------------
 }
 
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'error';
-    file_name: string;
-    file_type: string;
-    chunk_count: number;
-    error_message: string | null;
-    minio_exists?: boolean;
-    milvus_chunk_count?: number;
+    status: string;
+    file_name?: string;
+    file_type?: string;
+    chunk_count?: number;
+    error_message?: string | null;
     last_updated: string;
 }
 
-// --- MODIFICACIÓN: Usar request y añadir params --- 
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
   try {
@@ -261,7 +225,6 @@ export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 1
     throw error;
   }
 }
-// -------------------------------------------------
 
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
     return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
@@ -297,7 +260,17 @@ export async function retryIngestDocument(documentId: string, auth: AuthHeaders)
     throw error;
   }
 }
-// ----------------------------------
+
+/**
+ * Elimina un documento de la base de conocimiento (Milvus, MinIO y registro).
+ * Endpoint: DELETE /api/v1/ingest/{document_id}
+ */
+export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
+  await request<null>(`/api/v1/ingest/${documentId}`, {
+    method: 'DELETE',
+    headers: { ...auth } as Record<string, string>,
+  });
+}
 
 // --- Query Service ---
 export interface RetrievedDocApi {
@@ -317,9 +290,7 @@ export interface ChatSummary {
     title: string | null;
     created_at: string;
     updated_at: string;
-    // --- MODIFICACIÓN: Añadir message_count ---
     message_count: number;
-    // --------------------------------------
 }
 
 export interface ChatMessageApi {
@@ -327,8 +298,6 @@ export interface ChatMessageApi {
     chat_id: string;
     role: 'user' | 'assistant';
     content: string;
-    // --- MODIFICACIÓN: Aclarar el tipo de sources ---
-    // La API devuelve null o un array de objetos con estructura específica
     sources: Array<{
         chunk_id: string;
         document_id: string;
@@ -336,7 +305,6 @@ export interface ChatMessageApi {
         score: number;
         preview: string; // Este campo está en la API de mensajes, usarlo en el mapeo si es necesario
     }> | null;
-    // -------------------------------------------
     created_at: string; // La API garantiza este campo para mensajes
 }
 
@@ -358,15 +326,12 @@ export const getChats = async (limit: number = 50, offset: number = 0): Promise<
      return request<ChatSummary[]>(endpoint);
 };
 
-// --- MODIFICACIÓN: Añadir params a la firma ---
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     // -----------------------------------------
      return request<ChatMessageApi[]>(endpoint);
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     // Asegurarse que chat_id es null si no se proporciona, como espera la API
      const body = {
          ...payload,
          chat_id: payload.chat_id || null
@@ -374,22 +339,19 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
      return request<QueryApiResponse>('/api/v1/query/ask', {
         method: 'POST',
         body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' } // Explícito aquí
+        headers: { 'Content-Type': 'application/json' }
      });
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
-     // El request ya maneja la respuesta 204 devolviendo null
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
 // --- Auth Service ---
-// Definición de LoginPayload explícita
 interface LoginPayload {
     email: string;
     password: string;
 }
-// Definición de LoginResponse explícita basada en la documentación
 export interface LoginResponse {
     access_token: string;
     token_type: string; // "bearer"
@@ -399,38 +361,33 @@ export interface LoginResponse {
     role: string;
     company_id: string;
 }
-// Login se maneja en useAuth.tsx, no necesita una función aquí
 
-// --- Type Mapping Helpers ---
-// Mapea la estructura de sources recibida en ChatMessageApi a RetrievedDoc
 export const mapApiSourcesToFrontend = (
-    apiSources: ChatMessageApi['sources'] // Usa el tipo correcto definido en ChatMessageApi
+    apiSources: ChatMessageApi['sources']
 ): RetrievedDoc[] | undefined => {
     if (!apiSources) {
         return undefined;
     }
-    // Mapea cada source de la API de mensaje al formato RetrievedDoc
     return apiSources.map(source => ({
-        id: source.chunk_id, // Mapea chunk_id a id
+        id: source.chunk_id,
         document_id: source.document_id,
         file_name: source.file_name,
-        content: source.preview, // Usa preview como content por defecto (podría ajustarse si hay más data)
+        content: source.preview,
         content_preview: source.preview,
-        metadata: null, // La API de mensajes no provee metadata detallada en 'sources'
+        metadata: null,
         score: source.score,
     }));
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
-    // Mapear las sources usando la función anterior
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
 
     return {
         id: apiMessage.id,
         role: apiMessage.role,
         content: apiMessage.content,
-        sources: mappedSources, // Usa las sources mapeadas
+        sources: mappedSources,
         isError: false,
-        created_at: apiMessage.created_at, // Usar siempre el timestamp de la API
+        created_at: apiMessage.created_at,
     };
 };

@@ -23,6 +23,8 @@ atenex-frontend/
 │   ├── contact
 │   │   └── page.tsx
 │   ├── globals.css
+│   ├── help
+│   │   └── page.tsx
 │   ├── layout.tsx
 │   ├── page.tsx
 │   ├── privacy
@@ -592,6 +594,19 @@ export default function ChatPage() {
     }, [messages, isSending]);
 
     const handleSendMessage = useCallback(async (query: string) => {
+        const greetingRegex = /^(hola|hello|hi|buenos días|buenas tardes|buenas noches)$/i; // Detect simple greetings
+        if (greetingRegex.test(query.trim())) {
+            // Respond locally to greetings
+            const greetingResponse: Message = {
+                id: `assistant-greet-${Date.now()}`,
+                role: 'assistant',
+                content: '¡Hola! ¿En qué puedo ayudarte con tus documentos hoy?',
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev.filter(m => m.id !== 'initial-welcome'), greetingResponse]);
+            return; // Skip API call
+        }
+
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
         const isAuthenticated = !!user || bypassAuth;
 
@@ -803,6 +818,7 @@ export default function ChatPage() {
 import React from 'react'; // No se necesita useState, useEffect, useCallback aquí
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; // Import Button
+import { Card, CardContent } from '@/components/ui/card'; // Wrap panels in Cards
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses'; // Hook para estados
@@ -814,28 +830,31 @@ import { AuthHeaders } from '@/lib/api';
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Hook para manejar la lista de estados de documentos
+  // Hook para manejar la lista de estados de documentos con paginación, refresco y eliminación
   const {
     documents,
     isLoading: isLoadingDocuments,
     error: documentsError,
-    fetchDocuments, // Función para refrescar la lista
-    retryLocalUpdate, // Función para actualizar localmente al reintentar
+    fetchDocuments,
+    fetchMore,
+    hasMore,
+    retryLocalUpdate,
+    refreshDocument,
+    deleteLocalDocument,
   } = useDocumentStatuses();
 
   // Hook para manejar la subida de archivos
   const {
     isUploading,
     uploadError,
-    // uploadResponse, // No necesitamos mostrar la respuesta aquí directamente
     uploadFile,
-    clearUploadStatus // Para limpiar el error de subida si el usuario interactúa de nuevo
+    clearUploadStatus
   } = useUploadDocument(
     // Callback onSuccess: Refrescar la lista después de subir
     () => {
         // Pequeño delay para dar tiempo al backend a actualizar el estado
         setTimeout(() => {
-            fetchDocuments();
+            fetchDocuments(true);
         }, 1500);
     }
   );
@@ -883,66 +902,72 @@ export default function KnowledgePage() {
       <h1 className="text-2xl font-semibold">Gestionar Base de Conocimiento</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8"> {/* Aumentado gap */}
-        {/* Columna de subida */}
-        <div className="lg:col-span-1 space-y-4"> {/* Añadido space-y */}
-          <h2 className="text-lg font-medium">Subir Nuevo Documento</h2>
-          {authHeadersForChildren ? (
-            <FileUploader
-              authHeaders={authHeadersForChildren}
-              onUploadFile={uploadFile} // Pasar la función de subida del hook
-              isUploading={isUploading} // Pasar estado de carga del hook
-              uploadError={uploadError} // Pasar error de subida del hook
-              clearUploadStatus={clearUploadStatus} // Pasar función para limpiar estado
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
-              Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
-            </p>
-          )}
-        </div>
+        {/* Panel de Subida */}
+        <Card className="lg:col-span-1">
+          <CardContent className="space-y-4">
+            <h2 className="text-lg font-medium">Subir Nuevo Documento</h2>
+            {authHeadersForChildren ? (
+              <FileUploader
+                authHeaders={authHeadersForChildren}
+                onUploadFile={uploadFile}
+                isUploading={isUploading}
+                uploadError={uploadError}
+                clearUploadStatus={clearUploadStatus}
+              />
+            ) : (
+              <p className="text-muted-foreground text-sm border p-4 rounded-md bg-muted/50">
+                Inicia sesión para poder subir nuevos documentos a tu base de conocimiento.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Columna de listado */}
-        <div className="lg:col-span-2 space-y-4"> {/* Wrap list column content */}
-           <div className='flex justify-between items-center'>
+        {/* Panel de Lista de Documentos */}
+        <Card className="lg:col-span-2">
+          <CardContent className="space-y-4">
+            <div className='flex justify-between items-center'>
               <h2 className="text-lg font-medium">Documentos Subidos</h2>
-              {/* Botón opcional para refrescar manualmente */}
               {authHeadersForChildren && (
-                 <Button variant="outline" size="sm" onClick={fetchDocuments} disabled={isLoadingDocuments}>
-                    <Loader2 className={`mr-2 h-4 w-4 ${isLoadingDocuments ? 'animate-spin' : 'hidden'}`} /> {/* Use template literal for class */}
-                    Refrescar Lista
-                 </Button>
-             )}
-          </div>
+                <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
+                  <Loader2 className={isLoadingDocuments ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
+                  Refrescar Lista
+                </Button>
+              )}
+            </div>
 
-          {/* Mostrar error de carga de la lista */}
-          {documentsError && (
-              <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
-                Error al cargar documentos: {documentsError}
-              </div>
-          )}
+            {/* Mostrar error de carga de la lista */}
+            {documentsError && (
+                <div className="text-destructive border border-destructive/50 bg-destructive/10 p-3 rounded-md text-sm">
+                  Error al cargar documentos: {documentsError}
+                </div>
+            )}
 
-          {/* Mostrar estado de carga de la lista */}
-          {isLoadingDocuments ? (
-             <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-             </div>
-          ) : (
-            // Renderizar la lista solo si hay headers (usuario logueado)
-            authHeadersForChildren ? (
+            {/* Mostrar estado de carga de la lista */}
+            {isLoadingDocuments ? (
+               <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+               </div>
+            ) : (
+              // Renderizar la lista solo si hay headers (usuario logueado)
+              authHeadersForChildren ? (
                 <DocumentStatusList
                   documents={documents}
-                  isLoading={false}
+                  authHeaders={authHeadersForChildren}
                   onRetrySuccess={handleRetrySuccess}
-                  authHeaders={authHeadersForChildren} // Pasar headers por si se necesitan dentro
+                  fetchMore={fetchMore}
+                  hasMore={hasMore}
+                  refreshDocument={refreshDocument}
+                  deleteLocalDocument={deleteLocalDocument}
                 />
-            ) : (
+              ) : (
                 // Mensaje si no está cargando, no hay error y no hay usuario
                 !documentsError && <p className="text-muted-foreground text-center py-6">Inicia sesión para ver tus documentos.</p>
-            )
-          )}
-        </div> {/* Close list column wrapper */}
+              )
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -1181,17 +1206,6 @@ export default function SettingsPage() {
       </Card>
 
        <Separator />
-
-       <Card>
-        <CardHeader>
-          <CardTitle>Apariencia</CardTitle>
-          <CardDescription>Personaliza la apariencia de la interfaz.</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <p className="text-sm text-muted-foreground">La selección de temas está disponible en el encabezado.</p>
-           {/* Aquí podría ir el ThemePaletteButton si se quisiera aquí también */}
-        </CardContent>
-      </Card>
 
     </div>
   );
@@ -1698,6 +1712,44 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
         /* font-feature-settings: "rlig" 1, "calt" 1; /* Mantenlo si es necesario */
     }
 }
+```
+
+## File: `app\help\page.tsx`
+```tsx
+// filepath: e:/Nyro/AUDIZOR_B2B/atenex-frontend/app/help/page.tsx
+"use client";
+
+import React from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+
+export default function HelpPage() {
+  return (
+    <div className="container mx-auto p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Ayuda y Soporte</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle>Documentación de la Plataforma</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p>
+            Encuentra guías y respuestas a preguntas frecuentes sobre cómo utilizar Atenex.
+            Visita nuestra <a href="https://docs.atenex.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">documentación oficial</a> para más información.
+          </p>
+          <p>
+            Si necesitas asistencia adicional, contacta al equipo de soporte:
+          </p>
+          <ul className="list-disc list-inside">
+            <li>Email: <a href="mailto:soporte@atenex.com" className="text-primary underline">soporte@atenex.com</a></li>
+            <li>Teléfono: <a href="tel:+34123456789" className="text-primary underline">+34 123 456 789</a></li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 ```
 
 ## File: `app\layout.tsx`
@@ -3013,7 +3065,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle } from 'lucide-react'; // Added HelpCircle for chunks
-import { retryIngestDocument, DocumentStatusResponse, AuthHeaders } from '@/lib/api'; // Usar interfaz y función API
+import { retryIngestDocument, deleteIngestDocument, DocumentStatusResponse, AuthHeaders } from '@/lib/api'; // Usar interfaz y función API
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
 import { cn } from '@/lib/utils';
@@ -3022,10 +3074,13 @@ import { cn } from '@/lib/utils';
 type DocumentStatus = DocumentStatusResponse;
 
 interface DocumentStatusListProps {
-  documents: DocumentStatus[]; // Usar la interfaz de la API
-  isLoading: boolean;
+  documents: DocumentStatus[];
   authHeaders: AuthHeaders;
   onRetrySuccess: (documentId: string) => void;
+  fetchMore: () => void;
+  hasMore: boolean;
+  refreshDocument: (documentId: string) => void;
+  deleteLocalDocument: (documentId: string) => void;
 }
 
 // Helper con textos y estilos actualizados
@@ -3045,7 +3100,7 @@ const getStatusAttributes = (status: DocumentStatus['status']) => {
       }
 };
 
-export function DocumentStatusList({ documents, isLoading, authHeaders, onRetrySuccess }: DocumentStatusListProps) {
+export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, deleteLocalDocument }: DocumentStatusListProps) {
 
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
@@ -3068,16 +3123,37 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
     }
   };
 
-  // Ya no se necesita el estado de carga interno, lo maneja el hook padre
-  // if (isLoading) { ... }
+  const handleRefresh = (documentId: string) => {
+    refreshDocument(documentId);
+    toast.success('Estado actualizado.');
+  };
+
+  const handleDelete = async (documentId: string, fileName?: string | null) => {
+    const display = fileName || documentId.substring(0,8)+'...';
+    const id = toast.loading(`Eliminando ${display}...`);
+    try {
+      await deleteIngestDocument(documentId, authHeaders);
+      deleteLocalDocument(documentId);
+      toast.success('Documento eliminado', { id });
+    } catch(e:any) {
+      toast.error('Error al eliminar', { id, description: e.message || '' });
+    }
+  };
 
   if (!documents || documents.length === 0) {
-    // Mensaje si no hay documentos (y no está cargando)
-    return isLoading ? null : <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
+    return <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
   }
 
   return (
     <TooltipProvider>
+      {/* Legend for statuses */}
+      <div className="flex flex-wrap gap-3 mb-4 text-xs">
+        {['En Cola','Procesando','Procesado','Error'].map((label, i) => {
+          const attr = [ 'uploaded','processing','processed','error' ].map(s => getStatusAttributes(s));
+          const { className: cls } = attr[i];
+          return <span key={label} className={`inline-block px-2 py-0.5 rounded ${cls}`}>{label}</span>;
+        })}
+      </div>
       <div className="border rounded-md overflow-hidden"> {/* overflow-hidden para bordes redondeados */}
         <Table>
           <TableHeader>
@@ -3093,8 +3169,8 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
           <TableBody>
             {documents.map((doc) => {
               const { icon: Icon, text: statusText, className: statusClassName, animate } = getStatusAttributes(doc.status);
-              // Usar updated_at si existe, si no created_at
-              const dateToShow = doc.updated_at || doc.created_at;
+              // Mostrar fecha de última actualización desde 'last_updated'
+              const dateToShow = doc.last_updated;
               const displayDate = dateToShow ? new Date(dateToShow).toLocaleString() : 'N/D';
               const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 8)}...`;
 
@@ -3132,7 +3208,8 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-1">
+                    {/* Retry on error */}
                     {doc.status === 'error' && (
                       <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
@@ -3148,17 +3225,39 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
                         </TooltipTrigger>
                          <TooltipContent>
                             {/* Tooltip traducido */}
-                            <p>Reintentar Ingesta</p>
+                            <p>Reintentar</p>
                          </TooltipContent>
                       </Tooltip>
                     )}
-                    {/* Espacio para futuras acciones como 'Eliminar' */}
+                    {/* Manual refresh */}
+                    <Tooltip delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => handleRefresh(doc.document_id)} aria-label="Actualizar estado">
+                          <Loader2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Actualizar</p></TooltipContent>
+                    </Tooltip>
+                    {/* Delete document */}
+                    <Tooltip delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(doc.document_id, doc.file_name)} aria-label="Eliminar documento">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Eliminar</p></TooltipContent>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+        {hasMore && (
+          <div className="p-3 text-center">
+            <Button variant="outline" size="sm" onClick={fetchMore}>Cargar más</Button>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );
@@ -5367,42 +5466,10 @@ export interface AuthHeaders {
   'X-User-ID': string;
 }
 
-// --- MODIFICACIÓN: Eliminar fetchWithAuth y usar request directamente ---
-// Base fetch function to include auth headers
-/* // Eliminado fetchWithAuth
-async function fetchWithAuth(path: string, options: RequestInit & { auth: AuthHeaders }) { // Changed first arg to path
-    const { auth, ...restOptions } = options;
-    const headers = {
-        ...restOptions.headers,
-        'X-Company-ID': auth['X-Company-ID'],
-        'X-User-ID': auth['X-User-ID'],
-    };
-
-    // Construct the full URL
-    const baseUrl = getApiGatewayUrl(); // Get base URL
-    const fullUrl = `${baseUrl}${path}`; // Concatenate base URL and path
-
-    // Need to handle FormData correctly here if used
-    let body = restOptions.body;
-    if (!(body instanceof FormData)) {
-        if (!headers['Content-Type']) {
-            headers['Content-Type'] = 'application/json';
-        }
-    } else {
-        // Let the browser set the Content-Type for FormData
-        delete headers['Content-Type'];
-    }
-
-    return fetch(fullUrl, { ...restOptions, headers, body });
-}
-*/
-// -------------------------------------------------------------------
-
 export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> { // Return type updated
   const formData = new FormData();
   formData.append('file', file);
 
-  // --- MODIFICACIÓN: Usar request --- 
   try {
     // Pass auth headers directly to the request options
     const response = await request<IngestResponse>('/api/v1/ingest/upload', {
@@ -5420,24 +5487,18 @@ export async function uploadDocument(file: File, auth: AuthHeaders): Promise<Ing
     // The request function already formats ApiError messages
     throw error;
   }
-  // ----------------------------------
 }
 
 export interface DocumentStatusResponse {
     document_id: string;
-    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // string como fallback. 'indexed' eliminado por ahora.
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
+    status: string;
+    file_name?: string;
+    file_type?: string;
+    chunk_count?: number;
     error_message?: string | null;
-    created_at?: string; // Timestamp de creación
-    updated_at?: string; // Timestamp de última actualización (más útil que last_updated)
-    // file_path?: string | null; // Probablemente no necesario en el frontend listado
-    // message?: string | null; // Mensaje específico de /status/{id}, no garantizado en la lista
-    // metadata?: Record<string, any> | null; // No esencial para la lista de estado
+    last_updated: string;
 }
 
-// --- MODIFICACIÓN: Usar request y añadir params --- 
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 100, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
   try {
@@ -5457,7 +5518,6 @@ export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 1
     throw error;
   }
 }
-// -------------------------------------------------
 
 export const getDocumentStatus = async (documentId: string): Promise<DocumentStatusResponse> => {
     return request<DocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`);
@@ -5493,7 +5553,17 @@ export async function retryIngestDocument(documentId: string, auth: AuthHeaders)
     throw error;
   }
 }
-// ----------------------------------
+
+/**
+ * Elimina un documento de la base de conocimiento (Milvus, MinIO y registro).
+ * Endpoint: DELETE /api/v1/ingest/{document_id}
+ */
+export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
+  await request<null>(`/api/v1/ingest/${documentId}`, {
+    method: 'DELETE',
+    headers: { ...auth } as Record<string, string>,
+  });
+}
 
 // --- Query Service ---
 export interface RetrievedDocApi {
@@ -5513,9 +5583,7 @@ export interface ChatSummary {
     title: string | null;
     created_at: string;
     updated_at: string;
-    // --- MODIFICACIÓN: Añadir message_count ---
     message_count: number;
-    // --------------------------------------
 }
 
 export interface ChatMessageApi {
@@ -5523,8 +5591,6 @@ export interface ChatMessageApi {
     chat_id: string;
     role: 'user' | 'assistant';
     content: string;
-    // --- MODIFICACIÓN: Aclarar el tipo de sources ---
-    // La API devuelve null o un array de objetos con estructura específica
     sources: Array<{
         chunk_id: string;
         document_id: string;
@@ -5532,7 +5598,6 @@ export interface ChatMessageApi {
         score: number;
         preview: string; // Este campo está en la API de mensajes, usarlo en el mapeo si es necesario
     }> | null;
-    // -------------------------------------------
     created_at: string; // La API garantiza este campo para mensajes
 }
 
@@ -5554,15 +5619,12 @@ export const getChats = async (limit: number = 50, offset: number = 0): Promise<
      return request<ChatSummary[]>(endpoint);
 };
 
-// --- MODIFICACIÓN: Añadir params a la firma ---
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     // -----------------------------------------
      return request<ChatMessageApi[]>(endpoint);
 };
 
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     // Asegurarse que chat_id es null si no se proporciona, como espera la API
      const body = {
          ...payload,
          chat_id: payload.chat_id || null
@@ -5570,22 +5632,19 @@ export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse
      return request<QueryApiResponse>('/api/v1/query/ask', {
         method: 'POST',
         body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' } // Explícito aquí
+        headers: { 'Content-Type': 'application/json' }
      });
 };
 
 export const deleteChat = async (chatId: string): Promise<void> => {
-     // El request ya maneja la respuesta 204 devolviendo null
      await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
 // --- Auth Service ---
-// Definición de LoginPayload explícita
 interface LoginPayload {
     email: string;
     password: string;
 }
-// Definición de LoginResponse explícita basada en la documentación
 export interface LoginResponse {
     access_token: string;
     token_type: string; // "bearer"
@@ -5595,39 +5654,34 @@ export interface LoginResponse {
     role: string;
     company_id: string;
 }
-// Login se maneja en useAuth.tsx, no necesita una función aquí
 
-// --- Type Mapping Helpers ---
-// Mapea la estructura de sources recibida en ChatMessageApi a RetrievedDoc
 export const mapApiSourcesToFrontend = (
-    apiSources: ChatMessageApi['sources'] // Usa el tipo correcto definido en ChatMessageApi
+    apiSources: ChatMessageApi['sources']
 ): RetrievedDoc[] | undefined => {
     if (!apiSources) {
         return undefined;
     }
-    // Mapea cada source de la API de mensaje al formato RetrievedDoc
     return apiSources.map(source => ({
-        id: source.chunk_id, // Mapea chunk_id a id
+        id: source.chunk_id,
         document_id: source.document_id,
         file_name: source.file_name,
-        content: source.preview, // Usa preview como content por defecto (podría ajustarse si hay más data)
+        content: source.preview,
         content_preview: source.preview,
-        metadata: null, // La API de mensajes no provee metadata detallada en 'sources'
+        metadata: null,
         score: source.score,
     }));
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
-    // Mapear las sources usando la función anterior
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
 
     return {
         id: apiMessage.id,
         role: apiMessage.role,
         content: apiMessage.content,
-        sources: mappedSources, // Usa las sources mapeadas
+        sources: mappedSources,
         isError: false,
-        created_at: apiMessage.created_at, // Usar siempre el timestamp de la API
+        created_at: apiMessage.created_at,
     };
 };
 ```
@@ -5910,31 +5964,36 @@ export const useAuth = (): AuthContextType => {
 ## File: `lib\hooks\useDocumentStatuses.ts`
 ```ts
 import { useState, useEffect, useCallback } from 'react';
-import { getDocumentStatusList, DocumentStatusResponse, AuthHeaders, ApiError } from '@/lib/api';
+import { getDocumentStatusList, DocumentStatusResponse, AuthHeaders, ApiError, getDocumentStatus } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface UseDocumentStatusesReturn {
   documents: DocumentStatusResponse[];
   isLoading: boolean;
   error: string | null;
-  fetchDocuments: () => Promise<void>; // Función para refrescar manualmente
+  fetchDocuments: (reset?: boolean) => Promise<void>; // Función para refrescar manualmente
+  fetchMore: () => void; // Función para cargar más documentos
+  hasMore: boolean; // Indica si hay más documentos para cargar
   retryLocalUpdate: (documentId: string) => void; // Función para actualizar estado local al reintentar
+  refreshDocument: (documentId: string) => Promise<void>; // Refrescar estado de un documento específico
+  deleteLocalDocument: (documentId: string) => void; // Eliminar documento localmente
 }
 
 export function useDocumentStatuses(): UseDocumentStatusesReturn {
   const { user, isLoading: isAuthLoading } = useAuth();
   const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Loading state for documents specifically
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const offsetRef = useRef<number>(0);
+  const limit = 100; // page size
+  const [hasMore, setHasMore] = useState<boolean>(false);
 
-  const fetchDocuments = useCallback(async () => {
-    // Don't fetch if auth is still loading or user is not available
+  const fetchDocuments = useCallback(async (reset: boolean = true) => {
     if (isAuthLoading || !user?.userId || !user?.companyId) {
-      // If auth finished and no user, clear documents and stop loading
       if (!isAuthLoading) {
         setDocuments([]);
         setIsLoading(false);
-        setError(null); // No error, just no user
+        setError(null);
       }
       return;
     }
@@ -5948,37 +6007,56 @@ export function useDocumentStatuses(): UseDocumentStatusesReturn {
     setError(null);
 
     try {
-      // TODO: Implement pagination/infinite loading here later if needed
-      const data = await getDocumentStatusList(authHeaders); // Using default limit/offset for now
-      setDocuments(Array.isArray(data) ? data : []);
+      const newOffset = reset ? 0 : offsetRef.current;
+      const data = await getDocumentStatusList(authHeaders, limit, newOffset);
+      setHasMore(data.length === limit);
+      setDocuments(prev => reset ? data : [...prev, ...data]);
+      if (reset) offsetRef.current = limit; else offsetRef.current += limit;
     } catch (err: any) {
       const errorMessage = err instanceof ApiError ? err.message : (err.message || 'Error al cargar la lista de documentos.');
       setError(errorMessage);
-      setDocuments([]); // Clear documents on error
+      setDocuments([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user, isAuthLoading]); // Depend on user and auth loading state
+  }, [user, isAuthLoading]);
 
-  // Initial fetch when auth is ready
   useEffect(() => {
-    fetchDocuments();
-  }, [fetchDocuments]); // fetchDocuments already depends on user/isAuthLoading
+    fetchDocuments(true);
+  }, [fetchDocuments]);
 
-  // Function to optimistically update status locally when retry is triggered
   const retryLocalUpdate = useCallback((documentId: string) => {
     setDocuments(prevDocs =>
       prevDocs.map(doc =>
         doc.document_id === documentId
-          ? { ...doc, status: 'processing', error_message: null } // Optimistic update
+          ? { ...doc, status: 'processing', error_message: null }
           : doc
       )
     );
-    // Optionally trigger a full refresh after a delay
-    // setTimeout(fetchDocuments, 5000);
-  }, []); // No dependencies needed for this specific update logic
+  }, []);
 
-  return { documents, isLoading, error, fetchDocuments, retryLocalUpdate };
+  const fetchMore = useCallback(() => {
+    if (!isLoading && hasMore) fetchDocuments(false);
+  }, [fetchDocuments, isLoading, hasMore]);
+
+  const refreshDocument = useCallback(async (documentId: string) => {
+    const authHeaders: AuthHeaders = {
+      'X-User-ID': user?.userId || '',
+      'X-Company-ID': user?.companyId || '',
+    };
+    try {
+      const updated = await getDocumentStatus(documentId, authHeaders);
+      setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updated : doc));
+    } catch {
+      // ignore errors
+    }
+  }, [user]);
+
+  const deleteLocalDocument = useCallback((documentId: string) => {
+    setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
+  }, []);
+
+  return { documents, isLoading, error, fetchDocuments, fetchMore, hasMore, retryLocalUpdate, refreshDocument, deleteLocalDocument };
 }
 
 ```

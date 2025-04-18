@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, AlertTriangle, HelpCircle } from 'lucide-react'; // Added HelpCircle for chunks
-import { retryIngestDocument, DocumentStatusResponse, AuthHeaders } from '@/lib/api'; // Usar interfaz y función API
+import { retryIngestDocument, deleteIngestDocument, DocumentStatusResponse, AuthHeaders } from '@/lib/api'; // Usar interfaz y función API
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
 import { cn } from '@/lib/utils';
@@ -16,10 +16,13 @@ import { cn } from '@/lib/utils';
 type DocumentStatus = DocumentStatusResponse;
 
 interface DocumentStatusListProps {
-  documents: DocumentStatus[]; // Usar la interfaz de la API
-  isLoading: boolean;
+  documents: DocumentStatus[];
   authHeaders: AuthHeaders;
   onRetrySuccess: (documentId: string) => void;
+  fetchMore: () => void;
+  hasMore: boolean;
+  refreshDocument: (documentId: string) => void;
+  deleteLocalDocument: (documentId: string) => void;
 }
 
 // Helper con textos y estilos actualizados
@@ -39,7 +42,7 @@ const getStatusAttributes = (status: DocumentStatus['status']) => {
       }
 };
 
-export function DocumentStatusList({ documents, isLoading, authHeaders, onRetrySuccess }: DocumentStatusListProps) {
+export function DocumentStatusList({ documents, authHeaders, onRetrySuccess, fetchMore, hasMore, refreshDocument, deleteLocalDocument }: DocumentStatusListProps) {
 
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders) return;
@@ -62,16 +65,37 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
     }
   };
 
-  // Ya no se necesita el estado de carga interno, lo maneja el hook padre
-  // if (isLoading) { ... }
+  const handleRefresh = (documentId: string) => {
+    refreshDocument(documentId);
+    toast.success('Estado actualizado.');
+  };
+
+  const handleDelete = async (documentId: string, fileName?: string | null) => {
+    const display = fileName || documentId.substring(0,8)+'...';
+    const id = toast.loading(`Eliminando ${display}...`);
+    try {
+      await deleteIngestDocument(documentId, authHeaders);
+      deleteLocalDocument(documentId);
+      toast.success('Documento eliminado', { id });
+    } catch(e:any) {
+      toast.error('Error al eliminar', { id, description: e.message || '' });
+    }
+  };
 
   if (!documents || documents.length === 0) {
-    // Mensaje si no hay documentos (y no está cargando)
-    return isLoading ? null : <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
+    return <p className="text-center text-muted-foreground p-5">No hay documentos subidos aún.</p>;
   }
 
   return (
     <TooltipProvider>
+      {/* Legend for statuses */}
+      <div className="flex flex-wrap gap-3 mb-4 text-xs">
+        {['En Cola','Procesando','Procesado','Error'].map((label, i) => {
+          const attr = [ 'uploaded','processing','processed','error' ].map(s => getStatusAttributes(s));
+          const { className: cls } = attr[i];
+          return <span key={label} className={`inline-block px-2 py-0.5 rounded ${cls}`}>{label}</span>;
+        })}
+      </div>
       <div className="border rounded-md overflow-hidden"> {/* overflow-hidden para bordes redondeados */}
         <Table>
           <TableHeader>
@@ -126,7 +150,8 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs hidden md:table-cell">{displayDate}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-1">
+                    {/* Retry on error */}
                     {doc.status === 'error' && (
                       <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
@@ -142,17 +167,39 @@ export function DocumentStatusList({ documents, isLoading, authHeaders, onRetryS
                         </TooltipTrigger>
                          <TooltipContent>
                             {/* Tooltip traducido */}
-                            <p>Reintentar Ingesta</p>
+                            <p>Reintentar</p>
                          </TooltipContent>
                       </Tooltip>
                     )}
-                    {/* Espacio para futuras acciones como 'Eliminar' */}
+                    {/* Manual refresh */}
+                    <Tooltip delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => handleRefresh(doc.document_id)} aria-label="Actualizar estado">
+                          <Loader2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Actualizar</p></TooltipContent>
+                    </Tooltip>
+                    {/* Delete document */}
+                    <Tooltip delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(doc.document_id, doc.file_name)} aria-label="Eliminar documento">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Eliminar</p></TooltipContent>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+        {hasMore && (
+          <div className="p-3 text-center">
+            <Button variant="outline" size="sm" onClick={fetchMore}>Cargar más</Button>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );

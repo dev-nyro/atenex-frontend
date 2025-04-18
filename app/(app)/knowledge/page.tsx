@@ -15,28 +15,31 @@ import { AuthHeaders } from '@/lib/api';
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Hook para manejar la lista de estados de documentos
+  // Hook para manejar la lista de estados de documentos con paginación, refresco y eliminación
   const {
     documents,
     isLoading: isLoadingDocuments,
     error: documentsError,
-    fetchDocuments, // Función para refrescar la lista
-    retryLocalUpdate, // Función para actualizar localmente al reintentar
+    fetchDocuments,
+    fetchMore,
+    hasMore,
+    retryLocalUpdate,
+    refreshDocument,
+    deleteLocalDocument,
   } = useDocumentStatuses();
 
   // Hook para manejar la subida de archivos
   const {
     isUploading,
     uploadError,
-    // uploadResponse, // No necesitamos mostrar la respuesta aquí directamente
     uploadFile,
-    clearUploadStatus // Para limpiar el error de subida si el usuario interactúa de nuevo
+    clearUploadStatus
   } = useUploadDocument(
     // Callback onSuccess: Refrescar la lista después de subir
     () => {
         // Pequeño delay para dar tiempo al backend a actualizar el estado
         setTimeout(() => {
-            fetchDocuments();
+            fetchDocuments(true);
         }, 1500);
     }
   );
@@ -110,7 +113,7 @@ export default function KnowledgePage() {
             <div className='flex justify-between items-center'>
               <h2 className="text-lg font-medium">Documentos Subidos</h2>
               {authHeadersForChildren && (
-                <Button variant="outline" size="sm" onClick={fetchDocuments} disabled={isLoadingDocuments}>
+                <Button variant="outline" size="sm" onClick={() => fetchDocuments(true)} disabled={isLoadingDocuments}>
                   <Loader2 className={isLoadingDocuments ? 'mr-2 h-4 w-4 animate-spin' : 'mr-2 h-4 w-4'} />
                   Refrescar Lista
                 </Button>
@@ -136,9 +139,12 @@ export default function KnowledgePage() {
               authHeadersForChildren ? (
                 <DocumentStatusList
                   documents={documents}
-                  isLoading={false}
-                  onRetrySuccess={handleRetrySuccess}
                   authHeaders={authHeadersForChildren}
+                  onRetrySuccess={handleRetrySuccess}
+                  fetchMore={fetchMore}
+                  hasMore={hasMore}
+                  refreshDocument={refreshDocument}
+                  deleteLocalDocument={deleteLocalDocument}
                 />
               ) : (
                 // Mensaje si no está cargando, no hay error y no hay usuario

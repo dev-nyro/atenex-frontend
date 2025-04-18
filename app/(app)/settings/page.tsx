@@ -93,17 +93,6 @@ export default function SettingsPage() {
 
        <Separator />
 
-       <Card>
-        <CardHeader>
-          <CardTitle>Apariencia</CardTitle>
-          <CardDescription>Personaliza la apariencia de la interfaz.</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <p className="text-sm text-muted-foreground">La selección de temas está disponible en el encabezado.</p>
-           {/* Aquí podría ir el ThemePaletteButton si se quisiera aquí también */}
-        </CardContent>
-      </Card>
-
     </div>
   );
 }
