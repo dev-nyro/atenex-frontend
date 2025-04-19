@@ -13,7 +13,7 @@ atenex-frontend/
 │   │   │   └── page.tsx
 │   │   ├── layout.tsx
 │   │   └── settings
-│   │       └── page.tsx 
+│   │       └── page.tsx
 │   ├── (auth)
 │   │   ├── layout.tsx
 │   │   └── login
@@ -40,6 +40,8 @@ atenex-frontend/
 │   │   ├── chat-interface.tsx
 │   │   ├── chat-message.tsx
 │   │   └── retrieved-documents-panel.tsx
+│   ├── icons
+│   │   └── atenex-logo.tsx
 │   ├── knowledge
 │   │   ├── document-status-list.tsx
 │   │   └── file-uploader.tsx
@@ -1775,35 +1777,35 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --sidebar-ring: var(--ring);
 }
 
-/* Variables para el tema oscuro (.dark) - Ajustados */
+/* Variables para el tema oscuro (.dark) - Base Oscuro (Elegante) */
 .dark {
-    --background: oklch(0.12 0.015 240); /* Azul muy muy oscuro */
-    --foreground: oklch(0.96 0.008 240); /* Gris muy claro */
-    --card: oklch(0.16 0.02 240);     /* Azul oscuro ligeramente más claro */
+    --background: oklch(0.1 0.01 230); /* Azul/Gris muy oscuro */
+    --foreground: oklch(0.93 0.008 230); /* Gris muy claro, ligeramente azulado */
+    --card: oklch(0.14 0.015 230);    /* Un poco más claro que el fondo */
     --card-foreground: var(--foreground);
-    --popover: oklch(0.11 0.01 240);    /* Popover aún más oscuro */
+    --popover: oklch(0.10 0.01 230);   /* Más oscuro para popovers */
     --popover-foreground: var(--foreground);
-    --primary: oklch(0.78 0.15 265);    /* Primario más brillante */
-    --primary-foreground: oklch(0.08 0.02 265); /* Texto oscuro para primario brillante */
-    --secondary: oklch(0.22 0.025 240);  /* Gris azulado oscuro */
-    --secondary-foreground: oklch(0.85 0.01 240); /* Texto claro para secundario */
+    --primary: oklch(0.8 0.1 210);    /* Azul claro brillante como primario */
+    --primary-foreground: oklch(0.08 0.03 210); /* Azul muy oscuro para texto primario */
+    --secondary: oklch(0.20 0.02 230); /* Gris oscuro azulado */
+    --secondary-foreground: oklch(0.80 0.01 230); /* Texto claro para secundario */
     --muted: var(--secondary);
-    --muted-foreground: oklch(0.60 0.015 240); /* Texto muted más claro */
-    --accent: oklch(0.28 0.03 240);    /* Accent oscuro */
-    --accent-foreground: oklch(0.98 0.01 240); /* Texto claro para accent */
-    --destructive: oklch(0.68 0.18 20);     /* Rojo destructivo más brillante */
-    --destructive-foreground: oklch(0.99 0.01 20); /* Texto claro para destructivo */
-    --border: oklch(0.25 0.025 240);  /* Borde oscuro */
-    --input: oklch(0.26 0.028 240);   /* Input oscuro */
-    --ring: oklch(0.78 0.15 265 / 0.6); /* Anillo primario oscuro semi-transparente */
-    /* Variables Chart (Ajustar para dark mode) */
+    --muted-foreground: oklch(0.55 0.015 230); /* Muted más claro */
+    --accent: oklch(0.25 0.025 230);   /* Accent oscuro */
+    --accent-foreground: oklch(0.97 0.008 230); /* Texto claro para accent */
+    --destructive: oklch(0.65 0.18 15);    /* Rojo anaranjado */
+    --destructive-foreground: oklch(0.99 0.01 15); /* Texto claro */
+    --border: oklch(0.22 0.02 230);   /* Borde oscuro */
+    --input: oklch(0.24 0.022 230);  /* Input oscuro */
+    --ring: oklch(0.8 0.1 210 / 0.5); /* Anillo azul claro semi-transparente */
+    /* Variables Chart */
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
     /* Sidebar */
-     --sidebar: oklch(0.15 0.018 240); /* Sidebar ligeramente diferente */
+     --sidebar: oklch(0.13 0.012 230); /* Sidebar ligeramente diferente */
      --sidebar-foreground: var(--foreground);
      --sidebar-primary: var(--primary);
      --sidebar-primary-foreground: var(--primary-foreground);
@@ -1813,27 +1815,27 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
      --sidebar-ring: var(--ring);
 }
 
-/* --- NUEVO TEMA: Slate --- */
+/* --- TEMA: Slate (Oscuro) --- */
 .slate {
-    --background: oklch(0.18 0.01 230); /* Gris pizarra oscuro */
-    --foreground: oklch(0.94 0.005 230); /* Casi blanco */
+    --background: oklch(0.18 0.01 230);
+    --foreground: oklch(0.94 0.005 230);
     --card: oklch(0.22 0.015 230);
     --card-foreground: var(--foreground);
     --popover: oklch(0.15 0.01 230);
     --popover-foreground: var(--foreground);
     --primary: oklch(0.7 0.18 40); /* Naranja vibrante */
-    --primary-foreground: oklch(0.1 0.05 40); /* Marrón oscuro para contraste */
+    --primary-foreground: oklch(0.1 0.05 40);
     --secondary: oklch(0.3 0.02 230);
     --secondary-foreground: oklch(0.88 0.008 230);
     --muted: var(--secondary);
     --muted-foreground: oklch(0.6 0.01 230);
     --accent: oklch(0.35 0.025 230);
     --accent-foreground: oklch(0.96 0.006 230);
-    --destructive: oklch(0.65 0.16 15); /* Rojo más anaranjado */
+    --destructive: oklch(0.65 0.16 15);
     --destructive-foreground: oklch(0.99 0.01 15);
     --border: oklch(0.3 0.02 230);
     --input: oklch(0.32 0.022 230);
-    --ring: oklch(0.7 0.18 40 / 0.5); /* Naranja semi-transparente */
+    --ring: oklch(0.7 0.18 40 / 0.5);
     --sidebar: oklch(0.20 0.012 230);
     --sidebar-border: var(--border);
     /* Hereda el resto de variables de .slate */
@@ -1845,27 +1847,27 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --sidebar-ring: var(--ring);
 }
 
-/* --- NUEVO TEMA: Indigo --- */
+/* --- TEMA: Indigo (Claro) --- */
 .indigo {
-    --background: oklch(0.98 0.01 250); /* Blanco ligeramente violáceo */
-    --foreground: oklch(0.15 0.03 280); /* Índigo muy oscuro */
+    --background: oklch(0.98 0.01 250);
+    --foreground: oklch(0.15 0.03 280);
     --card: oklch(1 0 0);
     --card-foreground: var(--foreground);
     --popover: var(--card);
     --popover-foreground: var(--card-foreground);
-    --primary: oklch(0.55 0.18 280); /* Índigo principal */
+    --primary: oklch(0.55 0.18 280);
     --primary-foreground: oklch(0.99 0.01 280);
-    --secondary: oklch(0.96 0.02 270); /* Lavanda muy pálido */
+    --secondary: oklch(0.96 0.02 270);
     --secondary-foreground: oklch(0.35 0.04 280);
     --muted: var(--secondary);
     --muted-foreground: oklch(0.55 0.03 275);
-    --accent: oklch(0.8 0.15 190); /* Aqua/Cian como acento */
-    --accent-foreground: oklch(0.1 0.04 190); /* Azul oscuro para texto accent */
-    --destructive: oklch(0.6 0.2 10); /* Rojo */
+    --accent: oklch(0.8 0.15 190); /* Aqua/Cian */
+    --accent-foreground: oklch(0.1 0.04 190);
+    --destructive: oklch(0.6 0.2 10);
     --destructive-foreground: oklch(0.99 0.01 10);
-    --border: oklch(0.9 0.015 260); /* Borde lavanda */
+    --border: oklch(0.9 0.015 260);
     --input: oklch(0.93 0.018 265);
-    --ring: oklch(0.55 0.18 280 / 0.5); /* Índigo semi-transparente */
+    --ring: oklch(0.55 0.18 280 / 0.5);
     --sidebar: oklch(0.99 0.008 255);
     --sidebar-border: var(--border);
     /* Hereda */
@@ -1877,17 +1879,17 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --sidebar-ring: var(--ring);
 }
 
-/* --- NUEVO TEMA: Stone --- */
+/* --- TEMA: Stone (Claro) --- */
 .stone {
-    --background: oklch(0.98 0.005 80); /* Beige muy claro / casi blanco */
-    --foreground: oklch(0.25 0.01 80); /* Marrón grisáceo oscuro */
+    --background: oklch(0.98 0.005 80);
+    --foreground: oklch(0.25 0.01 80);
     --card: oklch(1 0 0);
     --card-foreground: var(--foreground);
     --popover: var(--card);
     --popover-foreground: var(--card-foreground);
-    --primary: oklch(0.55 0.12 165); /* Verde azulado (Teal) */
+    --primary: oklch(0.55 0.12 165); /* Teal */
     --primary-foreground: oklch(0.99 0.01 165);
-    --secondary: oklch(0.95 0.01 80); /* Gris piedra claro */
+    --secondary: oklch(0.95 0.01 80);
     --secondary-foreground: oklch(0.40 0.01 80);
     --muted: var(--secondary);
     --muted-foreground: oklch(0.55 0.01 80);
@@ -1897,7 +1899,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --destructive-foreground: oklch(0.99 0.01 30);
     --border: oklch(0.90 0.01 80);
     --input: oklch(0.93 0.01 80);
-    --ring: oklch(0.55 0.12 165 / 0.5); /* Teal semi-transparente */
+    --ring: oklch(0.55 0.12 165 / 0.5);
     --sidebar: oklch(0.99 0.006 80);
     --sidebar-border: var(--border);
      /* Hereda */
@@ -1909,11 +1911,39 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     --sidebar-ring: var(--ring);
 }
 
-/* --- FIN NUEVOS TEMAS --- */
+/* --- NUEVO TEMA: Zinc (Oscuro Elegante) --- */
+.zinc {
+    --background: oklch(0.15 0.01 220);  /* Gris Zinc muy oscuro */
+    --foreground: oklch(0.95 0.005 220); /* Gris muy claro */
+    --card: oklch(0.19 0.012 220);   /* Ligeramente más claro que el fondo */
+    --card-foreground: var(--foreground);
+    --popover: oklch(0.12 0.008 220);  /* Más oscuro */
+    --popover-foreground: var(--foreground);
+    --primary: oklch(0.75 0.06 220);   /* Azul grisáceo claro como primario */
+    --primary-foreground: oklch(0.1 0.01 220); /* Texto oscuro */
+    --secondary: oklch(0.25 0.015 220); /* Gris zinc medio */
+    --secondary-foreground: oklch(0.88 0.006 220); /* Texto claro */
+    --muted: var(--secondary);
+    --muted-foreground: oklch(0.6 0.01 220);
+    --accent: oklch(0.3 0.02 220);     /* Accent más oscuro */
+    --accent-foreground: oklch(0.98 0.005 220);
+    --destructive: oklch(0.6 0.15 20);     /* Rojo */
+    --destructive-foreground: oklch(0.99 0.01 20);
+    --border: oklch(0.25 0.015 220);  /* Borde sutil */
+    --input: oklch(0.27 0.018 220);   /* Input un poco más claro */
+    --ring: oklch(0.75 0.06 220 / 0.5); /* Ring azul grisáceo */
+    /* Sidebar */
+     --sidebar: oklch(0.17 0.011 220);
+     --sidebar-foreground: var(--foreground);
+     --sidebar-primary: var(--primary);
+     --sidebar-primary-foreground: var(--primary-foreground);
+     --sidebar-accent: var(--accent);
+     --sidebar-accent-foreground: var(--accent-foreground);
+     --sidebar-border: var(--border);
+     --sidebar-ring: var(--ring);
+}
 
-/* Tema blue y green existentes (mantienen sus definiciones originales por ahora) */
-.blue { /* ... definición previa ... */ }
-.green { /* ... definición previa ... */ }
+/* --- FIN NUEVOS TEMAS --- */
 
 
 /* 4. Aplica overrides mínimos en la capa base */
@@ -1928,6 +1958,11 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
     /* Asegurar que los elementos deshabilitados tengan cursor not-allowed */
     [disabled] {
         cursor: not-allowed !important;
+    }
+
+    /* Mejoras específicas para Tooltip Content para evitar solapamientos */
+    [data-slot="tooltip-content"] {
+        z-index: 60 !important; /* Asegurar que esté por encima del overlay del diálogo (z-50) */
     }
 }
 ```
@@ -3393,9 +3428,45 @@ const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTML
 );
 ```
 
+## File: `components\icons\atenex-logo.tsx`
+```tsx
+// File: components/icons/atenex-logo.tsx
+// Purpose: Atenex Logo SVG Component
+import React from 'react';
+import { cn } from '@/lib/utils'; // Import cn if needed for className variations
+
+interface AtenexLogoProps extends React.SVGProps<SVGSVGElement> {
+  // Add any specific props if needed, e.g., size variants
+}
+
+export const AtenexLogo = ({ className, width = 24, height = 24, ...props }: AtenexLogoProps) => {
+  return (
+    <svg
+      version="1.0"
+      xmlns="http://www.w3.org/2000/svg"
+      width={width} // Use props for size
+      height={height} // Use props for size
+      viewBox="0 0 1024.000000 1024.000000"
+      preserveAspectRatio="xMidYMid meet"
+      // Use currentColor for fill to inherit text color for theme changes
+      fill="currentColor"
+      stroke="none"
+      className={cn("inline-block", className)} // Basic class and allow overrides
+      {...props}
+    >
+      <g transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)">
+        {/* The path data from your SVG */}
+        <path d="M0 5120 l0 -5120 5120 0 5120 0 0 5120 0 5120 -5120 0 -5120 0 0 -5120z m5638 3284 c31 -22 60 -82 132 -279 122 -333 876 -2402 1131 -3105 291 -802 374 -1020 466 -1230 186 -423 345 -594 602 -647 85 -17 121 -42 121 -83 0 -16 -11 -37 -26 -51 l-26 -24 -866 -3 c-609 -2 -882 0 -918 8 -63 13 -87 37 -82 81 3 32 4 33 75 45 137 23 224 78 270 172 26 53 28 65 27 182 0 109 -4 141 -33 250 -28 102 -310 887 -419 1164 -48 122 46 111 -910 111 -781 0 -829 -1 -864 -18 -42 -21 -35 -9 -98 -192 -27 -77 -105 -304 -174 -505 -194 -561 -237 -768 -186 -903 47 -124 143 -202 299 -244 116 -31 140 -66 82 -124 l-29 -29 -749 0 c-807 0 -775 -2 -803 51 -22 40 5 61 125 94 73 20 195 81 290 143 99 66 249 220 324 332 71 106 188 341 249 500 48 125 277 787 316 915 26 83 33 95 89 150 69 67 177 128 300 170 153 51 217 55 910 55 514 0 639 3 643 13 4 12 -123 378 -349 1002 -58 160 -137 380 -175 490 -100 285 -191 534 -202 556 -22 40 -37 19 -74 -98 -203 -646 -480 -1431 -568 -1607 -36 -71 -103 -145 -180 -197 -31 -21 -137 -81 -235 -132 -203 -106 -258 -141 -326 -209 -93 -93 -126 -224 -98 -391 l13 -72 -50 -130 c-27 -71 -76 -203 -107 -292 -32 -90 -61 -163 -65 -163 -4 0 -49 42 -100 93 -203 202 -302 423 -303 672 -1 280 109 522 321 705 87 76 178 132 425 267 117 64 241 135 277 158 82 55 186 159 230 231 39 65 373 909 501 1269 104 292 132 410 127 540 -2 72 -8 100 -28 140 -22 44 -31 52 -72 65 -27 8 -48 21 -48 28 0 24 21 53 53 72 30 19 53 20 387 20 307 0 359 -2 378 -16z m-1103 -569 c50 -13 116 -35 149 -49 47 -21 57 -29 51 -43 -4 -10 -41 -113 -82 -229 l-75 -212 -36 10 c-65 19 -200 13 -267 -11 -93 -33 -122 -63 -192 -196 -89 -170 -115 -187 -378 -246 -96 -21 -189 -45 -207 -52 -18 -8 -66 -42 -107 -76 -122 -102 -188 -127 -372 -138 l-96 -6 -27 -43 c-56 -88 -157 -153 -243 -157 -48 -2 -103 17 -103 35 0 5 22 6 49 2 86 -11 181 37 242 121 20 28 40 45 53 45 13 0 5 8 -24 23 -59 29 -94 91 -94 163 0 55 8 68 135 219 33 39 77 113 124 210 46 95 86 163 109 186 21 21 102 70 189 115 84 43 231 124 328 180 97 55 196 108 219 118 159 64 466 78 655 31z m65 -3330 c455 -100 559 -132 688 -209 187 -111 320 -249 399 -411 58 -122 77 -219 70 -360 -14 -264 -88 -429 -281 -620 -133 -132 -223 -188 -501 -309 -366 -161 -479 -258 -479 -416 -1 -155 93 -222 310 -222 112 1 229 27 419 94 203 72 324 98 485 105 173 7 268 -10 395 -72 78 -37 183 -111 173 -121 -2 -1 -44 11 -93 29 -87 30 -96 31 -250 31 -233 0 -264 -10 -643 -209 -278 -146 -547 -190 -772 -125 -166 48 -332 168 -405 294 -84 145 -85 344 -2 500 40 76 156 199 266 282 46 34 161 106 255 160 302 172 397 247 454 360 77 152 63 294 -39 391 -140 133 -479 227 -851 234 -54 2 -98 5 -98 8 0 10 207 629 214 640 4 6 12 8 19 6 7 -2 127 -29 267 -60z"/>
+        <path d="M3340 7268 c0 -12 -21 -64 -46 -116 -32 -67 -54 -98 -75 -110 -67 -39 -14 -39 133 0 63 16 84 27 108 55 28 32 95 152 88 158 -8 6 -154 35 -179 35 -23 0 -29 -4 -29 -22z"/>
+      </g>
+    </svg>
+  );
+};
+```
+
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog)
+// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog v2)
 "use client";
 
 import React from 'react';
@@ -3449,14 +3520,13 @@ export function DocumentStatusList({
     onDeleteSuccess,
     isLoading
 }: DocumentStatusListProps) {
-  // Estado para controlar qué diálogo de confirmación está abierto (usando el ID del documento)
   const [deletingDocId, setDeletingDocId] = React.useState<string | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isRetrying, setIsRetrying] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState<string | null>(null);
 
-  // --- Handlers ---
-  const handleRetry = async (documentId: string, fileName?: string | null) => {
+  // --- Handlers (sin cambios lógicos) ---
+   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders || isRetrying) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
     setIsRetrying(documentId);
@@ -3495,11 +3565,8 @@ export function DocumentStatusList({
         console.log("Download requested for:", doc.document_id);
     };
 
-    // Abre el diálogo seteando el ID del documento a borrar
-    const openDeleteConfirmation = (docId: string) => { setDeletingDocId(docId); };
-
-    // Cierra el diálogo reseteando el ID
-    const closeDeleteConfirmation = () => { setDeletingDocId(null); };
+  const openDeleteConfirmation = (docId: string) => { setDeletingDocId(docId); };
+  const closeDeleteConfirmation = () => { setDeletingDocId(null); };
 
   const handleDeleteConfirmed = async () => {
     if (!deletingDocId || !authHeaders || isDeleting) return;
@@ -3512,13 +3579,12 @@ export function DocumentStatusList({
       await deleteIngestDocument(deletingDocId, authHeaders);
       onDeleteSuccess(deletingDocId);
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
-      closeDeleteConfirmation(); // Cierra el diálogo al éxito
+      closeDeleteConfirmation();
     } catch (e: any) {
       const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
     } finally {
       setIsDeleting(false);
-      // No cerramos aquí en caso de error, para que el usuario pueda reintentar cerrar o ver el error
     }
   };
 
@@ -3527,9 +3593,8 @@ export function DocumentStatusList({
     return ( <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border-2 border-dashed rounded-lg bg-muted/30 mt-4 min-h-[150px]"> <Info className="h-8 w-8 mb-3 opacity-50"/> <p className="text-sm font-medium mb-1">Sin Documentos</p> <p className="text-xs">Aún no se han subido documentos.</p> </div> );
   }
 
-  // Usar TooltipProvider a nivel de tabla para mejor rendimiento
   return (
-      <TooltipProvider>
+      <TooltipProvider> {/* Un solo provider para toda la lista */}
         <div className="border rounded-lg overflow-hidden shadow-sm bg-card">
           <Table className='w-full text-sm'>
             <TableHeader>
@@ -3555,63 +3620,62 @@ export function DocumentStatusList({
                 const displayChunks = doc.milvus_chunk_count ?? doc.chunk_count ?? '-';
 
                 return (
-                  // Envolver cada fila en su propio AlertDialog para manejar el estado de apertura individualmente
-                  <AlertDialog key={doc.document_id} open={deletingDocId === doc.document_id} onOpenChange={(open) => !open && closeDeleteConfirmation()}>
-                      <TableRow className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
-                          <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
-                          <TableCell className="px-2 py-1.5">
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
-                                          <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
-                                          {statusInfo.text}
-                                      </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={5} className="max-w-xs break-words p-2 text-xs shadow-lg">
-                                      <p>{statusInfo.description}</p>
-                                      {doc.status === 'error' && doc.error_message && <p className='mt-1 pt-1 border-t text-destructive'>Error: {doc.error_message}</p>}
-                                  </TooltipContent>
-                              </Tooltip>
-                          </TableCell>
-                          <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
-                          <TableCell className="text-right space-x-1 pr-3 pl-2 py-1"> {/* Aumentar space-x a 1 */}
-                              {/* Tooltip para Descargar */}
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={6}><p>Descargar (N/D)</p></TooltipContent>
-                              </Tooltip>
-                              {/* Tooltip para Reintentar */}
-                              {doc.status === 'error' && (
-                                  <Tooltip delayDuration={100}>
-                                      <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
-                                  </Tooltip>
-                              )}
-                              {/* Tooltip para Actualizar */}
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
-                              </Tooltip>
-                              {/* Tooltip para Eliminar (Trigger del Dialog dentro) */}
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      {/* El AlertDialogTrigger abre el diálogo asociado a esta fila */}
-                                      <AlertDialogTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled} onClick={() => openDeleteConfirmation(doc.document_id)}> <Trash2 className="h-4 w-4" /> </Button>
-                                      </AlertDialogTrigger>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
-                              </Tooltip>
-                          </TableCell>
-                      </TableRow>
-                  </AlertDialog>
+                    // AlertDialog ahora envuelve solo el botón de eliminar
+                    <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
+                        <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
+                        <TableCell className="px-2 py-1.5">
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
+                                        <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
+                                        {statusInfo.text}
+                                    </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" sideOffset={5} className="max-w-xs break-words p-2 text-xs shadow-lg">
+                                    <p>{statusInfo.description}</p>
+                                    {doc.status === 'error' && doc.error_message && <p className='mt-1 pt-1 border-t text-destructive'>Error: {doc.error_message}</p>}
+                                </TooltipContent>
+                            </Tooltip>
+                        </TableCell>
+                        <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
+                        <TableCell className="text-right space-x-1 pr-3 pl-2 py-1">
+                            {/* --- ACCIONES INDIVIDUALES CON SU TOOLTIP --- */}
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" sideOffset={6}><p>Descargar (N/D)</p></TooltipContent>
+                            </Tooltip>
+                            {doc.status === 'error' && (
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
+                                </Tooltip>
+                            )}
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
+                            </Tooltip>
+
+                            {/* AlertDialogTrigger y Tooltip para ELIMINAR */}
+                            <AlertDialog>
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled} onClick={(e) => {e.stopPropagation(); openDeleteConfirmation(doc.document_id);}}> <Trash2 className="h-4 w-4" /> </Button>
+                                        </AlertDialogTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
+                                </Tooltip>
+                                {/* El AlertDialogContent se renderiza condicionalmente abajo */}
+                            </AlertDialog>
+                        </TableCell>
+                    </TableRow>
                 );
               })}
             </TableBody>
@@ -3621,36 +3685,39 @@ export function DocumentStatusList({
         {/* Botón Cargar Más */}
         {hasMore && ( <div className="pt-6 text-center"> <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}> {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Cargar más documentos </Button> </div> )}
 
-        {/* AlertDialog Content (solo uno, controlado por deletingDocId) */}
-         {/* El contenido del diálogo ahora se renderiza fuera del mapeo, pero dentro del AlertDialog raíz */}
-         {/* Se asegura que solo se muestre si hay un documento seleccionado para borrar */}
-         {deletingDocId && (
-              <AlertDialogContent>
-                  <AlertDialogHeader>
-                      <AlertDialogTitle className="flex items-center gap-2">
-                          <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                          Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
-                          <br />
-                          <span className="font-semibold text-foreground mt-2 block break-all">"{documents.find(d => d.document_id === deletingDocId)?.file_name || deletingDocId}"</span>
-                      </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                      <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                          onClick={handleDeleteConfirmed}
-                          disabled={isDeleting}
-                          className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
-                      >
-                          {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                          Eliminar Permanentemente
-                      </AlertDialogAction>
-                  </AlertDialogFooter>
-              </AlertDialogContent>
-         )}
+         {/* AlertDialog Content (Instancia ÚNICA fuera del map) */}
+         {/* Se renderiza solo si deletingDocId tiene un valor */}
+         <AlertDialogContent>
+             {deletingDocId && ( // Renderizar solo si hay un doc seleccionado
+                 <>
+                     <AlertDialogHeader>
+                         <AlertDialogTitle className="flex items-center gap-2">
+                             <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
+                         </AlertDialogTitle>
+                         <AlertDialogDescription>
+                             Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
+                             <br />
+                             <span className="font-semibold text-foreground mt-2 block break-all">
+                                 "{documents.find(d => d.document_id === deletingDocId)?.file_name || deletingDocId}"
+                             </span>
+                         </AlertDialogDescription>
+                     </AlertDialogHeader>
+                     <AlertDialogFooter>
+                         <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                         <AlertDialogAction
+                             onClick={handleDeleteConfirmed}
+                             disabled={isDeleting}
+                             className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
+                         >
+                             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                             Eliminar Permanentemente
+                         </AlertDialogAction>
+                     </AlertDialogFooter>
+                 </>
+             )}
+         </AlertDialogContent>
+
       </TooltipProvider>
-    
   );
 }
 ```
@@ -4009,7 +4076,7 @@ export function Header() {
 
 ## File: `components\layout\sidebar.tsx`
 ```tsx
-// File: components/layout/sidebar.tsx (MODIFICADO)
+// File: components/layout/sidebar.tsx (REFACTORIZADO - Logo y Navegación)
 "use client";
 
 import React from 'react';
@@ -4018,18 +4085,21 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BotMessageSquare, FileUp, Settings, PlusCircle } from 'lucide-react'; // Quitados iconos no usados
+import { BotMessageSquare, Database, Settings, /* Quitamos PlusCircle */ LayoutDashboard } from 'lucide-react'; // Cambiado FileUp por Database
 import { APP_NAME } from '@/lib/constants';
 import { ChatHistory } from '@/components/chat/chat-history';
-import { Separator } from '@/components/ui/separator'; // Importar Separator
+import { Separator } from '@/components/ui/separator';
+import { AtenexLogo } from '@/components/icons/atenex-logo'; // Importar nuevo logo
 
 interface SidebarProps {
   isCollapsed: boolean;
 }
 
+// Items de navegación actualizados
 const navItems = [
+  // { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }, // Ejemplo si se añade dashboard
   { href: '/chat', label: 'Chat', icon: BotMessageSquare },
-  { href: '/knowledge', label: 'Base de Conocimiento', icon: FileUp },
+  { href: '/knowledge', label: 'Base de Conocimiento', icon: Database }, // Icono más representativo
   { href: '/settings', label: 'Configuración', icon: Settings },
 ];
 
@@ -4037,126 +4107,90 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter ? useRouter() : undefined;
 
-  const handleNewChat = React.useCallback(() => {
-    if (router) router.push('/chat'); // Simplificado, siempre va a /chat para nuevo
-    else window.location.href = '/chat';
-  }, [router]);
+  // Ya no se necesita handleNewChat porque se eliminó el botón
 
   return (
-    // Ajustamos padding general y gap
     <aside className={cn(
-        "flex h-full flex-col border-r bg-muted/40 dark:bg-background", // Fondo más integrado en dark mode
-        isCollapsed ? "w-[60px] items-center p-2" : "w-full p-3" // Ancho colapsado y padding ajustados
+        "flex h-full flex-col border-r bg-card", // Usar bg-card para consistencia
+        isCollapsed ? "w-[60px] items-center px-2 py-4" : "w-full p-4" // Padding ajustado
       )}
       >
-      {/* Sección Superior: Logo y Nuevo Chat */}
+      {/* Sección Superior: Logo */}
       <div className={cn(
-          "flex flex-col", // Sin gap aquí, el margen se controla abajo
-          isCollapsed ? "items-center" : "items-stretch"
-        )}
-      >
-        {/* Logo */}
-        <div className={cn(
-            "flex items-center mb-4", // Margen inferior
-            isCollapsed ? "h-10 justify-center" : "h-12 justify-start pl-1" // Altura y padding ajustados
+          "flex items-center mb-6", // Más margen inferior
+          isCollapsed ? "h-10 justify-center" : "h-12 justify-start" // Altura y alineación
+          )}
+        >
+            {/* Enlace del logo a la página principal o al dashboard/chat */}
+            <Link href="/chat" className={cn("flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm", isCollapsed ? 'justify-center w-full' : '')} aria-label={`${APP_NAME} - Inicio`}>
+                 <AtenexLogo className={cn("h-8 w-auto", isCollapsed ? "h-7" : "")} /> {/* Tamaño ajustable del logo */}
+                 {!isCollapsed && (
+                     <span className="text-xl font-bold text-foreground tracking-tight">{APP_NAME}</span>
+                 )}
+            </Link>
+       </div>
+
+        {/* SE ELIMINÓ el botón "Nuevo Chat" */}
+
+        {/* Separador si no está colapsado */}
+        {!isCollapsed && <Separator className="my-2" />}
+
+        {/* Navegación Principal */}
+        <nav className={cn(
+            "flex flex-col gap-1 flex-grow", // flex-grow para empujar historial abajo
+            isCollapsed ? "items-center mt-2" : "" // Ajuste margen si colapsado
             )}
         >
-          <BotMessageSquare className={cn("h-6 w-6 text-primary", !isCollapsed && "mr-2")} />
-          {!isCollapsed && (
-            <span className="text-lg font-semibold text-primary">{APP_NAME}</span> // font-semibold
-          )}
-        </div>
-
-        {/* Botón Nuevo Chat */}
-        <TooltipProvider delayDuration={0}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={handleNewChat}
-                variant="default" // Mantenemos default, pero podríamos crear uno específico
-                size={isCollapsed ? "icon" : "default"}
-                className={cn(
-                  "w-full transition-colors duration-150",
-                  isCollapsed ? "h-10 w-10 rounded-lg mb-4" : "justify-start py-2.5 text-base font-medium mb-4", // Tamaño y margen ajustados
-                  "shadow-sm" // Sombra más sutil
-                )}
-                aria-label="Nuevo chat"
-              >
-                <PlusCircle className={cn("h-5 w-5", !isCollapsed && "mr-2")}/>
-                {!isCollapsed && <span>Nuevo chat</span>}
-              </Button>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right" sideOffset={5}>Nuevo chat</TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-
-      {/* Separador antes de la navegación */}
-      {!isCollapsed && <Separator className="my-2" />}
-
-      {/* Navegación Principal */}
-      <nav className={cn(
-          "flex flex-col gap-1", // Espaciado entre items reducido
-          isCollapsed ? "items-center mt-2" : "flex-1 mt-1" // Margen superior ajustado
-        )}
-      >
-        <TooltipProvider delayDuration={0}>
-          {navItems.map((item) => {
-             // Usar startsWith para que rutas anidadas también activen el ítem
-             const isActive = pathname === item.href || (item.href !== '/chat' && pathname.startsWith(item.href));
-             return (
-                <Tooltip key={item.href}>
-                  <TooltipTrigger asChild>
-                    <Link
-                        href={item.href}
-                        className={cn(
-                            buttonVariants({ variant: 'ghost', size: isCollapsed ? "icon" : "default" }), // Usar ghost siempre
-                            "w-full transition-colors duration-150 ease-in-out relative group", // Añadido group
-                            isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start pl-3 py-2 text-sm h-10", // Padding y tamaño
-                            isActive
-                                ? 'font-medium text-primary bg-primary/10 dark:bg-primary/20' // Estilo activo más claro
-                                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 dark:hover:bg-accent/30' // Estilo inactivo
-                        )}
-                        aria-label={item.label}
-                    >
-                      {/* Indicador activo (solo visible si está activo y expandido) */}
-                      {isActive && !isCollapsed && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary rounded-r-md transition-all duration-200"></span>
-                      )}
-                      <item.icon className={cn(
-                          "h-5 w-5 transition-colors",
-                          isCollapsed ? "" : "mr-3",
-                          isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground" // Color icono
+          <TooltipProvider delayDuration={0}>
+            {navItems.map((item) => {
+               const isActive = pathname === item.href || (item.href !== '/chat' && pathname.startsWith(item.href));
+               return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      <Link
+                          href={item.href}
+                          className={cn(
+                              buttonVariants({ variant: 'ghost', size: isCollapsed ? "icon" : "default" }),
+                              "w-full transition-colors duration-150 ease-in-out relative group",
+                              isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start pl-3 py-2 text-sm h-10",
+                              isActive
+                                  ? 'font-semibold text-primary bg-primary/10 dark:bg-primary/20'
+                                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 dark:hover:bg-accent/30'
                           )}
-                       />
-                      {!isCollapsed && <span className="truncate">{item.label}</span>}
-                    </Link>
-                  </TooltipTrigger>
-                  {isCollapsed && (
-                    <TooltipContent side="right" sideOffset={5}>
-                      {item.label}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-             )
-            })}
-        </TooltipProvider>
-      </nav>
+                          aria-label={item.label}
+                      >
+                        {/* Indicador activo */}
+                        {isActive && !isCollapsed && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-primary rounded-r-md transition-all duration-200"></span>
+                        )}
+                        <item.icon className={cn(
+                            "h-5 w-5 transition-colors",
+                            isCollapsed ? "" : "mr-3",
+                            isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                            )}
+                         />
+                        {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      </Link>
+                    </TooltipTrigger>
+                    {isCollapsed && (
+                      <TooltipContent side="right" sideOffset={5}>
+                        {item.label}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+               )
+              })}
+          </TooltipProvider>
+        </nav>
 
-      {/* Historial de Chats (Solo si no está colapsado) */}
-      {!isCollapsed && (
-         // Contenedor para el historial con borde superior
-         <div className="mt-auto flex flex-col border-t pt-3 -mx-3 px-3"> {/* Padding negativo/positivo para borde completo */}
-             {/* Aquí irá el ChatHistory rediseñado en Iteración 2 */}
-             {/* Placeholder temporal: */}
-              <div className='flex-1 overflow-hidden'>
-                 <ChatHistory />
-              </div>
-
-         </div>
-      )}
+        {/* Historial de Chats (Solo si no está colapsado) */}
+        {!isCollapsed && (
+           <div className="mt-auto flex flex-col border-t pt-3 -mx-4 px-4"> {/* Padding negativo/positivo ajustado */}
+               <div className='flex-1 overflow-hidden'> {/* Contenedor para limitar altura */}
+                   <ChatHistory />
+               </div>
+           </div>
+        )}
     </aside>
   );
 }
@@ -4164,7 +4198,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 
 ## File: `components\theme-palette-button.tsx`
 ```tsx
-// File: components/theme-palette-button.tsx (MODIFICADO - Nuevos Temas)
+// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas B2B)
 "use client";
 
 import * as React from "react";
@@ -4175,24 +4209,35 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel, // Añadir Label si se quiere título
+  DropdownMenuSeparator, // Añadir Separator si se quiere
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils"; // Importar cn
+import { cn } from "@/lib/utils";
 
-// Definición de temas disponibles
+// Definición de temas B2B disponibles
 const themes = [
-    { value: 'system', label: 'Sistema' },
-    { value: 'light', label: 'Claro' },
-    { value: 'dark', label: 'Oscuro' },
-    { value: 'slate', label: 'Pizarra (Oscuro)' }, // Nuevo
-    { value: 'indigo', label: 'Índigo (Claro)' },   // Nuevo
-    { value: 'stone', label: 'Piedra (Claro)' },  // Nuevo
-    // { value: 'blue', label: 'Blue Oasis' }, // Mantener si se desea
-    // { value: 'green', label: 'Emerald Depths' }, // Mantener si se desea
+    { value: 'system', label: 'Automático (Sistema)' },
+    { value: 'light', label: 'Claro Profesional' },
+    { value: 'dark', label: 'Oscuro Elegante' },
+    { value: 'slate', label: 'Pizarra (Oscuro)' },
+    { value: 'indigo', label: 'Índigo (Claro)' },
+    { value: 'stone', label: 'Piedra (Claro)' },
+    { value: 'zinc', label: 'Zinc (Oscuro)' }, // Nuevo tema oscuro
 ];
 
 export function ThemePaletteButton() {
   const { setTheme, theme: activeTheme } = useTheme();
+  // Añadir estado para manejar el tema 'resolved' si se usa 'system'
+  const [currentResolvedTheme, setCurrentResolvedTheme] = React.useState<string | undefined>(undefined);
+
+  // Efecto para obtener el tema resuelto cuando se usa 'system'
+  React.useEffect(() => {
+    // 'resolvedTheme' está disponible después de la hidratación
+    const resolved = activeTheme === 'system' ? document.documentElement.classList.contains('dark') ? 'dark' : 'light' : activeTheme;
+    setCurrentResolvedTheme(resolved);
+  }, [activeTheme]);
+
 
   return (
     <DropdownMenu>
@@ -4201,20 +4246,26 @@ export function ThemePaletteButton() {
                <Palette className="h-5 w-5"/>
             </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="w-48"> {/* Ancho ajustado */}
+           {/* Opcional: Título */}
+           {/* <DropdownMenuLabel>Seleccionar Tema</DropdownMenuLabel>
+           <DropdownMenuSeparator /> */}
            {themes.map((theme) => (
                <DropdownMenuItem
                     key={theme.value}
                     onClick={() => setTheme(theme.value)}
                     className={cn(
-                        "flex items-center justify-between cursor-pointer",
-                        activeTheme === theme.value && "font-semibold text-primary" // Resaltar tema activo
+                        "flex items-center justify-between cursor-pointer text-sm px-2 py-1.5 rounded-sm", // Estilos base
+                        // Resaltar si el valor es el tema activo O si el tema activo es 'system' y este es el tema resuelto
+                        (activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value))
+                          ? "font-semibold text-primary bg-accent dark:bg-accent/50"
+                          : "hover:bg-accent/50 dark:hover:bg-accent/20"
                     )}
-                    // Evitar cierre automático al seleccionar para ver el check
-                    // onSelect={(event) => event.preventDefault()}
                >
-                    {theme.label}
-                    {activeTheme === theme.value && <Check className="h-4 w-4 ml-2" />} {/* Checkmark para activo */}
+                    <span>{theme.label}</span>
+                    {(activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value)) && (
+                        <Check className="h-4 w-4" />
+                    )}
                </DropdownMenuItem>
            ))}
       </DropdownMenuContent>

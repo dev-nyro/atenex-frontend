@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css"; // Import global styles
+import AtenexLogo from '@/components/icons/atenex-logo';
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider"; // Theme context
 import { AuthProvider } from "@/lib/hooks/useAuth"; // CORRECTED Auth context
@@ -17,6 +18,9 @@ export const metadata: Metadata = {
   description: "Query your enterprise knowledge base using natural language with Atenex.",
   // Add more metadata: icons, open graph tags, etc.
 };
+
+// Define the application name constant
+const APP_NAME = "Atenex";
 
 export default function RootLayout({
   children,
@@ -41,7 +45,14 @@ export default function RootLayout({
             disableTransitionOnChange // Prevent transitions on theme change
           >
             {/* Render the application content */}
-            {children}
+            {/* Cabecera con Logo Atenex */}
+           <header className="sticky top-0 z-50 w-full bg-black/90 backdrop-blur-sm">
+             <div className="container mx-auto px-4 py-2 flex items-center">
+               <AtenexLogo />
+               <span className="ml-3 text-white font-bold text-xl">{APP_NAME}</span>
+             </div>
+           </header>
+           {/* Render the application content */}
 
             {/* Global Toaster component for notifications */}
             <Toaster richColors position="top-right" closeButton />

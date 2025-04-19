@@ -9,6 +9,8 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap, BookOpen } from 'lucide-react'; // Añadido BookOpen
 import Link from 'next/link';
+import SnakeAnimation from '@/components/animations/snakeanimation';
+import AtenexLogo from '@/components/icons/atenex-logo';
 
 // Mapeo de iconos actualizado
 const iconMap: { [key: string]: React.ElementType } = {
@@ -69,11 +71,23 @@ export default function HomePage() {
           </nav>
         </div>
       </header>
+      {/* Animación de fondo: serpiente */}
+      <SnakeAnimation />
 
       {/* Contenido Principal (Hero + Features) */}
-      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center">
+      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center relative">
+        {/* Capa oscura por debajo */}
+        <div className="absolute inset-0 bg-black/80 -z-10" />
+        {/* Logo de Atenex */}
+        <div className="absolute top-10 left-10 z-10 hidden sm:block">
+          <AtenexLogo width={80} height={80} className="text-primary" />
+        </div>
          {/* Hero Section */}
-         <section className="max-w-4xl">
+         <section className="relative max-w-4xl z-10">
+            {/* Logo centrado en hero */}
+            <div className="mx-auto mb-6">
+              <AtenexLogo width={64} height={64} className="text-primary" />
+            </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
                 Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
             </h1>
