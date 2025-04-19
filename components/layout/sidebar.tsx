@@ -11,7 +11,7 @@ import { BotMessageSquare, Database, Settings, /* Quitamos PlusCircle */ LayoutD
 import { APP_NAME } from '@/lib/constants';
 import { ChatHistory } from '@/components/chat/chat-history';
 import { Separator } from '@/components/ui/separator';
-import { AtenexLogo } from '@/components/icons/atenex-logo'; // Importar nuevo logo
+import AtenexLogo from '@/components/icons/atenex-logo'; // Import default del logo
 
 interface SidebarProps {
   isCollapsed: boolean;

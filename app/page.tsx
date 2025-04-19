@@ -13,7 +13,7 @@ import SnakeAnimation from '@/components/animations/snakeanimation';
 import AtenexLogo from '@/components/icons/atenex-logo';
 
 // Mapeo de iconos actualizado
-const iconMap: { [key: string]: React.ElementType } = {
+const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
   Search: Search,
   Library: Library, // Usaremos Library para Conocimiento Centralizado
   Zap: Zap,
@@ -154,7 +154,7 @@ export default function HomePage() {
 }
 
 // Componente LinkButton (Revisado para consistencia)
-function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ComponentType<{ className?: string }>; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button

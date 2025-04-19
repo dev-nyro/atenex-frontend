@@ -127,7 +127,7 @@ export default function ContactPage() {
 }
 
 // Componente LinkButton (consistente)
-function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ComponentType<{ className?: string }>; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
@@ -189,7 +189,7 @@ function ContactForm() {
 }
 
 // Componente ContactInfoItem (consistente)
-function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ElementType, label: string, href?: string, text: string, targetBlank?: boolean }) {
+function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ComponentType<{ className?: string }>, label: string, href?: string, text: string, targetBlank?: boolean }) {
     const content = (
         <>
             <Icon className="h-4 w-4 text-primary flex-shrink-0" />

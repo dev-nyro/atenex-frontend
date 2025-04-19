@@ -21,7 +21,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Mapeo de estado (sin cambios)
-const statusMap: { [key: string]: { icon: React.ElementType, text: string, className: string, animate: boolean, description: string } } = {
+const statusMap: { [key: string]: { icon: React.ComponentType<{ className?: string }>, text: string, className: string, animate: boolean, description: string } } = {
     uploaded:   { icon: FileClock, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true, description: "Esperando para ser procesado." },
     processing: { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true, description: "Extrayendo texto y generando vectores..." },
     processed:  { icon: FileCheck2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false, description: "Listo para ser consultado." },
