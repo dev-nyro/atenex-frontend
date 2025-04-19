@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap } from 'lucide-react';
 import Link from 'next/link';
 import AtenexLogoIcon from '@/components/icons/atenex-logo'; // Renombrado para claridad vs componente
-import SnakeAnimation from '@/components/animations/snakeanimation'; // <-- IMPORTAR ANIMACIÓN
 
 // Mapeo de iconos
 const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
@@ -30,9 +29,6 @@ export default function HomePage() {
   return (
     // FLAG_LLM: Añadido 'relative' al contenedor principal para que la animación absoluta se posicione correctamente
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
-      {/* FLAG_LLM: Renderizar la animación como overlay */}
-      <SnakeAnimation />
-
       {/* Header específico de la Landing Page */}
       <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
