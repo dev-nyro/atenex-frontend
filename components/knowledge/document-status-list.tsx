@@ -1,4 +1,4 @@
-// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Tabla más densa)
+// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Tooltip/Dialog Fix)
 "use client";
 
 import React from 'react';
@@ -8,19 +8,19 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     AlertCircle, Loader2, RefreshCw, Trash2, Info,
-    FileClock, FileCheck2, FileX2, FileQuestion, Download, // Iconos de estado y descarga
-    AlertTriangle
+    FileClock, FileCheck2, FileX2, FileQuestion, Download, AlertTriangle // Iconos
 } from 'lucide-react';
 import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument, retryIngestDocument } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+    AlertDialogTrigger // Importar AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Mapeo de estado a atributos visuales (revisado)
+// Mapeo de estado (sin cambios)
 const statusMap: { [key: string]: { icon: React.ElementType, text: string, className: string, animate: boolean, description: string } } = {
     uploaded:   { icon: FileClock, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true, description: "Esperando para ser procesado." },
     processing: { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true, description: "Extrayendo texto y generando vectores..." },
@@ -39,7 +39,7 @@ export interface DocumentStatusListProps {
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
   onDeleteSuccess: (documentId: string) => void;
-  isLoading: boolean; // Indica si se están cargando más documentos
+  isLoading: boolean;
 }
 
 export function DocumentStatusList({
@@ -50,14 +50,15 @@ export function DocumentStatusList({
     hasMore,
     refreshDocument,
     onDeleteSuccess,
-    isLoading // Estado de carga (para el botón "Cargar más")
+    isLoading
 }: DocumentStatusListProps) {
+  // Eliminamos el estado local isAlertOpen, el AlertDialog lo maneja internamente
   const [docToDelete, setDocToDelete] = React.useState<DocumentStatus | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isRetrying, setIsRetrying] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState<string | null>(null);
 
-  // --- Handlers (sin cambios lógicos, solo formateo y estado visual) ---
+  // --- Handlers (Lógica interna sin cambios, solo ajuste en openDeleteConfirmation) ---
   const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders || isRetrying) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
@@ -66,7 +67,7 @@ export function DocumentStatusList({
     try {
       await retryIngestDocument(documentId, authHeaders);
       toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` });
-      onRetrySuccess(documentId); // Notifica al padre para actualizar UI y refrescar
+      onRetrySuccess(documentId);
     } catch (error: any) {
       const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
       toast.error("Error al Reintentar", { id: toastId, description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}` });
@@ -84,22 +85,21 @@ export function DocumentStatusList({
         await refreshDocument(documentId);
         toast.success("Estado Actualizado", { id: `refresh-${documentId}`, description: `Se actualizó el estado de "${displayId}".` });
     } catch (error) {
-        // El error ya se maneja en el hook padre
-        toast.dismiss(`refresh-${documentId}`); // Quita el toast de "actualizando" si hubo error
+        toast.dismiss(`refresh-${documentId}`);
     } finally {
         setIsRefreshing(null);
     }
   };
 
-    const handleDownload = (doc: DocumentStatus) => {
-        // TODO: Implementar endpoint de descarga en backend y llamada aquí
+  const handleDownload = (doc: DocumentStatus) => {
         toast.info("Descarga No Implementada", {
             description: `La funcionalidad para descargar "${doc.file_name || doc.document_id}" aún no está disponible.`
         });
         console.log("Download requested for:", doc.document_id);
-    };
+  };
 
-  const openDeleteConfirmation = (doc: DocumentStatus) => { setDocToDelete(doc); };
+  // Guarda el documento a eliminar ANTES de que el diálogo se abra
+  const prepareDeleteDialog = (doc: DocumentStatus) => { setDocToDelete(doc); };
 
   const handleDeleteConfirmed = async () => {
     if (!docToDelete || !authHeaders || isDeleting) return;
@@ -115,34 +115,23 @@ export function DocumentStatusList({
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
     } finally {
       setIsDeleting(false);
-      setDocToDelete(null);
+      setDocToDelete(null); // Limpiar el estado del doc a eliminar cierra el diálogo si onOpenChange está bien configurado
     }
   };
 
   // --- Renderizado ---
-
-  // Estado Vacío
   if (!isLoading && documents.length === 0) {
-    return (
-        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border-2 border-dashed rounded-lg bg-muted/30 mt-4 min-h-[150px]">
-            <Info className="h-8 w-8 mb-3 opacity-50"/>
-            <p className="text-sm font-medium mb-1">Sin Documentos</p>
-            <p className="text-xs">Aún no se han subido documentos a la base de conocimiento.</p>
-        </div>
-    );
+    return ( <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border-2 border-dashed rounded-lg bg-muted/30 mt-4 min-h-[150px]"> <Info className="h-8 w-8 mb-3 opacity-50"/> <p className="text-sm font-medium mb-1">Sin Documentos</p> <p className="text-xs">Aún no se han subido documentos.</p> </div> );
   }
 
-  // Tabla y Diálogo
   return (
-    <AlertDialog open={!!docToDelete} onOpenChange={(open) => !open && setDocToDelete(null)}>
+    // Envolver todo en el Provider y el AlertDialog (no modal por defecto hasta trigger)
+    <AlertDialog>
       <TooltipProvider>
-        {/* Contenedor de la tabla */}
         <div className="border rounded-lg overflow-hidden shadow-sm bg-card">
           <Table className='w-full text-sm'>
             <TableHeader>
-              {/* Cabecera más compacta */}
               <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
-                {/* Ajuste de padding y widths para densidad */}
                 <TableHead className="w-[40%] pl-3 pr-2 py-2">Nombre Archivo</TableHead>
                 <TableHead className="w-[15%] px-2 py-2">Estado</TableHead>
                 <TableHead className="w-[10%] text-center px-2 py-2 hidden sm:table-cell">Chunks</TableHead>
@@ -165,15 +154,11 @@ export function DocumentStatusList({
 
                 return (
                   <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
-                    {/* Celda Nombre (padding reducido) */}
-                    <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>
-                      {displayFileName}
-                    </TableCell>
-                    {/* Celda Estado (con Tooltip descriptivo) */}
+                    <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
                     <TableCell className="px-2 py-1.5">
-                      <Tooltip delayDuration={100}>
-                          <TooltipTrigger>
-                               <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5", statusInfo.className)}>
+                       <Tooltip delayDuration={100}>
+                          <TooltipTrigger asChild>
+                               <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
                                  <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
                                  {statusInfo.text}
                                </Badge>
@@ -184,52 +169,38 @@ export function DocumentStatusList({
                           </TooltipContent>
                       </Tooltip>
                     </TableCell>
-                    {/* Celda Chunks (padding reducido) */}
-                    <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">
-                      {displayChunks}
-                    </TableCell>
-                    {/* Celda Fecha (padding reducido) */}
+                    <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
                     <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
-                    {/* Celda Acciones (iconos más pequeños, padding reducido) */}
                     <TableCell className="text-right space-x-0 pr-3 pl-2 py-1">
-                       {/* Botón Descargar (Placeholder) */}
+                        {/* Acciones envueltas en Tooltip */}
                         <Tooltip delayDuration={100}>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}>
-                               <Download className="h-4 w-4" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
                           </TooltipTrigger>
                           <TooltipContent><p>Descargar (N/D)</p></TooltipContent>
                         </Tooltip>
-                       {/* Botón Reintentar */}
-                      {doc.status === 'error' && (
+                        {doc.status === 'error' && (
+                            <Tooltip delayDuration={100}>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Reintentar</p></TooltipContent>
+                            </Tooltip>
+                        )}
                         <Tooltip delayDuration={100}>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}>
-                              {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
                           </TooltipTrigger>
-                          <TooltipContent><p>Reintentar</p></TooltipContent>
+                          <TooltipContent><p>Actualizar Estado</p></TooltipContent>
                         </Tooltip>
-                      )}
-                      {/* Botón Actualizar */}
-                      <Tooltip delayDuration={100}>
-                        <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}>
-                             {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
-                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Actualizar Estado</p></TooltipContent>
-                      </Tooltip>
-                      {/* Botón Eliminar */}
-                      <Tooltip delayDuration={100}>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={() => openDeleteConfirmation(doc)} aria-label="Eliminar documento" disabled={isActionDisabled}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Eliminar</p></TooltipContent>
-                      </Tooltip>
+
+                        {/* FIX: AlertDialogTrigger envuelve el botón, Tooltip envuelve el AlertDialogTrigger */}
+                        <Tooltip delayDuration={100}>
+                           <AlertDialogTrigger asChild onClick={() => prepareDeleteDialog(doc)}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled}> <Trash2 className="h-4 w-4" /> </Button>
+                           </AlertDialogTrigger>
+                           <TooltipContent><p>Eliminar</p></TooltipContent>
+                        </Tooltip>
                     </TableCell>
                   </TableRow>
                 );
@@ -239,40 +210,35 @@ export function DocumentStatusList({
         </div>
 
         {/* Botón Cargar Más */}
-        {hasMore && (
-          <div className="pt-6 text-center">
-            <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}>
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Cargar más documentos
-            </Button>
-          </div>
-        )}
+        {hasMore && ( <div className="pt-6 text-center"> <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}> {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Cargar más documentos </Button> </div> )}
       </TooltipProvider>
 
-      {/* AlertDialog de Confirmación */}
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-             <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados de la base de conocimiento:
-            <br />
-            <span className="font-semibold text-foreground mt-2 block break-all">"{docToDelete?.file_name || docToDelete?.document_id}"</span>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDeleteConfirmed}
-            disabled={isDeleting}
-            className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
-          >
-            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-            Eliminar Permanentemente
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
+      {/* AlertDialog Content (se muestra cuando docToDelete no es null) */}
+       {docToDelete && (
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
+                        <br />
+                        <span className="font-semibold text-foreground mt-2 block break-all">"{docToDelete.file_name || docToDelete.document_id}"</span>
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDocToDelete(null)} disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleDeleteConfirmed}
+                        disabled={isDeleting}
+                        className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
+                    >
+                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Eliminar Permanentemente
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+       )}
     </AlertDialog>
   );
 }
