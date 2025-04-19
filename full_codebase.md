@@ -32,6 +32,8 @@ atenex-frontend/
 │   └── terms
 │       └── page.tsx
 ├── components
+│   ├── animations
+│   │   └── snakeanimation.tsx
 │   ├── auth
 │   │   └── login-form.tsx
 │   ├── chat
@@ -134,6 +136,8 @@ const nextConfig = {
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@react-three/drei": "^10.0.6",
+    "@react-three/fiber": "^9.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.486.0",
@@ -150,6 +154,7 @@ const nextConfig = {
     "sonner": "^2.0.2",
     "tailwind-merge": "^3.1.0",
     "tailwindcss-animate": "^1.0.7",
+    "three": "^0.175.0",
     "tw-animate-css": "^1.2.5",
     "zod": "^3.24.2"
   },
@@ -1637,7 +1642,7 @@ export default function ContactPage() {
 }
 
 // Componente LinkButton (consistente)
-function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ComponentType<{ className?: string }>; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
@@ -1699,7 +1704,7 @@ function ContactForm() {
 }
 
 // Componente ContactInfoItem (consistente)
-function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ElementType, label: string, href?: string, text: string, targetBlank?: boolean }) {
+function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ComponentType<{ className?: string }>, label: string, href?: string, text: string, targetBlank?: boolean }) {
     const content = (
         <>
             <Icon className="h-4 w-4 text-primary flex-shrink-0" />
@@ -2042,6 +2047,7 @@ const APP_NAME = "Atenex";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css"; // Import global styles
+import AtenexLogo from '@/components/icons/atenex-logo';
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider"; // Theme context
 import { AuthProvider } from "@/lib/hooks/useAuth"; // CORRECTED Auth context
@@ -2056,6 +2062,9 @@ export const metadata: Metadata = {
   description: "Query your enterprise knowledge base using natural language with Atenex.",
   // Add more metadata: icons, open graph tags, etc.
 };
+
+// Define the application name constant
+const APP_NAME = "Atenex";
 
 export default function RootLayout({
   children,
@@ -2080,7 +2089,14 @@ export default function RootLayout({
             disableTransitionOnChange // Prevent transitions on theme change
           >
             {/* Render the application content */}
-            {children}
+            {/* Cabecera con Logo Atenex */}
+           <header className="sticky top-0 z-50 w-full bg-black/90 backdrop-blur-sm">
+             <div className="container mx-auto px-4 py-2 flex items-center">
+               <AtenexLogo />
+               <span className="ml-3 text-white font-bold text-xl">{APP_NAME}</span>
+             </div>
+           </header>
+           {/* Render the application content */}
 
             {/* Global Toaster component for notifications */}
             <Toaster richColors position="top-right" closeButton />
@@ -2105,9 +2121,11 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap, BookOpen } from 'lucide-react'; // Añadido BookOpen
 import Link from 'next/link';
+import SnakeAnimation from '@/components/animations/snakeanimation';
+import AtenexLogo from '@/components/icons/atenex-logo';
 
 // Mapeo de iconos actualizado
-const iconMap: { [key: string]: React.ElementType } = {
+const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
   Search: Search,
   Library: Library, // Usaremos Library para Conocimiento Centralizado
   Zap: Zap,
@@ -2165,11 +2183,23 @@ export default function HomePage() {
           </nav>
         </div>
       </header>
+      {/* Animación de fondo: serpiente */}
+      <SnakeAnimation />
 
       {/* Contenido Principal (Hero + Features) */}
-      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center">
+      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center relative">
+        {/* Capa oscura por debajo */}
+        <div className="absolute inset-0 bg-black/80 -z-10" />
+        {/* Logo de Atenex */}
+        <div className="absolute top-10 left-10 z-10 hidden sm:block">
+          <AtenexLogo width={80} height={80} className="text-primary" />
+        </div>
          {/* Hero Section */}
-         <section className="max-w-4xl">
+         <section className="relative max-w-4xl z-10">
+            {/* Logo centrado en hero */}
+            <div className="mx-auto mb-6">
+              <AtenexLogo width={64} height={64} className="text-primary" />
+            </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
                 Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
             </h1>
@@ -2236,7 +2266,7 @@ export default function HomePage() {
 }
 
 // Componente LinkButton (Revisado para consistencia)
-function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ElementType; isActive?: boolean }) {
+function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ComponentType<{ className?: string }>; isActive?: boolean }) {
   const router = useRouter();
   return (
     <Button
@@ -2456,6 +2486,143 @@ export default function TermsPage() {
             </Card>
         </div>
     </div>
+  );
+}
+```
+
+## File: `components\animations\snakeanimation.tsx`
+```tsx
+'use client';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrthographicCamera, Text } from '@react-three/drei';
+import { useRef, useState, useEffect } from 'react';
+import * as THREE from 'three';
+
+const WORDS = [
+  { id: 'Nosotros', pos: new THREE.Vector3(-6, 3, 0) },
+  { id: 'Contacto', pos: new THREE.Vector3(5, -2, 0) },
+];
+
+// Curva para la forma de 'A'
+const A_SHAPE_POINTS = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-2, -2, 0),
+  new THREE.Vector3(0, 2, 0),
+  new THREE.Vector3(2, -2, 0),
+  new THREE.Vector3(-1, 0, 0),
+  new THREE.Vector3(1, 0, 0),
+]).getPoints(100);
+
+interface SnakeProps {
+  eaten: Set<string>;
+  onEat: (id: string) => void;
+  final: boolean;
+}
+
+function Snake({ eaten, onEat, final }: SnakeProps) {
+  const segments = useRef<THREE.Vector3[]>([]);
+  const curve = useRef(new THREE.CatmullRomCurve3([]));
+  const meshRef = useRef<THREE.Mesh>(null!);
+
+  if (segments.current.length === 0) {
+    segments.current = Array.from({ length: 60 }).map(
+      (_, i) => new THREE.Vector3(-10 + i * 0.4, 0, 0)
+    );
+    curve.current.points = segments.current;
+  }
+
+  useFrame(({ clock }) => {
+    if (final) {
+      // Dibujar forma de 'A' estática
+      segments.current = A_SHAPE_POINTS.map(p => p.clone());
+      curve.current.points = segments.current;
+    } else {
+      const t = clock.getElapsedTime() * 0.4;
+      const head = new THREE.Vector3(
+        Math.cos(t) * 8,
+        Math.sin(t * 1.2) * 4,
+        0
+      );
+      // Detectar colisiones con palabras
+      WORDS.forEach(w => {
+        if (!eaten.has(w.id) && head.distanceTo(w.pos) < 0.5) {
+          onEat(w.id);
+        }
+      });
+      // Crecer según comidas
+      const maxLen = 60 + eaten.size * 5;
+      segments.current.unshift(head);
+      if (segments.current.length > maxLen) segments.current.pop();
+      curve.current.points = segments.current;
+    }
+    const geo = new THREE.TubeGeometry(
+      curve.current,
+      60,
+      0.15 + 0.03 * Math.sin(clock.getElapsedTime() * 3),
+      8,
+      false
+    );
+    meshRef.current.geometry.dispose();
+    meshRef.current.geometry = geo;
+  });
+
+  return (
+    <mesh ref={meshRef} material={new THREE.MeshBasicMaterial({ color: '#fff' })}>
+      <bufferGeometry />
+    </mesh>
+  );
+}
+
+export default function SnakeAnimation() {
+  const [eaten, setEaten] = useState<Set<string>>(new Set());
+  const final = eaten.size >= WORDS.length;
+
+  // Callback para registrar palabra comida
+  const handleEat = (id: string) => {
+    setEaten(prev => new Set(prev).add(id));
+  };
+
+  useEffect(() => {
+    if (final) {
+      // opcional: reproducir sonido o animación al llegar al final
+    }
+  }, [final]);
+
+  return (
+    <Canvas
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        pointerEvents: 'none',
+      }}
+    >
+      <OrthographicCamera
+        makeDefault
+        left={-10}
+        right={10}
+        top={7}
+        bottom={-7}
+        near={0.1}
+        far={100}
+        position={[0, 0, 20]}
+      />
+      <ambientLight intensity={0.5} />
+      <Snake eaten={eaten} onEat={handleEat} final={final} />
+      {WORDS.map((w) =>
+        !eaten.has(w.id) ? (
+          <Text key={w.id} position={[w.pos.x, w.pos.y, w.pos.z]} fontSize={1} color="#facc15">
+            {w.id}
+          </Text>
+        ) : null
+      )}
+      {final && (
+        <Text position={[0, -1, 0]} fontSize={2.5} color="#fff" anchorX="center" anchorY="middle">
+          Atenex
+        </Text>
+      )}
+    </Canvas>
   );
 }
 ```
@@ -3430,43 +3597,39 @@ const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTML
 
 ## File: `components\icons\atenex-logo.tsx`
 ```tsx
-// File: components/icons/atenex-logo.tsx
-// Purpose: Atenex Logo SVG Component
 import React from 'react';
-import { cn } from '@/lib/utils'; // Import cn if needed for className variations
+import { cn } from '@/lib/utils';
 
 interface AtenexLogoProps extends React.SVGProps<SVGSVGElement> {
-  // Add any specific props if needed, e.g., size variants
+  // Puedes agregar props adicionales según sea necesario
 }
 
-export const AtenexLogo = ({ className, width = 24, height = 24, ...props }: AtenexLogoProps) => {
+export default function AtenexLogo(props: AtenexLogoProps) {
   return (
     <svg
-      version="1.0"
+      width="64"
+      height="64"
+      viewBox="0 0 1024 1024"
       xmlns="http://www.w3.org/2000/svg"
-      width={width} // Use props for size
-      height={height} // Use props for size
-      viewBox="0 0 1024.000000 1024.000000"
-      preserveAspectRatio="xMidYMid meet"
-      // Use currentColor for fill to inherit text color for theme changes
-      fill="currentColor"
-      stroke="none"
-      className={cn("inline-block", className)} // Basic class and allow overrides
+      style={{ background: '#000000', borderRadius: '8px' }}
       {...props}
     >
-      <g transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)">
-        {/* The path data from your SVG */}
-        <path d="M0 5120 l0 -5120 5120 0 5120 0 0 5120 0 5120 -5120 0 -5120 0 0 -5120z m5638 3284 c31 -22 60 -82 132 -279 122 -333 876 -2402 1131 -3105 291 -802 374 -1020 466 -1230 186 -423 345 -594 602 -647 85 -17 121 -42 121 -83 0 -16 -11 -37 -26 -51 l-26 -24 -866 -3 c-609 -2 -882 0 -918 8 -63 13 -87 37 -82 81 3 32 4 33 75 45 137 23 224 78 270 172 26 53 28 65 27 182 0 109 -4 141 -33 250 -28 102 -310 887 -419 1164 -48 122 46 111 -910 111 -781 0 -829 -1 -864 -18 -42 -21 -35 -9 -98 -192 -27 -77 -105 -304 -174 -505 -194 -561 -237 -768 -186 -903 47 -124 143 -202 299 -244 116 -31 140 -66 82 -124 l-29 -29 -749 0 c-807 0 -775 -2 -803 51 -22 40 5 61 125 94 73 20 195 81 290 143 99 66 249 220 324 332 71 106 188 341 249 500 48 125 277 787 316 915 26 83 33 95 89 150 69 67 177 128 300 170 153 51 217 55 910 55 514 0 639 3 643 13 4 12 -123 378 -349 1002 -58 160 -137 380 -175 490 -100 285 -191 534 -202 556 -22 40 -37 19 -74 -98 -203 -646 -480 -1431 -568 -1607 -36 -71 -103 -145 -180 -197 -31 -21 -137 -81 -235 -132 -203 -106 -258 -141 -326 -209 -93 -93 -126 -224 -98 -391 l13 -72 -50 -130 c-27 -71 -76 -203 -107 -292 -32 -90 -61 -163 -65 -163 -4 0 -49 42 -100 93 -203 202 -302 423 -303 672 -1 280 109 522 321 705 87 76 178 132 425 267 117 64 241 135 277 158 82 55 186 159 230 231 39 65 373 909 501 1269 104 292 132 410 127 540 -2 72 -8 100 -28 140 -22 44 -31 52 -72 65 -27 8 -48 21 -48 28 0 24 21 53 53 72 30 19 53 20 387 20 307 0 359 -2 378 -16z m-1103 -569 c50 -13 116 -35 149 -49 47 -21 57 -29 51 -43 -4 -10 -41 -113 -82 -229 l-75 -212 -36 10 c-65 19 -200 13 -267 -11 -93 -33 -122 -63 -192 -196 -89 -170 -115 -187 -378 -246 -96 -21 -189 -45 -207 -52 -18 -8 -66 -42 -107 -76 -122 -102 -188 -127 -372 -138 l-96 -6 -27 -43 c-56 -88 -157 -153 -243 -157 -48 -2 -103 17 -103 35 0 5 22 6 49 2 86 -11 181 37 242 121 20 28 40 45 53 45 13 0 5 8 -24 23 -59 29 -94 91 -94 163 0 55 8 68 135 219 33 39 77 113 124 210 46 95 86 163 109 186 21 21 102 70 189 115 84 43 231 124 328 180 97 55 196 108 219 118 159 64 466 78 655 31z m65 -3330 c455 -100 559 -132 688 -209 187 -111 320 -249 399 -411 58 -122 77 -219 70 -360 -14 -264 -88 -429 -281 -620 -133 -132 -223 -188 -501 -309 -366 -161 -479 -258 -479 -416 -1 -155 93 -222 310 -222 112 1 229 27 419 94 203 72 324 98 485 105 173 7 268 -10 395 -72 78 -37 183 -111 173 -121 -2 -1 -44 11 -93 29 -87 30 -96 31 -250 31 -233 0 -264 -10 -643 -209 -278 -146 -547 -190 -772 -125 -166 48 -332 168 -405 294 -84 145 -85 344 -2 500 40 76 156 199 266 282 46 34 161 106 255 160 302 172 397 247 454 360 77 152 63 294 -39 391 -140 133 -479 227 -851 234 -54 2 -98 5 -98 8 0 10 207 629 214 640 4 6 12 8 19 6 7 -2 127 -29 267 -60z"/>
-        <path d="M3340 7268 c0 -12 -21 -64 -46 -116 -32 -67 -54 -98 -75 -110 -67 -39 -14 -39 133 0 63 16 84 27 108 55 28 32 95 152 88 158 -8 6 -154 35 -179 35 -23 0 -29 -4 -29 -22z"/>
+      <g
+        transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)"
+        fill="#FFFFFF"
+        stroke="none"
+      >
+        <path d="M0 5120 l0 -5120 5120 0 5120 0 0 5120 0 5120 -5120 0 -5120 0 0 -5120z m5638 3284 c31 -22 60 -82 132 -279 122 -333 876 -2402 1131 -3105 291 -802 374 -1020 466 -1230 186 -423 345 -594 602 -647 85 -17 121 -42 121 -83 0 -16 -11 -37 -26 -51 l-26 -24 -866 -3 c-609 -2 -882 0 -918 8 -63 13 -87 37 -82 81 3 32 4 33 75 45 137 23 224 78 270 172 26 53 28 65 27 182 0 109 -4 141 -33 250 -28 102 -310 887 -419 1164 -48 122 46 111 -910 111 -781 0 -829 -1 -864 -18 -42 -21 -35 -9 -98 -192 -27 -77 -105 -304 -174 -505 -194 -561 -237 -768 -186 -903 47 -124 143 -202 299 -244 116 -31 140 -66 82 -124 l-29 -29 -749 0 c-807 0 -775 -2 -803 51 -22 40 5 61 125 94 73 20 195 81 290 143 99 66 249 220 324 332 71 106 188 341 249 500 48 125 277 787 316 915 26 83 33 95 89 150 69 67 177 128 300 170 153 51 217 55 910 55 514 0 639 3 643 13 4 12 -123 378 -349 1002 -58 160 -137 380 -175 490 -100 285 -191 534 -202 556 -22 40 -37 19 -74 -98 -203 -646 -480 -1431 -568 -1607 -36 -71 -103 -145 -180 -197 -31 -21 -137 -81 -235 -132 -203 -106 -258 -141 -326 -209 -93 -93 -126 -224 -98 -391 l13 -72 -50 -130 c-27 -71 -76 -203 -107 -292 -32 -90 -61 -163 -65 -163 -4 0 -49 42 -100 93 -203 202 -302 423 -303 672 -1 280 109 522 321 705 87 76 178 132 425 267 117 64 241 135 277 158 82 55 186 159 230 231 39 65 373 909 501 1269 104 292 132 410 127 540 -2 72 -8 100 -28 140 -22 44 -31 52 -72 65 -27 8 -48 21 -48 28 0 24 21 53 53 72 30 19 53 20 387 20 307 0 359 -2 378 -16z m-1103 -569 c50 -13 116 -35 149 -49 47 -21 57 -29 51 -43 -4 -10 -41 -113 -82 -229 l-75 -212 -36 10 c-65 19 -200 13 -267 -11 -93 -33 -122 -63 -192 -196 -89 -170 -115 -187 -378 -246 -96 -21 -189 -45 -207 -52 -18 -8 -66 -42 -107 -76 -122 -102 -188 -127 -372 -138 l-96 -6 -27 -43 c-56 -88 -157 -153 -243 -157 -48 -2 -103 17 -103 35 0 5 22 6 49 2 86 -11 181 37 242 121 20 28 40 45 53 45 13 0 5 8 -24 23 -59 29 -94 91 -94 163 0 55 8 68 135 219 33 39 77 113 124 210 46 95 86 163 109 186 21 21 102 70 189 115 84 43 231 124 328 180 97 55 196 108 219 118 159 64 466 78 655 31z m65 -3330 c455 -100 559 -132 688 -209 187 -111 320 -249 399 -411 58 -122 77 -219 70 -360 -14 -264 -88 -429 -281 -620 -133 -132 -223 -188 -501 -309 -366 -161 -479 -258 -479 -416 -1 -155 93 -222 310 -222 112 1 229 27 419 94 203 72 324 98 485 105 173 7 268 -10 395 -72 78 -37 183 -111 173 -121 -2 -1 -44 11 -93 29 -87 30 -96 31 -250 31 -233 0 -264 -10 -643 -209 -278 -146 -547 -190 -772 -125 -166 48 -332 168 -405 294 -84 145 -85 344 -2 500 40 76 156 199 266 282 46 34 161 106 255 160 302 172 397 247 454 360 77 152 63 294 -39 391 -140 133 -479 227 -851 234 -54 2 -98 5 -98 8 0 10 207 629 214 640 4 6 12 8 19 6 7 -2 127 -29 267 -60z" />
+        <path d="M3340 7268 c0 -12 -21 -64 -46 -116 -32 -67 -54 -98 -75 -110 -67 -39 -14 -39 133 0 63 16 84 27 108 55 28 32 95 152 88 158 -8 6 -154 35 -179 35 -23 0 -29 -4 -29 -22z" />
       </g>
     </svg>
   );
-};
+}
 ```
 
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog v2)
+// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog v3)
 "use client";
 
 import React from 'react';
@@ -3484,12 +3647,12 @@ import { cn } from '@/lib/utils';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-    AlertDialogTrigger // Importar AlertDialogTrigger
+    AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Mapeo de estado (sin cambios)
-const statusMap: { [key: string]: { icon: React.ElementType, text: string, className: string, animate: boolean, description: string } } = {
+const statusMap: { [key: string]: { icon: React.ComponentType<{ className?: string }>, text: string, className: string, animate: boolean, description: string } } = {
     uploaded:   { icon: FileClock, text: 'En Cola', className: 'text-blue-600 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-700', animate: true, description: "Esperando para ser procesado." },
     processing: { icon: Loader2, text: 'Procesando', className: 'text-orange-600 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-700', animate: true, description: "Extrayendo texto y generando vectores..." },
     processed:  { icon: FileCheck2, text: 'Procesado', className: 'text-green-600 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700', animate: false, description: "Listo para ser consultado." },
@@ -3520,13 +3683,14 @@ export function DocumentStatusList({
     onDeleteSuccess,
     isLoading
 }: DocumentStatusListProps) {
+  // Estado para controlar qué diálogo de confirmación está abierto (usando el ID del documento)
   const [deletingDocId, setDeletingDocId] = React.useState<string | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isRetrying, setIsRetrying] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState<string | null>(null);
 
   // --- Handlers (sin cambios lógicos) ---
-   const handleRetry = async (documentId: string, fileName?: string | null) => {
+  const handleRetry = async (documentId: string, fileName?: string | null) => {
     if (!authHeaders || isRetrying) return;
     const displayId = fileName || documentId.substring(0, 8) + "...";
     setIsRetrying(documentId);
@@ -3565,8 +3729,16 @@ export function DocumentStatusList({
         console.log("Download requested for:", doc.document_id);
     };
 
+  // Abre el diálogo seteando el ID del documento a borrar
   const openDeleteConfirmation = (docId: string) => { setDeletingDocId(docId); };
-  const closeDeleteConfirmation = () => { setDeletingDocId(null); };
+
+  // Cierra el diálogo reseteando el ID
+  const closeDeleteConfirmation = () => {
+      // Solo cerrar si no está en proceso de borrado para evitar cierres accidentales
+      if (!isDeleting) {
+          setDeletingDocId(null);
+      }
+  };
 
   const handleDeleteConfirmed = async () => {
     if (!deletingDocId || !authHeaders || isDeleting) return;
@@ -3579,10 +3751,11 @@ export function DocumentStatusList({
       await deleteIngestDocument(deletingDocId, authHeaders);
       onDeleteSuccess(deletingDocId);
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
-      closeDeleteConfirmation();
+      closeDeleteConfirmation(); // Cierra el diálogo al éxito
     } catch (e: any) {
       const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
+      // Mantenemos el dialogo abierto en caso de error
     } finally {
       setIsDeleting(false);
     }
@@ -3594,7 +3767,7 @@ export function DocumentStatusList({
   }
 
   return (
-      <TooltipProvider> {/* Un solo provider para toda la lista */}
+      <TooltipProvider>
         <div className="border rounded-lg overflow-hidden shadow-sm bg-card">
           <Table className='w-full text-sm'>
             <TableHeader>
@@ -3612,7 +3785,8 @@ export function DocumentStatusList({
                 const Icon = statusInfo.icon;
                 const isCurrentlyRetrying = isRetrying === doc.document_id;
                 const isCurrentlyRefreshing = isRefreshing === doc.document_id;
-                const isActionDisabled = isDeleting || isCurrentlyRetrying || isCurrentlyRefreshing;
+                // Permitir abrir dialog incluso si otra acción está en curso, pero los botones del dialog estarán deshabilitados
+                const isActionDisabled = isCurrentlyRetrying || isCurrentlyRefreshing;
 
                 const dateToShow = doc.last_updated;
                 const displayDate = dateToShow ? new Date(dateToShow).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short'}) : 'N/D';
@@ -3620,62 +3794,86 @@ export function DocumentStatusList({
                 const displayChunks = doc.milvus_chunk_count ?? doc.chunk_count ?? '-';
 
                 return (
-                    // AlertDialog ahora envuelve solo el botón de eliminar
-                    <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
-                        <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
-                        <TableCell className="px-2 py-1.5">
-                            <Tooltip delayDuration={100}>
-                                <TooltipTrigger asChild>
-                                    <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
-                                        <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
-                                        {statusInfo.text}
-                                    </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" sideOffset={5} className="max-w-xs break-words p-2 text-xs shadow-lg">
-                                    <p>{statusInfo.description}</p>
-                                    {doc.status === 'error' && doc.error_message && <p className='mt-1 pt-1 border-t text-destructive'>Error: {doc.error_message}</p>}
-                                </TooltipContent>
-                            </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
-                        <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
-                        <TableCell className="text-right space-x-1 pr-3 pl-2 py-1">
-                            {/* --- ACCIONES INDIVIDUALES CON SU TOOLTIP --- */}
-                            <Tooltip delayDuration={100}>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" sideOffset={6}><p>Descargar (N/D)</p></TooltipContent>
-                            </Tooltip>
-                            {doc.status === 'error' && (
-                                <Tooltip delayDuration={100}>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
-                                </Tooltip>
-                            )}
-                            <Tooltip delayDuration={100}>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
-                            </Tooltip>
+                      <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
+                          <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
+                          <TableCell className="px-2 py-1.5">
+                              <Tooltip delayDuration={100}>
+                                  <TooltipTrigger asChild>
+                                      <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
+                                          <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
+                                          {statusInfo.text}
+                                      </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" sideOffset={5} className="max-w-xs break-words p-2 text-xs shadow-lg">
+                                      <p>{statusInfo.description}</p>
+                                      {doc.status === 'error' && doc.error_message && <p className='mt-1 pt-1 border-t text-destructive'>Error: {doc.error_message}</p>}
+                                  </TooltipContent>
+                              </Tooltip>
+                          </TableCell>
+                          <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
+                          <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
+                          <TableCell className="text-right space-x-1 pr-3 pl-2 py-1">
+                              {/* --- ACCIONES INDIVIDUALES CON SU TOOLTIP --- */}
+                              <Tooltip delayDuration={100}>
+                                  <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" sideOffset={6}><p>Descargar (N/D)</p></TooltipContent>
+                              </Tooltip>
+                              {doc.status === 'error' && (
+                                  <Tooltip delayDuration={100}>
+                                      <TooltipTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
+                                  </Tooltip>
+                              )}
+                              <Tooltip delayDuration={100}>
+                                  <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
+                              </Tooltip>
 
-                            {/* AlertDialogTrigger y Tooltip para ELIMINAR */}
-                            <AlertDialog>
-                                <Tooltip delayDuration={100}>
-                                    <TooltipTrigger asChild>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled} onClick={(e) => {e.stopPropagation(); openDeleteConfirmation(doc.document_id);}}> <Trash2 className="h-4 w-4" /> </Button>
-                                        </AlertDialogTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
-                                </Tooltip>
-                                {/* El AlertDialogContent se renderiza condicionalmente abajo */}
-                            </AlertDialog>
-                        </TableCell>
-                    </TableRow>
+                              {/* AlertDialog + Tooltip para Eliminar */}
+                              <AlertDialog open={deletingDocId === doc.document_id} onOpenChange={(open) => !open && closeDeleteConfirmation()}>
+                                  <Tooltip delayDuration={100}>
+                                      <TooltipTrigger asChild>
+                                          <AlertDialogTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled}>
+                                                  <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                          </AlertDialogTrigger>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
+                                  </Tooltip>
+                                  {/* Contenido del diálogo específico para esta fila */}
+                                  <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                          <AlertDialogTitle className="flex items-center gap-2">
+                                              <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
+                                          </AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                              Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
+                                              <br />
+                                              <span className="font-semibold text-foreground mt-2 block break-all">"{doc.file_name || doc.document_id}"</span>
+                                          </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                          <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction
+                                              onClick={handleDeleteConfirmed}
+                                              disabled={isDeleting}
+                                              className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
+                                          >
+                                              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                              Eliminar Permanentemente
+                                          </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                  </AlertDialogContent>
+                              </AlertDialog>
+                          </TableCell>
+                      </TableRow>
                 );
               })}
             </TableBody>
@@ -3684,38 +3882,6 @@ export function DocumentStatusList({
 
         {/* Botón Cargar Más */}
         {hasMore && ( <div className="pt-6 text-center"> <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}> {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Cargar más documentos </Button> </div> )}
-
-         {/* AlertDialog Content (Instancia ÚNICA fuera del map) */}
-         {/* Se renderiza solo si deletingDocId tiene un valor */}
-         <AlertDialogContent>
-             {deletingDocId && ( // Renderizar solo si hay un doc seleccionado
-                 <>
-                     <AlertDialogHeader>
-                         <AlertDialogTitle className="flex items-center gap-2">
-                             <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
-                         </AlertDialogTitle>
-                         <AlertDialogDescription>
-                             Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
-                             <br />
-                             <span className="font-semibold text-foreground mt-2 block break-all">
-                                 "{documents.find(d => d.document_id === deletingDocId)?.file_name || deletingDocId}"
-                             </span>
-                         </AlertDialogDescription>
-                     </AlertDialogHeader>
-                     <AlertDialogFooter>
-                         <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                         <AlertDialogAction
-                             onClick={handleDeleteConfirmed}
-                             disabled={isDeleting}
-                             className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
-                         >
-                             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                             Eliminar Permanentemente
-                         </AlertDialogAction>
-                     </AlertDialogFooter>
-                 </>
-             )}
-         </AlertDialogContent>
 
       </TooltipProvider>
   );
@@ -4089,7 +4255,7 @@ import { BotMessageSquare, Database, Settings, /* Quitamos PlusCircle */ LayoutD
 import { APP_NAME } from '@/lib/constants';
 import { ChatHistory } from '@/components/chat/chat-history';
 import { Separator } from '@/components/ui/separator';
-import { AtenexLogo } from '@/components/icons/atenex-logo'; // Importar nuevo logo
+import AtenexLogo from '@/components/icons/atenex-logo'; // Import default del logo
 
 interface SidebarProps {
   isCollapsed: boolean;

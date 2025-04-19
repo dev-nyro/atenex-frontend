@@ -6,34 +6,31 @@
 /* 2. Define variables base FUERA del @theme */
 /* Variables para el tema claro (:root) - Ajustados para mayor neutralidad */
 :root {
-    --radius: 0.6rem; /* Radio de borde ligeramente ajustado */
-    /* OKLCH - Base Claro Neutro */
-    --background: oklch(0.995 0.005 240); /* Casi blanco */
-    --foreground: oklch(0.15 0.015 240); /* Negro azulado suave */
-    --card: oklch(1 0 0);              /* Blanco puro */
+    --radius: 0.6rem;
+    --background: oklch(0.995 0.005 240);
+    --foreground: oklch(0.15 0.015 240);
+    --card: oklch(1 0 0);
     --card-foreground: var(--foreground);
     --popover: var(--card);
     --popover-foreground: var(--card-foreground);
-    --primary: oklch(0.48 0.16 265);     /* Azul/Violeta Corporativo */
-    --primary-foreground: oklch(0.99 0.01 265); /* Blanco */
-    --secondary: oklch(0.97 0.01 240);    /* Gris muy claro azulado */
-    --secondary-foreground: oklch(0.30 0.02 240); /* Gris azulado medio */
+    --primary: oklch(0.48 0.16 265);
+    --primary-foreground: oklch(0.99 0.01 265);
+    --secondary: oklch(0.97 0.01 240);
+    --secondary-foreground: oklch(0.30 0.02 240);
     --muted: var(--secondary);
-    --muted-foreground: oklch(0.50 0.015 240); /* Gris azulado más claro para muted */
-    --accent: oklch(0.95 0.015 240);   /* Gris azulado un poco más oscuro */
-    --accent-foreground: oklch(0.20 0.02 240); /* Gris oscuro para texto accent */
-    --destructive: oklch(0.6 0.2 20);       /* Rojo menos saturado */
-    --destructive-foreground: oklch(0.99 0.01 20); /* Blanco */
-    --border: oklch(0.92 0.01 240);      /* Borde gris azulado claro */
-    --input: oklch(0.94 0.01 240);       /* Input border ligeramente más oscuro */
-    --ring: oklch(0.65 0.16 265 / 0.5);   /* Anillo primario semi-transparente */
-    /* Variables Chart (ajustar si es necesario) */
+    --muted-foreground: oklch(0.50 0.015 240);
+    --accent: oklch(0.95 0.015 240);
+    --accent-foreground: oklch(0.20 0.02 240);
+    --destructive: oklch(0.6 0.2 20);
+    --destructive-foreground: oklch(0.99 0.01 20);
+    --border: oklch(0.92 0.01 240);
+    --input: oklch(0.94 0.01 240);
+    --ring: oklch(0.65 0.16 265 / 0.5);
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
-    /* Sidebar - puede heredar o personalizarse */
     --sidebar: var(--card);
     --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--primary);
@@ -105,7 +102,6 @@
     --ring: oklch(0.7 0.18 40 / 0.5);
     --sidebar: oklch(0.20 0.012 230);
     --sidebar-border: var(--border);
-    /* Hereda el resto de variables de .slate */
     --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--primary);
     --sidebar-primary-foreground: var(--primary-foreground);
@@ -137,7 +133,6 @@
     --ring: oklch(0.55 0.18 280 / 0.5);
     --sidebar: oklch(0.99 0.008 255);
     --sidebar-border: var(--border);
-    /* Hereda */
     --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--primary);
     --sidebar-primary-foreground: var(--primary-foreground);
@@ -169,7 +164,6 @@
     --ring: oklch(0.55 0.12 165 / 0.5);
     --sidebar: oklch(0.99 0.006 80);
     --sidebar-border: var(--border);
-     /* Hereda */
     --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--primary);
     --sidebar-primary-foreground: var(--primary-foreground);
@@ -209,9 +203,7 @@
      --sidebar-border: var(--border);
      --sidebar-ring: var(--ring);
 }
-
 /* --- FIN NUEVOS TEMAS --- */
-
 
 /* 4. Aplica overrides mínimos en la capa base */
 @layer base {
@@ -229,6 +221,17 @@
 
     /* Mejoras específicas para Tooltip Content para evitar solapamientos */
     [data-slot="tooltip-content"] {
-        z-index: 60 !important; /* Asegurar que esté por encima del overlay del diálogo (z-50) */
+        /* z-index: 60 !important; ya no es necesario con la nueva estructura */
     }
+
+    /* Keyframes para animación fade-in */
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fade-in 0.6s ease-out forwards;
+      animation-delay: var(--animation-delay, 0s); /* Permite retraso opcional */
+    }
+
 }

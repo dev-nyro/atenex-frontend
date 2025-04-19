@@ -1,17 +1,17 @@
-// File: components/layout/sidebar.tsx (REFACTORIZADO - Logo y Navegación)
+// File: components/layout/sidebar.tsx (REFACTORIZADO - Logo y Navegación v2)
 "use client";
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation'; // Quitar useRouter si no se usa aquí
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BotMessageSquare, Database, Settings, /* Quitamos PlusCircle */ LayoutDashboard } from 'lucide-react'; // Cambiado FileUp por Database
+import { BotMessageSquare, Database, Settings, /* Quitamos PlusCircle */ LayoutDashboard } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 import { ChatHistory } from '@/components/chat/chat-history';
 import { Separator } from '@/components/ui/separator';
-import AtenexLogo from '@/components/icons/atenex-logo'; // Import default del logo
+import AtenexLogo from '@/components/icons/atenex-logo'; // Importar logo
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -19,33 +19,32 @@ interface SidebarProps {
 
 // Items de navegación actualizados
 const navItems = [
-  // { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }, // Ejemplo si se añade dashboard
+  // { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }, // Ejemplo
   { href: '/chat', label: 'Chat', icon: BotMessageSquare },
-  { href: '/knowledge', label: 'Base de Conocimiento', icon: Database }, // Icono más representativo
+  { href: '/knowledge', label: 'Conocimiento', icon: Database }, // Texto más corto
   { href: '/settings', label: 'Configuración', icon: Settings },
 ];
 
 export function Sidebar({ isCollapsed }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter ? useRouter() : undefined;
+  // const router = useRouter(); // Ya no se necesita aquí
 
-  // Ya no se necesita handleNewChat porque se eliminó el botón
+  // Ya no se necesita handleNewChat
 
   return (
     <aside className={cn(
-        "flex h-full flex-col border-r bg-card", // Usar bg-card para consistencia
-        isCollapsed ? "w-[60px] items-center px-2 py-4" : "w-full p-4" // Padding ajustado
+        "flex h-full flex-col border-r bg-card", // Fondo card para consistencia
+        isCollapsed ? "w-[60px] items-center px-2 py-4" : "w-full p-4"
       )}
       >
-      {/* Sección Superior: Logo */}
-      <div className={cn(
-          "flex items-center mb-6", // Más margen inferior
-          isCollapsed ? "h-10 justify-center" : "h-12 justify-start" // Altura y alineación
-          )}
-        >
-            {/* Enlace del logo a la página principal o al dashboard/chat */}
-            <Link href="/chat" className={cn("flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm", isCollapsed ? 'justify-center w-full' : '')} aria-label={`${APP_NAME} - Inicio`}>
-                 <AtenexLogo className={cn("h-8 w-auto", isCollapsed ? "h-7" : "")} /> {/* Tamaño ajustable del logo */}
+      {/* Sección Superior: Logo/Nombre como Link */}
+      <div className={cn( "flex items-center mb-6", isCollapsed ? "h-10 justify-center" : "h-12 justify-start" )}>
+            <Link href="/chat" // Enlaza a la sección principal (Chat)
+                className={cn( "flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm", isCollapsed ? 'justify-center w-full' : '' )}
+                aria-label={`${APP_NAME} - Inicio`}
+            >
+                 {/* Ajustar tamaño del logo SVG */}
+                 <AtenexLogo className={cn("h-8 w-auto text-primary", isCollapsed ? "h-7" : "")} />
                  {!isCollapsed && (
                      <span className="text-xl font-bold text-foreground tracking-tight">{APP_NAME}</span>
                  )}
@@ -54,20 +53,22 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 
         {/* SE ELIMINÓ el botón "Nuevo Chat" */}
 
-        {/* Separador si no está colapsado */}
-        {!isCollapsed && <Separator className="my-2" />}
+        {/* Separador solo si no está colapsado y hay historial */}
+        {/* {!isCollapsed && <Separator className="my-2" />} */}
 
         {/* Navegación Principal */}
         <nav className={cn(
             "flex flex-col gap-1 flex-grow", // flex-grow para empujar historial abajo
-            isCollapsed ? "items-center mt-2" : "" // Ajuste margen si colapsado
+            isCollapsed ? "items-center mt-4" : "mt-2" // Margen superior ajustado
             )}
         >
           <TooltipProvider delayDuration={0}>
             {navItems.map((item) => {
-               const isActive = pathname === item.href || (item.href !== '/chat' && pathname.startsWith(item.href));
+               // Mejorar lógica isActive para /chat y sus subrutas [[...chatId]]
+               const isChatActive = item.href === '/chat' && (pathname === '/chat' || pathname.startsWith('/chat/'));
+               const isActive = isChatActive || (item.href !== '/chat' && pathname.startsWith(item.href));
                return (
-                  <Tooltip key={item.href}>
+                  <Tooltip key={item.href} disableHoverableContent={!isCollapsed}>
                     <TooltipTrigger asChild>
                       <Link
                           href={item.href}
@@ -107,8 +108,8 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 
         {/* Historial de Chats (Solo si no está colapsado) */}
         {!isCollapsed && (
-           <div className="mt-auto flex flex-col border-t pt-3 -mx-4 px-4"> {/* Padding negativo/positivo ajustado */}
-               <div className='flex-1 overflow-hidden'> {/* Contenedor para limitar altura */}
+           <div className="mt-4 flex flex-col border-t pt-3 -mx-4 px-4 h-1/3"> {/* Altura limitada para historial */}
+               <div className='flex-1 overflow-hidden min-h-0'> {/* Forzar overflow */}
                    <ChatHistory />
                </div>
            </div>

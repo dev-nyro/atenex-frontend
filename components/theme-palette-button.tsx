@@ -1,4 +1,4 @@
-// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas B2B)
+// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas B2B Final)
 "use client";
 
 import * as React from "react";
@@ -9,13 +9,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel, // Añadir Label si se quiere título
-  DropdownMenuSeparator, // Añadir Separator si se quiere
+  DropdownMenuLabel, // Importar Label
+  DropdownMenuSeparator, // Importar Separator
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-// Definición de temas B2B disponibles
+// Definición de temas B2B disponibles (Final)
 const themes = [
     { value: 'system', label: 'Automático (Sistema)' },
     { value: 'light', label: 'Claro Profesional' },
@@ -23,21 +23,14 @@ const themes = [
     { value: 'slate', label: 'Pizarra (Oscuro)' },
     { value: 'indigo', label: 'Índigo (Claro)' },
     { value: 'stone', label: 'Piedra (Claro)' },
-    { value: 'zinc', label: 'Zinc (Oscuro)' }, // Nuevo tema oscuro
+    { value: 'zinc', label: 'Zinc (Oscuro)' },
 ];
 
 export function ThemePaletteButton() {
-  const { setTheme, theme: activeTheme } = useTheme();
-  // Añadir estado para manejar el tema 'resolved' si se usa 'system'
-  const [currentResolvedTheme, setCurrentResolvedTheme] = React.useState<string | undefined>(undefined);
+  const { setTheme, theme: activeTheme, resolvedTheme } = useTheme();
 
-  // Efecto para obtener el tema resuelto cuando se usa 'system'
-  React.useEffect(() => {
-    // 'resolvedTheme' está disponible después de la hidratación
-    const resolved = activeTheme === 'system' ? document.documentElement.classList.contains('dark') ? 'dark' : 'light' : activeTheme;
-    setCurrentResolvedTheme(resolved);
-  }, [activeTheme]);
-
+  // El tema resuelto (light o dark) si activeTheme es 'system'
+  const currentResolvedTheme = resolvedTheme;
 
   return (
     <DropdownMenu>
@@ -46,28 +39,28 @@ export function ThemePaletteButton() {
                <Palette className="h-5 w-5"/>
             </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48"> {/* Ancho ajustado */}
-           {/* Opcional: Título */}
-           {/* <DropdownMenuLabel>Seleccionar Tema</DropdownMenuLabel>
-           <DropdownMenuSeparator /> */}
-           {themes.map((theme) => (
-               <DropdownMenuItem
+      <DropdownMenuContent align="end" className="w-52"> {/* Ancho ajustado */}
+           <DropdownMenuLabel className="px-2 py-1.5 text-xs font-semibold">Apariencia</DropdownMenuLabel>
+           <DropdownMenuSeparator />
+           {themes.map((theme) => {
+               // Determinar si este item es el activo (considerando 'system')
+               const isActive = activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value);
+               return (
+                 <DropdownMenuItem
                     key={theme.value}
                     onClick={() => setTheme(theme.value)}
                     className={cn(
-                        "flex items-center justify-between cursor-pointer text-sm px-2 py-1.5 rounded-sm", // Estilos base
-                        // Resaltar si el valor es el tema activo O si el tema activo es 'system' y este es el tema resuelto
-                        (activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value))
+                        "flex items-center justify-between cursor-pointer text-sm px-2 py-1.5 rounded-sm",
+                        isActive
                           ? "font-semibold text-primary bg-accent dark:bg-accent/50"
                           : "hover:bg-accent/50 dark:hover:bg-accent/20"
                     )}
-               >
+                 >
                     <span>{theme.label}</span>
-                    {(activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value)) && (
-                        <Check className="h-4 w-4" />
-                    )}
-               </DropdownMenuItem>
-           ))}
+                    {isActive && ( <Check className="h-4 w-4" /> )}
+                 </DropdownMenuItem>
+               );
+           })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
