@@ -1,4 +1,4 @@
-// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog v4 - Final)
+// File: components/knowledge/document-status-list.tsx (CORREGIDO - Validación ID indefinido)
 "use client";
 
 import React from 'react';
@@ -57,9 +57,16 @@ export function DocumentStatusList({
   const [isRetrying, setIsRetrying] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState<string | null>(null);
 
-  // --- Handlers (sin cambios lógicos) ---
+  // --- Handlers (Añadidas validaciones de documentId) ---
   const handleRetry = async (documentId: string, fileName?: string | null) => {
+    // FLAG_LLM: Validar que documentId sea una cadena válida antes de proceder
+    if (!documentId || typeof documentId !== 'string') {
+        console.error("Error: Se intentó reintentar con un ID de documento inválido:", documentId);
+        toast.error("Error Interno", { description: "No se puede reintentar: ID de documento faltante." });
+        return;
+    }
     if (!authHeaders || isRetrying) return;
+
     const displayId = fileName || documentId.substring(0, 8) + "...";
     setIsRetrying(documentId);
     const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
@@ -76,52 +83,74 @@ export function DocumentStatusList({
   };
 
   const handleRefresh = async (documentId: string, fileName?: string | null) => {
-     if (isRefreshing) return;
+    // FLAG_LLM: Validar que documentId sea una cadena válida antes de proceder
+    if (!documentId || typeof documentId !== 'string') {
+        console.error("Error: Se intentó refrescar con un ID de documento inválido:", documentId);
+        toast.error("Error Interno", { description: "No se puede refrescar: ID de documento faltante." });
+        return;
+    }
+    if (isRefreshing) return;
+
     const displayId = fileName || documentId.substring(0, 8) + "...";
     setIsRefreshing(documentId);
     toast.info(`Actualizando estado de "${displayId}"...`, {id: `refresh-${documentId}`});
     try {
-        await refreshDocument(documentId);
+        await refreshDocument(documentId); // refreshDocument ya debería tener su propia validación o manejo
         toast.success("Estado Actualizado", { id: `refresh-${documentId}`, description: `Se actualizó el estado de "${displayId}".` });
     } catch (error) {
-        toast.dismiss(`refresh-${documentId}`);
+        toast.error("Error al Actualizar", { id: `refresh-${documentId}`, description: `No se pudo actualizar el estado de "${displayId}".` });
+        // No limpiar toast en error para que el usuario vea el mensaje
     } finally {
         setIsRefreshing(null);
     }
   };
 
     const handleDownload = (doc: DocumentStatus) => {
+        // FLAG_LLM: Validar document_id antes de mostrar toast
+        if (!doc || !doc.document_id) {
+             console.error("Error: Se intentó descargar con datos de documento inválidos:", doc);
+             toast.error("Error Interno", { description: "No se puede descargar: información del documento incompleta." });
+             return;
+        }
         toast.info("Descarga No Implementada", {
             description: `La funcionalidad para descargar "${doc.file_name || doc.document_id}" aún no está disponible.`
         });
         console.log("Download requested for:", doc.document_id);
     };
 
-  const openDeleteConfirmation = (docId: string) => { setDeletingDocId(docId); };
+  const openDeleteConfirmation = (docId: string) => {
+       // FLAG_LLM: Validar que docId sea una cadena válida antes de abrir el diálogo
+       if (!docId || typeof docId !== 'string') {
+          console.error("Error: Se intentó abrir confirmación de eliminación con ID inválido:", docId);
+          toast.error("Error Interno", { description: "No se puede eliminar: ID de documento faltante." });
+          return;
+       }
+       setDeletingDocId(docId);
+    };
   const closeDeleteConfirmation = () => { if (!isDeleting) setDeletingDocId(null); };
 
   const handleDeleteConfirmed = async () => {
-    if (!deletingDocId || !authHeaders || isDeleting) return;
+    if (!deletingDocId || !authHeaders || isDeleting) return; // deletingDocId ya fue validado en openDeleteConfirmation
     const docToDelete = documents.find(d => d.document_id === deletingDocId);
     const display = docToDelete?.file_name || deletingDocId.substring(0, 8) + '...';
 
     setIsDeleting(true);
     const toastId = toast.loading(`Eliminando "${display}"...`);
     try {
-      await deleteIngestDocument(deletingDocId, authHeaders);
+      await deleteIngestDocument(deletingDocId, authHeaders); // deleteIngestDocument debe validar internamente
       onDeleteSuccess(deletingDocId);
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
-      closeDeleteConfirmation();
+      closeDeleteConfirmation(); // Cerrar diálogo al éxito
     } catch (e: any) {
       const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
+      // No cerrar dialogo automáticamente en error para permitir reintento o cancelación manual
     } finally {
       setIsDeleting(false);
-      // No cerramos aquí en caso de error, para que el usuario pueda reintentar cerrar
     }
   };
 
-  // --- Renderizado ---
+  // --- Renderizado (sin cambios estructurales, solo llamadas a handlers validados) ---
   if (!isLoading && documents.length === 0) {
     return ( <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border-2 border-dashed rounded-lg bg-muted/30 mt-4 min-h-[150px]"> <Info className="h-8 w-8 mb-3 opacity-50"/> <p className="text-sm font-medium mb-1">Sin Documentos</p> <p className="text-xs">Aún no se han subido documentos.</p> </div> );
   }
@@ -141,6 +170,12 @@ export function DocumentStatusList({
             </TableHeader>
             <TableBody>
               {documents.map((doc) => {
+                // FLAG_LLM: Comprobar si el doc o su ID es inválido antes de renderizar la fila
+                if (!doc || !doc.document_id) {
+                    console.warn("Se encontró un documento inválido en la lista, omitiendo renderizado:", doc);
+                    return null; // O renderizar una fila de error específica
+                }
+
                 const statusInfo = statusMap[doc.status] || statusMap.default;
                 const Icon = statusInfo.icon;
                 const isCurrentlyRetrying = isRetrying === doc.document_id;
@@ -195,12 +230,13 @@ export function DocumentStatusList({
                             </Tooltip>
 
                             {/* AlertDialog + Tooltip para Eliminar (Estructura corregida) */}
+                             {/* Usamos el ID validado 'doc.document_id' aquí */}
                             <AlertDialog open={deletingDocId === doc.document_id} onOpenChange={(open) => !open && closeDeleteConfirmation()}>
                                 <Tooltip delayDuration={100}>
                                     <TooltipTrigger asChild>
                                          {/* AlertDialogTrigger ahora es el hijo directo de TooltipTrigger */}
                                          <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); openDeleteConfirmation(doc.document_id); }} aria-label="Eliminar documento" disabled={isActionDisabled}>
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
                                          </AlertDialogTrigger>
