@@ -13,7 +13,7 @@ atenex-frontend/
 │   │   │   └── page.tsx
 │   │   ├── layout.tsx
 │   │   └── settings
-│   │       └── page.tsx
+│   │       └── page.tsx 
 │   ├── (auth)
 │   │   ├── layout.tsx
 │   │   └── login
