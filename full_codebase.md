@@ -2045,29 +2045,32 @@ const APP_NAME = "Atenex";
 
 ## File: `app\layout.tsx`
 ```tsx
-// File: app/layout.tsx
+// File: app/layout.tsx (CORREGIDO - Sin cabecera duplicada)
 // Purpose: Root layout, sets up global providers (Theme, Auth) and Toaster.
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css"; // Import global styles
-import AtenexLogo from '@/components/icons/atenex-logo';
+// Quitamos import de AtenexLogo aquí
 import { cn } from "@/lib/utils";
-import { ThemeProvider } from "@/components/theme-provider"; // Theme context
-import { AuthProvider } from "@/lib/hooks/useAuth"; // CORRECTED Auth context
-import { Toaster } from "@/components/ui/sonner"; // Sonner for notifications
+import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/lib/hooks/useAuth";
+import { Toaster } from "@/components/ui/sonner";
 
 // Setup Inter font
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 // Metadata for the application
 export const metadata: Metadata = {
-  title: "Atenex - AI Knowledge Assistant", // Updated title
+  title: "Atenex - AI Knowledge Assistant",
   description: "Query your enterprise knowledge base using natural language with Atenex.",
-  // Add more metadata: icons, open graph tags, etc.
+  // Añadir icono usando el logo SVG (requiere ponerlo en /public o /app)
+  // icons: {
+  //   icon: '/favicon.svg', // O la ruta a tu logo SVG
+  // },
 };
 
-// Define the application name constant
-const APP_NAME = "Atenex";
+// Quitamos APP_NAME si no se usa aquí directamente
+// const APP_NAME = "Atenex";
 
 export default function RootLayout({
   children,
@@ -2075,33 +2078,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning> {/* Set language, suppress hydration warning */}
+    <html lang="es" suppressHydrationWarning>
       <body
         className={cn(
-          "min-h-screen bg-background font-sans antialiased", // Base styles
-          inter.variable // Apply Inter font variable
+          "min-h-screen bg-background font-sans antialiased",
+          inter.variable
         )}
       >
-        {/* Wrap entire application in AuthProvider */}
         <AuthProvider>
-          {/* ThemeProvider for light/dark/custom themes */}
           <ThemeProvider
-            attribute="class" // Use class strategy for theming
-            defaultTheme="system" // Default to system preference
-            enableSystem // Allow system preference detection
-            disableTransitionOnChange // Prevent transitions on theme change
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
           >
-            {/* Render the application content */}
-            {/* Cabecera con Logo Atenex */}
-           <header className="sticky top-0 z-50 w-full bg-black/90 backdrop-blur-sm">
-             <div className="container mx-auto px-4 py-2 flex items-center">
-               <AtenexLogo />
-               <span className="ml-3 text-white font-bold text-xl">{APP_NAME}</span>
-             </div>
-           </header>
-           {/* Render the application content */}
-
-            {/* Global Toaster component for notifications */}
+            {/* ELIMINADA la <header> de aquí */}
+            {/* Renderiza directamente el contenido de la página/layout anidado */}
+            {children}
+            {/* Toaster global */}
             <Toaster richColors position="top-right" closeButton />
           </ThemeProvider>
         </AuthProvider>
@@ -2113,7 +2107,7 @@ export default function RootLayout({
 
 ## File: `app\page.tsx`
 ```tsx
-// File: app/page.tsx (REFACTORIZADO - Animación eliminada, logo integrado)
+// File: app/page.tsx (MODIFICADO - Añadida Animación Serpiente)
 "use client";
 
 import React from 'react';
@@ -2122,17 +2116,19 @@ import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap, BookOpen } from 'lucide-react';
+import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap } from 'lucide-react';
 import Link from 'next/link';
-// import SnakeAnimation from '@/components/animations/snakeanimation'; // Eliminado - Causaba problemas
-import AtenexLogo from '@/components/icons/atenex-logo'; // Importar el logo SVG
+import AtenexLogoIcon from '@/components/icons/atenex-logo'; // Renombrado para claridad vs componente
+import SnakeAnimation from '@/components/animations/snakeanimation'; // <-- IMPORTAR ANIMACIÓN
 
-// Mapeo de iconos (sin cambios)
+// Mapeo de iconos
 const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
   Search: Search,
   Library: Library,
   Zap: Zap,
-  BookOpen: BookOpen
+  HomeIcon: HomeIcon,
+  Info: Info,
+  Mail: Mail,
 };
 
 export default function HomePage() {
@@ -2141,8 +2137,12 @@ export default function HomePage() {
   const isAuthenticated = !isAuthLoading && !!user;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
-      {/* Header (sin cambios) */}
+    // FLAG_LLM: Añadido 'relative' al contenedor principal para que la animación absoluta se posicione correctamente
+    <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
+      {/* FLAG_LLM: Renderizar la animación como overlay */}
+      <SnakeAnimation />
+
+      {/* Header específico de la Landing Page */}
       <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
           {/* Logo/Nombre App */}
@@ -2151,35 +2151,40 @@ export default function HomePage() {
             className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
             aria-label={`${APP_NAME} - Inicio`}
           >
-             {/* Usar BookOpen o un icono simple aquí si el logo principal va al sidebar */}
-             <BookOpen className="w-6 h-6" />
+             {/* Logo aquí o icono simple si se prefiere */}
+             <AtenexLogoIcon className="h-7 w-auto" />
             <span className='font-bold'>{APP_NAME}</span>
           </Link>
-          {/* Navegación y Autenticación (sin cambios) */}
+
+          {/* Navegación y Autenticación */}
           <nav className="flex items-center space-x-1 sm:space-x-2">
+            {/* FLAG_LLM: IDs de los botones de navegación que la serpiente 'comerá' (visualmente) */}
             <LinkButton href="/" Icon={HomeIcon} isActive={true}>Inicio</LinkButton>
             <LinkButton href="/about" Icon={Info}>Nosotros</LinkButton>
             <LinkButton href="/contact" Icon={Mail}>Contacto</LinkButton>
             <div className="pl-2 sm:pl-4">
-                {isAuthLoading ? ( <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> <Loader2 className="h-4 w-4 animate-spin" /> </Button>
-                ) : isAuthenticated ? ( <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> Ir a la App </Button>
-                ) : ( <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"> Acceder </Button> )}
+                {isAuthLoading ? (
+                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> <Loader2 className="h-4 w-4 animate-spin" /> </Button>
+                ) : isAuthenticated ? (
+                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> Ir a la App </Button>
+                ) : (
+                    <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"> Acceder </Button>
+                )}
             </div>
           </nav>
         </div>
       </header>
 
-      {/* ELIMINADO: <SnakeAnimation /> */}
-
-      {/* Contenido Principal (Hero + Features) */}
-      {/* Añadido 'animate-fade-in' (definir en globals.css o usar librería) */}
-      <main className="container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center animate-fade-in opacity-0 [--animation-delay:200ms]" style={{animationFillMode: 'forwards'}}>
+      {/* Contenido Principal con animación fade-in */}
+      {/* FLAG_LLM: Añadido z-10 para asegurar que el contenido esté sobre la animación si z-index=0, o ajustar z-index de Canvas */}
+      <main className="relative z-10 container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center animate-fade-in opacity-0 [--animation-delay:200ms]" style={{animationFillMode: 'forwards'}}>
          {/* Hero Section */}
          <section className="max-w-4xl">
-             {/* Logo Atenex Integrado */}
-             <div className="mb-8 flex justify-center">
-                 <AtenexLogo width={80} height={80} className="text-primary" />
-             </div>
+            {/* Logo Atenex */}
+            <div className="mb-8 flex justify-center">
+                {/* FLAG_LLM: Se podría ocultar este logo mientras la animación está en curso si se desea */}
+                <AtenexLogoIcon width={100} height={100} className="text-primary drop-shadow-lg" />
+            </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
                 Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
             </h1>
@@ -2188,15 +2193,9 @@ export default function HomePage() {
             </p>
             {/* Botón Principal */}
             {isAuthLoading ? (
-                 <Button size="lg" disabled={true} className="w-48 shadow-md">
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando...
-                 </Button>
+                 <Button size="lg" disabled={true} className="w-48 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>
             ) : (
-              <Button
-                  size="lg"
-                  onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')}
-                  className={cn( "w-48 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg" )}
-              >
+              <Button size="lg" onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')} className={cn( "w-48 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg" )}>
                   {isAuthenticated ? 'Ir al Chat' : 'Comenzar Ahora'}
               </Button>
             )}
@@ -2207,7 +2206,7 @@ export default function HomePage() {
             )}
          </section>
 
-         {/* Features Section (sin cambios estructurales) */}
+         {/* Features Section */}
          <section className="mt-24 md:mt-32 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl w-full">
              <FeatureCard title="Búsqueda Inteligente" description="Encuentra información exacta al instante usando lenguaje natural. Olvídate de adivinar palabras clave." icon="Search"/>
              <FeatureCard title="Conocimiento Centralizado" description="Rompe los silos de información. Accede al conocimiento colectivo de tu organización en un solo lugar seguro." icon="Library"/>
@@ -2215,9 +2214,17 @@ export default function HomePage() {
          </section>
       </main>
 
-      {/* Footer (sin cambios) */}
-      <footer className="bg-muted/20 border-t border-border/60 py-6">
-        {/* ... contenido footer ... */}
+      {/* Footer */}
+      {/* FLAG_LLM: Añadido z-10 por si acaso */}
+      <footer className="relative z-10 bg-muted/20 border-t border-border/60 py-6">
+        <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+          <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+          <div className="flex gap-3">
+             <Link href="/privacy" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Política de Privacidad</Link>
+             <span className='opacity-50'>|</span>
+             <Link href="/terms" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Términos de Servicio</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );
@@ -2231,7 +2238,7 @@ function LinkButton({ href, children, Icon, isActive = false }: { href: string; 
 
 // Componente FeatureCard (sin cambios)
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   const IconComponent = iconMap[icon] || BookOpen;
+   const IconComponent = iconMap[icon] || Info; // Default icon fallback
   return ( <div className={cn( "p-6 rounded-xl bg-card/60 backdrop-blur-sm", "border border-border/60", "hover:bg-card/90 hover:shadow-lg hover:-translate-y-1", "transition-all duration-200 ease-in-out text-left" )}> <IconComponent className="w-8 h-8 mb-4 text-primary" /> <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3> <p className="text-sm text-muted-foreground leading-relaxed">{description}</p> </div> );
 }
 ```
@@ -2423,136 +2430,263 @@ export default function TermsPage() {
 
 ## File: `components\animations\snakeanimation.tsx`
 ```tsx
+// File: components/animations/snakeanimation.tsx (CORREGIDO - Error R3F Hook)
 'use client';
-import { Canvas, useFrame } from '@react-three/fiber';
+
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, Text } from '@react-three/drei';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
 
-const WORDS = [
-  { id: 'Nosotros', pos: new THREE.Vector3(-6, 3, 0) },
-  { id: 'Contacto', pos: new THREE.Vector3(5, -2, 0) },
+// --- Constantes (sin cambios) ---
+const WORDS_TO_EAT = [
+  { id: 'Inicio', pos: new THREE.Vector3(1, 5.5, 0) },
+  { id: 'Nosotros', pos: new THREE.Vector3(4, 5.5, 0) },
+  { id: 'Contacto', pos: new THREE.Vector3(7, 5.5, 0) },
 ];
+const A_SHAPE_POINTS_INITIAL = [
+  new THREE.Vector3(-1.5, -1.5, 0), new THREE.Vector3(-1.5, -0.5, 0),
+  new THREE.Vector3(-0.5, 1.5, 0),  new THREE.Vector3(0.5, 1.5, 0),
+  new THREE.Vector3(1.5, -0.5, 0), new THREE.Vector3(1.5, -1.5, 0),
+  new THREE.Vector3(0.75, 0, 0), new THREE.Vector3(-0.75, 0, 0),
+];
+const A_CURVE = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-10, -2, 0), new THREE.Vector3(-4, 3, 0),
+  new THREE.Vector3(0, -3, 0), new THREE.Vector3(4, 3, 0),
+  new THREE.Vector3(10, -2, 0), A_SHAPE_POINTS_INITIAL[0],
+  ...A_SHAPE_POINTS_INITIAL
+], false, 'catmullrom', 0.5);
+const FINAL_A_POINTS = A_CURVE.getPoints(200);
 
-// Curva para la forma de 'A'
-const A_SHAPE_POINTS = new THREE.CatmullRomCurve3([
-  new THREE.Vector3(-2, -2, 0),
-  new THREE.Vector3(0, 2, 0),
-  new THREE.Vector3(2, -2, 0),
-  new THREE.Vector3(-1, 0, 0),
-  new THREE.Vector3(1, 0, 0),
-]).getPoints(100);
+type AnimationPhase = 'roaming' | 'eating' | 'movingToA' | 'drawingA' | 'final';
 
+// --- Componente Snake (sin cambios estructurales) ---
 interface SnakeProps {
-  eaten: Set<string>;
-  onEat: (id: string) => void;
-  final: boolean;
+  eatenWords: Set<string>;
+  onWordEaten: (id: string) => void;
+  animationPhase: AnimationPhase;
+  onPhaseChange: (phase: AnimationPhase) => void;
 }
 
-function Snake({ eaten, onEat, final }: SnakeProps) {
-  const segments = useRef<THREE.Vector3[]>([]);
-  const curve = useRef(new THREE.CatmullRomCurve3([]));
-  const meshRef = useRef<THREE.Mesh>(null!);
+function Snake({ eatenWords, onWordEaten, animationPhase, onPhaseChange }: SnakeProps) {
+  const snakeSegments = useRef<THREE.Vector3[]>([]);
+  const snakeCurve = useRef<THREE.CatmullRomCurve3 | null>(null);
+  const snakeMeshRef = useRef<THREE.Mesh>(null!);
+  const headPosition = useRef(new THREE.Vector3(-15, 0, 0));
+  const animationProgress = useRef(0);
 
-  if (segments.current.length === 0) {
-    segments.current = Array.from({ length: 60 }).map(
-      (_, i) => new THREE.Vector3(-10 + i * 0.4, 0, 0)
-    );
-    curve.current.points = segments.current;
-  }
+  const snakeLength = useMemo(() => 50 + eatenWords.size * 10, [eatenWords.size]);
+
+   if (snakeSegments.current.length === 0) {
+      snakeSegments.current = Array.from({ length: snakeLength }).map(
+          (_, i) => new THREE.Vector3(-15 + i * 0.2, Math.sin(i * 0.5) * 0.5, 0)
+      );
+      snakeCurve.current = new THREE.CatmullRomCurve3(snakeSegments.current);
+      headPosition.current = snakeSegments.current[0].clone();
+   }
 
   useFrame(({ clock }) => {
-    if (final) {
-      // Dibujar forma de 'A' estática
-      segments.current = A_SHAPE_POINTS.map(p => p.clone());
-      curve.current.points = segments.current;
-    } else {
-      const t = clock.getElapsedTime() * 0.4;
-      const head = new THREE.Vector3(
-        Math.cos(t) * 8,
-        Math.sin(t * 1.2) * 4,
-        0
-      );
-      // Detectar colisiones con palabras
-      WORDS.forEach(w => {
-        if (!eaten.has(w.id) && head.distanceTo(w.pos) < 0.5) {
-          onEat(w.id);
-        }
-      });
-      // Crecer según comidas
-      const maxLen = 60 + eaten.size * 5;
-      segments.current.unshift(head);
-      if (segments.current.length > maxLen) segments.current.pop();
-      curve.current.points = segments.current;
+    if (!snakeMeshRef.current || !snakeCurve.current) return;
+
+    let targetPosition: THREE.Vector3 | null = null;
+    let currentPhase = animationPhase;
+
+    // --- Phase Logic (sin cambios) ---
+    switch (currentPhase) {
+        case 'roaming':
+        case 'eating':
+            const t = clock.getElapsedTime() * 0.5;
+            targetPosition = new THREE.Vector3(
+                Math.cos(t * 0.7) * 9 + Math.sin(t * 0.4) * 2,
+                Math.sin(t * 0.9) * 5 + Math.cos(t * 0.3) * 1.5,
+                Math.sin(t * 1.1) * 0.5
+            );
+            headPosition.current.lerp(targetPosition, 0.06);
+
+            WORDS_TO_EAT.forEach(word => {
+                if (!eatenWords.has(word.id) && headPosition.current.distanceTo(word.pos) < 1.0) {
+                    onWordEaten(word.id);
+                    if (eatenWords.size + 1 === WORDS_TO_EAT.length) {
+                        currentPhase = 'movingToA';
+                        onPhaseChange(currentPhase);
+                        animationProgress.current = 0;
+                    }
+                }
+            });
+            break;
+        case 'movingToA':
+            targetPosition = A_CURVE.getPointAt(0);
+            headPosition.current.lerp(targetPosition, 0.04);
+            if (headPosition.current.distanceTo(targetPosition) < 0.1) {
+                currentPhase = 'drawingA';
+                onPhaseChange(currentPhase);
+                animationProgress.current = 0;
+            }
+            break;
+        case 'drawingA':
+            animationProgress.current += 0.003;
+            if (animationProgress.current >= 1) {
+                animationProgress.current = 1;
+                currentPhase = 'final';
+                onPhaseChange(currentPhase);
+            }
+            const pointOnACurve = A_CURVE.getPointAt(animationProgress.current);
+            headPosition.current.copy(pointOnACurve);
+            break;
+        case 'final':
+             if (snakeSegments.current.length !== FINAL_A_POINTS.length) {
+                 snakeSegments.current = FINAL_A_POINTS;
+                 snakeCurve.current.points = snakeSegments.current;
+             }
+             targetPosition = headPosition.current;
+            break;
     }
-    const geo = new THREE.TubeGeometry(
-      curve.current,
-      60,
-      0.15 + 0.03 * Math.sin(clock.getElapsedTime() * 3),
-      8,
-      false
+
+    // --- Update Snake Geometry (sin cambios) ---
+    if (currentPhase !== 'final') {
+        snakeSegments.current.unshift(headPosition.current.clone());
+        while (snakeSegments.current.length > snakeLength) {
+            snakeSegments.current.pop();
+        }
+        snakeCurve.current.points = snakeSegments.current;
+    }
+
+    const tubeRadius = 0.12 + 0.02 * Math.sin(clock.getElapsedTime() * 5);
+    const tubeGeometry = new THREE.TubeGeometry(
+      snakeCurve.current,
+      Math.max(10, snakeSegments.current.length * 2),
+      tubeRadius, 8, false
     );
-    meshRef.current.geometry.dispose();
-    meshRef.current.geometry = geo;
+
+    if (snakeMeshRef.current.geometry) {
+        snakeMeshRef.current.geometry.dispose();
+    }
+    snakeMeshRef.current.geometry = tubeGeometry;
+    snakeMeshRef.current.geometry.computeVertexNormals();
   });
 
   return (
-    <mesh ref={meshRef} material={new THREE.MeshBasicMaterial({ color: '#fff' })}>
-      <bufferGeometry />
+    <mesh ref={snakeMeshRef}>
+      <meshStandardMaterial color="#FFFFFF" roughness={0.5} metalness={0.2} side={THREE.DoubleSide} />
+      <bufferGeometry attach="geometry" />
     </mesh>
   );
 }
 
+// --- NUEVO: Componente interno para el contenido de la escena ---
+interface SceneContentProps extends SnakeProps {
+    showFinalText: boolean;
+}
+
+function SceneContent({ eatenWords, onWordEaten, animationPhase, onPhaseChange, showFinalText }: SceneContentProps) {
+    // *** ¡El hook useThree se mueve aquí dentro! ***
+    const { size } = useThree(); // Get canvas size for aspect ratio
+
+    // Calculate camera properties based on canvas size
+    const aspect = size.width / size.height;
+    const frustumSize = 14; // Adjust this to control zoom level
+    const cameraProps = {
+      makeDefault: true, // Make this the default camera
+      left: frustumSize * aspect / -2,
+      right: frustumSize * aspect / 2,
+      top: frustumSize / 2,
+      bottom: frustumSize / -2,
+      near: 0.1,
+      far: 100,
+      position: [0, 0, 10] as [number, number, number], // Camera position Z
+    };
+
+    return (
+        <>
+            {/* Camera setup now uses calculated props */}
+            <OrthographicCamera {...cameraProps} />
+
+            {/* Lighting (sin cambios) */}
+            <ambientLight intensity={0.8} />
+            <directionalLight position={[5, 5, 8]} intensity={1.5} />
+            <directionalLight position={[-3, -2, 5]} intensity={0.5} color="#AAAAFF" />
+
+            {/* Render the Snake (pasando props) */}
+            <Snake
+                eatenWords={eatenWords}
+                onWordEaten={onWordEaten}
+                animationPhase={animationPhase}
+                onPhaseChange={onPhaseChange}
+            />
+
+            {/* Render Words to Eat (pasando props) */}
+            {animationPhase !== 'final' && WORDS_TO_EAT.map((word) =>
+                !eatenWords.has(word.id) ? (
+                <Text
+                    key={word.id}
+                    position={word.pos}
+                    fontSize={0.8}
+                    color="#D1D5DB"
+                    anchorX="center"
+                    anchorY="middle"
+                    outlineWidth={0.05}
+                    outlineColor="#374151"
+                >
+                    {word.id}
+                </Text>
+                ) : null
+            )}
+
+             {/* Render Final Atenex Text (pasando props) */}
+             {showFinalText && (
+                <Text
+                    position={[0, -2.5, 1]}
+                    fontSize={1.8}
+                    color="#FFFFFF"
+                    anchorX="center"
+                    anchorY="middle"
+                    font="/fonts/Inter-Bold.woff"
+                    outlineWidth={0.08}
+                    outlineColor="#000000"
+                >
+                    Atenex
+                </Text>
+             )}
+        </>
+    );
+}
+
+
+// --- Componente Principal SnakeAnimation (ahora más simple) ---
 export default function SnakeAnimation() {
-  const [eaten, setEaten] = useState<Set<string>>(new Set());
-  const final = eaten.size >= WORDS.length;
+  const [eatenWords, setEatenWords] = useState<Set<string>>(new Set());
+  const [phase, setPhase] = useState<AnimationPhase>('roaming');
+  const [showFinalText, setShowFinalText] = useState(false);
+  // const allWordsEaten = useMemo(() => eatenWords.size === WORDS_TO_EAT.length, [eatenWords]); // Ya no se necesita aquí directamente
 
-  // Callback para registrar palabra comida
-  const handleEat = (id: string) => {
-    setEaten(prev => new Set(prev).add(id));
-  };
+  const handleWordEaten = useCallback((id: string) => {
+    setEatenWords(prev => new Set(prev).add(id));
+  }, []);
 
-  useEffect(() => {
-    if (final) {
-      // opcional: reproducir sonido o animación al llegar al final
-    }
-  }, [final]);
+   const handlePhaseChange = useCallback((newPhase: AnimationPhase) => {
+       console.log("Animation Phase Change:", newPhase);
+       setPhase(newPhase);
+       if (newPhase === 'final') {
+           setTimeout(() => setShowFinalText(true), 500);
+       }
+   }, []);
 
   return (
     <Canvas
       style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        pointerEvents: 'none',
+        position: 'absolute', top: 0, left: 0, width: '100vw',
+        height: '100vh', zIndex: 0, pointerEvents: 'none', background: 'transparent',
       }}
+      // No necesitamos la cámara aquí, se define dentro de SceneContent
     >
-      <OrthographicCamera
-        makeDefault
-        left={-10}
-        right={10}
-        top={7}
-        bottom={-7}
-        near={0.1}
-        far={100}
-        position={[0, 0, 20]}
-      />
-      <ambientLight intensity={0.5} />
-      <Snake eaten={eaten} onEat={handleEat} final={final} />
-      {WORDS.map((w) =>
-        !eaten.has(w.id) ? (
-          <Text key={w.id} position={[w.pos.x, w.pos.y, w.pos.z]} fontSize={1} color="#facc15">
-            {w.id}
-          </Text>
-        ) : null
-      )}
-      {final && (
-        <Text position={[0, -1, 0]} fontSize={2.5} color="#fff" anchorX="center" anchorY="middle">
-          Atenex
-        </Text>
-      )}
+        {/* Renderiza el componente interno que contiene la escena */}
+        <SceneContent
+            eatenWords={eatenWords}
+            onWordEaten={handleWordEaten}
+            animationPhase={phase}
+            onPhaseChange={handlePhaseChange}
+            showFinalText={showFinalText}
+        />
     </Canvas>
   );
 }
@@ -3560,7 +3694,7 @@ export default function AtenexLogo(props: AtenexLogoProps) {
 
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog v3)
+// File: components/knowledge/document-status-list.tsx (REFACTORIZADO - Fix Superposición Tooltip/Dialog v4 - Final)
 "use client";
 
 import React from 'react';
@@ -3601,7 +3735,7 @@ export interface DocumentStatusListProps {
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
   onDeleteSuccess: (documentId: string) => void;
-  isLoading: boolean;
+  isLoading: boolean; // Indica si se están cargando más documentos
 }
 
 export function DocumentStatusList({
@@ -3614,7 +3748,6 @@ export function DocumentStatusList({
     onDeleteSuccess,
     isLoading
 }: DocumentStatusListProps) {
-  // Estado para controlar qué diálogo de confirmación está abierto (usando el ID del documento)
   const [deletingDocId, setDeletingDocId] = React.useState<string | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isRetrying, setIsRetrying] = React.useState<string | null>(null);
@@ -3660,16 +3793,8 @@ export function DocumentStatusList({
         console.log("Download requested for:", doc.document_id);
     };
 
-  // Abre el diálogo seteando el ID del documento a borrar
   const openDeleteConfirmation = (docId: string) => { setDeletingDocId(docId); };
-
-  // Cierra el diálogo reseteando el ID
-  const closeDeleteConfirmation = () => {
-      // Solo cerrar si no está en proceso de borrado para evitar cierres accidentales
-      if (!isDeleting) {
-          setDeletingDocId(null);
-      }
-  };
+  const closeDeleteConfirmation = () => { if (!isDeleting) setDeletingDocId(null); };
 
   const handleDeleteConfirmed = async () => {
     if (!deletingDocId || !authHeaders || isDeleting) return;
@@ -3682,13 +3807,13 @@ export function DocumentStatusList({
       await deleteIngestDocument(deletingDocId, authHeaders);
       onDeleteSuccess(deletingDocId);
       toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
-      closeDeleteConfirmation(); // Cierra el diálogo al éxito
+      closeDeleteConfirmation();
     } catch (e: any) {
       const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
       toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
-      // Mantenemos el dialogo abierto en caso de error
     } finally {
       setIsDeleting(false);
+      // No cerramos aquí en caso de error, para que el usuario pueda reintentar cerrar
     }
   };
 
@@ -3716,7 +3841,6 @@ export function DocumentStatusList({
                 const Icon = statusInfo.icon;
                 const isCurrentlyRetrying = isRetrying === doc.document_id;
                 const isCurrentlyRefreshing = isRefreshing === doc.document_id;
-                // Permitir abrir dialog incluso si otra acción está en curso, pero los botones del dialog estarán deshabilitados
                 const isActionDisabled = isCurrentlyRetrying || isCurrentlyRefreshing;
 
                 const dateToShow = doc.last_updated;
@@ -3725,86 +3849,87 @@ export function DocumentStatusList({
                 const displayChunks = doc.milvus_chunk_count ?? doc.chunk_count ?? '-';
 
                 return (
-                      <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
-                          <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
-                          <TableCell className="px-2 py-1.5">
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
-                                          <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
-                                          {statusInfo.text}
-                                      </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={5} className="max-w-xs break-words p-2 text-xs shadow-lg">
-                                      <p>{statusInfo.description}</p>
-                                      {doc.status === 'error' && doc.error_message && <p className='mt-1 pt-1 border-t text-destructive'>Error: {doc.error_message}</p>}
-                                  </TooltipContent>
-                              </Tooltip>
-                          </TableCell>
-                          <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
-                          <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
-                          <TableCell className="text-right space-x-1 pr-3 pl-2 py-1">
-                              {/* --- ACCIONES INDIVIDUALES CON SU TOOLTIP --- */}
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={6}><p>Descargar (N/D)</p></TooltipContent>
-                              </Tooltip>
-                              {doc.status === 'error' && (
-                                  <Tooltip delayDuration={100}>
-                                      <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
-                                  </Tooltip>
-                              )}
-                              <Tooltip delayDuration={100}>
-                                  <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
-                              </Tooltip>
+                    <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
+                        <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
+                        <TableCell className="px-2 py-1.5">
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Badge variant='outline' className={cn("border text-[11px] font-medium whitespace-nowrap py-0.5 px-1.5 cursor-default", statusInfo.className)}>
+                                        <Icon className={cn("h-3 w-3 mr-1", statusInfo.animate && "animate-spin")} />
+                                        {statusInfo.text}
+                                    </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" sideOffset={5} className="max-w-xs break-words p-2 text-xs shadow-lg">
+                                    <p>{statusInfo.description}</p>
+                                    {doc.status === 'error' && doc.error_message && <p className='mt-1 pt-1 border-t text-destructive'>Error: {doc.error_message}</p>}
+                                </TooltipContent>
+                            </Tooltip>
+                        </TableCell>
+                        <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
+                        <TableCell className="text-right space-x-1 pr-3 pl-2 py-1"> {/* Aumentar space-x a 1 */}
+                            {/* --- Tooltips individuales para cada botón de acción --- */}
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" sideOffset={6}><p>Descargar (N/D)</p></TooltipContent>
+                            </Tooltip>
+                            {doc.status === 'error' && (
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
+                                </Tooltip>
+                            )}
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
+                            </Tooltip>
 
-                              {/* AlertDialog + Tooltip para Eliminar */}
-                              <AlertDialog open={deletingDocId === doc.document_id} onOpenChange={(open) => !open && closeDeleteConfirmation()}>
-                                  <Tooltip delayDuration={100}>
-                                      <TooltipTrigger asChild>
-                                          <AlertDialogTrigger asChild>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled}>
-                                                  <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                          </AlertDialogTrigger>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
-                                  </Tooltip>
-                                  {/* Contenido del diálogo específico para esta fila */}
-                                  <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                          <AlertDialogTitle className="flex items-center gap-2">
-                                              <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
-                                          </AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                              Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
-                                              <br />
-                                              <span className="font-semibold text-foreground mt-2 block break-all">"{doc.file_name || doc.document_id}"</span>
-                                          </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                          <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                                          <AlertDialogAction
-                                              onClick={handleDeleteConfirmed}
-                                              disabled={isDeleting}
-                                              className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
-                                          >
-                                              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                                              Eliminar Permanentemente
-                                          </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                  </AlertDialogContent>
-                              </AlertDialog>
-                          </TableCell>
-                      </TableRow>
+                            {/* AlertDialog + Tooltip para Eliminar (Estructura corregida) */}
+                            <AlertDialog open={deletingDocId === doc.document_id} onOpenChange={(open) => !open && closeDeleteConfirmation()}>
+                                <Tooltip delayDuration={100}>
+                                    <TooltipTrigger asChild>
+                                         {/* AlertDialogTrigger ahora es el hijo directo de TooltipTrigger */}
+                                         <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" aria-label="Eliminar documento" disabled={isActionDisabled}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                         </AlertDialogTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
+                                </Tooltip>
+                                {/* El contenido del diálogo asociado */}
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle className="flex items-center gap-2">
+                                            <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
+                                            <br />
+                                            <span className="font-semibold text-foreground mt-2 block break-all">"{doc.file_name || doc.document_id}"</span>
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={handleDeleteConfirmed}
+                                            disabled={isDeleting}
+                                            className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
+                                        >
+                                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                                            Eliminar Permanentemente
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </TableCell>
+                    </TableRow>
                 );
               })}
             </TableBody>
