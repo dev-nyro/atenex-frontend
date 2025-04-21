@@ -1,4 +1,4 @@
-// File: app/page.tsx (MODIFICADO - Iteración 2: Contenido Landing)
+// File: app/page.tsx
 "use client";
 
 import React from 'react';
@@ -74,9 +74,10 @@ export default function HomePage() {
 
   return (
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
-      {/* --- Header (sin cambios) --- */}
+      {/* --- Header --- */}
       <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
-        <div className="container flex items-center justify-between h-16 px-4 md:px-6">
+        {/* FLAG_LLM: Añadido container y mx-auto al div interior para centrar el header */}
+        <div className="container mx-auto flex items-center justify-between h-16 px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" aria-label={`${APP_NAME} - Inicio`}>
              <AtenexLogoIcon className="h-7 w-auto" />
             <span className='font-bold'>{APP_NAME}</span>
@@ -95,60 +96,56 @@ export default function HomePage() {
       </header>
 
       {/* --- Contenido Principal --- */}
-      {/* Añadidos py-16 md:py-24 para más espacio vertical entre secciones */}
       <main className="flex-1 flex flex-col items-center text-center animate-fade-in opacity-0 [--animation-delay:200ms]" style={{animationFillMode: 'forwards'}}>
 
-         {/* --- Hero Section (Modificada levemente) --- */}
-         {/* Padding ajustado */}
-         <section className="w-full max-w-4xl pt-16 pb-16 md:pt-24 md:pb-20 px-4">
-            <div className="mb-8 flex justify-center">
-                <AtenexLogoIcon className="h-24 w-auto text-primary drop-shadow-lg" />
+         {/* --- Hero Section --- */}
+         <section className="w-full pt-16 pb-16 md:pt-24 md:pb-20 px-4">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el contenido hero */}
+            <div className="container mx-auto max-w-4xl">
+                <div className="mb-8 flex justify-center">
+                    <AtenexLogoIcon className="h-24 w-auto text-primary drop-shadow-lg" />
+                </div>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
+                    Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
+                </h1>
+                <h2 className="text-xl sm:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto">
+                    La IA que conecta a tu equipo con la información crucial de tus documentos, al instante.
+                </h2>
+                <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+                    Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    {isAuthLoading ? ( <Button size="lg" disabled={true} className="w-full sm:w-auto px-8 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>)
+                     : ( <Button size="lg" onClick={mainCtaAction} className={cn("w-full sm:w-auto px-8 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg")}> {mainCtaText} <ChevronRight className='ml-1 h-5 w-5'/> </Button> )}
+                </div>
+                {!isAuthenticated && !isAuthLoading && ( <p className="text-xs text-muted-foreground mt-6"> ¿Ya tienes cuenta?{' '} <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4"> Inicia Sesión </Link> </p> )}
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
-                Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
-            </h1>
-            <h2 className="text-xl sm:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto">
-                La IA que conecta a tu equipo con la información crucial de tus documentos, al instante.
-            </h2>
-            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
-                Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                {isAuthLoading ? ( <Button size="lg" disabled={true} className="w-full sm:w-auto px-8 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>)
-                 : ( <Button size="lg" onClick={mainCtaAction} className={cn("w-full sm:w-auto px-8 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg")}> {mainCtaText} <ChevronRight className='ml-1 h-5 w-5'/> </Button> )}
-                 {/* Enlace secundario podría ir aquí */}
-            </div>
-            {!isAuthenticated && !isAuthLoading && ( <p className="text-xs text-muted-foreground mt-6"> ¿Ya tienes cuenta?{' '} <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4"> Inicia Sesión </Link> </p> )}
          </section>
          {/* --- FIN Hero Section --- */}
 
-         {/* --- Social Proof Section (NUEVA) --- */}
+         {/* --- Social Proof Section --- */}
          <section className="w-full py-12 md:py-16 bg-gradient-to-b from-background to-muted/20 dark:to-muted/10 border-y">
-            <div className="container max-w-5xl px-4">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el contenido de social proof */}
+            <div className="container mx-auto max-w-5xl px-4">
                  <h3 className="text-center text-lg font-semibold text-muted-foreground tracking-wider uppercase mb-8">
                     Impulsando Empresas Como la Tuya
                  </h3>
-                 {/* Logos Placeholder */}
                  <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4 opacity-70">
                     {trustedLogos.map(logo => (
                         <span key={logo.name} className="text-sm font-medium text-muted-foreground italic" title={logo.name}>
-                            {logo.name} {/* Reemplazar con <Image> si hay logos */}
+                            {logo.name}
                         </span>
                     ))}
                  </div>
-                 {/* Testimonios (Placeholder)
-                 <div className="mt-12 max-w-2xl mx-auto text-center italic text-muted-foreground">
-                    "Atenex ha transformado cómo accedemos a nuestra documentación interna. ¡Imprescindible!" - CEO, Empresa Ficticia
-                 </div>
-                 */}
             </div>
          </section>
          {/* --- FIN Social Proof --- */}
 
 
-         {/* --- Cómo Funciona Section (NUEVA) --- */}
+         {/* --- Cómo Funciona Section --- */}
          <section className="w-full py-16 md:py-24 px-4">
-             <div className="container max-w-4xl text-center">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el contenido de cómo funciona */}
+             <div className="container mx-auto max-w-4xl text-center">
                 <h2 className="text-3xl font-bold tracking-tight mb-4">Atenex en Acción</h2>
                 <p className="text-lg text-muted-foreground mb-12">De documentos dispersos a decisiones informadas en 4 simples pasos.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
@@ -167,13 +164,12 @@ export default function HomePage() {
          {/* --- FIN Cómo Funciona --- */}
 
 
-         {/* --- Features Section (Refinada Descripción) --- */}
+         {/* --- Features Section --- */}
          <section className="w-full py-16 md:py-24 px-4 bg-muted/20 dark:bg-muted/10 border-y">
-             <div className="container max-w-6xl">
-                {/* Título opcional para la sección de features si se desea */}
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar las features */}
+             <div className="container mx-auto max-w-6xl">
                  <h2 className="text-3xl font-bold tracking-tight text-center mb-12">Potencia Tu Inteligencia Empresarial</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                    {/* Descripciones refinadas */}
                     <FeatureCard title="Búsqueda Inteligente" description="Encuentra información exacta al instante usando lenguaje natural, ahorrando horas de búsqueda manual y frustración." icon="Search"/>
                     <FeatureCard title="Conocimiento Centralizado" description="Rompe los silos de información accediendo al conocimiento colectivo en un solo lugar seguro, eliminando la duplicidad de esfuerzos." icon="Library"/>
                     <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo con acceso rápido a datos relevantes, acelerando la incorporación y permitiendo decisiones más rápidas." icon="Zap"/>
@@ -183,9 +179,10 @@ export default function HomePage() {
          {/* --- FIN Features Section --- */}
 
 
-         {/* --- Casos de Uso Section (NUEVA) --- */}
+         {/* --- Casos de Uso Section --- */}
          <section className="w-full py-16 md:py-24 px-4">
-             <div className="container max-w-6xl">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar los casos de uso */}
+             <div className="container mx-auto max-w-6xl">
                  <h2 className="text-3xl font-bold tracking-tight text-center mb-4">Ideal Para Cada Departamento</h2>
                  <p className="text-lg text-muted-foreground text-center mb-12 max-w-2xl mx-auto">Desde RRHH hasta I+D, Atenex se adapta a las necesidades específicas de tu equipo.</p>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -198,9 +195,10 @@ export default function HomePage() {
          {/* --- FIN Casos de Uso --- */}
 
 
-         {/* --- Seguridad Section (NUEVA) --- */}
+         {/* --- Seguridad Section --- */}
          <section className="w-full py-16 md:py-24 px-4 bg-muted/20 dark:bg-muted/10 border-y">
-             <div className="container max-w-4xl text-center">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar la sección de seguridad */}
+             <div className="container mx-auto max-w-4xl text-center">
                  <h2 className="text-3xl font-bold tracking-tight mb-4">Seguridad y Confianza en el Núcleo</h2>
                  <p className="text-lg text-muted-foreground mb-12">Tu información es tu activo más valioso. La protegemos como si fuera nuestra.</p>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
@@ -219,9 +217,10 @@ export default function HomePage() {
          {/* --- FIN Seguridad --- */}
 
 
-         {/* --- CTA Final Section (NUEVA) --- */}
+         {/* --- CTA Final Section --- */}
          <section className="w-full py-16 md:py-24 px-4">
-            <div className="container max-w-3xl text-center">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el CTA final */}
+            <div className="container mx-auto max-w-3xl text-center">
                  <h2 className="text-3xl font-bold tracking-tight mb-4">¿Listo para Potenciar tu Conocimiento Interno?</h2>
                  <p className="text-lg text-muted-foreground mb-8">Descubre cómo Atenex puede transformar el acceso a la información en tu empresa.</p>
                   {/* Repetir CTA Principal */}
@@ -239,9 +238,10 @@ export default function HomePage() {
       {/* --- FIN Contenido Principal --- */}
 
 
-      {/* --- Footer (Actualizado Crédito) --- */}
+      {/* --- Footer --- */}
       <footer className="bg-muted/20 border-t border-border/60 py-6 mt-auto">
-        <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+         {/* FLAG_LLM: Añadido container y mx-auto al div interior para centrar el footer */}
+        <div className="container mx-auto text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-center">
               <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
               <span className="hidden sm:inline-block opacity-50">|</span>

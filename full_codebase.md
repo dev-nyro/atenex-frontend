@@ -1392,7 +1392,7 @@ export default function LoginPage() {
 "use client";
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
