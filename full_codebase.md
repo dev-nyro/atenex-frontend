@@ -2119,7 +2119,6 @@ import { cn } from '@/lib/utils';
 import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap } from 'lucide-react';
 import Link from 'next/link';
 import AtenexLogoIcon from '@/components/icons/atenex-logo'; // Renombrado para claridad vs componente
-import SnakeAnimation from '@/components/animations/snakeanimation'; // <-- IMPORTAR ANIMACIÓN
 
 // Mapeo de iconos
 const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
@@ -2139,9 +2138,6 @@ export default function HomePage() {
   return (
     // FLAG_LLM: Añadido 'relative' al contenedor principal para que la animación absoluta se posicione correctamente
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
-      {/* FLAG_LLM: Renderizar la animación como overlay */}
-      <SnakeAnimation />
-
       {/* Header específico de la Landing Page */}
       <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
@@ -3694,7 +3690,7 @@ export default function AtenexLogo(props: AtenexLogoProps) {
 
 ## File: `components\knowledge\document-status-list.tsx`
 ```tsx
-// File: components/knowledge/document-status-list.tsx (CORREGIDO - Validación ID indefinido)
+// File: components/knowledge/document-status-list.tsx (CORREGIDO - Usa document_id consistentemente)
 "use client";
 
 import React from 'react';
@@ -3706,6 +3702,7 @@ import {
     AlertCircle, Loader2, RefreshCw, Trash2, Info,
     FileClock, FileCheck2, FileX2, FileQuestion, Download, AlertTriangle // Iconos
 } from 'lucide-react';
+// FLAG_LLM: Importa la interfaz correcta con document_id
 import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument, retryIngestDocument } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -3725,6 +3722,7 @@ const statusMap: { [key: string]: { icon: React.ComponentType<{ className?: stri
     default:    { icon: FileQuestion, text: 'Desconocido', className: 'text-gray-600 bg-gray-100 border-gray-200 dark:text-gray-400 dark:bg-gray-700/30 dark:border-gray-600', animate: false, description: "Estado no reconocido." }
 };
 
+// FLAG_LLM: Renombrado para claridad, usa la interfaz de frontend
 type DocumentStatus = DocumentStatusResponse;
 
 export interface DocumentStatusListProps {
@@ -3735,7 +3733,7 @@ export interface DocumentStatusListProps {
   hasMore: boolean;
   refreshDocument: (documentId: string) => void;
   onDeleteSuccess: (documentId: string) => void;
-  isLoading: boolean; // Indica si se están cargando más documentos
+  isLoading: boolean;
 }
 
 export function DocumentStatusList({
@@ -3753,100 +3751,51 @@ export function DocumentStatusList({
   const [isRetrying, setIsRetrying] = React.useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = React.useState<string | null>(null);
 
-  // --- Handlers (Añadidas validaciones de documentId) ---
+  // --- Handlers (con validaciones, usan document_id) ---
   const handleRetry = async (documentId: string, fileName?: string | null) => {
-    // FLAG_LLM: Validar que documentId sea una cadena válida antes de proceder
-    if (!documentId || typeof documentId !== 'string') {
-        console.error("Error: Se intentó reintentar con un ID de documento inválido:", documentId);
-        toast.error("Error Interno", { description: "No se puede reintentar: ID de documento faltante." });
-        return;
-    }
+    if (!documentId || typeof documentId !== 'string') { console.error("Error: ID de documento inválido para reintento:", documentId); toast.error("Error Interno", { description: "ID de documento faltante." }); return; }
     if (!authHeaders || isRetrying) return;
-
-    const displayId = fileName || documentId.substring(0, 8) + "...";
-    setIsRetrying(documentId);
+    const displayId = fileName || documentId.substring(0, 8) + "..."; setIsRetrying(documentId);
     const toastId = toast.loading(`Reintentando ingesta para "${displayId}"...`);
-    try {
-      await retryIngestDocument(documentId, authHeaders);
-      toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` });
-      onRetrySuccess(documentId);
-    } catch (error: any) {
-      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-      toast.error("Error al Reintentar", { id: toastId, description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}` });
-    } finally {
-      setIsRetrying(null);
-    }
+    try { await retryIngestDocument(documentId, authHeaders); toast.success("Reintento Iniciado", { id: toastId, description: `El documento "${displayId}" se está procesando de nuevo.` }); onRetrySuccess(documentId); }
+    catch (error: any) { const errorMsg = error instanceof Error ? error.message : 'Error desconocido'; toast.error("Error al Reintentar", { id: toastId, description: `No se pudo reintentar la ingesta para "${displayId}": ${errorMsg}` }); }
+    finally { setIsRetrying(null); }
   };
 
   const handleRefresh = async (documentId: string, fileName?: string | null) => {
-    // FLAG_LLM: Validar que documentId sea una cadena válida antes de proceder
-    if (!documentId || typeof documentId !== 'string') {
-        console.error("Error: Se intentó refrescar con un ID de documento inválido:", documentId);
-        toast.error("Error Interno", { description: "No se puede refrescar: ID de documento faltante." });
-        return;
-    }
+    if (!documentId || typeof documentId !== 'string') { console.error("Error: ID de documento inválido para refrescar:", documentId); toast.error("Error Interno", { description: "ID de documento faltante." }); return; }
     if (isRefreshing) return;
-
-    const displayId = fileName || documentId.substring(0, 8) + "...";
-    setIsRefreshing(documentId);
-    toast.info(`Actualizando estado de "${displayId}"...`, {id: `refresh-${documentId}`});
-    try {
-        await refreshDocument(documentId); // refreshDocument ya debería tener su propia validación o manejo
-        toast.success("Estado Actualizado", { id: `refresh-${documentId}`, description: `Se actualizó el estado de "${displayId}".` });
-    } catch (error) {
-        toast.error("Error al Actualizar", { id: `refresh-${documentId}`, description: `No se pudo actualizar el estado de "${displayId}".` });
-        // No limpiar toast en error para que el usuario vea el mensaje
-    } finally {
-        setIsRefreshing(null);
-    }
+    const displayId = fileName || documentId.substring(0, 8) + "..."; setIsRefreshing(documentId);
+    const toastId = toast.info(`Actualizando estado de "${displayId}"...`); // Usar toastId para actualizar
+    try { await refreshDocument(documentId); toast.success("Estado Actualizado", { id: toastId, description: `Se actualizó el estado de "${displayId}".` }); } // Actualizar toast
+    catch (error) { toast.error("Error al Actualizar", { id: toastId, description: `No se pudo actualizar el estado de "${displayId}".` }); } // Actualizar toast en error
+    finally { setIsRefreshing(null); }
   };
 
     const handleDownload = (doc: DocumentStatus) => {
-        // FLAG_LLM: Validar document_id antes de mostrar toast
-        if (!doc || !doc.document_id) {
-             console.error("Error: Se intentó descargar con datos de documento inválidos:", doc);
-             toast.error("Error Interno", { description: "No se puede descargar: información del documento incompleta." });
-             return;
-        }
-        toast.info("Descarga No Implementada", {
-            description: `La funcionalidad para descargar "${doc.file_name || doc.document_id}" aún no está disponible.`
-        });
+        if (!doc || !doc.document_id) { console.error("Error: datos de documento inválidos para descarga:", doc); toast.error("Error Interno", { description: "Información del documento incompleta." }); return; }
+        toast.info("Descarga No Implementada", { description: `La funcionalidad para descargar "${doc.file_name || doc.document_id}" aún no está disponible.` });
         console.log("Download requested for:", doc.document_id);
     };
 
   const openDeleteConfirmation = (docId: string) => {
-       // FLAG_LLM: Validar que docId sea una cadena válida antes de abrir el diálogo
-       if (!docId || typeof docId !== 'string') {
-          console.error("Error: Se intentó abrir confirmación de eliminación con ID inválido:", docId);
-          toast.error("Error Interno", { description: "No se puede eliminar: ID de documento faltante." });
-          return;
-       }
+       if (!docId || typeof docId !== 'string') { console.error("Error: ID inválido para confirmación de eliminación:", docId); toast.error("Error Interno", { description: "ID de documento faltante." }); return; }
        setDeletingDocId(docId);
     };
   const closeDeleteConfirmation = () => { if (!isDeleting) setDeletingDocId(null); };
 
   const handleDeleteConfirmed = async () => {
-    if (!deletingDocId || !authHeaders || isDeleting) return; // deletingDocId ya fue validado en openDeleteConfirmation
+    if (!deletingDocId || !authHeaders || isDeleting) return;
+    // FLAG_LLM: Buscar usando document_id
     const docToDelete = documents.find(d => d.document_id === deletingDocId);
     const display = docToDelete?.file_name || deletingDocId.substring(0, 8) + '...';
-
-    setIsDeleting(true);
-    const toastId = toast.loading(`Eliminando "${display}"...`);
-    try {
-      await deleteIngestDocument(deletingDocId, authHeaders); // deleteIngestDocument debe validar internamente
-      onDeleteSuccess(deletingDocId);
-      toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
-      closeDeleteConfirmation(); // Cerrar diálogo al éxito
-    } catch (e: any) {
-      const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
-      toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
-      // No cerrar dialogo automáticamente en error para permitir reintento o cancelación manual
-    } finally {
-      setIsDeleting(false);
-    }
+    setIsDeleting(true); const toastId = toast.loading(`Eliminando "${display}"...`);
+    try { await deleteIngestDocument(deletingDocId, authHeaders); onDeleteSuccess(deletingDocId); toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` }); closeDeleteConfirmation(); }
+    catch (e: any) { const errorMsg = e instanceof Error ? e.message : 'Error desconocido'; toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` }); }
+    finally { setIsDeleting(false); }
   };
 
-  // --- Renderizado (sin cambios estructurales, solo llamadas a handlers validados) ---
+  // --- Renderizado ---
   if (!isLoading && documents.length === 0) {
     return ( <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 border-2 border-dashed rounded-lg bg-muted/30 mt-4 min-h-[150px]"> <Info className="h-8 w-8 mb-3 opacity-50"/> <p className="text-sm font-medium mb-1">Sin Documentos</p> <p className="text-xs">Aún no se han subido documentos.</p> </div> );
   }
@@ -3866,10 +3815,13 @@ export function DocumentStatusList({
             </TableHeader>
             <TableBody>
               {documents.map((doc) => {
-                // FLAG_LLM: Comprobar si el doc o su ID es inválido antes de renderizar la fila
+                 // FLAG_LLM: Comprobar document_id que es el esperado por el frontend
                 if (!doc || !doc.document_id) {
-                    console.warn("Se encontró un documento inválido en la lista, omitiendo renderizado:", doc);
-                    return null; // O renderizar una fila de error específica
+                    // No mostrar el warning en producción, solo omitir
+                    if (process.env.NODE_ENV === 'development') {
+                         console.warn("Documento inválido (sin document_id) omitido:", doc);
+                    }
+                    return null;
                 }
 
                 const statusInfo = statusMap[doc.status] || statusMap.default;
@@ -3878,12 +3830,13 @@ export function DocumentStatusList({
                 const isCurrentlyRefreshing = isRefreshing === doc.document_id;
                 const isActionDisabled = isCurrentlyRetrying || isCurrentlyRefreshing;
 
-                const dateToShow = doc.last_updated;
+                const dateToShow = doc.last_updated; // Usar last_updated que viene mapeado
                 const displayDate = dateToShow ? new Date(dateToShow).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short'}) : 'N/D';
                 const displayFileName = doc.file_name || `ID: ${doc.document_id.substring(0, 12)}...`;
                 const displayChunks = doc.milvus_chunk_count ?? doc.chunk_count ?? '-';
 
                 return (
+                    // FLAG_LLM: Usar doc.document_id como key
                     <TableRow key={doc.document_id} className="group hover:bg-accent/30 data-[state=selected]:bg-accent">
                         <TableCell className="font-medium text-foreground/90 max-w-[150px] sm:max-w-xs lg:max-w-sm xl:max-w-md truncate pl-3 pr-2 py-1.5" title={displayFileName}>{displayFileName}</TableCell>
                         <TableCell className="px-2 py-1.5">
@@ -3902,8 +3855,7 @@ export function DocumentStatusList({
                         </TableCell>
                         <TableCell className="text-center text-muted-foreground text-xs px-2 py-1.5 hidden sm:table-cell">{displayChunks}</TableCell>
                         <TableCell className="text-muted-foreground text-xs px-2 py-1.5 hidden md:table-cell">{displayDate}</TableCell>
-                        <TableCell className="text-right space-x-1 pr-3 pl-2 py-1"> {/* Aumentar space-x a 1 */}
-                            {/* --- Tooltips individuales para cada botón de acción --- */}
+                        <TableCell className="text-right space-x-1 pr-3 pl-2 py-1">
                             <Tooltip delayDuration={100}>
                                 <TooltipTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleDownload(doc)} aria-label="Descargar documento original" disabled={isActionDisabled || !doc.minio_exists}> <Download className="h-4 w-4" /> </Button>
@@ -3913,6 +3865,7 @@ export function DocumentStatusList({
                             {doc.status === 'error' && (
                                 <Tooltip delayDuration={100}>
                                     <TooltipTrigger asChild>
+                                        {/* FLAG_LLM: Pasar doc.document_id */}
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30" onClick={() => handleRetry(doc.document_id, doc.file_name)} aria-label="Reintentar ingesta" disabled={isActionDisabled}> {isCurrentlyRetrying ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" sideOffset={6}><p>Reintentar</p></TooltipContent>
@@ -3920,18 +3873,16 @@ export function DocumentStatusList({
                             )}
                             <Tooltip delayDuration={100}>
                                 <TooltipTrigger asChild>
+                                     {/* FLAG_LLM: Pasar doc.document_id */}
                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-accent" onClick={() => handleRefresh(doc.document_id, doc.file_name)} aria-label="Actualizar estado" disabled={isActionDisabled}> {isCurrentlyRefreshing ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />} </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" sideOffset={6}><p>Actualizar Estado</p></TooltipContent>
                             </Tooltip>
-
-                            {/* AlertDialog + Tooltip para Eliminar (Estructura corregida) */}
-                             {/* Usamos el ID validado 'doc.document_id' aquí */}
                             <AlertDialog open={deletingDocId === doc.document_id} onOpenChange={(open) => !open && closeDeleteConfirmation()}>
                                 <Tooltip delayDuration={100}>
                                     <TooltipTrigger asChild>
-                                         {/* AlertDialogTrigger ahora es el hijo directo de TooltipTrigger */}
                                          <AlertDialogTrigger asChild>
+                                             {/* FLAG_LLM: Pasar doc.document_id */}
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/80 hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); openDeleteConfirmation(doc.document_id); }} aria-label="Eliminar documento" disabled={isActionDisabled}>
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -3939,25 +3890,19 @@ export function DocumentStatusList({
                                     </TooltipTrigger>
                                     <TooltipContent side="top" sideOffset={6}><p>Eliminar</p></TooltipContent>
                                 </Tooltip>
-                                {/* El contenido del diálogo asociado */}
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
                                         <AlertDialogTitle className="flex items-center gap-2">
                                             <AlertTriangle className="h-5 w-5 text-destructive"/> ¿Confirmar Eliminación?
                                         </AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados:
-                                            <br />
+                                            Esta acción no se puede deshacer. Se eliminará permanentemente el documento y todos sus datos asociados: <br />
                                             <span className="font-semibold text-foreground mt-2 block break-all">"{doc.file_name || doc.document_id}"</span>
                                         </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel onClick={closeDeleteConfirmation} disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={handleDeleteConfirmed}
-                                            disabled={isDeleting}
-                                            className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
-                                        >
+                                        <AlertDialogAction onClick={handleDeleteConfirmed} disabled={isDeleting} className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}>
                                             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                                             Eliminar Permanentemente
                                         </AlertDialogAction>
@@ -3971,10 +3916,7 @@ export function DocumentStatusList({
             </TableBody>
           </Table>
         </div>
-
-        {/* Botón Cargar Más */}
         {hasMore && ( <div className="pt-6 text-center"> <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}> {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Cargar más documentos </Button> </div> )}
-
       </TooltipProvider>
   );
 }
@@ -4576,15 +4518,14 @@ function AlertDialogPortal({
   )
 }
 
-function AlertDialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
+function AlertDialogOverlay({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
   return (
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        // FLAG_LLM: z-index alto
+        "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm", // Fondo más oscuro y blur
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -4592,17 +4533,17 @@ function AlertDialogOverlay({
   )
 }
 
-function AlertDialogContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          // FLAG_LLM: Fondo opaco (bg-background), borde, sombra y z-index alto
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200",
+          "rounded-lg", // Asegurar redondeo
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
           className
         )}
         {...props}
@@ -5197,43 +5138,28 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-function DropdownMenu({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
 }
 
-function DropdownMenuPortal({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
-  return (
-    <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
-  )
+function DropdownMenuPortal({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
+  return <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
 
-function DropdownMenuTrigger({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
-  return (
-    <DropdownMenuPrimitive.Trigger
-      data-slot="dropdown-menu-trigger"
-      {...props}
-    />
-  )
+function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
+  return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" className="focus:outline-none" {...props} /> // Añadido focus:outline-none
 }
 
-function DropdownMenuContent({
-  className,
-  sideOffset = 4,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
+          // FLAG_LLM: Asegurar fondo opaco, borde y sombra; z-index alto
+          "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className
         )}
         {...props}
@@ -5901,7 +5827,7 @@ export { Textarea }
 
 ## File: `components\ui\tooltip.tsx`
 ```tsx
-// File: components/ui/tooltip.tsx (MODIFICADO - Iteración 3)
+// File: components/ui/tooltip.tsx (CORREGIDO - Estilos visuales)
 "use client"
 
 import * as React from "react"
@@ -5909,61 +5835,37 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
 import { cn } from "@/lib/utils"
 
-function TooltipProvider({
-  delayDuration = 0,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return (
-    <TooltipPrimitive.Provider
-      data-slot="tooltip-provider"
-      delayDuration={delayDuration}
-      {...props}
-    />
-  )
+function TooltipProvider({ delayDuration = 0, ...props }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delayDuration={delayDuration} {...props} />
 }
 
-function Tooltip({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return (
-    // No necesitamos un Provider anidado aquí si ya se usa en ChatMessage
-    // <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    // </TooltipProvider>
-  )
+function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
-function TooltipTrigger({
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
 }
 
-function TooltipContent({
-  className,
-  sideOffset = 4, // Aumentar ligeramente el offset
-  children,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+function TooltipContent({ className, sideOffset = 4, children, ...props }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          // Cambiado a popover para consistencia con otros menús flotantes
-          "bg-popover text-popover-foreground border shadow-md", // Añadido borde y sombra
+          // FLAG_LLM: Asegurar fondo opaco (bg-popover), borde, sombra y z-index alto
+          "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md",
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-2 text-xs", // Ajustado padding y tamaño de texto
-          "text-balance", // Mejorar balance de texto si es largo
+          "text-balance",
           className
         )}
         {...props}
       >
         {children}
-        {/* La flecha puede quitarse para un look más limpio o estilizarse diferente */}
-        {/* <TooltipPrimitive.Arrow className="fill-popover border-t border-l border-popover z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" /> */}
+        {/* TooltipArrow opcional si se desea */}
+        {/* <TooltipPrimitive.Arrow className="fill-popover" /> */}
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )
@@ -6114,193 +6016,121 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: lib/api.ts (CORREGIDO - Ruta Delete y validaciones ID)
+// File: lib/api.ts (CORREGIDO - Mapeo ID en getDocumentStatusList, validaciones)
 // Purpose: Centralized API request function and specific API call definitions.
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
 
-// --- Tipos de Error ---
-interface ApiErrorDataDetail {
-    msg: string;
-    type: string;
-    loc?: (string | number)[];
-}
-interface ApiErrorData {
-    detail?: string | ApiErrorDataDetail[] | any;
-    message?: string; // Campo alternativo común para mensajes de error
-}
+// --- Tipos de Error (sin cambios) ---
+interface ApiErrorDataDetail { msg: string; type: string; loc?: (string | number)[]; }
+interface ApiErrorData { detail?: string | ApiErrorDataDetail[] | any; message?: string; }
 export class ApiError extends Error {
-    status: number;
-    data?: ApiErrorData;
-
+    status: number; data?: ApiErrorData;
     constructor(message: string, status: number, data?: ApiErrorData) {
-        super(message);
-        this.name = 'ApiError';
-        this.status = status;
-        this.data = data;
+        super(message); this.name = 'ApiError'; this.status = status; this.data = data;
         Object.setPrototypeOf(this, ApiError.prototype);
     }
 }
 
-// --- Función Genérica de Request ---
-/**
- * Realiza una solicitud a la API Gateway.
- * Maneja la URL base, token de autenticación, headers y errores comunes.
- * @param endpoint Ruta del endpoint (ej. '/api/v1/ingest/status')
- * @param options Opciones de Fetch API (method, body, etc.)
- * @returns Promise<T> La respuesta parseada como JSON o null si es 204.
- * @throws {ApiError} Si la respuesta no es OK (status >= 400) o hay otros errores.
- */
-export async function request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-): Promise<T> {
+// --- Función Genérica de Request (sin cambios estructurales) ---
+export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-
-    // Validar formato del endpoint (debe empezar con /api/v1/)
-    // FLAG_LLM: Permitir /api/v1/docs y /openapi.json para documentación autogenerada
     if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
         console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/ (or be /api/v1/docs, /openapi.json)`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
-
-    // Obtener URL del API Gateway
     let apiUrl: string;
-    try {
-        apiUrl = `${getApiGatewayUrl()}${cleanEndpoint}`;
-    } catch (err) {
-        console.error("API Request failed: Could not get API Gateway URL.", err);
+    try { apiUrl = `${getApiGatewayUrl()}${cleanEndpoint}`; } catch (err) {
         const message = err instanceof Error ? err.message : "API Gateway URL configuration error.";
-        throw new ApiError(message, 500);
+        console.error("API Request failed: Could not get API Gateway URL.", err); throw new ApiError(message, 500);
     }
-
-    // Obtener token de autenticación si está disponible
-    let token: string | null = null;
-    if (typeof window !== 'undefined') {
-        token = localStorage.getItem(AUTH_TOKEN_KEY);
-    } else {
-        // Advertir si se ejecuta en contexto de servidor (no debería para llamadas protegidas)
-        // console.warn(`API Request: localStorage not available for ${cleanEndpoint} (SSR/Server Context?). Cannot get auth token.`);
-    }
-
-    // Configurar Headers
-    const headers = new Headers(options.headers || {});
-    headers.set('Accept', 'application/json');
-    // Header especial para evitar advertencia de Ngrok (si se usa)
-    if (apiUrl.includes("ngrok-free.app")) {
-        headers.set('ngrok-skip-browser-warning', 'true');
-    }
-    // Establecer Content-Type a JSON por defecto, excepto para FormData
-    if (!(options.body instanceof FormData)) {
-        if (!headers.has('Content-Type')) {
-             headers.set('Content-Type', 'application/json');
-        }
-    } else {
-        // Dejar que el navegador establezca Content-Type para FormData (incluye boundary)
-        headers.delete('Content-Type');
-    }
-    // Añadir token de autorización si existe
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    } else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
-        // Advertir si se llama a endpoint protegido sin token (excepto login y docs)
-        console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
-    }
-
-    // Configuración final de la solicitud
-    const config: RequestInit = {
-        ...options,
-        headers,
-    };
-
-    // Loggear la solicitud (útil para depuración)
-    // console.log(`API Request: ${config.method || 'GET'} ${apiUrl}`);
-
+    let token: string | null = null; if (typeof window !== 'undefined') { token = localStorage.getItem(AUTH_TOKEN_KEY); }
+    const headers = new Headers(options.headers || {}); headers.set('Accept', 'application/json');
+    if (apiUrl.includes("ngrok-free.app")) { headers.set('ngrok-skip-browser-warning', 'true'); }
+    if (!(options.body instanceof FormData)) { if (!headers.has('Content-Type')) { headers.set('Content-Type', 'application/json'); } } else { headers.delete('Content-Type'); }
+    if (token) { headers.set('Authorization', `Bearer ${token}`); }
+    else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') { console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`); }
+    const config: RequestInit = { ...options, headers };
     try {
-        // Realizar la solicitud Fetch
         const response = await fetch(apiUrl, config);
-
-        // --- Manejo de Respuestas ---
-
-        // Si la respuesta NO es OK (status >= 400)
         if (!response.ok) {
-            let errorData: ApiErrorData | null = null;
-            let errorText = '';
-            const contentType = response.headers.get('content-type');
-
-            // Intentar parsear el cuerpo del error (JSON o Texto)
-            try {
-                if (contentType && contentType.includes('application/json')) {
-                    errorData = await response.json();
-                } else { errorText = await response.text(); }
-            } catch (parseError) {
-                 console.warn(`API Request: Could not parse error response body for ${response.status} ${response.statusText} from ${apiUrl}`, parseError);
-                 try { errorText = await response.text(); } catch {} // Intenta leer como texto si falla JSON
-            }
-
-            // Construir mensaje de error significativo
+            let errorData: ApiErrorData | null = null; let errorText = ''; const contentType = response.headers.get('content-type');
+            try { if (contentType && contentType.includes('application/json')) { errorData = await response.json(); } else { errorText = await response.text(); } }
+            catch (parseError) { console.warn(`API Request: Could not parse error response body for ${response.status} ${response.statusText} from ${apiUrl}`, parseError); try { errorText = await response.text(); } catch {}}
             let errorMessage = `API Error (${response.status})`;
             if (errorData) {
-                if (typeof errorData.detail === 'string') { // FastAPI a veces usa string
-                    errorMessage = errorData.detail;
-                } else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') { // FastAPI validation errors
-                    errorMessage = errorData.detail.map(d => `${d.loc ? d.loc.join('.')+': ' : ''}${d.msg}`).join('; ');
-                } else if (typeof errorData.message === 'string') { // Otros formatos
-                    errorMessage = errorData.message;
-                } else {
-                   // Si el detail es un objeto pero no con 'msg' (ej. error genérico de Starlette/FastAPI)
-                   errorMessage = JSON.stringify(errorData.detail).substring(0, 200);
-                }
-            } else if (errorText) { // Si no hubo JSON o falló, usar texto
-                errorMessage = errorText.substring(0, 200); // Limitar longitud
-            } else { // Fallback
-                errorMessage = response.statusText || `Request failed with status ${response.status}`;
-            }
-
+                if (typeof errorData.detail === 'string') { errorMessage = errorData.detail; }
+                else if (Array.isArray(errorData.detail) && errorData.detail.length > 0 && typeof errorData.detail[0].msg === 'string') { errorMessage = errorData.detail.map(d => `${d.loc ? d.loc.join('.')+': ' : ''}${d.msg}`).join('; '); }
+                else if (typeof errorData.message === 'string') { errorMessage = errorData.message; }
+                else { errorMessage = JSON.stringify(errorData.detail).substring(0, 200); }
+            } else if (errorText) { errorMessage = errorText.substring(0, 200); }
+            else { errorMessage = response.statusText || `Request failed with status ${response.status}`; }
             console.error(`API Error Response: ${response.status} ${response.statusText} from ${apiUrl}`, { data: errorData, text: errorText });
-            // Lanzar ApiError personalizado
             throw new ApiError(errorMessage, response.status, errorData || undefined);
         }
-
-        // Manejo específico de respuestas 204 No Content
-        if (response.status === 204 || response.headers.get('content-length') === '0') {
-            return null as T; // Devuelve null explícito para concordar con Promise<void>
+        if (response.status === 204 || response.headers.get('content-length') === '0') { return null as T; }
+        try { const data: T = await response.json(); return data; }
+        catch (jsonError) {
+            const responseText = await response.text().catch(() => "Could not read response text.");
+            console.error(`API Request: Invalid JSON response from ${apiUrl}. Status: ${response.status}. Response Text: ${responseText}`, jsonError);
+            throw new ApiError(`Invalid JSON response received from server.`, response.status);
         }
-
-        // Intentar parsear la respuesta JSON para respuestas OK con contenido
-        try {
-            const data: T = await response.json();
-            return data;
-        } catch (jsonError) {
-             // Si falla el parseo JSON de una respuesta OK
-             const responseText = await response.text().catch(() => "Could not read response text."); // Leer como texto para depurar
-             console.error(`API Request: Invalid JSON response from ${apiUrl}. Status: ${response.status}. Response Text: ${responseText}`, jsonError);
-             throw new ApiError(`Invalid JSON response received from server.`, response.status);
-        }
-
     } catch (error) {
-        // Re-lanzar ApiError si ya fue capturado
         if (error instanceof ApiError) { throw error; }
-        // Manejar errores de red (TypeError: Failed to fetch)
         else if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
-             const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
-             console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
-             throw new ApiError(networkErrorMsg, 0); // Status 0 para errores de red
+            const networkErrorMsg = 'Network error or API Gateway unreachable. Check connection and API URL.';
+            console.error(`API Request Network Error: ${networkErrorMsg} (URL: ${apiUrl})`, error);
+            throw new ApiError(networkErrorMsg, 0);
         } else {
-             // Otros errores inesperados
-             console.error(`API Request: Unexpected error during fetch to ${apiUrl}`, error);
-             const message = error instanceof Error ? error.message : 'An unknown fetch error occurred.';
-             throw new ApiError(`Unexpected fetch error: ${message}`, 500);
+            console.error(`API Request: Unexpected error during fetch to ${apiUrl}`, error);
+            const message = error instanceof Error ? error.message : 'An unknown fetch error occurred.';
+            throw new ApiError(`Unexpected fetch error: ${message}`, 500);
         }
     }
 }
 
-// --- Tipos Específicos de Servicio (Sin cambios estructurales) ---
+// --- Tipos Específicos de Servicio ---
 export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
 export interface AuthHeaders { 'X-Company-ID': string; 'X-User-ID': string; }
-export interface DocumentStatusResponse { document_id: string; status: 'uploaded' | 'processing' | 'processed' | 'error' | string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; created_at?: string; last_updated: string; minio_exists?: boolean; milvus_chunk_count?: number; }
-export interface DetailedDocumentStatusResponse extends DocumentStatusResponse { minio_exists: boolean; milvus_chunk_count: number; message?: string; }
+// FLAG_LLM: Interfaz actualizada para coincidir con los logs (usa 'id' en lugar de 'document_id')
+export interface DocumentStatusApiResponse {
+    id: string; // ID Principal del documento (UUID)
+    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // Tipos conocidos + fallback string
+    file_name?: string | null;
+    file_type?: string | null;
+    file_path?: string | null; // Añadido según logs
+    company_id?: string; // Añadido según logs
+    chunk_count?: number | null;
+    error_message?: string | null;
+    created_at?: string; // Fecha creación DB record
+    uploaded_at?: string; // Fecha subida original
+    last_updated?: string; // Fecha última actualización DB record
+    minio_exists?: boolean; // Existe en MinIO?
+    milvus_chunk_count?: number; // Conteo real en Milvus
+    message?: string; // Mensaje adicional del backend
+    // Añadir cualquier otro campo que devuelva la API si es necesario
+}
+// Interfaz Frontend (mantenemos document_id como clave principal para consistencia interna)
+export interface DocumentStatusResponse {
+    document_id: string; // Usaremos este como identificador principal en el frontend
+    status: 'uploaded' | 'processing' | 'processed' | 'error' | string;
+    file_name?: string | null;
+    file_type?: string | null;
+    chunk_count?: number | null;
+    error_message?: string | null;
+    created_at?: string;
+    last_updated?: string; // Cambiado de last_updated a string opcional
+    minio_exists?: boolean;
+    milvus_chunk_count?: number;
+}
+// Interfaz detallada (hereda de la de frontend)
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
+    minio_exists: boolean;
+    milvus_chunk_count: number;
+    message?: string;
+}
+// --- Resto de interfaces (sin cambios) ---
 export interface RetrievedDocApi { id: string; document_id: string; file_name: string | null; content: string; content_preview: string; metadata: Record<string, any> | null; score: number; }
 export type RetrievedDoc = RetrievedDocApi;
 export interface ChatSummary { id: string; title: string | null; created_at: string; updated_at: string; message_count: number; }
@@ -6312,112 +6142,89 @@ export interface LoginResponse { access_token: string; token_type: string; user_
 // --- Funciones API Específicas ---
 
 // ** INGEST SERVICE **
-
 export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
-  const formData = new FormData();
-  formData.append('file', file);
+  const formData = new FormData(); formData.append('file', file);
   return request<IngestResponse>('/api/v1/ingest/upload', { method: 'POST', headers: { ...auth } as Record<string, string>, body: formData });
 }
 
+// FLAG_LLM: Mapeo de la respuesta API a la interfaz del frontend
+const mapApiResponseToFrontend = (apiDoc: DocumentStatusApiResponse): DocumentStatusResponse => {
+    return {
+        document_id: apiDoc.id, // Mapear id a document_id
+        status: apiDoc.status,
+        file_name: apiDoc.file_name,
+        file_type: apiDoc.file_type,
+        chunk_count: apiDoc.chunk_count,
+        error_message: apiDoc.error_message,
+        created_at: apiDoc.created_at || apiDoc.uploaded_at, // Usar created_at o uploaded_at
+        last_updated: apiDoc.last_updated, // Usar el campo que venga
+        minio_exists: apiDoc.minio_exists,
+        milvus_chunk_count: apiDoc.milvus_chunk_count,
+    };
+};
+
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
-  const response = await request<DocumentStatusResponse[]>(endpoint, { method: 'GET', headers: { ...auth } as Record<string, string> });
-  return response || [];
+  // Pedimos la respuesta como array de DocumentStatusApiResponse
+  const apiResponse = await request<DocumentStatusApiResponse[]>(endpoint, { method: 'GET', headers: { ...auth } as Record<string, string> });
+  // Mapeamos cada objeto al formato esperado por el frontend
+  return (apiResponse || []).map(mapApiResponseToFrontend);
 }
 
 export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
-    // FLAG_LLM: Añadir validación de documentId
-    if (!documentId || typeof documentId !== 'string') {
-        throw new ApiError("Se requiere un ID de documento válido.", 400); // 400 Bad Request
-    }
-    return request<DetailedDocumentStatusResponse>(`/api/v1/ingest/status/${documentId}`, { method: 'GET', headers: { ...auth } as Record<string, string> });
+    if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido.", 400); }
+    // La respuesta detallada también necesita mapeo si usa 'id'
+    const apiDoc = await request<DocumentStatusApiResponse>(`/api/v1/ingest/status/${documentId}`, { method: 'GET', headers: { ...auth } as Record<string, string> });
+    // Mapear y asegurar campos detallados
+    const frontendDoc = mapApiResponseToFrontend(apiDoc) as DetailedDocumentStatusResponse;
+    frontendDoc.minio_exists = apiDoc.minio_exists ?? false; // Asegurar valor booleano
+    frontendDoc.milvus_chunk_count = apiDoc.milvus_chunk_count ?? -1; // Asegurar valor numérico o -1
+    frontendDoc.message = apiDoc.message;
+    return frontendDoc;
 };
 
 export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> {
-  // FLAG_LLM: Añadir validación de documentId
-  if (!documentId || typeof documentId !== 'string') {
-        throw new ApiError("Se requiere un ID de documento válido para reintentar.", 400);
-  }
+  if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para reintentar.", 400); }
   const endpoint = `/api/v1/ingest/retry/${documentId}`;
   return request<IngestResponse>(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth } as Record<string, string> });
 }
 
-/**
- * DELETE /api/v1/ingest/{document_id}
- * Elimina un documento (registro DB, archivo MinIO, chunks Milvus). Requiere X-Company-ID.
- */
 export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
-  // FLAG_LLM: Validar ID antes de la llamada
-  if (!documentId || typeof documentId !== 'string') {
-        throw new ApiError("Se requiere un ID de documento válido para eliminar.", 400);
-  }
-  // FLAG_LLM: Corregir endpoint según la documentación proporcionada
-  await request<null>(`/api/v1/ingest/${documentId}`, {
-    method: 'DELETE',
-    headers: { ...auth } as Record<string, string>,
-  });
+  if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para eliminar.", 400); }
+  // Usar la ruta correcta /api/v1/ingest/{document_id}
+  await request<null>(`/api/v1/ingest/${documentId}`, { method: 'DELETE', headers: { ...auth } as Record<string, string> });
 }
 
-// ** QUERY SERVICE ** (Sin cambios en las funciones)
-
+// ** QUERY SERVICE ** (Funciones sin cambios estructurales, solo validaciones añadidas)
 export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     const response = await request<ChatSummary[]>(endpoint);
-     return response || [];
+     const response = await request<ChatSummary[]>(endpoint); return response || [];
 };
-
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
-     // FLAG_LLM: Validar chatId
-     if (!chatId || typeof chatId !== 'string') {
-         throw new ApiError("Se requiere un ID de chat válido.", 400);
-     }
+     if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido.", 400); }
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     const response = await request<ChatMessageApi[]>(endpoint);
-     return response || [];
+     const response = await request<ChatMessageApi[]>(endpoint); return response || [];
 };
-
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
      const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', { method: 'POST', body: JSON.stringify(body) });
 };
-
 export const deleteChat = async (chatId: string): Promise<void> => {
-    // FLAG_LLM: Validar chatId
-    if (!chatId || typeof chatId !== 'string') {
-        throw new ApiError("Se requiere un ID de chat válido para eliminar.", 400);
-    }
+    if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido para eliminar.", 400); }
     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
-
-// --- Helpers de Mapeo de Tipos (API -> Frontend) (Sin cambios) ---
-// export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => { /* ... */ }; // Removed duplicate declaration
-// export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => { /* ... */ }; // Removed duplicate declaration
-
-// Reimplementar el contenido omitido de mapApiSourcesToFrontend y mapApiMessageToFrontend
+// --- Helpers de Mapeo (sin cambios, ya presentes y correctos) ---
 export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
     if (!apiSources || apiSources.length === 0) return undefined;
     return apiSources.map(source => ({
-        id: source.chunk_id,
-        document_id: source.document_id,
-        file_name: source.file_name || null,
-        content: source.preview, // Asumiendo preview es suficiente para frontend 'content'
-        content_preview: source.preview,
-        metadata: null, // No disponible en este punto según API
-        score: source.score,
+        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name || null,
+        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
     }));
 };
-
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
-    return {
-        id: apiMessage.id,
-        role: apiMessage.role,
-        content: apiMessage.content,
-        sources: mappedSources,
-        isError: false,
-        created_at: apiMessage.created_at,
-    };
+    return { id: apiMessage.id, role: apiMessage.role, content: apiMessage.content, sources: mappedSources, isError: false, created_at: apiMessage.created_at, };
 };
 ```
 
@@ -6698,148 +6505,117 @@ export const useAuth = (): AuthContextType => {
 
 ## File: `lib\hooks\useDocumentStatuses.ts`
 ```ts
-// File: lib/hooks/useDocumentStatuses.ts (REVISADO Y CORREGIDO - Coincide con API y componentes)
+// File: lib/hooks/useDocumentStatuses.ts (CORREGIDO - Usa document_id internamente)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     getDocumentStatusList,
-    DocumentStatusResponse,
+    DocumentStatusResponse, // <-- Usa la interfaz mapeada del frontend
     DetailedDocumentStatusResponse,
     AuthHeaders,
     ApiError,
     getDocumentStatus
 } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { toast } from 'sonner'; // Para mostrar errores al refrescar
+import { toast } from 'sonner';
 
-const DEFAULT_LIMIT = 30; // Ajustar límite si es necesario
+const DEFAULT_LIMIT = 30;
 
 interface UseDocumentStatusesReturn {
-  documents: DocumentStatusResponse[]; // Lista de documentos
-  isLoading: boolean; // Estado general de carga (inicial o cargando más)
-  error: string | null; // Mensaje de error si falla la carga
-  fetchDocuments: (reset?: boolean) => Promise<void>; // Función para (re)cargar documentos
-  fetchMore: () => void; // Función para cargar la siguiente página
-  hasMore: boolean; // Indica si hay más documentos por cargar
-  retryLocalUpdate: (documentId: string) => void; // Actualiza UI para reintento
-  refreshDocument: (documentId: string) => Promise<void>; // Refresca un documento individual
-  deleteLocalDocument: (documentId: string) => void; // Elimina un documento de la UI local
+  documents: DocumentStatusResponse[]; // Lista de documentos con 'document_id'
+  isLoading: boolean;
+  error: string | null;
+  fetchDocuments: (reset?: boolean) => Promise<void>;
+  fetchMore: () => void;
+  hasMore: boolean;
+  retryLocalUpdate: (documentId: string) => void;
+  refreshDocument: (documentId: string) => Promise<void>;
+  deleteLocalDocument: (documentId: string) => void;
 }
 
 export function useDocumentStatuses(): UseDocumentStatusesReturn {
-  const { user, isLoading: isAuthLoading } = useAuth(); // Obtener usuario y estado de auth
-  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]); // Estado para la lista de documentos
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Estado de carga general
-  const [error, setError] = useState<string | null>(null); // Estado de error
-  const offsetRef = useRef<number>(0); // Referencia para el offset de paginación
-  const [hasMore, setHasMore] = useState<boolean>(true); // Estado para saber si hay más páginas
-  const isFetchingRef = useRef<boolean>(false); // Ref para evitar llamadas concurrentes
+  const { user, isLoading: isAuthLoading } = useAuth();
+  // FLAG_LLM: El estado interno usa la interfaz DocumentStatusResponse con 'document_id'
+  const [documents, setDocuments] = useState<DocumentStatusResponse[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const offsetRef = useRef<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const isFetchingRef = useRef<boolean>(false);
 
-  // Función principal para cargar documentos
   const fetchDocuments = useCallback(async (reset: boolean = false) => {
-    // Evitar ejecución si ya se está cargando o si no hay usuario/compañía
     if (isFetchingRef.current || isAuthLoading || !user?.userId || !user?.companyId) {
       if (!isAuthLoading && !user?.userId) {
-        // Si la autenticación terminó y no hay usuario, limpiar estado
         setDocuments([]); setIsLoading(false); setError(null); setHasMore(false);
       }
       return;
     }
-
-    isFetchingRef.current = true; // Marcar como cargando
-    setIsLoading(true); // Activar estado de carga visual
-    setError(null); // Limpiar errores previos
-
-    // Preparar headers de autenticación
-    const authHeaders: AuthHeaders = {
-      'X-User-ID': user.userId,
-      'X-Company-ID': user.companyId,
-    };
+    isFetchingRef.current = true; setIsLoading(true); setError(null);
+    const authHeaders: AuthHeaders = { 'X-User-ID': user.userId, 'X-Company-ID': user.companyId };
 
     try {
-      const currentOffset = reset ? 0 : offsetRef.current; // Determinar offset
+      const currentOffset = reset ? 0 : offsetRef.current;
+      // FLAG_LLM: getDocumentStatusList ahora devuelve DocumentStatusResponse[] ya mapeado
       const data = await getDocumentStatusList(authHeaders, DEFAULT_LIMIT, currentOffset);
-
-      // Actualizar estado de paginación
       setHasMore(data.length === DEFAULT_LIMIT);
-      offsetRef.current = currentOffset + data.length; // Incrementar offset
-
-      // Actualizar lista de documentos (reemplazar si reset=true, añadir si reset=false)
+      offsetRef.current = currentOffset + data.length;
       setDocuments(prev => reset ? data : [...prev, ...data]);
-
     } catch (err: any) {
       const errorMessage = err instanceof ApiError ? err.message : (err.message || 'Error al cargar la lista de documentos.');
-      setError(errorMessage);
-      // Opcional: limpiar documentos en error, o mantener los actuales
-      // if(reset) setDocuments([]);
-      setHasMore(false); // Asumir no más páginas si hay error
+      setError(errorMessage); setHasMore(false);
     } finally {
-      setIsLoading(false); // Desactivar estado de carga visual
-      isFetchingRef.current = false; // Desmarcar como cargando
+      setIsLoading(false); isFetchingRef.current = false;
     }
-  }, [user, isAuthLoading]); // Dependencias: usuario y estado de auth
+  }, [user, isAuthLoading]); // Dependencia correcta
 
-  // Carga inicial de documentos cuando el usuario esté disponible
   useEffect(() => {
-    if (user?.userId && user?.companyId && documents.length === 0) { // Cargar solo si hay usuario y la lista está vacía
-        fetchDocuments(true); // reset = true
+    // Cargar solo si hay usuario, compañía y la lista está vacía o si el usuario/compañía cambia
+    if (user?.userId && user?.companyId) {
+      fetchDocuments(true); // Siempre resetea al cambiar usuario/compañía
     } else if (!isAuthLoading && !user?.userId) {
-        // Si auth terminó y no hay usuario, asegurar estado limpio
-        setDocuments([]);
-        setIsLoading(false);
-        setError(null);
-        setHasMore(false);
+      setDocuments([]); setIsLoading(false); setError(null); setHasMore(false);
     }
-    // No incluir fetchDocuments en dependencias para evitar bucles si cambia rápido
-  }, [user, isAuthLoading]); // Solo depende del usuario y auth
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.userId, user?.companyId, isAuthLoading]); // Depender de IDs específicos y auth
 
-  // Actualiza la UI localmente cuando se inicia un reintento
   const retryLocalUpdate = useCallback((documentId: string) => {
     setDocuments(prevDocs =>
       prevDocs.map(doc =>
+        // FLAG_LLM: Comparar con document_id
         doc.document_id === documentId
-          ? { ...doc, status: 'processing', error_message: null } // Cambiar estado a 'processing'
+          ? { ...doc, status: 'processing', error_message: null }
           : doc
       )
     );
   }, []);
 
-  // Carga la siguiente página de documentos
   const fetchMore = useCallback(() => {
     if (!isLoading && hasMore && !isFetchingRef.current) {
-      fetchDocuments(false); // reset = false para añadir
+      fetchDocuments(false);
     }
   }, [fetchDocuments, isLoading, hasMore]);
 
-  // Refresca el estado de un documento individual desde la API
   const refreshDocument = useCallback(async (documentId: string) => {
     if (!user?.userId || !user?.companyId) {
         console.error("Cannot refresh document: user or company ID missing.");
-        toast.error("Error de autenticación", { description: "No se pudo verificar la sesión." });
-        return;
+        toast.error("Error de autenticación", { description: "No se pudo verificar la sesión." }); return;
     }
-    const authHeaders: AuthHeaders = {
-        'X-User-ID': user.userId,
-        'X-Company-ID': user.companyId,
-      };
+    const authHeaders: AuthHeaders = { 'X-User-ID': user.userId, 'X-Company-ID': user.companyId };
     try {
-      const updatedDoc = await getDocumentStatus(documentId, authHeaders); // Llama a la API
-      // Actualiza el documento específico en la lista local
+      // FLAG_LLM: getDocumentStatus devuelve DetailedDocumentStatusResponse con document_id
+      const updatedDoc = await getDocumentStatus(documentId, authHeaders);
+      // FLAG_LLM: Actualizar usando document_id
       setDocuments(prev => prev.map(doc => doc.document_id === documentId ? updatedDoc : doc));
-      // Opcional: toast de éxito
-      // toast.success("Estado Actualizado", { description: `Se actualizó el estado de ${updatedDoc.file_name || documentId}.` });
     } catch (error){
       console.error(`Failed to refresh status for document ${documentId}:`, error);
       toast.error("Error al refrescar estado", { description: error instanceof Error ? error.message : "Error desconocido" });
     }
-  }, [user]); // Depende del usuario para los headers
+  }, [user]);
 
-  // Elimina un documento de la lista local (después de confirmación API exitosa)
   const deleteLocalDocument = useCallback((documentId: string) => {
+    // FLAG_LLM: Filtrar usando document_id
     setDocuments(prev => prev.filter(doc => doc.document_id !== documentId));
-    // Nota: No recalcula 'hasMore' aquí para simplificar. Podría ser necesario en casos complejos.
   }, []);
 
-  // Devuelve el estado y las funciones del hook
   return { documents, isLoading, error, fetchDocuments, fetchMore, hasMore, retryLocalUpdate, refreshDocument, deleteLocalDocument };
 }
 ```
