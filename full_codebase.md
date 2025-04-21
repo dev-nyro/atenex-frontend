@@ -60,6 +60,7 @@ atenex-frontend/
 │       ├── badge.tsx
 │       ├── button.tsx
 │       ├── card.tsx
+│       ├── checkbox.tsx
 │       ├── dialog.tsx
 │       ├── dropdown-menu.tsx
 │       ├── input.tsx
@@ -67,6 +68,7 @@ atenex-frontend/
 │       ├── progress.tsx
 │       ├── resizable.tsx
 │       ├── scroll-area.tsx
+│       ├── select.tsx
 │       ├── separator.tsx
 │       ├── skeleton.tsx
 │       ├── sonner.tsx
@@ -127,11 +129,13 @@ const nextConfig = {
     "@hookform/resolvers": "^4.1.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-avatar": "^1.1.3",
+    "@radix-ui/react-checkbox": "^1.1.0",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
     "@radix-ui/react-label": "^2.1.2",
     "@radix-ui/react-progress": "^1.1.2",
     "@radix-ui/react-scroll-area": "^1.2.3",
+    "@radix-ui/react-select": "^2.1.1",
     "@radix-ui/react-separator": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.6",
@@ -180,7 +184,6 @@ const nextConfig = {
     "typescript": "^5.8.2"
   }
 }
-
 ```
 
 ## File: `tsconfig.json`
@@ -1385,144 +1388,175 @@ export default function LoginPage() {
 
 ## File: `app\about\page.tsx`
 ```tsx
-// File: app/about/page.tsx (MODIFICADO - Iteración 5.2)
+// File: app/about/tsx (MODIFICADO - Iteración 2: Reestructuración y Contenido)
 "use client";
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { APP_NAME } from '@/lib/constants';
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Añadido AvatarImage
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react'; // Icono para volver
+import { APP_NAME } from '@/lib/constants';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Building, Users, Target, Eye, HeartHandshake, Zap, Lightbulb, Linkedin } from 'lucide-react'; // Importar iconos
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
-const teamMembers = [
-    { name: "Demo User 1", role: "Fundador", imageUrl: null },
-    { name: "Demo User 2", role: "Co-Fundador", imageUrl: null },
-    { name: "Demo User 3", role: "Ingeniero Líder", imageUrl: null },
+// Información del Fundador
+const founder = {
+    name: "Mark Romero",
+    alias: "MarkDev",
+    role: "Fundador y Desarrollador Principal",
+    bio: "Apasionado por la inteligencia artificial y la optimización de procesos empresariales. Con experiencia en desarrollo de software full-stack y soluciones de IA, Mark creó Atenex para resolver el desafío del acceso al conocimiento fragmentado en las organizaciones.",
+    imageUrl: null, // Reemplazar con URL si hay foto profesional
+    linkedinUrl: null, // Reemplazar con URL de LinkedIn si existe
+};
+
+// Valores de la empresa
+const coreValues = [
+    { icon: HeartHandshake, title: "Integridad", description: "Mantenemos los más altos estándares éticos en todo lo que hacemos." },
+    { icon: Lightbulb, title: "Innovación", description: "Buscamos continuamente nuevas y mejores formas de resolver problemas." },
+    { icon: Zap, title: "Éxito del Cliente", description: "Estamos dedicados a ayudar a nuestros clientes a alcanzar sus objetivos." },
+    { icon: Users, title: "Colaboración", description: "Creemos en el poder de trabajar juntos para lograr resultados excepcionales." },
 ];
 
 export default function AboutPage() {
     const router = useRouter();
 
+    // Header consistente con otras páginas públicas (Asumiendo que existe /layout.tsx global para estas)
+    // Si no, se replicaría aquí como en contact.tsx
+
   return (
-      // Contenedor principal con padding y layout de una columna
-      <div className="container mx-auto max-w-4xl p-4 md:p-8 space-y-8">
-          {/* Botón volver mejorado */}
-          <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground mb-4 -ml-4">
+    // Contenedor principal con padding y layout de una columna
+    <div className="bg-gradient-to-b from-background via-background to-muted/10 min-h-screen">
+        {/* Contenido de la página */}
+        <div className="container mx-auto max-w-4xl px-4 py-12 md:py-20 space-y-12 md:space-y-16">
+            {/* Botón volver */}
+            <Button variant="ghost" onClick={() => router.push('/')} className="text-sm text-muted-foreground hover:text-foreground -ml-4">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Volver al Inicio
-          </Button>
-          {/* Título principal */}
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">Acerca de {APP_NAME}</h1>
+            </Button>
 
-          {/* Card Misión */}
-          <Card>
-              <CardHeader>
-                  <CardTitle>Nuestra Misión</CardTitle>
-                  <CardDescription>
-                      Empoderar a las organizaciones con acceso fluido a su conocimiento colectivo.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-                  <p>
-                      Estamos comprometidos a proporcionar soluciones innovadoras que optimicen la gestión del conocimiento,
-                      faciliten la toma de decisiones informadas y mejoren la productividad del equipo.
-                  </p>
-              </CardContent>
-          </Card>
+             {/* --- Hero Section --- */}
+            <section className="text-center border-b pb-12 md:pb-16">
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4">
+                    Nuestra Pasión: Conectar Empresas con su Propio Conocimiento
+                </h1>
+                <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
+                    En {APP_NAME}, creemos que el activo más valioso de una organización es su conocimiento colectivo. Nuestra misión es hacerlo accesible, útil e instantáneo para todos.
+                </p>
+                 {/* Placeholder para imagen hero */}
+                 {/* <div className="mt-8 h-48 bg-muted rounded-lg flex items-center justify-center text-muted-foreground italic">
+                    [Imagen Representativa: Innovación / Equipo / Conexión]
+                 </div> */}
+            </section>
+            {/* --- FIN Hero Section --- */}
 
-          {/* Card Visión */}
-          <Card>
-              <CardHeader>
-                  <CardTitle>Nuestra Visión</CardTitle>
-                  <CardDescription>
-                      Ser la plataforma líder de consulta de conocimiento, transformando cómo las empresas aprovechan la información.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-                  <p>
-                      Visualizamos un futuro donde las organizaciones pueden aprovechar sin esfuerzo su experiencia interna,
-                      fomentando una cultura de aprendizaje y crecimiento continuos.
-                  </p>
-              </CardContent>
-          </Card>
 
-          {/* Card Valores */}
-          <Card>
-              <CardHeader>
-                  <CardTitle>Nuestros Valores</CardTitle>
-                  <CardDescription>
-                      Pilares que guían nuestro trabajo diario.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-                  <ul>
-                      <li>
-                          <strong>Integridad:</strong> Mantenemos los más altos estándares éticos en todas nuestras operaciones.
-                      </li>
-                      <li>
-                          <strong>Innovación:</strong> Buscamos continuamente nuevas formas de mejorar nuestra plataforma y servicios.
-                      </li>
-                      <li>
-                          <strong>Colaboración:</strong> Creemos en trabajar juntos para lograr objetivos compartidos.
-                      </li>
-                      <li>
-                          <strong>Éxito del Cliente:</strong> Estamos dedicados a ayudar a nuestros clientes a tener éxito.
-                      </li>
-                  </ul>
-              </CardContent>
-          </Card>
+            {/* --- Historia / Origen --- */}
+            <section>
+                <h2 className="text-3xl font-bold tracking-tight text-center mb-8">El Nacimiento de {APP_NAME}</h2>
+                <div className="prose prose-lg dark:prose-invert max-w-none mx-auto text-foreground/90 leading-relaxed text-center">
+                    <p>
+                        Fundada por <span className='font-semibold'>{founder.name} ({founder.alias})</span>, {APP_NAME} nació de la frustración común en muchas empresas: información vital dispersa en documentos, correos y sistemas inconexos, haciendo casi imposible encontrar respuestas rápidas y fiables.
+                    </p>
+                    <p>
+                        Viendo el potencial transformador de la inteligencia artificial, la visión fue clara: crear una herramienta intuitiva que permitiera a cualquier miembro del equipo 'conversar' con la base de conocimiento de su organización, obteniendo información precisa y contextualizada al instante. Así nació Atenex.
+                    </p>
+                </div>
+            </section>
+            {/* --- FIN Historia --- */}
 
-          {/* Card Equipo */}
-          <Card>
-              <CardHeader>
-                  <CardTitle>Conoce a Nuestro Equipo</CardTitle>
-                  <CardDescription>
-                      Las talentosas personas detrás de {APP_NAME}.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent>
-                  {/* Grid para el equipo */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 justify-items-center">
-                    {teamMembers.map((member) => (
-                        <div key={member.name} className="flex flex-col items-center text-center">
-                            <Avatar className="h-20 w-20 border-2 border-primary/10">
-                                {member.imageUrl ? (
-                                    <AvatarImage src={member.imageUrl} alt={member.name} />
-                                ) : (
-                                    // Fallback con iniciales y fondo suave
-                                    <AvatarFallback className='text-xl bg-muted'>{member.name.charAt(0)}</AvatarFallback>
-                                )}
-                            </Avatar>
-                            <div className="mt-3">
-                                <p className="font-semibold text-foreground">{member.name}</p>
-                                <p className="text-xs text-muted-foreground">{member.role}</p>
-                            </div>
+            <Separator className="my-8 md:my-12" />
+
+             {/* --- Misión y Visión --- */}
+             <section className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div className="text-center md:text-left">
+                    <Target className="h-10 w-10 text-primary mx-auto md:mx-0 mb-3" />
+                    <h3 className="text-2xl font-semibold mb-2">Nuestra Misión</h3>
+                    <p className="text-muted-foreground">
+                        Empoderar a las organizaciones con acceso fluido a su conocimiento colectivo, optimizando la gestión de la información, facilitando decisiones informadas y mejorando la productividad del equipo a través de soluciones innovadoras de IA.
+                    </p>
+                </div>
+                 <div className="text-center md:text-left">
+                    <Eye className="h-10 w-10 text-primary mx-auto md:mx-0 mb-3" />
+                    <h3 className="text-2xl font-semibold mb-2">Nuestra Visión</h3>
+                    <p className="text-muted-foreground">
+                        Ser la plataforma líder de consulta de conocimiento inteligente, transformando cómo las empresas aprovechan su experiencia interna y fomentando una cultura de aprendizaje y crecimiento continuos.
+                    </p>
+                </div>
+            </section>
+            {/* --- FIN Misión y Visión --- */}
+
+            <Separator className="my-8 md:my-12" />
+
+            {/* --- Valores --- */}
+            <section>
+                <h2 className="text-3xl font-bold tracking-tight text-center mb-10">Nuestros Valores Fundamentales</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+                    {coreValues.map((value) => (
+                        <div key={value.title} className="flex flex-col items-center text-center p-4 border rounded-lg bg-card/50 shadow-sm">
+                            <value.icon className="h-8 w-8 text-primary mb-3" />
+                            <h4 className="text-md font-semibold mb-1">{value.title}</h4>
+                            <p className="text-sm text-muted-foreground">{value.description}</p>
                         </div>
                     ))}
-                 </div>
-              </CardContent>
-          </Card>
-          <Separator className="my-12" /> {/* Separador al final */}
-      </div>
+                </div>
+            </section>
+            {/* --- FIN Valores --- */}
+
+             <Separator className="my-8 md:my-12" />
+
+            {/* --- Equipo --- */}
+            <section>
+                <h2 className="text-3xl font-bold tracking-tight text-center mb-10">Conoce al Fundador</h2>
+                <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 bg-card p-8 rounded-lg border shadow-sm">
+                    <Avatar className="h-32 w-32 border-4 border-primary/20">
+                        {founder.imageUrl ? (
+                            <AvatarImage src={founder.imageUrl} alt={founder.name} />
+                        ) : (
+                            <AvatarFallback className='text-4xl bg-muted'>{founder.name.charAt(0)}</AvatarFallback>
+                        )}
+                    </Avatar>
+                    <div className="text-center md:text-left">
+                        <h3 className="text-2xl font-semibold text-foreground">{founder.name}</h3>
+                        <p className="text-md text-primary font-medium mb-2">{founder.role}</p>
+                        <p className="text-muted-foreground mb-4 max-w-xl">{founder.bio}</p>
+                        {founder.linkedinUrl && (
+                             <a href={founder.linkedinUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "mt-2")}>
+                                <Linkedin className="mr-2 h-4 w-4" /> Conectar en LinkedIn
+                             </a>
+                        )}
+                    </div>
+                </div>
+                 {/* Placeholder para más miembros / CTA de unirse */}
+                {/*
+                <div className="mt-12 text-center">
+                     <p className="text-muted-foreground">¡Estamos creciendo! Buscamos talento apasionado.</p>
+                     <Button variant="link" className="mt-2">Ver Oportunidades</Button>
+                </div>
+                */}
+            </section>
+            {/* --- FIN Equipo --- */}
+
+        </div>
+        {/* Footer Consistente (Asumiendo que está en el Root Layout) */}
+    </div>
   );
 }
 ```
 
 ## File: `app\contact\page.tsx`
 ```tsx
-// File: app/contact/page.tsx (MODIFICADO - Iteración 5.2)
+// File: app/contact/page.tsx (MODIFICADO - Iteración 3: Formulario y Estilo)
 "use client";
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
+import { Button, buttonVariants } from '@/components/ui/button'; // Importar buttonVariants
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mail, Phone, Linkedin, MessageCircle, Loader2, Building, MapPin, ArrowLeft } from 'lucide-react'; // Icono volver
+import { Mail, Phone, Linkedin, Loader2, Building, MapPin, Send, Info, Check } from 'lucide-react'; // Añadidos Send, Info, Check
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -1530,7 +1564,19 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Importar Select
+import { Checkbox } from "@/components/ui/checkbox"; // Importar Checkbox
+import AtenexLogoIcon from '@/components/icons/atenex-logo'; // Importar logo
 
+// Opciones para el dropdown de motivo
+const contactReasons = [
+    "Solicitar una Demo",
+    "Información de Precios",
+    "Consulta Técnica",
+    "Soporte",
+    "Colaboración / Partnership",
+    "Otro",
+];
 
 export default function ContactPage() {
   const router = useRouter();
@@ -1546,7 +1592,8 @@ export default function ContactPage() {
             className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
             aria-label={`${APP_NAME} - Inicio`}
           >
-             <Building className="w-6 h-6" /> {/* Usar Building para consistencia */}
+             {/* Usar AtenexLogoIcon aquí también */}
+             <AtenexLogoIcon className="h-7 w-auto" />
             <span className='font-bold'>{APP_NAME}</span>
           </Link>
           <nav className="flex items-center space-x-1 sm:space-x-2">
@@ -1555,17 +1602,11 @@ export default function ContactPage() {
             <LinkButton href="/contact" isActive={true}>Contacto</LinkButton>
             <div className="pl-2 sm:pl-4">
                 {isAuthLoading ? (
-                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                    </Button>
+                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> <Loader2 className="h-4 w-4 animate-spin" /> </Button>
                 ) : isAuthenticated ? (
-                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm">
-                        Ir a la App
-                    </Button>
+                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> Ir a la App </Button>
                 ) : (
-                    <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px]">
-                        Acceder
-                    </Button>
+                    <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px]"> Acceder </Button>
                 )}
             </div>
           </nav>
@@ -1574,52 +1615,63 @@ export default function ContactPage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted/20 dark:bg-background">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-muted/10 dark:to-muted/10">
       {renderHeader()}
 
       {/* Main Content Area */}
       <main className="container mx-auto px-4 py-12 md:py-20 flex-1">
-        {/* Título y descripción */}
+        {/* Título y descripción Actualizados */}
         <section className="text-center mb-12 md:mb-16">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4">
-            Ponte en Contacto
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground mb-4">
+            Hablemos
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto">
-            ¿Tienes preguntas o comentarios? ¡Nos encantaría escucharte! Utiliza el formulario o nuestros canales directos.
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
+            Completa el formulario o utiliza nuestros datos de contacto. Estamos listos para ayudarte a implementar Atenex en tu organización.
           </p>
         </section>
 
         {/* Grid para Formulario e Información */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12 items-start max-w-6xl mx-auto">
 
-          {/* Columna Izquierda: Formulario */}
-          <Card className="lg:col-span-3 shadow-md border">
+          {/* Columna Izquierda: Formulario Actualizado */}
+          <Card className="lg:col-span-3 shadow-lg border border-border/60"> {/* Sombra más pronunciada */}
             <CardHeader>
-              <CardTitle>Envíanos un Mensaje</CardTitle>
+              <CardTitle>Envíanos tu Consulta</CardTitle>
               <CardDescription>
-                Rellena el formulario y te responderemos lo antes posible.
+                Nos pondremos en contacto contigo lo antes posible.
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Componente de formulario mejorado */}
               <ContactForm />
             </CardContent>
           </Card>
 
-          {/* Columna Derecha: Información Adicional */}
+          {/* Columna Derecha: Información Adicional Actualizada */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="shadow-md border">
               <CardHeader>
-                <CardTitle className="text-lg">Información de Contacto</CardTitle>
-                <CardDescription>Otras formas de localizarnos.</CardDescription>
+                <CardTitle className="text-lg">Información Directa</CardTitle>
+                 <CardDescription>Otras formas de contactarnos.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                 <ContactInfoItem Icon={Mail} label="Correo Electrónico:" href="mailto:info@atenex.ai" text="info@atenex.ai" />
-                 <ContactInfoItem Icon={Phone} label="Teléfono:" href="tel:+15551234567" text="+1 (555) 123-4567" />
-                 <Separator className='my-4'/> {/* Más margen en separador */}
-                 <ContactInfoItem Icon={Linkedin} label="LinkedIn:" href="https://linkedin.com/company/atenex" text="Atenex en LinkedIn" targetBlank={true} />
-                 <ContactInfoItem Icon={MessageCircle} label="WhatsApp:" href="https://wa.me/15551234567" text="Chatea por WhatsApp" targetBlank={true}/>
+              <CardContent className="space-y-4"> {/* Aumentar espaciado */}
+                 {/* Email Actualizado */}
+                 <ContactInfoItem Icon={Mail} label="Email Principal:" href="mailto:mark.romero.dev@gmail.com" text="mark.romero.dev@gmail.com" />
+                 {/* LinkedIn Placeholder */}
+                 <ContactInfoItem Icon={Linkedin} label="LinkedIn:" href="#" text="MarkDev (Próximamente)" isPlaceholder={true} />
+                 {/* Teléfono Placeholder */}
+                 {/* <ContactInfoItem Icon={Phone} label="Teléfono:" href="tel:+15551234567" text="+1 (555) 123-4567" /> */}
+                 {/* WhatsApp Placeholder */}
+                 {/* <ContactInfoItem Icon={MessageCircle} label="WhatsApp:" href="https://wa.me/15551234567" text="Chatea por WhatsApp" targetBlank={true}/> */}
                  <Separator className='my-4'/>
-                 <ContactInfoItem Icon={MapPin} label="Oficina:" text="Dirección Ficticia, Ciudad, País" />
+                 {/* Oficina Placeholder */}
+                 <ContactInfoItem Icon={MapPin} label="Ubicación:" text="Desarrollo Remoto" />
+                 <Separator className='my-4'/>
+                 {/* Nota sobre tiempo de respuesta */}
+                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2">
+                    <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Normalmente respondemos en 24 horas hábiles.</span>
+                 </div>
               </CardContent>
             </Card>
           </div>
@@ -1629,7 +1681,11 @@ export default function ContactPage() {
        {/* Footer Consistente */}
        <footer className="bg-muted/20 border-t border-border/60 py-6 mt-16">
          <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
-           <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+           <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-center">
+               <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+               <span className="hidden sm:inline-block opacity-50">|</span>
+               <span className='opacity-80'>Desarrollado por MarkDev</span>
+           </div>
            <div className="flex gap-3">
               <Link href="/privacy" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Política de Privacidad</Link>
               <span className='opacity-50'>|</span>
@@ -1641,83 +1697,144 @@ export default function ContactPage() {
   );
 }
 
-// Componente LinkButton (consistente)
+// Componente LinkButton (Header Navigation)
 function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ComponentType<{ className?: string }>; isActive?: boolean }) {
-  const router = useRouter();
   return (
-    <Button
-        variant="ghost"
-        onClick={() => router.push(href)}
+    <Link
+        href={href}
         className={cn(
-            "text-sm px-2 sm:px-3 py-1 h-8",
-            "rounded-md",
-            "hover:bg-accent hover:text-accent-foreground",
-            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            buttonVariants({ variant: 'ghost' }),
+            "text-sm px-2 sm:px-3 py-1 h-8 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             isActive ? "text-primary font-semibold bg-primary/10" : "text-muted-foreground"
         )}
      >
        {Icon && <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />}
       {children}
-    </Button>
+    </Link>
   );
 }
 
 
-// Formulario de contacto (consistente)
+// Formulario de contacto Actualizado
 function ContactForm() {
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  // Aquí iría la integración con react-hook-form y zod para validación real
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      console.log("Formulario de contacto enviado (implementar lógica de envío)");
-      toast.info("Formulario Enviado (Simulado)", { description: "La lógica de envío del formulario necesita implementación."});
+      setIsSubmitting(true);
+      setSubmitSuccess(false);
+      console.log("Simulando envío de formulario...");
+
+      // Simular llamada API
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Simular éxito
+      toast.success("Consulta Enviada", { description: "Gracias por contactarnos. Te responderemos pronto."});
+      setSubmitSuccess(true);
+      // Aquí se resetearía el formulario con react-hook-form form.reset()
+
+      // Simular fallo (descomentar para probar)
+      // toast.error("Error al Enviar", { description: "Hubo un problema al enviar tu consulta. Inténtalo de nuevo." });
+
+      setIsSubmitting(false);
+
+      // Opcional: Resetear el estado de éxito después de un tiempo
+      // setTimeout(() => setSubmitSuccess(false), 4000);
   }
 
   return (
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5"> {/* Aumentar espaciado */}
+         {/* Fila Nombre y Correo */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="name">Nombre</Label>
-              <Input id="name" required placeholder="Tu Nombre" />
+              <Label htmlFor="name">Nombre Completo <span className="text-destructive">*</span></Label>
+              <Input id="name" required placeholder="Tu Nombre" disabled={isSubmitting} />
+              {/* Aquí irían los mensajes de error de validación */}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="email">Correo Electrónico</Label>
-              <Input id="email" type="email" required placeholder="tu@ejemplo.com" />
+              <Label htmlFor="email">Correo Electrónico <span className="text-destructive">*</span></Label>
+              <Input id="email" type="email" required placeholder="tu@empresa.com" disabled={isSubmitting} />
             </div>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="subject">Asunto</Label>
-          <Input id="subject" placeholder="Ej: Consulta sobre precios" />
+         {/* Fila Empresa y Teléfono */}
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+                <Label htmlFor="companyName">Nombre de la Empresa</Label>
+                <Input id="companyName" placeholder="Nombre de tu Organización" disabled={isSubmitting} />
+            </div>
+            <div className="space-y-1.5">
+                <Label htmlFor="phone">Teléfono (Opcional)</Label>
+                <Input id="phone" type="tel" placeholder="+1 (555) 123-4567" disabled={isSubmitting} />
+            </div>
         </div>
+         {/* Motivo de Contacto */}
         <div className="space-y-1.5">
-          <Label htmlFor="message">Mensaje</Label>
+          <Label htmlFor="reason">Motivo de Contacto <span className="text-destructive">*</span></Label>
+          <Select name="reason" required disabled={isSubmitting}>
+              <SelectTrigger id="reason" className="w-full">
+                <SelectValue placeholder="Selecciona un motivo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {contactReasons.map(reason => (
+                     <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                ))}
+              </SelectContent>
+          </Select>
+        </div>
+         {/* Mensaje */}
+        <div className="space-y-1.5">
+          <Label htmlFor="message">Mensaje <span className="text-destructive">*</span></Label>
           <Textarea
             id="message"
             required
-            placeholder="Escribe tu mensaje aquí..."
+            placeholder="Cuéntanos cómo podemos ayudarte..."
             className="min-h-[120px]"
+            disabled={isSubmitting}
           />
         </div>
-        <Button type="submit" className="w-full sm:w-auto">
-          Enviar Mensaje
+         {/* Checkbox Privacidad */}
+         <div className="flex items-center space-x-2">
+            <Checkbox id="privacy" required disabled={isSubmitting} />
+            <Label htmlFor="privacy" className="text-xs text-muted-foreground font-normal">
+                 He leído y acepto la <Link href="/privacy" className="underline hover:text-primary" target="_blank">Política de Privacidad</Link>. <span className="text-destructive">*</span>
+            </Label>
+         </div>
+         {/* Botón Enviar */}
+        <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting || submitSuccess}>
+           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+           {submitSuccess && <Check className="mr-2 h-4 w-4" />}
+           {isSubmitting ? 'Enviando...' : submitSuccess ? 'Enviado Correctamente' : 'Enviar Consulta'}
         </Button>
       </form>
   );
 }
 
-// Componente ContactInfoItem (consistente)
-function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Icon: React.ComponentType<{ className?: string }>, label: string, href?: string, text: string, targetBlank?: boolean }) {
+// Componente ContactInfoItem Actualizado
+function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlaceholder = false }: {
+    Icon: React.ComponentType<{ className?: string }>,
+    label: string,
+    href?: string,
+    text: string,
+    targetBlank?: boolean,
+    isPlaceholder?: boolean // Prop para indicar si es placeholder
+}) {
     const content = (
         <>
-            <Icon className="h-4 w-4 text-primary flex-shrink-0" />
-            <span className="font-medium text-foreground/90">{label}</span>
-            <span className="text-muted-foreground break-all">{text}</span> {/* Allow break-all for long text */}
+            <Icon className={cn("h-4 w-4 flex-shrink-0", isPlaceholder ? "text-muted-foreground/60" : "text-primary")} />
+            <div className="flex flex-col flex-1 min-w-0">
+                <span className={cn("font-medium", isPlaceholder ? "text-muted-foreground/80" : "text-foreground/90")}>{label}</span>
+                 <span className={cn("text-muted-foreground break-words", isPlaceholder && "italic")}>{text}</span>
+             </div>
         </>
     );
-    const containerClasses = "flex items-center space-x-2 text-sm";
-    const linkClasses = "inline-flex items-center gap-2 group hover:text-primary transition-colors";
+    const containerClasses = cn("flex items-start space-x-3 text-sm", isPlaceholder && "opacity-70"); // Usa items-start y gap
+    const linkClasses = "inline-flex items-start gap-3 group hover:opacity-80 transition-opacity w-full";
 
     return (
         <div className={containerClasses}>
-            {href ? (
+            {href && !isPlaceholder ? (
                  <a
                     href={href}
                     className={cn(linkClasses)}
@@ -1727,7 +1844,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
                     {content}
                  </a>
             ) : (
-                <div className="inline-flex items-center gap-2">{content}</div>
+                <div className="inline-flex items-start gap-3 w-full">{content}</div>
             )}
         </div>
     );
@@ -1962,14 +2079,15 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false }: { Ico
         /* z-index: 60 !important; ya no es necesario con la nueva estructura */
     }
 
-    /* Keyframes para animación fade-in */
+    /* Keyframes para animación fade-in (¡NUEVO!) */
     @keyframes fade-in {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in {
       animation: fade-in 0.6s ease-out forwards;
-      animation-delay: var(--animation-delay, 0s); /* Permite retraso opcional */
+      /* Permite retraso opcional con una variable CSS */
+      animation-delay: var(--animation-delay, 0s);
     }
 
 }
@@ -2107,114 +2225,255 @@ export default function RootLayout({
 
 ## File: `app\page.tsx`
 ```tsx
-// File: app/page.tsx (MODIFICADO - Añadida Animación Serpiente)
+// File: app/page.tsx (MODIFICADO - Iteración 2: Contenido Landing)
 "use client";
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { APP_NAME } from '@/lib/constants';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap } from 'lucide-react';
+import {
+    Loader2, Home as HomeIcon, Info, Mail, Search, Library, Zap, ChevronRight,
+    UploadCloud, BrainCircuit, MessageSquare, CheckCircle, GraduationCap, HelpCircle, TrendingUp, // Cómo Funciona
+    Briefcase, FileLock, ShieldCheck, Settings, Lightbulb, Scale // Casos Uso y Seguridad
+} from 'lucide-react';
 import Link from 'next/link';
-import AtenexLogoIcon from '@/components/icons/atenex-logo'; // Renombrado para claridad vs componente
+import AtenexLogoIcon from '@/components/icons/atenex-logo';
+import { Separator } from '@/components/ui/separator'; // Importar Separator
 
-// Mapeo de iconos
+// Mapeo de iconos extendido
 const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = {
-  Search: Search,
-  Library: Library,
-  Zap: Zap,
-  HomeIcon: HomeIcon,
-  Info: Info,
-  Mail: Mail,
+  Search, Library, Zap, HomeIcon, Info, Mail, UploadCloud, BrainCircuit, MessageSquare,
+  CheckCircle, GraduationCap, HelpCircle, TrendingUp, Briefcase, FileLock, ShieldCheck, Settings, Lightbulb, Scale
 };
+
+// Empresas Placeholder para Social Proof
+const trustedLogos = [
+    { name: "Empresa Innovadora", logo: null }, // Usaremos texto como placeholder
+    { name: "Consultora Global", logo: null },
+    { name: "Startup Tecnológica", logo: null },
+    { name: "Sector Financiero", logo: null },
+    { name: "Manufactura Avanzada", logo: null },
+];
+
+// Pasos Cómo Funciona
+const howItWorksSteps = [
+    { icon: UploadCloud, title: "1. Carga Segura", description: "Sube documentos y datos de múltiples formatos de forma segura." },
+    { icon: BrainCircuit, title: "2. Procesamiento IA", description: "Atenex indexa y comprende semánticamente el contenido." },
+    { icon: MessageSquare, title: "3. Consulta Natural", description: "Haz preguntas como hablarías con un experto humano." },
+    { icon: CheckCircle, title: "4. Respuesta Precisa", description: "Recibe respuestas directas con las fuentes originales verificadas." },
+];
+
+// Casos de Uso
+const useCases = [
+  { icon: GraduationCap, title: "Onboarding y Formación", description: "Acelera la integración de nuevos empleados dándoles acceso instantáneo a políticas, guías y documentación relevante." },
+  { icon: HelpCircle, title: "Soporte Interno (TI/RRHH)", description: "Responde preguntas frecuentes de forma automática sobre procesos internos, beneficios o soporte técnico." },
+  { icon: TrendingUp, title: "Ventas y Marketing", description: "Accede rápidamente a información de producto, estudios de caso y argumentarios de venta actualizados." },
+  { icon: Lightbulb, title: "I+D y Producto", description: "Encuentra investigaciones pasadas, especificaciones técnicas y feedback de usuarios para innovar más rápido." },
+  { icon: Scale, title: "Cumplimiento y Legal", description: "Localiza fácilmente políticas, regulaciones y documentación contractual específica." },
+];
+
+// Puntos de Seguridad
+const securityPoints = [
+    { icon: ShieldCheck, title: "Seguridad de Datos", description: "Protegemos tu información con encriptación en tránsito y en reposo, y las mejores prácticas de seguridad cloud." },
+    { icon: FileLock, title: "Privacidad Garantizada", description: "Tu conocimiento es tuyo. Nunca usamos tus datos para entrenar modelos de IA públicos." },
+    // { icon: Settings, title: "Control de Acceso", description: "Gestiona permisos para asegurar que solo el personal autorizado acceda a información sensible (Próximamente)." },
+];
+
 
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
   const isAuthenticated = !isAuthLoading && !!user;
 
+  // Decide el texto y la acción del CTA principal (Mantenemos "Comenzar Ahora" por simplicidad, podría ser "Solicitar Demo")
+  const mainCtaText = isAuthenticated ? 'Ir a la App' : 'Comenzar Ahora';
+  const mainCtaAction = () => {
+    if (isAuthenticated) {
+        router.push('/chat');
+    } else {
+        router.push('/login');
+    }
+  };
+
+
   return (
-    // FLAG_LLM: Añadido 'relative' al contenedor principal para que la animación absoluta se posicione correctamente
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
-      {/* Header específico de la Landing Page */}
+      {/* --- Header (sin cambios) --- */}
       <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
         <div className="container flex items-center justify-between h-16 px-4 md:px-6">
-          {/* Logo/Nombre App */}
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-            aria-label={`${APP_NAME} - Inicio`}
-          >
-             {/* Logo aquí o icono simple si se prefiere */}
+          <Link href="/" className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" aria-label={`${APP_NAME} - Inicio`}>
              <AtenexLogoIcon className="h-7 w-auto" />
             <span className='font-bold'>{APP_NAME}</span>
           </Link>
-
-          {/* Navegación y Autenticación */}
           <nav className="flex items-center space-x-1 sm:space-x-2">
-            {/* FLAG_LLM: IDs de los botones de navegación que la serpiente 'comerá' (visualmente) */}
             <LinkButton href="/" Icon={HomeIcon} isActive={true}>Inicio</LinkButton>
             <LinkButton href="/about" Icon={Info}>Nosotros</LinkButton>
             <LinkButton href="/contact" Icon={Mail}>Contacto</LinkButton>
             <div className="pl-2 sm:pl-4">
-                {isAuthLoading ? (
-                    <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> <Loader2 className="h-4 w-4 animate-spin" /> </Button>
-                ) : isAuthenticated ? (
-                    <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> Ir a la App </Button>
-                ) : (
-                    <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"> Acceder </Button>
-                )}
+                {isAuthLoading ? ( <Button variant="ghost" disabled={true} size="sm" className="w-[95px]"> <Loader2 className="h-4 w-4 animate-spin" /> </Button> )
+                 : isAuthenticated ? ( <Button variant="default" onClick={() => router.push('/chat')} size="sm" className="w-[95px] shadow-sm"> Ir a la App </Button> )
+                 : ( <Button variant="outline" onClick={() => router.push('/login')} size="sm" className="w-[95px] transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"> Acceder </Button> )}
             </div>
           </nav>
         </div>
       </header>
 
-      {/* Contenido Principal con animación fade-in */}
-      {/* FLAG_LLM: Añadido z-10 para asegurar que el contenido esté sobre la animación si z-index=0, o ajustar z-index de Canvas */}
-      <main className="relative z-10 container mx-auto px-4 py-20 md:py-32 flex-1 flex flex-col items-center text-center animate-fade-in opacity-0 [--animation-delay:200ms]" style={{animationFillMode: 'forwards'}}>
-         {/* Hero Section */}
-         <section className="max-w-4xl">
-            {/* Logo Atenex */}
+      {/* --- Contenido Principal --- */}
+      {/* Añadidos py-16 md:py-24 para más espacio vertical entre secciones */}
+      <main className="flex-1 flex flex-col items-center text-center animate-fade-in opacity-0 [--animation-delay:200ms]" style={{animationFillMode: 'forwards'}}>
+
+         {/* --- Hero Section (Modificada levemente) --- */}
+         {/* Padding ajustado */}
+         <section className="w-full max-w-4xl pt-16 pb-16 md:pt-24 md:pb-20 px-4">
             <div className="mb-8 flex justify-center">
-                {/* FLAG_LLM: Se podría ocultar este logo mientras la animación está en curso si se desea */}
-                <AtenexLogoIcon width={100} height={100} className="text-primary drop-shadow-lg" />
+                <AtenexLogoIcon className="h-24 w-auto text-primary drop-shadow-lg" />
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
                 Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
             </h1>
+            <h2 className="text-xl sm:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto">
+                La IA que conecta a tu equipo con la información crucial de tus documentos, al instante.
+            </h2>
             <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
                 Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
             </p>
-            {/* Botón Principal */}
-            {isAuthLoading ? (
-                 <Button size="lg" disabled={true} className="w-48 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>
-            ) : (
-              <Button size="lg" onClick={() => isAuthenticated ? router.push('/chat') : router.push('/login')} className={cn( "w-48 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg" )}>
-                  {isAuthenticated ? 'Ir al Chat' : 'Comenzar Ahora'}
-              </Button>
-            )}
-            {!isAuthenticated && !isAuthLoading && (
-                 <p className="text-xs text-muted-foreground mt-4">
-                     ¿Ya tienes cuenta? <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4">Inicia Sesión</Link>
-                 </p>
-            )}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                {isAuthLoading ? ( <Button size="lg" disabled={true} className="w-full sm:w-auto px-8 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>)
+                 : ( <Button size="lg" onClick={mainCtaAction} className={cn("w-full sm:w-auto px-8 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg")}> {mainCtaText} <ChevronRight className='ml-1 h-5 w-5'/> </Button> )}
+                 {/* Enlace secundario podría ir aquí */}
+            </div>
+            {!isAuthenticated && !isAuthLoading && ( <p className="text-xs text-muted-foreground mt-6"> ¿Ya tienes cuenta?{' '} <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4"> Inicia Sesión </Link> </p> )}
          </section>
+         {/* --- FIN Hero Section --- */}
 
-         {/* Features Section */}
-         <section className="mt-24 md:mt-32 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl w-full">
-             <FeatureCard title="Búsqueda Inteligente" description="Encuentra información exacta al instante usando lenguaje natural. Olvídate de adivinar palabras clave." icon="Search"/>
-             <FeatureCard title="Conocimiento Centralizado" description="Rompe los silos de información. Accede al conocimiento colectivo de tu organización en un solo lugar seguro." icon="Library"/>
-             <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo con acceso rápido a datos relevantes, permitiendo decisiones más rápidas y fundamentadas." icon="Zap"/>
+         {/* --- Social Proof Section (NUEVA) --- */}
+         <section className="w-full py-12 md:py-16 bg-gradient-to-b from-background to-muted/20 dark:to-muted/10 border-y">
+            <div className="container max-w-5xl px-4">
+                 <h3 className="text-center text-lg font-semibold text-muted-foreground tracking-wider uppercase mb-8">
+                    Impulsando Empresas Como la Tuya
+                 </h3>
+                 {/* Logos Placeholder */}
+                 <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4 opacity-70">
+                    {trustedLogos.map(logo => (
+                        <span key={logo.name} className="text-sm font-medium text-muted-foreground italic" title={logo.name}>
+                            {logo.name} {/* Reemplazar con <Image> si hay logos */}
+                        </span>
+                    ))}
+                 </div>
+                 {/* Testimonios (Placeholder)
+                 <div className="mt-12 max-w-2xl mx-auto text-center italic text-muted-foreground">
+                    "Atenex ha transformado cómo accedemos a nuestra documentación interna. ¡Imprescindible!" - CEO, Empresa Ficticia
+                 </div>
+                 */}
+            </div>
          </section>
+         {/* --- FIN Social Proof --- */}
+
+
+         {/* --- Cómo Funciona Section (NUEVA) --- */}
+         <section className="w-full py-16 md:py-24 px-4">
+             <div className="container max-w-4xl text-center">
+                <h2 className="text-3xl font-bold tracking-tight mb-4">Atenex en Acción</h2>
+                <p className="text-lg text-muted-foreground mb-12">De documentos dispersos a decisiones informadas en 4 simples pasos.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+                    {howItWorksSteps.map((step) => (
+                        <div key={step.title} className="flex flex-col items-center text-center">
+                            <div className="mb-4 flex items-center justify-center h-14 w-14 rounded-full bg-primary/10 text-primary">
+                                <step.icon className="h-7 w-7" />
+                            </div>
+                            <h4 className="text-md font-semibold mb-1.5">{step.title}</h4>
+                            <p className="text-sm text-muted-foreground">{step.description}</p>
+                        </div>
+                    ))}
+                </div>
+             </div>
+         </section>
+         {/* --- FIN Cómo Funciona --- */}
+
+
+         {/* --- Features Section (Refinada Descripción) --- */}
+         <section className="w-full py-16 md:py-24 px-4 bg-muted/20 dark:bg-muted/10 border-y">
+             <div className="container max-w-6xl">
+                {/* Título opcional para la sección de features si se desea */}
+                 <h2 className="text-3xl font-bold tracking-tight text-center mb-12">Potencia Tu Inteligencia Empresarial</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+                    {/* Descripciones refinadas */}
+                    <FeatureCard title="Búsqueda Inteligente" description="Encuentra información exacta al instante usando lenguaje natural, ahorrando horas de búsqueda manual y frustración." icon="Search"/>
+                    <FeatureCard title="Conocimiento Centralizado" description="Rompe los silos de información accediendo al conocimiento colectivo en un solo lugar seguro, eliminando la duplicidad de esfuerzos." icon="Library"/>
+                    <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo con acceso rápido a datos relevantes, acelerando la incorporación y permitiendo decisiones más rápidas." icon="Zap"/>
+                </div>
+            </div>
+         </section>
+         {/* --- FIN Features Section --- */}
+
+
+         {/* --- Casos de Uso Section (NUEVA) --- */}
+         <section className="w-full py-16 md:py-24 px-4">
+             <div className="container max-w-6xl">
+                 <h2 className="text-3xl font-bold tracking-tight text-center mb-4">Ideal Para Cada Departamento</h2>
+                 <p className="text-lg text-muted-foreground text-center mb-12 max-w-2xl mx-auto">Desde RRHH hasta I+D, Atenex se adapta a las necesidades específicas de tu equipo.</p>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                     {useCases.map((useCase) => (
+                         <UseCaseCard key={useCase.title} {...useCase} />
+                     ))}
+                 </div>
+            </div>
+         </section>
+         {/* --- FIN Casos de Uso --- */}
+
+
+         {/* --- Seguridad Section (NUEVA) --- */}
+         <section className="w-full py-16 md:py-24 px-4 bg-muted/20 dark:bg-muted/10 border-y">
+             <div className="container max-w-4xl text-center">
+                 <h2 className="text-3xl font-bold tracking-tight mb-4">Seguridad y Confianza en el Núcleo</h2>
+                 <p className="text-lg text-muted-foreground mb-12">Tu información es tu activo más valioso. La protegemos como si fuera nuestra.</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                     {securityPoints.map((point) => (
+                         <div key={point.title} className="flex items-start gap-4 p-4 rounded-lg bg-background/50 border">
+                            <point.icon className="h-8 w-8 text-primary mt-1 flex-shrink-0" />
+                            <div>
+                                <h4 className="text-md font-semibold mb-1">{point.title}</h4>
+                                <p className="text-sm text-muted-foreground">{point.description}</p>
+                            </div>
+                         </div>
+                     ))}
+                 </div>
+            </div>
+         </section>
+         {/* --- FIN Seguridad --- */}
+
+
+         {/* --- CTA Final Section (NUEVA) --- */}
+         <section className="w-full py-16 md:py-24 px-4">
+            <div className="container max-w-3xl text-center">
+                 <h2 className="text-3xl font-bold tracking-tight mb-4">¿Listo para Potenciar tu Conocimiento Interno?</h2>
+                 <p className="text-lg text-muted-foreground mb-8">Descubre cómo Atenex puede transformar el acceso a la información en tu empresa.</p>
+                  {/* Repetir CTA Principal */}
+                  {isAuthLoading ? (
+                     <Button size="lg" disabled={true} className="w-full sm:w-auto px-8 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>
+                  ) : (
+                  <Button size="lg" onClick={mainCtaAction} className={cn( "w-full sm:w-auto px-8 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg" )}> {mainCtaText} <ChevronRight className='ml-1 h-5 w-5'/> </Button>
+                 )}
+                 {!isAuthenticated && !isAuthLoading && ( <p className="text-xs text-muted-foreground mt-4"> O <Link href="/contact" className="font-medium text-primary hover:underline underline-offset-4"> contacta con ventas </Link> para una demo personalizada. </p> )}
+            </div>
+         </section>
+         {/* --- FIN CTA Final --- */}
+
       </main>
+      {/* --- FIN Contenido Principal --- */}
 
-      {/* Footer */}
-      {/* FLAG_LLM: Añadido z-10 por si acaso */}
-      <footer className="relative z-10 bg-muted/20 border-t border-border/60 py-6">
+
+      {/* --- Footer (Actualizado Crédito) --- */}
+      <footer className="bg-muted/20 border-t border-border/60 py-6 mt-auto">
         <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
-          <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+          <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-center">
+              <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
+              <span className="hidden sm:inline-block opacity-50">|</span>
+              <span className='opacity-80'>Desarrollado por MarkDev</span>
+          </div>
           <div className="flex gap-3">
              <Link href="/privacy" className="hover:text-primary hover:underline underline-offset-4 transition-colors">Política de Privacidad</Link>
              <span className='opacity-50'>|</span>
@@ -2222,20 +2481,33 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+      {/* --- FIN Footer --- */}
     </div>
   );
 }
 
-// Componente LinkButton (sin cambios)
+// --- Componentes Auxiliares ---
+
+// LinkButton (sin cambios)
 function LinkButton({ href, children, Icon, isActive = false }: { href: string; children: React.ReactNode; Icon?: React.ComponentType<{ className?: string }>; isActive?: boolean }) {
-  const router = useRouter();
-  return ( <Button variant="ghost" onClick={() => router.push(href)} className={cn( "text-sm px-2 sm:px-3 py-1 h-8", "rounded-md", "hover:bg-accent hover:text-accent-foreground", "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", isActive ? "text-primary font-semibold bg-primary/10" : "text-muted-foreground" )}> {Icon && <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />} {children} </Button> );
+  return ( <Link href={href} className={cn( buttonVariants({ variant: 'ghost' }), "text-sm px-2 sm:px-3 py-1 h-8 rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", isActive ? "text-primary font-semibold bg-primary/10" : "text-muted-foreground" )}> {Icon && <Icon className="h-4 w-4 mr-1.5 hidden sm:inline-block flex-shrink-0" />} {children} </Link> );
 }
 
-// Componente FeatureCard (sin cambios)
+// FeatureCard (sin cambios estructurales, texto refinado arriba)
 function FeatureCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-   const IconComponent = iconMap[icon] || Info; // Default icon fallback
-  return ( <div className={cn( "p-6 rounded-xl bg-card/60 backdrop-blur-sm", "border border-border/60", "hover:bg-card/90 hover:shadow-lg hover:-translate-y-1", "transition-all duration-200 ease-in-out text-left" )}> <IconComponent className="w-8 h-8 mb-4 text-primary" /> <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3> <p className="text-sm text-muted-foreground leading-relaxed">{description}</p> </div> );
+   const IconComponent = iconMap[icon] || Info;
+  return ( <div className={cn( "p-6 rounded-xl bg-card/60 backdrop-blur-sm border border-border/60", "hover:bg-card/90 hover:shadow-lg hover:-translate-y-1", "transition-all duration-200 ease-in-out text-left" )}> <IconComponent className="w-8 h-8 mb-4 text-primary" /> <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3> <p className="text-sm text-muted-foreground leading-relaxed">{description}</p> </div> );
+}
+
+// UseCaseCard (NUEVO)
+function UseCaseCard({ title, description, icon: Icon }: { title: string; description: string; icon: React.ComponentType<{ className?: string }> }) {
+    return (
+      <div className="p-6 rounded-lg border bg-card/80 text-left h-full flex flex-col shadow-sm hover:shadow-md transition-shadow">
+        <Icon className="w-7 h-7 mb-3 text-primary flex-shrink-0" />
+        <h3 className="text-md font-semibold text-foreground mb-1.5">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-snug flex-grow">{description}</p>
+      </div>
+    );
 }
 ```
 
@@ -3658,30 +3930,38 @@ const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTML
 
 ## File: `components\icons\atenex-logo.tsx`
 ```tsx
+// File: components/icons/atenex-logo.tsx
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-interface AtenexLogoProps extends React.SVGProps<SVGSVGElement> {
-  // Puedes agregar props adicionales según sea necesario
+interface AtenexLogoIconProps extends React.SVGProps<SVGSVGElement> {
+  // No necesita props adicionales por ahora, pero se pueden añadir si es necesario
 }
 
-export default function AtenexLogo(props: AtenexLogoProps) {
+// Renombrado a AtenexLogoIcon para diferenciarlo del componente wrapper si se creara
+export default function AtenexLogoIcon({ className, ...props }: AtenexLogoIconProps) {
+  // El SVG proporcionado no tiene fondo negro ni borde redondeado intrínseco.
+  // Se aplica fill="currentColor" para que herede el color del texto (ej. text-primary).
+  // Eliminamos el style inline de background y border-radius.
   return (
     <svg
+      // Tamaño por defecto, puede ser sobrescrito por props o clases
       width="64"
       height="64"
       viewBox="0 0 1024 1024"
       xmlns="http://www.w3.org/2000/svg"
-      style={{ background: '#000000', borderRadius: '8px' }}
-      {...props}
+      fill="currentColor" // Hereda color del contexto (ej. text-primary)
+      className={cn(className)} // Permite pasar clases personalizadas
+      {...props} // Pasa cualquier otra prop SVG (width, height, etc.)
     >
       <g
         transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)"
-        fill="#FFFFFF"
+        // fill se establece en el SVG principal para heredar
         stroke="none"
       >
-        <path d="M0 5120 l0 -5120 5120 0 5120 0 0 5120 0 5120 -5120 0 -5120 0 0 -5120z m5638 3284 c31 -22 60 -82 132 -279 122 -333 876 -2402 1131 -3105 291 -802 374 -1020 466 -1230 186 -423 345 -594 602 -647 85 -17 121 -42 121 -83 0 -16 -11 -37 -26 -51 l-26 -24 -866 -3 c-609 -2 -882 0 -918 8 -63 13 -87 37 -82 81 3 32 4 33 75 45 137 23 224 78 270 172 26 53 28 65 27 182 0 109 -4 141 -33 250 -28 102 -310 887 -419 1164 -48 122 46 111 -910 111 -781 0 -829 -1 -864 -18 -42 -21 -35 -9 -98 -192 -27 -77 -105 -304 -174 -505 -194 -561 -237 -768 -186 -903 47 -124 143 -202 299 -244 116 -31 140 -66 82 -124 l-29 -29 -749 0 c-807 0 -775 -2 -803 51 -22 40 5 61 125 94 73 20 195 81 290 143 99 66 249 220 324 332 71 106 188 341 249 500 48 125 277 787 316 915 26 83 33 95 89 150 69 67 177 128 300 170 153 51 217 55 910 55 514 0 639 3 643 13 4 12 -123 378 -349 1002 -58 160 -137 380 -175 490 -100 285 -191 534 -202 556 -22 40 -37 19 -74 -98 -203 -646 -480 -1431 -568 -1607 -36 -71 -103 -145 -180 -197 -31 -21 -137 -81 -235 -132 -203 -106 -258 -141 -326 -209 -93 -93 -126 -224 -98 -391 l13 -72 -50 -130 c-27 -71 -76 -203 -107 -292 -32 -90 -61 -163 -65 -163 -4 0 -49 42 -100 93 -203 202 -302 423 -303 672 -1 280 109 522 321 705 87 76 178 132 425 267 117 64 241 135 277 158 82 55 186 159 230 231 39 65 373 909 501 1269 104 292 132 410 127 540 -2 72 -8 100 -28 140 -22 44 -31 52 -72 65 -27 8 -48 21 -48 28 0 24 21 53 53 72 30 19 53 20 387 20 307 0 359 -2 378 -16z m-1103 -569 c50 -13 116 -35 149 -49 47 -21 57 -29 51 -43 -4 -10 -41 -113 -82 -229 l-75 -212 -36 10 c-65 19 -200 13 -267 -11 -93 -33 -122 -63 -192 -196 -89 -170 -115 -187 -378 -246 -96 -21 -189 -45 -207 -52 -18 -8 -66 -42 -107 -76 -122 -102 -188 -127 -372 -138 l-96 -6 -27 -43 c-56 -88 -157 -153 -243 -157 -48 -2 -103 17 -103 35 0 5 22 6 49 2 86 -11 181 37 242 121 20 28 40 45 53 45 13 0 5 8 -24 23 -59 29 -94 91 -94 163 0 55 8 68 135 219 33 39 77 113 124 210 46 95 86 163 109 186 21 21 102 70 189 115 84 43 231 124 328 180 97 55 196 108 219 118 159 64 466 78 655 31z m65 -3330 c455 -100 559 -132 688 -209 187 -111 320 -249 399 -411 58 -122 77 -219 70 -360 -14 -264 -88 -429 -281 -620 -133 -132 -223 -188 -501 -309 -366 -161 -479 -258 -479 -416 -1 -155 93 -222 310 -222 112 1 229 27 419 94 203 72 324 98 485 105 173 7 268 -10 395 -72 78 -37 183 -111 173 -121 -2 -1 -44 11 -93 29 -87 30 -96 31 -250 31 -233 0 -264 -10 -643 -209 -278 -146 -547 -190 -772 -125 -166 48 -332 168 -405 294 -84 145 -85 344 -2 500 40 76 156 199 266 282 46 34 161 106 255 160 302 172 397 247 454 360 77 152 63 294 -39 391 -140 133 -479 227 -851 234 -54 2 -98 5 -98 8 0 10 207 629 214 640 4 6 12 8 19 6 7 -2 127 -29 267 -60z" />
-        <path d="M3340 7268 c0 -12 -21 -64 -46 -116 -32 -67 -54 -98 -75 -110 -67 -39 -14 -39 133 0 63 16 84 27 108 55 28 32 95 152 88 158 -8 6 -154 35 -179 35 -23 0 -29 -4 -29 -22z" />
+         {/* El path data del SVG original */}
+         <path d="M0 5120 l0 -5120 5120 0 5120 0 0 5120 0 5120 -5120 0 -5120 0 0 -5120z m5638 3284 c31 -22 60 -82 132 -279 122 -333 876 -2402 1131 -3105 291 -802 374 -1020 466 -1230 186 -423 345 -594 602 -647 85 -17 121 -42 121 -83 0 -16 -11 -37 -26 -51 l-26 -24 -866 -3 c-609 -2 -882 0 -918 8 -63 13 -87 37 -82 81 3 32 4 33 75 45 137 23 224 78 270 172 26 53 28 65 27 182 0 109 -4 141 -33 250 -28 102 -310 887 -419 1164 -48 122 46 111 -910 111 -781 0 -829 -1 -864 -18 -42 -21 -35 -9 -98 -192 -27 -77 -105 -304 -174 -505 -194 -561 -237 -768 -186 -903 47 -124 143 -202 299 -244 116 -31 140 -66 82 -124 l-29 -29 -749 0 c-807 0 -775 -2 -803 51 -22 40 5 61 125 94 73 20 195 81 290 143 99 66 249 220 324 332 71 106 188 341 249 500 48 125 277 787 316 915 26 83 33 95 89 150 69 67 177 128 300 170 153 51 217 55 910 55 514 0 639 3 643 13 4 12 -123 378 -349 1002 -58 160 -137 380 -175 490 -100 285 -191 534 -202 556 -22 40 -37 19 -74 -98 -203 -646 -480 -1431 -568 -1607 -36 -71 -103 -145 -180 -197 -31 -21 -137 -81 -235 -132 -203 -106 -258 -141 -326 -209 -93 -93 -126 -224 -98 -391 l13 -72 -50 -130 c-27 -71 -76 -203 -107 -292 -32 -90 -61 -163 -65 -163 -4 0 -49 42 -100 93 -203 202 -302 423 -303 672 -1 280 109 522 321 705 87 76 178 132 425 267 117 64 241 135 277 158 82 55 186 159 230 231 39 65 373 909 501 1269 104 292 132 410 127 540 -2 72 -8 100 -28 140 -22 44 -31 52 -72 65 -27 8 -48 21 -48 28 0 24 21 53 53 72 30 19 53 20 387 20 307 0 359 -2 378 -16z m-1103 -569 c50 -13 116 -35 149 -49 47 -21 57 -29 51 -43 -4 -10 -41 -113 -82 -229 l-75 -212 -36 10 c-65 19 -200 13 -267 -11 -93 -33 -122 -63 -192 -196 -89 -170 -115 -187 -378 -246 -96 -21 -189 -45 -207 -52 -18 -8 -66 -42 -107 -76 -122 -102 -188 -127 -372 -138 l-96 -6 -27 -43 c-56 -88 -157 -153 -243 -157 -48 -2 -103 17 -103 35 0 5 22 6 49 2 86 -11 181 37 242 121 20 28 40 45 53 45 13 0 5 8 -24 23 -59 29 -94 91 -94 163 0 55 8 68 135 219 33 39 77 113 124 210 46 95 86 163 109 186 21 21 102 70 189 115 84 43 231 124 328 180 97 55 196 108 219 118 159 64 466 78 655 31z m65 -3330 c455 -100 559 -132 688 -209 187 -111 320 -249 399 -411 58 -122 77 -219 70 -360 -14 -264 -88 -429 -281 -620 -133 -132 -223 -188 -501 -309 -366 -161 -479 -258 -479 -416 -1 -155 93 -222 310 -222 112 1 229 27 419 94 203 72 324 98 485 105 173 7 268 -10 395 -72 78 -37 183 -111 173 -121 -2 -1 -44 11 -93 29 -87 30 -96 31 -250 31 -233 0 -264 -10 -643 -209 -278 -146 -547 -190 -772 -125 -166 48 -332 168 -405 294 -84 145 -85 344 -2 500 40 76 156 199 266 282 46 34 161 106 255 160 302 172 397 247 454 360 77 152 63 294 -39 391 -140 133 -479 227 -851 234 -54 2 -98 5 -98 8 0 10 207 629 214 640 4 6 12 8 19 6 7 -2 127 -29 267 -60z"/>
+         <path d="M3340 7268 c0 -12 -21 -64 -46 -116 -32 -67 -54 -98 -75 -110 -67 -39 -14 -39 133 0 63 16 84 27 108 55 28 32 95 152 88 158 -8 6 -154 35 -179 35 -23 0 -29 -4 -29 -22z"/>
       </g>
     </svg>
   );
@@ -4988,6 +5268,39 @@ export {
 
 ```
 
+## File: `components\ui\checkbox.tsx`
+```tsx
+"use client"
+
+import * as React from "react"
+import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
+import { CheckIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Checkbox({
+  className,
+  ...props
+}: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+  return (
+    <CheckboxPrimitive.Root
+      data-slot="checkbox"
+      className={cn(
+        "border-primary ring-offset-background focus-visible:ring-ring data-[state=checked]:bg-primary data-[state=checked]:text-white peer size-4 shrink-0 rounded-sm border focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      {...props}
+    >
+      <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current">
+        <CheckIcon className="size-4" />
+      </CheckboxPrimitive.Indicator>
+    </CheckboxPrimitive.Root>
+  )
+}
+
+export { Checkbox }
+```
+
 ## File: `components\ui\dialog.tsx`
 ```tsx
 "use client"
@@ -5598,6 +5911,154 @@ function ScrollBar({
 
 export { ScrollArea, ScrollBar }
 
+```
+
+## File: `components\ui\select.tsx`
+```tsx
+"use client"
+
+import * as React from "react"
+import * as SelectPrimitive from "@radix-ui/react-select"
+import { ChevronDownIcon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Select({
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  return <SelectPrimitive.Root data-slot="select" {...props} />
+}
+
+function SelectGroup({
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Group>) {
+  return <SelectPrimitive.Group data-slot="select-group" {...props} />
+}
+
+function SelectValue({
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Value>) {
+  return <SelectPrimitive.Value data-slot="select-value" {...props} />
+}
+
+function SelectTrigger({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
+  return (
+    <SelectPrimitive.Trigger
+      data-slot="select-trigger"
+      className={cn(
+        "border-input ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-9 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [&>span]:line-clamp-1",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDownIcon className="text-muted-foreground size-4 opacity-50" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  )
+}
+
+function SelectContent({
+  className,
+  children,
+  position = "popper",
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        data-slot="select-content"
+        position={position}
+        className={cn(
+          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 min-w-[8rem] overflow-hidden rounded-md border shadow-md",
+          position === "popper" &&
+            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+          className
+        )}
+        {...props}
+      >
+        <SelectPrimitive.Viewport
+          data-slot="select-viewport"
+          className={cn(
+            "p-1",
+            position === "popper" &&
+              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+          )}
+        >
+          {children}
+        </SelectPrimitive.Viewport>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  )
+}
+
+function SelectLabel({
+  className,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Label>) {
+  return (
+    <SelectPrimitive.Label
+      data-slot="select-label"
+      className={cn("py-1.5 pr-2 pl-8 text-sm font-medium", className)}
+      {...props}
+    />
+  )
+}
+
+function SelectItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+  return (
+    <SelectPrimitive.Item
+      data-slot="select-item"
+      className={cn(
+        "focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <CheckIcon className="size-4" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  )
+}
+
+function SelectSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Separator>) {
+  return (
+    <SelectPrimitive.Separator
+      data-slot="select-separator"
+      className={cn("bg-muted -mx-1 my-1 h-px", className)}
+      {...props}
+    />
+  )
+}
+
+import { CheckIcon } from "lucide-react" // Asegurar importación local o global
+
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+}
 ```
 
 ## File: `components\ui\separator.tsx`
