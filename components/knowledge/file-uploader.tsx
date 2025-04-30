@@ -40,23 +40,23 @@ export function FileUploader({
     uploadError,
     clearUploadStatus
 }: FileUploaderProps) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [dropzoneError, setDropzoneError] = useState<string | null>(null);
   const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null);
 
   // Efecto para limpiar errores/éxito visual si el archivo cambia o se deselecciona
   useEffect(() => {
-    if (!file) {
-        setDropzoneError(null);
-        setLocalUploadSuccess(null);
-        // No limpiar uploadError aquí, podría ser un error persistente del último intento
+    if (files.length === 0) {
+      setDropzoneError(null);
+      setLocalUploadSuccess(null);
+      // No limpiar uploadError aquí, podría ser un error persistente del último intento
     } else {
-        // Si se selecciona un NUEVO archivo, limpiar estados visuales y error del padre
-        setDropzoneError(null);
-        setLocalUploadSuccess(null);
-        clearUploadStatus();
+      // Si se selecciona un NUEVO archivo, limpiar estados visuales y error del padre
+      setDropzoneError(null);
+      setLocalUploadSuccess(null);
+      clearUploadStatus();
     }
-  }, [file, clearUploadStatus]);
+  }, [files, clearUploadStatus]);
 
   // Manejador del Dropzone
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
@@ -64,7 +64,7 @@ export function FileUploader({
     setDropzoneError(null);
     setLocalUploadSuccess(null);
     clearUploadStatus();
-    setFile(null);
+    // setFile(null); // Eliminar referencia obsoleta
 
     if (fileRejections.length > 0) {
         const rejection = fileRejections[0];
@@ -80,7 +80,7 @@ export function FileUploader({
     }
 
     if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
+      setFiles(acceptedFiles);
     }
   }, [clearUploadStatus]);
 
@@ -88,28 +88,16 @@ export function FileUploader({
     onDrop,
     accept: acceptedFileTypes,
     maxSize: MAX_FILE_SIZE_BYTES,
-    multiple: false,
+    multiple: true,
     disabled: isUploading, // Deshabilitar dropzone mientras se sube
   });
 
   // Manejador del click del botón de subida
-  const handleUploadClick = async () => {
-    if (!file || !authHeaders || isUploading) return;
-    setLocalUploadSuccess(null); // Resetear estado visual
-
-    const success = await onUploadFile(file, authHeaders); // Llama a la función del hook padre
-    setLocalUploadSuccess(success);
-    if (success) {
-        // Limpiar selección solo si la subida fue exitosa (estado 202)
-        // Si falla (ej. 409 duplicado), mantener el archivo seleccionado para info
-        setFile(null);
-    }
-    // El hook padre se encarga de los toasts
-  };
+  // El botón de subir ahora sube todos los archivos, así que esta función ya no se usa
 
   // Quitar el archivo seleccionado
   const removeFile = () => {
-    setFile(null);
+    // setFile(null); // Eliminar referencia obsoleta
   }
 
   // Determinar el error a mostrar (prioridad al error de subida si existe)
@@ -176,40 +164,48 @@ export function FileUploader({
       </div>
 
       {/* Preview del Archivo Seleccionado (si existe y no está subiendo/completado) */}
-      {file && !isUploading && localUploadSuccess === null && (
-        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
-            <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
-                 <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
-                 <div className='flex flex-col min-w-0'>
-                    <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                        ({(file.size / 1024 / 1024).toFixed(2)} MB) -
-                        <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
-                    </span>
-                 </div>
+      {files.length > 0 && !isUploading && (
+        <div className="space-y-2">
+          {files.map(file => (
+            <div key={file.name} className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
+              <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
+                <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
+                <div className='flex flex-col min-w-0'>
+                  <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({(file.size / 1024 / 1024).toFixed(2)} MB) -
+                    <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
+                  </span>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={() => setFiles(files.filter(f => f.name !== file.name))} aria-label="Quitar archivo" disabled={isUploading}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          {/* Botón para quitar archivo, deshabilitado si está subiendo */}
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
-            <X className="h-4 w-4" />
-          </Button>
+          ))}
         </div>
       )}
 
       {/* Botón de Subida (visible solo si hay archivo y no se completó la subida) */}
-      {file && localUploadSuccess === null && (
-          <Button
-            onClick={handleUploadClick}
-            disabled={isUploading} // Deshabilitar si está subiendo
-            className="w-full"
-          >
-            {isUploading ? (
-                <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Subiendo...
-                </>
-             ) : 'Subir y Procesar Archivo'}
-          </Button>
-       )}
+      {files.length > 0 && (
+        <Button
+          onClick={async () => {
+            for (const file of files) {
+              await onUploadFile(file, authHeaders);
+            }
+            setFiles([]);
+          }}
+          disabled={isUploading}
+          className="w-full"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Subiendo...
+            </>
+          ) : 'Subir y Procesar Archivos'}
+        </Button>
+      )}
     </div>
   );
 }
