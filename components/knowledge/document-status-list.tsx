@@ -97,10 +97,44 @@ export function DocumentStatusList({
     // FLAG_LLM: Buscar usando document_id
     const docToDelete = documents.find(d => d.document_id === deletingDocId);
     const display = docToDelete?.file_name || deletingDocId.substring(0, 8) + '...';
-    setIsDeleting(true); const toastId = toast.loading(`Eliminando "${display}"...`);
-    try { await deleteIngestDocument(deletingDocId, authHeaders); onDeleteSuccess(deletingDocId); toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` }); closeDeleteConfirmation(); }
-    catch (e: any) { const errorMsg = e instanceof Error ? e.message : 'Error desconocido'; toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` }); }
-    finally { setIsDeleting(false); }
+    // --- LOG DETALLADO DE ORIGEN DE BORRADO ---
+    const now = new Date().toISOString();
+    let userInfo = '';
+    try {
+      // Si tienes acceso a usuario en contexto/props, inclúyelo aquí
+      if (authHeaders && (authHeaders['X-User-ID'] || authHeaders['X-Company-ID'])) {
+        userInfo = `UserID: ${authHeaders['X-User-ID'] || ''}, CompanyID: ${authHeaders['X-Company-ID'] || ''}`;
+      }
+    } catch {}
+    // Stack trace
+    const stack = (new Error('StackTrace (origen handleDeleteConfirmed)')).stack;
+    // Log en consola
+    console.error('[AUDIT][DELETE_DOCUMENT]', {
+      timestamp: now,
+      user: userInfo,
+      document_id: deletingDocId,
+      file_name: docToDelete?.file_name,
+      status: docToDelete?.status,
+      location: 'components/knowledge/document-status-list.tsx:handleDeleteConfirmed',
+      stack,
+      context: {
+        docToDelete,
+        authHeaders,
+      }
+    });
+    setIsDeleting(true);
+    const toastId = toast.loading(`Eliminando "${display}"...`);
+    try {
+      await deleteIngestDocument(deletingDocId, authHeaders);
+      onDeleteSuccess(deletingDocId);
+      toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
+      closeDeleteConfirmation();
+    } catch (e: any) {
+      const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
+      toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // --- Renderizado ---
