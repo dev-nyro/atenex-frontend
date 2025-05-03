@@ -9,11 +9,14 @@ import React, {
     useCallback,
     ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
-import { User as AppUser } from '@/lib/auth/helpers';
+import { useRouter, usePathname } from 'next/navigation'; // Import usePathname
+import { User as AppUser } from '@/lib/auth/helpers'; // Importa la interfaz actualizada
 import { toast } from "sonner";
 import { AUTH_TOKEN_KEY } from '@/lib/constants';
-import { getApiGatewayUrl, cn } from '@/lib/utils';
+import { getApiGatewayUrl } from '@/lib/utils'; // cn no se usa aquí
+
+// Definir el email del admin globalmente o importarlo
+const ADMIN_EMAIL = "atenex@gmail.com";
 
 interface AuthContextType {
     user: AppUser | null;
@@ -27,8 +30,8 @@ const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
     isLoading: true,
-    signIn: async () => { throw new Error("AuthProvider no inicializado"); }, // Traducido
-    signOut: async () => { throw new Error("AuthProvider no inicializado"); }, // Traducido
+    signIn: async () => { throw new Error("AuthProvider no inicializado"); },
+    signOut: async () => { throw new Error("AuthProvider no inicializado"); },
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
@@ -50,7 +53,7 @@ function decodeJwtPayload(token: string): any | null {
         );
         return JSON.parse(jsonPayload);
     } catch (error) {
-        console.error("Fallo al decodificar JWT:", error); // Traducido
+        console.error("Fallo al decodificar JWT:", error);
         return null;
     }
 }
@@ -59,12 +62,16 @@ function getUserFromDecodedToken(payload: any): AppUser | null {
     if (!payload || !payload.sub) {
         return null;
     }
+    // Añadir la lógica isAdmin
+    const isAdmin = payload.email === ADMIN_EMAIL;
+    console.log(`getUserFromDecodedToken: Email=${payload.email}, IsAdmin=${isAdmin}`);
     return {
         userId: payload.sub,
         email: payload.email,
         name: payload.name || null,
-        companyId: payload.company_id,
+        companyId: payload.company_id || null, // Asegurar que puede ser null
         roles: payload.roles || [],
+        isAdmin: isAdmin, // Establecer el flag isAdmin
     };
 }
 
@@ -73,9 +80,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    const pathname = usePathname(); // Obtener pathname actual
 
     useEffect(() => {
-        console.log("AuthProvider: Inicializando y buscando token en localStorage...");
+        console.log("AuthProvider: Inicializando...");
         if (typeof window !== 'undefined') {
             try {
                 const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -86,48 +94,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     if (currentUser) {
                         const isExpired = decodedPayload.exp && (decodedPayload.exp * 1000 < Date.now());
                         if (isExpired) {
-                            console.warn("AuthProvider: Token almacenado está expirado. Limpiando."); // Traducido
+                            console.warn("AuthProvider: Token expirado. Limpiando.");
                             localStorage.removeItem(AUTH_TOKEN_KEY);
                             setToken(null);
                             setUser(null);
                         } else {
-                            console.log("AuthProvider: Token válido encontrado en almacenamiento.", currentUser);
+                            console.log("AuthProvider: Token válido encontrado.", currentUser);
                             setToken(storedToken);
                             setUser(currentUser);
+
+                             // --- Redirección inicial si es Admin ---
+                             if (currentUser.isAdmin && !pathname?.startsWith('/admin')) {
+                                 console.log("AuthProvider: Admin detectado en inicialización, redirigiendo a /admin");
+                                 router.replace('/admin');
+                             }
+                             // --- Fin Redirección inicial ---
+
                         }
                     } else {
-                        console.warn("AuthProvider: Token inválido encontrado en almacenamiento. Limpiando."); // Traducido
+                        console.warn("AuthProvider: Token inválido encontrado. Limpiando.");
                         localStorage.removeItem(AUTH_TOKEN_KEY);
                         setToken(null);
                         setUser(null);
                     }
                 } else {
-                    console.log("AuthProvider: No se encontró token en almacenamiento."); // Traducido
+                    console.log("AuthProvider: No se encontró token.");
                     setToken(null);
                     setUser(null);
                 }
             } catch (error) {
-                console.error("AuthProvider: Error accediendo a localStorage o decodificando token:", error); // Traducido
+                console.error("AuthProvider: Error en inicialización:", error);
                 try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
                 setToken(null);
                 setUser(null);
             } finally {
                 setIsLoading(false);
-                console.log("AuthProvider: Carga inicial completa."); // Traducido
+                console.log("AuthProvider: Carga inicial completa.");
             }
         } else {
-             setIsLoading(false);
+             setIsLoading(false); // No estamos en el navegador
         }
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Ejecutar solo una vez al montar
 
     const signIn = useCallback(async (email: string, password: string): Promise<void> => {
-        console.log("AuthProvider: Intentando iniciar sesión..."); // Traducido
+        console.log("AuthProvider: Intentando iniciar sesión...");
         setIsLoading(true);
         let gatewayUrl = '';
         try {
             gatewayUrl = getApiGatewayUrl();
             const loginEndpoint = `${gatewayUrl}/api/v1/users/login`;
-            console.log(`AuthProvider: Llamando al endpoint de login: ${loginEndpoint}`);
+            console.log(`AuthProvider: Llamando a: ${loginEndpoint}`);
 
             const response = await fetch(loginEndpoint, {
                 method: 'POST',
@@ -142,40 +159,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const responseBody = await response.json();
 
             if (!response.ok) {
-                const errorMessage = responseBody?.message || responseBody?.detail || `Fallo en login (${response.status})`; // Traducido
-                console.error("AuthProvider: Llamada a API de login fallida.", { status: response.status, body: responseBody }); // Traducido
+                const errorMessage = responseBody?.message || responseBody?.detail || `Fallo en login (${response.status})`;
+                console.error("AuthProvider: Fallo API login.", { status: response.status, body: responseBody });
                 throw new Error(errorMessage);
             }
 
             const receivedToken = responseBody?.access_token || responseBody?.token;
             if (!receivedToken || typeof receivedToken !== 'string') {
-                console.error("AuthProvider: No se recibió un token válido en la respuesta de login.", responseBody); // Traducido
-                throw new Error("Login exitoso, pero no se recibió token."); // Traducido
+                console.error("AuthProvider: Token no válido en respuesta.", responseBody);
+                throw new Error("Login OK, pero no se recibió token.");
             }
 
             const decodedPayload = decodeJwtPayload(receivedToken);
             const loggedInUser = getUserFromDecodedToken(decodedPayload);
 
             if (!loggedInUser) {
-                console.error("AuthProvider: Token recibido es inválido o no se puede decodificar.", receivedToken); // Traducido
-                throw new Error("Login exitoso, pero se recibió un token inválido."); // Traducido
+                console.error("AuthProvider: Token recibido inválido.", receivedToken);
+                throw new Error("Login OK, pero token inválido.");
             }
 
             localStorage.setItem(AUTH_TOKEN_KEY, receivedToken);
             setToken(receivedToken);
             setUser(loggedInUser);
-            console.log("AuthProvider: Inicio de sesión exitoso.", loggedInUser); // Traducido
-            // Toast traducido
+            console.log("AuthProvider: Inicio de sesión exitoso.", loggedInUser);
             toast.success("Inicio de Sesión Exitoso", { description: `¡Bienvenido de nuevo, ${loggedInUser.name || loggedInUser.email}!` });
 
-            router.replace('/chat');
+            // Redirigir al dashboard si es admin, si no al chat
+            if (loggedInUser.isAdmin) {
+                router.replace('/admin'); // Redirigir a la nueva página admin
+            } else {
+                router.replace('/chat');
+            }
 
         } catch (err: any) {
-            console.error("AuthProvider: Error en inicio de sesión:", err); // Traducido
+            console.error("AuthProvider: Error en inicio de sesión:", err);
             localStorage.removeItem(AUTH_TOKEN_KEY);
             setToken(null);
             setUser(null);
-            // Toast traducido
             toast.error("Inicio de Sesión Fallido", { description: err.message || "Ocurrió un error inesperado." });
             throw err;
         } finally {
@@ -184,25 +204,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, [router]);
 
     const signOut = useCallback(async (): Promise<void> => {
-        console.log("AuthProvider: Cerrando sesión..."); // Traducido
+        console.log("AuthProvider: Cerrando sesión...");
         setIsLoading(true);
         try {
             localStorage.removeItem(AUTH_TOKEN_KEY);
             setToken(null);
             setUser(null);
-            console.log("AuthProvider: Token eliminado y estado limpiado."); // Traducido
-            // Toast traducido
+            console.log("AuthProvider: Estado limpiado.");
             toast.success("Sesión Cerrada", { description: "Has cerrado sesión correctamente." });
 
-            router.replace('/login');
+            router.replace('/login'); // Siempre redirigir a login al cerrar sesión
 
         } catch (error) {
-             console.error("AuthProvider: Error durante el proceso de cierre de sesión:", error); // Traducido
-             localStorage.removeItem(AUTH_TOKEN_KEY);
+             console.error("AuthProvider: Error durante cierre de sesión:", error);
+             localStorage.removeItem(AUTH_TOKEN_KEY); // Asegurar limpieza
              setToken(null);
              setUser(null);
-             // Toast traducido
-             toast.error("Problema al Cerrar Sesión", { description: "Ocurrió un error durante el cierre de sesión." });
+             toast.error("Problema al Cerrar Sesión", { description: "Ocurrió un error." });
         } finally {
              setIsLoading(false);
         }
@@ -226,7 +244,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
     if (context === undefined) {
-        throw new Error('useAuth debe ser usado dentro de un AuthProvider'); // Traducido
+        throw new Error('useAuth debe ser usado dentro de un AuthProvider');
     }
     return context;
 };

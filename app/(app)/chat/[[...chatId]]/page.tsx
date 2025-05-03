@@ -44,7 +44,9 @@ export default function ChatPage() {
     const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
 
     const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
+    // Mantener los documentos de la última consulta aunque cambie el chat
     const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
+    const lastDocsRef = useRef<RetrievedDoc[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export default function ChatPage() {
         setIsLoadingHistory(true);
         setHistoryError(null);
         setMessages([]);
-        setRetrievedDocs([]);
+        // NO limpiar retrievedDocs aquí, así se mantienen los docs de la última consulta
         setIsSourcesPanelVisible(false);
         fetchedChatIdRef.current = currentFetchTarget;
 
@@ -105,7 +107,17 @@ export default function ChatPage() {
                         return validTimeA - validTimeB;
                     });
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
-                    // Mostrar mensaje de bienvenida solo si el chat está vacío después de cargar
+                    // Buscar el último mensaje con fuentes
+                    let lastWithDocs: RetrievedDoc[] = [];
+                    for (let i = sortedMessages.length - 1; i >= 0; i--) {
+                        const sources = sortedMessages[i].sources;
+                        if (Array.isArray(sources) && sources.length > 0) {
+                            lastWithDocs = mapApiSourcesToFrontend(sources) || [];
+                            break;
+                        }
+                    }
+                    setRetrievedDocs(lastWithDocs);
+                    lastDocsRef.current = lastWithDocs;
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
                 })
                 .catch(error => {
@@ -124,7 +136,7 @@ export default function ChatPage() {
         } else {
             // Página de nuevo chat, mostrar bienvenida
             setMessages([welcomeMessage]);
-            setRetrievedDocs([]);
+            // NO limpiar retrievedDocs aquí
             setIsLoadingHistory(false);
             setIsSourcesPanelVisible(false);
             fetchedChatIdRef.current = 'welcome';
@@ -196,7 +208,7 @@ export default function ChatPage() {
         }
 
         setIsSending(true);
-        setRetrievedDocs([]);
+        // No limpiar retrievedDocs aquí, así se mantienen los docs de la última consulta
 
         const currentChatIdForApi = chatId || null;
         console.log(`ChatPage: Sending query to API (Chat ID: ${currentChatIdForApi || 'New'})...`);
@@ -220,6 +232,7 @@ export default function ChatPage() {
 
             setMessages(prev => [...prev, assistantMessage]);
             setRetrievedDocs(mappedSources || []);
+            lastDocsRef.current = mappedSources || [];
 
             if (!currentChatIdForApi && returnedChatId) {
                 setChatId(returnedChatId);
@@ -354,15 +367,13 @@ export default function ChatPage() {
                          </div>
                      </div>
                  </ResizablePanel>
-                 {isSourcesPanelVisible && (
-                     <>
-                         <ResizableHandle withHandle />
-                         {/* Ajuste de tamaño del panel de fuentes */}
-                         <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-                             <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
-                         </ResizablePanel>
-                     </>
-                 )}
+                 {/* Panel de fuentes siempre visible con los docs de la última consulta */}
+                 <>
+                     <ResizableHandle withHandle />
+                     <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                         <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                     </ResizablePanel>
+                 </>
              </ResizablePanelGroup>
         </div>
     );

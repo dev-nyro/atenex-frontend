@@ -6,6 +6,8 @@ atenex-frontend/
 ├── .gitignore
 ├── app
 │   ├── (app)
+│   │   ├── admin
+│   │   │   └── page.tsx
 │   │   ├── chat
 │   │   │   └── [[...chatId]]
 │   │   │       └── page.tsx
@@ -32,6 +34,9 @@ atenex-frontend/
 │   └── terms
 │       └── page.tsx
 ├── components
+│   ├── admin
+│   │   ├── AdminManagement.tsx
+│   │   └── AdminStats.tsx
 │   ├── animations
 │   │   └── snakeanimation.tsx
 │   ├── auth
@@ -48,6 +53,8 @@ atenex-frontend/
 │   │   ├── document-status-list.tsx
 │   │   └── file-uploader.tsx
 │   ├── layout
+│   │   ├── AdminLayout.tsx
+│   │   ├── AdminSidebar.tsx
 │   │   ├── header.tsx
 │   │   └── sidebar.tsx
 │   ├── theme-palette-button.tsx
@@ -447,6 +454,50 @@ ehthumbs_vista.db
 .history/
 ```
 
+## File: `app\(app)\admin\page.tsx`
+```tsx
+// File: app/(app)/admin/page.tsx
+"use client";
+
+import React from 'react';
+import { useRouter, useSearchParams } from 'next/navigation'; // Usaremos searchParams para la navegación interna
+import AdminStats from '@/components/admin/AdminStats';
+import AdminManagement from '@/components/admin/AdminManagement';
+import { useAuth } from '@/lib/hooks/useAuth'; // Importar useAuth para proteger si es necesario
+import { Loader2 } from 'lucide-react';
+
+export default function AdminDashboardPage() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const view = searchParams.get('view') || 'stats'; // Default to stats view
+
+  // Opcional: Doble chequeo de admin, aunque el layout ya debería proteger
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user?.isAdmin) {
+    // Si por alguna razón un no-admin llega aquí, redirigir
+    router.replace('/chat'); // o a donde sea apropiado
+    return null;
+  }
+
+  // Renderizar la vista seleccionada
+  return (
+    <div className="space-y-6">
+      {view === 'stats' && <AdminStats />}
+      {view === 'management' && <AdminManagement />}
+      {/* Puedes añadir más vistas aquí si es necesario */}
+    </div>
+  );
+}
+```
+
 ## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
 // File: app/(app)/chat/[[...chatId]]/page.tsx (MODIFICADO - Iteración 3.1)
@@ -495,7 +546,9 @@ export default function ChatPage() {
     const [chatId, setChatId] = useState<string | undefined>(chatIdParam);
 
     const [messages, setMessages] = useState<Message[]>([welcomeMessage]);
+    // Mantener los documentos de la última consulta aunque cambie el chat
     const [retrievedDocs, setRetrievedDocs] = useState<RetrievedDoc[]>([]);
+    const lastDocsRef = useRef<RetrievedDoc[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
@@ -538,7 +591,7 @@ export default function ChatPage() {
         setIsLoadingHistory(true);
         setHistoryError(null);
         setMessages([]);
-        setRetrievedDocs([]);
+        // NO limpiar retrievedDocs aquí, así se mantienen los docs de la última consulta
         setIsSourcesPanelVisible(false);
         fetchedChatIdRef.current = currentFetchTarget;
 
@@ -556,7 +609,16 @@ export default function ChatPage() {
                         return validTimeA - validTimeB;
                     });
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
-                    // Mostrar mensaje de bienvenida solo si el chat está vacío después de cargar
+                    // Buscar el último mensaje con fuentes
+                    let lastWithDocs: RetrievedDoc[] = [];
+                    for (let i = sortedMessages.length - 1; i >= 0; i--) {
+                        if (sortedMessages[i].sources && sortedMessages[i].sources.length > 0) {
+                            lastWithDocs = mapApiSourcesToFrontend(sortedMessages[i].sources);
+                            break;
+                        }
+                    }
+                    setRetrievedDocs(lastWithDocs);
+                    lastDocsRef.current = lastWithDocs;
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
                 })
                 .catch(error => {
@@ -575,7 +637,7 @@ export default function ChatPage() {
         } else {
             // Página de nuevo chat, mostrar bienvenida
             setMessages([welcomeMessage]);
-            setRetrievedDocs([]);
+            // NO limpiar retrievedDocs aquí
             setIsLoadingHistory(false);
             setIsSourcesPanelVisible(false);
             fetchedChatIdRef.current = 'welcome';
@@ -647,7 +709,7 @@ export default function ChatPage() {
         }
 
         setIsSending(true);
-        setRetrievedDocs([]);
+        // No limpiar retrievedDocs aquí, así se mantienen los docs de la última consulta
 
         const currentChatIdForApi = chatId || null;
         console.log(`ChatPage: Sending query to API (Chat ID: ${currentChatIdForApi || 'New'})...`);
@@ -671,6 +733,7 @@ export default function ChatPage() {
 
             setMessages(prev => [...prev, assistantMessage]);
             setRetrievedDocs(mappedSources || []);
+            lastDocsRef.current = mappedSources || [];
 
             if (!currentChatIdForApi && returnedChatId) {
                 setChatId(returnedChatId);
@@ -805,15 +868,13 @@ export default function ChatPage() {
                          </div>
                      </div>
                  </ResizablePanel>
-                 {isSourcesPanelVisible && (
-                     <>
-                         <ResizableHandle withHandle />
-                         {/* Ajuste de tamaño del panel de fuentes */}
-                         <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-                             <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isSending} />
-                         </ResizablePanel>
-                     </>
-                 )}
+                 {/* Panel de fuentes siempre visible con los docs de la última consulta */}
+                 <>
+                     <ResizableHandle withHandle />
+                     <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                         <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                     </ResizablePanel>
+                 </>
              </ResizablePanelGroup>
         </div>
     );
@@ -1022,14 +1083,14 @@ export default function KnowledgePage() {
 
 ## File: `app\(app)\layout.tsx`
 ```tsx
-// File: app/(app)/layout.tsx
-// Purpose: Layout for authenticated sections, handling route protection.
+// File: app/(app)/layout.tsx (MODIFICADO - Renderizado Condicional Admin)
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { AdminLayout } from '@/components/layout/AdminLayout'; // Importar AdminLayout
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
@@ -1039,130 +1100,122 @@ import { toast } from 'sonner';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
-  // Iniciar colapsado por defecto en pantallas más pequeñas podría ser una opción futura,
-  // pero por ahora empezamos expandido.
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
-
-  // Ref to track if the "incomplete setup" warning has been shown for this session load
   const incompleteSetupWarningShown = useRef(false);
 
   useEffect(() => {
-    // Reset warning flag if user changes significantly (e.g., new login)
     incompleteSetupWarningShown.current = false;
-  }, [user?.userId]); // Reset based on user ID change
+  }, [user?.userId]);
 
   useEffect(() => {
     if (bypassAuth) {
       console.warn("AppLayout: Auth check SKIPPED (Bypass).");
       return;
     }
-
-    // Don't redirect or evaluate further if auth state is still loading
     if (isLoading) {
       console.log("AppLayout: Waiting for auth state...");
       return;
     }
-
-    // If loading is finished and there's no user, redirect to home/login
     if (!user) {
       console.log("AppLayout: No user found after loading, redirecting to /");
       router.replace('/');
       return;
     }
 
-    // If user exists, but lacks companyId
-    if (user && !user.companyId) {
-       // Only show the toast ONCE per session load attempt to avoid repetition
+    // --- REDIRECCIÓN ADMIN ---
+    // Si el usuario es admin y *no* está ya en una ruta bajo /admin (o la raíz de admin)
+    // lo redirigimos a la página principal del admin.
+    // Nota: La página /admin será la que maneje las sub-vistas (stats, management).
+    if (user.isAdmin && !router.pathname?.startsWith('/admin')) {
+        console.log("AppLayout: Admin user detected, redirecting to /admin");
+        router.replace('/admin');
+        return; // Importante: detener la ejecución aquí para evitar renderizado incorrecto
+    }
+    // --- FIN REDIRECCIÓN ADMIN ---
+
+    if (user && !user.companyId && !user.isAdmin) { // Ignorar check de companyId para admin
        if (!incompleteSetupWarningShown.current) {
           console.error(`AppLayout: User data is incomplete (CompanyID: ${user?.companyId}). Showing warning.`);
-          toast.error("Incomplete Account Setup", {
-             description: "Your account setup seems incomplete (missing company association). Attempting to resolve or please log in again.",
-             duration: 8000, // Longer duration
-             id: "incomplete-setup-warn", // Prevent duplicates
-          });
-          incompleteSetupWarningShown.current = true; // Mark as shown for this session instance
+          toast.error("Incomplete Account Setup", { /* ... */ });
+          incompleteSetupWarningShown.current = true;
        }
-       // Optionally force logout immediately:
-       // signOut();
-       // Or let the user stay but potentially face API errors (depends on desired UX)
-       return; // Don't proceed to render children if state is known to be invalid
+       // No bloquear al admin si no tiene companyId asignado
+       return;
     }
 
-    // If we reach here: Loading is false, user exists, user.companyId exists.
     console.log("AppLayout: Auth check passed.");
-    // Reset warning flag if we reach a valid state
     incompleteSetupWarningShown.current = false;
 
-  }, [isLoading, user, bypassAuth, router, signOut]); // Dependencies
+  }, [isLoading, user, bypassAuth, router, signOut]);
 
   // --- Render Loading State ---
-  if (!bypassAuth && isLoading) {
+  if (isLoading) { // No necesitamos bypassAuth aquí, el loader es genérico
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-muted-foreground">Loading session...</p>
+        <p className="mt-4 text-muted-foreground">Cargando sesión...</p>
       </div>
     );
   }
 
-  // --- Render Auth Wall / Incomplete State Blocker ---
-  // Prevent rendering children if:
-  // 1. Auth is NOT bypassed AND
-  // 2. EITHER (a) auth is still loading OR (b) loading is done but there's no user OR (c) user data is incomplete
-  const shouldBlockRender = !bypassAuth && (isLoading || !user || !user.companyId);
+  // --- Render Auth Wall (si no es admin y falta user/company) ---
+  // El admin puede no tener companyId y aun así acceder al dashboard
+  const shouldBlockNonAdmin = !bypassAuth && !user?.isAdmin && (!user || !user.companyId);
 
-  if (shouldBlockRender) {
-      console.log("AppLayout: Auth guard preventing render.");
-      // Render a loader or null while waiting for redirect or state resolution
+  if (shouldBlockNonAdmin) {
+      console.log("AppLayout: Auth guard preventing non-admin render.");
       return (
         <div className="flex h-screen items-center justify-center bg-background">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-           {/* Optionally show a message if blocked due to incomplete setup */}
            {!isLoading && user && !user.companyId && (
-              <p className="mt-4 text-destructive">Resolving account setup...</p>
+              <p className="mt-4 text-destructive">Resolviendo configuración de cuenta...</p>
            )}
         </div>
       );
   }
 
-  // --- Render Protected Layout ---
-  console.log("AppLayout: Rendering protected layout...");
-  return (
-     <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
-      <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
-          <ResizablePanel
-              collapsible
-              collapsedSize={4} // Tamaño colapsado (en porcentaje o píxeles si se especifica unit)
-              minSize={15} // Permitir que sea más delgado
-              maxSize={25} // Límite superior
-              defaultSize={18} // Un poco más ancho por defecto
-              onCollapse={() => setIsSidebarCollapsed(true)}
-              onExpand={() => setIsSidebarCollapsed(false)}
-              className={cn(
-                  "transition-all duration-300 ease-in-out bg-background dark:bg-card",
-                  // Definimos el tamaño colapsado con clases específicas si collapsedSize no funciona como esperado
-                  isSidebarCollapsed ? "min-w-[50px] max-w-[50px]" : "min-w-[220px]" // Ancho mínimo expandido
-              )}
-              order={1}
-          >
-              {/* Pasamos el estado colapsado al Sidebar */}
-              <Sidebar isCollapsed={isSidebarCollapsed} />
-          </ResizablePanel>
-          {/* Usamos el handle personalizado de ui/resizable */}
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={82} minSize={30} order={2}> {/* Ajustar tamaño restante */}
-              <div className="flex h-full flex-col">
-                  <Header />
-                  {/* Cambiado el padding para ser consistente */}
-                  <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
-                      {children}
-                  </main>
-              </div>
-          </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
-  );
+  // --- Renderizado Condicional ---
+  if (user?.isAdmin) {
+      console.log("AppLayout: Rendering Admin Layout...");
+      // Renderizar el Layout de Admin si el usuario es admin
+      // Pasamos 'children' que en este caso será el contenido de `app/(app)/admin/page.tsx`
+      return <AdminLayout>{children}</AdminLayout>;
+  } else {
+      // Renderizar el Layout Normal para usuarios regulares
+      console.log("AppLayout: Rendering standard user layout...");
+      return (
+         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
+          <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
+              <ResizablePanel
+                  collapsible
+                  collapsedSize={4}
+                  minSize={15}
+                  maxSize={25}
+                  defaultSize={18}
+                  onCollapse={() => setIsSidebarCollapsed(true)}
+                  onExpand={() => setIsSidebarCollapsed(false)}
+                  className={cn(
+                      "transition-all duration-300 ease-in-out bg-background dark:bg-card",
+                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]"
+                  )}
+                  order={1}
+              >
+                  <Sidebar isCollapsed={isSidebarCollapsed} />
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={82} minSize={30} order={2}>
+                  <div className="flex h-full flex-col">
+                      <Header />
+                      <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
+                          {children} {/* Aquí se renderiza el contenido de /chat, /knowledge, etc. */}
+                      </main>
+                  </div>
+              </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      );
+  }
 }
 ```
 
@@ -1859,33 +1912,51 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
 @import "tailwindcss";
 
 /* 2. Define variables base FUERA del @theme */
-/* Variables para el tema claro (:root) - Ajustados para mayor neutralidad */
+/* Variables para el tema claro (:root) - Profesional Blanco */
 :root {
     --radius: 0.6rem;
+    /* Blanco casi puro con ligera tonalidad fría */
     --background: oklch(0.995 0.005 240);
+    /* Negro/gris muy oscuro para texto principal */
     --foreground: oklch(0.15 0.015 240);
+    /* Blanco puro para tarjetas */
     --card: oklch(1 0 0);
     --card-foreground: var(--foreground);
+    /* Popover usa fondo de tarjeta */
     --popover: var(--card);
     --popover-foreground: var(--card-foreground);
-    --primary: oklch(0.48 0.16 265);
-    --primary-foreground: oklch(0.99 0.01 265);
+    /* Azul corporativo principal (ej. un azul medio/oscuro) */
+    --primary: oklch(0.5 0.18 255); /* Ajustado a un azul más estándar */
+    /* Blanco para texto sobre primario */
+    --primary-foreground: oklch(0.99 0.01 255);
+    /* Gris muy claro para secundario */
     --secondary: oklch(0.97 0.01 240);
+    /* Gris medio para texto secundario */
     --secondary-foreground: oklch(0.30 0.02 240);
+    /* Muted usa secundario */
     --muted: var(--secondary);
+    /* Gris más claro para texto muted */
     --muted-foreground: oklch(0.50 0.015 240);
+    /* Gris aún más claro para acento */
     --accent: oklch(0.95 0.015 240);
+    /* Texto oscuro para acento */
     --accent-foreground: oklch(0.20 0.02 240);
+    /* Rojo estándar para destructivo */
     --destructive: oklch(0.6 0.2 20);
     --destructive-foreground: oklch(0.99 0.01 20);
+    /* Gris claro para bordes */
     --border: oklch(0.92 0.01 240);
+    /* Gris un poco más oscuro para inputs */
     --input: oklch(0.94 0.01 240);
-    --ring: oklch(0.65 0.16 265 / 0.5);
+    /* Anillo con color primario semi-transparente */
+    --ring: oklch(0.5 0.18 255 / 0.5);
+    /* Charts - Pueden mantenerse o simplificarse si no se usan */
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
     --chart-3: oklch(0.398 0.07 227.392);
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
+    /* Sidebar */
     --sidebar: var(--card);
     --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--primary);
@@ -1896,35 +1967,50 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
     --sidebar-ring: var(--ring);
 }
 
-/* Variables para el tema oscuro (.dark) - Base Oscuro (Elegante) */
+/* Variables para el tema oscuro (.dark) - Azul Oscuro Elegante */
 .dark {
-    --background: oklch(0.1 0.01 230); /* Azul/Gris muy oscuro */
-    --foreground: oklch(0.93 0.008 230); /* Gris muy claro, ligeramente azulado */
-    --card: oklch(0.14 0.015 230);    /* Un poco más claro que el fondo */
+    /* Fondo azul muy oscuro, casi negro */
+    --background: oklch(0.12 0.02 235);
+    /* Texto gris muy claro, ligeramente azulado */
+    --foreground: oklch(0.94 0.008 235);
+    /* Tarjeta un poco más clara que el fondo */
+    --card: oklch(0.16 0.018 235);
     --card-foreground: var(--foreground);
-    --popover: oklch(0.10 0.01 230);   /* Más oscuro para popovers */
+    /* Popover más oscuro que la tarjeta */
+    --popover: oklch(0.10 0.015 235);
     --popover-foreground: var(--foreground);
-    --primary: oklch(0.8 0.1 210);    /* Azul claro brillante como primario */
-    --primary-foreground: oklch(0.08 0.03 210); /* Azul muy oscuro para texto primario */
-    --secondary: oklch(0.20 0.02 230); /* Gris oscuro azulado */
-    --secondary-foreground: oklch(0.80 0.01 230); /* Texto claro para secundario */
+    /* Primario: Azul brillante pero no neón */
+    --primary: oklch(0.75 0.12 225);
+    /* Texto oscuro para contraste sobre primario */
+    --primary-foreground: oklch(0.08 0.03 225);
+    /* Secundario: Gris azulado oscuro */
+    --secondary: oklch(0.22 0.02 235);
+    /* Texto claro para secundario */
+    --secondary-foreground: oklch(0.85 0.01 235);
     --muted: var(--secondary);
-    --muted-foreground: oklch(0.55 0.015 230); /* Muted más claro */
-    --accent: oklch(0.25 0.025 230);   /* Accent oscuro */
-    --accent-foreground: oklch(0.97 0.008 230); /* Texto claro para accent */
-    --destructive: oklch(0.65 0.18 15);    /* Rojo anaranjado */
-    --destructive-foreground: oklch(0.99 0.01 15); /* Texto claro */
-    --border: oklch(0.22 0.02 230);   /* Borde oscuro */
-    --input: oklch(0.24 0.022 230);  /* Input oscuro */
-    --ring: oklch(0.8 0.1 210 / 0.5); /* Anillo azul claro semi-transparente */
-    /* Variables Chart */
+    /* Muted foreground más sutil */
+    --muted-foreground: oklch(0.60 0.015 235);
+    /* Accent más oscuro */
+    --accent: oklch(0.28 0.025 235);
+    /* Texto muy claro para accent */
+    --accent-foreground: oklch(0.98 0.008 235);
+    /* Destructive: Rojo/Naranja oscuro */
+    --destructive: oklch(0.65 0.18 15);
+    --destructive-foreground: oklch(0.99 0.01 15);
+    /* Borde oscuro sutil */
+    --border: oklch(0.25 0.02 235);
+    /* Input oscuro */
+    --input: oklch(0.26 0.022 235);
+    /* Anillo azul primario semi-transparente */
+    --ring: oklch(0.75 0.12 225 / 0.5);
+    /* Charts */
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
     /* Sidebar */
-     --sidebar: oklch(0.13 0.012 230); /* Sidebar ligeramente diferente */
+     --sidebar: oklch(0.15 0.015 235); /* Sidebar ligeramente diferente */
      --sidebar-foreground: var(--foreground);
      --sidebar-primary: var(--primary);
      --sidebar-primary-foreground: var(--primary-foreground);
@@ -1934,120 +2020,41 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
      --sidebar-ring: var(--ring);
 }
 
-/* --- TEMA: Slate (Oscuro) --- */
-.slate {
-    --background: oklch(0.18 0.01 230);
-    --foreground: oklch(0.94 0.005 230);
-    --card: oklch(0.22 0.015 230);
-    --card-foreground: var(--foreground);
-    --popover: oklch(0.15 0.01 230);
-    --popover-foreground: var(--foreground);
-    --primary: oklch(0.7 0.18 40); /* Naranja vibrante */
-    --primary-foreground: oklch(0.1 0.05 40);
-    --secondary: oklch(0.3 0.02 230);
-    --secondary-foreground: oklch(0.88 0.008 230);
-    --muted: var(--secondary);
-    --muted-foreground: oklch(0.6 0.01 230);
-    --accent: oklch(0.35 0.025 230);
-    --accent-foreground: oklch(0.96 0.006 230);
-    --destructive: oklch(0.65 0.16 15);
-    --destructive-foreground: oklch(0.99 0.01 15);
-    --border: oklch(0.3 0.02 230);
-    --input: oklch(0.32 0.022 230);
-    --ring: oklch(0.7 0.18 40 / 0.5);
-    --sidebar: oklch(0.20 0.012 230);
-    --sidebar-border: var(--border);
-    --sidebar-foreground: var(--foreground);
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: var(--accent);
-    --sidebar-accent-foreground: var(--accent-foreground);
-    --sidebar-ring: var(--ring);
-}
 
-/* --- TEMA: Indigo (Claro) --- */
-.indigo {
-    --background: oklch(0.98 0.01 250);
-    --foreground: oklch(0.15 0.03 280);
-    --card: oklch(1 0 0);
-    --card-foreground: var(--foreground);
-    --popover: var(--card);
-    --popover-foreground: var(--card-foreground);
-    --primary: oklch(0.55 0.18 280);
-    --primary-foreground: oklch(0.99 0.01 280);
-    --secondary: oklch(0.96 0.02 270);
-    --secondary-foreground: oklch(0.35 0.04 280);
-    --muted: var(--secondary);
-    --muted-foreground: oklch(0.55 0.03 275);
-    --accent: oklch(0.8 0.15 190); /* Aqua/Cian */
-    --accent-foreground: oklch(0.1 0.04 190);
-    --destructive: oklch(0.6 0.2 10);
-    --destructive-foreground: oklch(0.99 0.01 10);
-    --border: oklch(0.9 0.015 260);
-    --input: oklch(0.93 0.018 265);
-    --ring: oklch(0.55 0.18 280 / 0.5);
-    --sidebar: oklch(0.99 0.008 255);
-    --sidebar-border: var(--border);
-    --sidebar-foreground: var(--foreground);
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: var(--accent);
-    --sidebar-accent-foreground: var(--accent-foreground);
-    --sidebar-ring: var(--ring);
-}
-
-/* --- TEMA: Stone (Claro) --- */
-.stone {
-    --background: oklch(0.98 0.005 80);
-    --foreground: oklch(0.25 0.01 80);
-    --card: oklch(1 0 0);
-    --card-foreground: var(--foreground);
-    --popover: var(--card);
-    --popover-foreground: var(--card-foreground);
-    --primary: oklch(0.55 0.12 165); /* Teal */
-    --primary-foreground: oklch(0.99 0.01 165);
-    --secondary: oklch(0.95 0.01 80);
-    --secondary-foreground: oklch(0.40 0.01 80);
-    --muted: var(--secondary);
-    --muted-foreground: oklch(0.55 0.01 80);
-    --accent: oklch(0.92 0.015 80);
-    --accent-foreground: oklch(0.28 0.01 80);
-    --destructive: oklch(0.6 0.18 30); /* Marrón rojizo */
-    --destructive-foreground: oklch(0.99 0.01 30);
-    --border: oklch(0.90 0.01 80);
-    --input: oklch(0.93 0.01 80);
-    --ring: oklch(0.55 0.12 165 / 0.5);
-    --sidebar: oklch(0.99 0.006 80);
-    --sidebar-border: var(--border);
-    --sidebar-foreground: var(--foreground);
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: var(--accent);
-    --sidebar-accent-foreground: var(--accent-foreground);
-    --sidebar-ring: var(--ring);
-}
-
-/* --- NUEVO TEMA: Zinc (Oscuro Elegante) --- */
+/* --- TEMA: Zinc (Perla / Gris Oscuro) --- */
 .zinc {
-    --background: oklch(0.15 0.01 220);  /* Gris Zinc muy oscuro */
-    --foreground: oklch(0.95 0.005 220); /* Gris muy claro */
-    --card: oklch(0.19 0.012 220);   /* Ligeramente más claro que el fondo */
+    /* Fondo: Gris Zinc muy oscuro */
+    --background: oklch(0.15 0.01 220);
+    /* Texto: Gris muy claro */
+    --foreground: oklch(0.95 0.005 220);
+    /* Tarjeta: Ligeramente más clara */
+    --card: oklch(0.19 0.012 220);
     --card-foreground: var(--foreground);
-    --popover: oklch(0.12 0.008 220);  /* Más oscuro */
+    /* Popover: Más oscuro */
+    --popover: oklch(0.12 0.008 220);
     --popover-foreground: var(--foreground);
-    --primary: oklch(0.75 0.06 220);   /* Azul grisáceo claro como primario */
-    --primary-foreground: oklch(0.1 0.01 220); /* Texto oscuro */
-    --secondary: oklch(0.25 0.015 220); /* Gris zinc medio */
-    --secondary-foreground: oklch(0.88 0.006 220); /* Texto claro */
+    /* Primario: Azul grisáceo claro */
+    --primary: oklch(0.75 0.06 220);
+    /* Texto primario: Oscuro */
+    --primary-foreground: oklch(0.1 0.01 220);
+    /* Secundario: Gris zinc medio */
+    --secondary: oklch(0.25 0.015 220);
+    /* Texto secundario: Claro */
+    --secondary-foreground: oklch(0.88 0.006 220);
     --muted: var(--secondary);
     --muted-foreground: oklch(0.6 0.01 220);
-    --accent: oklch(0.3 0.02 220);     /* Accent más oscuro */
+    /* Accent: Más oscuro */
+    --accent: oklch(0.3 0.02 220);
     --accent-foreground: oklch(0.98 0.005 220);
-    --destructive: oklch(0.6 0.15 20);     /* Rojo */
+    /* Destructive: Rojo */
+    --destructive: oklch(0.6 0.15 20);
     --destructive-foreground: oklch(0.99 0.01 20);
-    --border: oklch(0.25 0.015 220);  /* Borde sutil */
-    --input: oklch(0.27 0.018 220);   /* Input un poco más claro */
-    --ring: oklch(0.75 0.06 220 / 0.5); /* Ring azul grisáceo */
+    /* Borde: Sutil */
+    --border: oklch(0.25 0.015 220);
+    /* Input: Un poco más claro */
+    --input: oklch(0.27 0.018 220);
+    /* Ring: Azul grisáceo */
+    --ring: oklch(0.75 0.06 220 / 0.5);
     /* Sidebar */
      --sidebar: oklch(0.17 0.011 220);
      --sidebar-foreground: var(--foreground);
@@ -2058,7 +2065,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
      --sidebar-border: var(--border);
      --sidebar-ring: var(--ring);
 }
-/* --- FIN NUEVOS TEMAS --- */
+/* --- FIN TEMAS MANTENIDOS --- */
 
 /* 4. Aplica overrides mínimos en la capa base */
 @layer base {
@@ -2079,7 +2086,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
         /* z-index: 60 !important; ya no es necesario con la nueva estructura */
     }
 
-    /* Keyframes para animación fade-in (¡NUEVO!) */
+    /* Keyframes para animación fade-in */
     @keyframes fade-in {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -2090,6 +2097,48 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
       animation-delay: var(--animation-delay, 0s);
     }
 
+}
+
+/* Estilo para que ScrollArea funcione correctamente en flexbox */
+[data-radix-scroll-area-viewport] > div {
+  min-width: 100%;
+  display: table;
+}
+
+/* Estilo para el esqueleto de mensaje de asistente */
+.skeleton-thinking {
+  display: flex;
+  align-items: flex-start; /* Cambiado a flex-start para alinear ícono y texto */
+  gap: 0.75rem; /* Equivalente a space-x-3 */
+  width: 100%;
+  padding-right: 2.5rem; /* Equivalente a pr-10 */
+  padding-top: 1rem; /* Equivalente a pt-4 */
+}
+
+.skeleton-thinking-avatar {
+  height: 2rem; /* h-8 */
+  width: 2rem; /* w-8 */
+  border-radius: 9999px; /* rounded-full */
+  flex-shrink: 0;
+  background-color: hsl(var(--primary) / 0.1); /* bg-primary/10 */
+}
+
+.skeleton-thinking-text {
+  flex: 1;
+  padding-top: 0.375rem; /* pt-1.5 */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem; /* space-y-2 */
+}
+
+.skeleton-thinking-line {
+  height: 0.875rem; /* h-3.5 */
+  border-radius: 0.375rem; /* rounded */
+  background-color: hsl(var(--accent)); /* Fondo del Skeleton */
+}
+
+.skeleton-thinking-line-short {
+  width: 4rem; /* w-16 */
 }
 ```
 
@@ -2225,7 +2274,7 @@ export default function RootLayout({
 
 ## File: `app\page.tsx`
 ```tsx
-// File: app/page.tsx (MODIFICADO - Iteración 2: Contenido Landing)
+// File: app/page.tsx
 "use client";
 
 import React from 'react';
@@ -2301,9 +2350,10 @@ export default function HomePage() {
 
   return (
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-background via-background to-secondary/10 dark:to-muted/10">
-      {/* --- Header (sin cambios) --- */}
+      {/* --- Header --- */}
       <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-lg border-b border-border/60">
-        <div className="container flex items-center justify-between h-16 px-4 md:px-6">
+        {/* FLAG_LLM: Añadido container y mx-auto al div interior para centrar el header */}
+        <div className="container mx-auto flex items-center justify-between h-16 px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2 text-xl font-semibold text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" aria-label={`${APP_NAME} - Inicio`}>
              <AtenexLogoIcon className="h-7 w-auto" />
             <span className='font-bold'>{APP_NAME}</span>
@@ -2322,60 +2372,56 @@ export default function HomePage() {
       </header>
 
       {/* --- Contenido Principal --- */}
-      {/* Añadidos py-16 md:py-24 para más espacio vertical entre secciones */}
       <main className="flex-1 flex flex-col items-center text-center animate-fade-in opacity-0 [--animation-delay:200ms]" style={{animationFillMode: 'forwards'}}>
 
-         {/* --- Hero Section (Modificada levemente) --- */}
-         {/* Padding ajustado */}
-         <section className="w-full max-w-4xl pt-16 pb-16 md:pt-24 md:pb-20 px-4">
-            <div className="mb-8 flex justify-center">
-                <AtenexLogoIcon className="h-24 w-auto text-primary drop-shadow-lg" />
+         {/* --- Hero Section --- */}
+         <section className="w-full pt-16 pb-16 md:pt-24 md:pb-20 px-4">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el contenido hero */}
+            <div className="container mx-auto max-w-4xl">
+                <div className="mb-8 flex justify-center">
+                    <AtenexLogoIcon className="h-24 w-auto text-primary drop-shadow-lg" />
+                </div>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
+                    Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
+                </h1>
+                <h2 className="text-xl sm:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto">
+                    La IA que conecta a tu equipo con la información crucial de tus documentos, al instante.
+                </h2>
+                <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+                    Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    {isAuthLoading ? ( <Button size="lg" disabled={true} className="w-full sm:w-auto px-8 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>)
+                     : ( <Button size="lg" onClick={mainCtaAction} className={cn("w-full sm:w-auto px-8 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg")}> {mainCtaText} <ChevronRight className='ml-1 h-5 w-5'/> </Button> )}
+                </div>
+                {!isAuthenticated && !isAuthLoading && ( <p className="text-xs text-muted-foreground mt-6"> ¿Ya tienes cuenta?{' '} <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4"> Inicia Sesión </Link> </p> )}
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter text-foreground mb-6 leading-tight">
-                Desbloquea el Conocimiento Oculto en tu Empresa con <span className="text-primary">{APP_NAME}</span>
-            </h1>
-            <h2 className="text-xl sm:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto">
-                La IA que conecta a tu equipo con la información crucial de tus documentos, al instante.
-            </h2>
-            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
-                Haz preguntas en lenguaje natural. Obtén respuestas precisas al instante, directamente desde los documentos y datos de tu organización.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                {isAuthLoading ? ( <Button size="lg" disabled={true} className="w-full sm:w-auto px-8 shadow-md"> <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Cargando... </Button>)
-                 : ( <Button size="lg" onClick={mainCtaAction} className={cn("w-full sm:w-auto px-8 transition-transform duration-150 ease-in-out transform hover:scale-[1.03]", "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-none shadow-lg")}> {mainCtaText} <ChevronRight className='ml-1 h-5 w-5'/> </Button> )}
-                 {/* Enlace secundario podría ir aquí */}
-            </div>
-            {!isAuthenticated && !isAuthLoading && ( <p className="text-xs text-muted-foreground mt-6"> ¿Ya tienes cuenta?{' '} <Link href="/login" className="font-medium text-primary hover:underline underline-offset-4"> Inicia Sesión </Link> </p> )}
          </section>
          {/* --- FIN Hero Section --- */}
 
-         {/* --- Social Proof Section (NUEVA) --- */}
+         {/* --- Social Proof Section --- */}
          <section className="w-full py-12 md:py-16 bg-gradient-to-b from-background to-muted/20 dark:to-muted/10 border-y">
-            <div className="container max-w-5xl px-4">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el contenido de social proof */}
+            <div className="container mx-auto max-w-5xl px-4">
                  <h3 className="text-center text-lg font-semibold text-muted-foreground tracking-wider uppercase mb-8">
                     Impulsando Empresas Como la Tuya
                  </h3>
-                 {/* Logos Placeholder */}
                  <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-4 opacity-70">
                     {trustedLogos.map(logo => (
                         <span key={logo.name} className="text-sm font-medium text-muted-foreground italic" title={logo.name}>
-                            {logo.name} {/* Reemplazar con <Image> si hay logos */}
+                            {logo.name}
                         </span>
                     ))}
                  </div>
-                 {/* Testimonios (Placeholder)
-                 <div className="mt-12 max-w-2xl mx-auto text-center italic text-muted-foreground">
-                    "Atenex ha transformado cómo accedemos a nuestra documentación interna. ¡Imprescindible!" - CEO, Empresa Ficticia
-                 </div>
-                 */}
             </div>
          </section>
          {/* --- FIN Social Proof --- */}
 
 
-         {/* --- Cómo Funciona Section (NUEVA) --- */}
+         {/* --- Cómo Funciona Section --- */}
          <section className="w-full py-16 md:py-24 px-4">
-             <div className="container max-w-4xl text-center">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el contenido de cómo funciona */}
+             <div className="container mx-auto max-w-4xl text-center">
                 <h2 className="text-3xl font-bold tracking-tight mb-4">Atenex en Acción</h2>
                 <p className="text-lg text-muted-foreground mb-12">De documentos dispersos a decisiones informadas en 4 simples pasos.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
@@ -2394,13 +2440,12 @@ export default function HomePage() {
          {/* --- FIN Cómo Funciona --- */}
 
 
-         {/* --- Features Section (Refinada Descripción) --- */}
+         {/* --- Features Section --- */}
          <section className="w-full py-16 md:py-24 px-4 bg-muted/20 dark:bg-muted/10 border-y">
-             <div className="container max-w-6xl">
-                {/* Título opcional para la sección de features si se desea */}
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar las features */}
+             <div className="container mx-auto max-w-6xl">
                  <h2 className="text-3xl font-bold tracking-tight text-center mb-12">Potencia Tu Inteligencia Empresarial</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                    {/* Descripciones refinadas */}
                     <FeatureCard title="Búsqueda Inteligente" description="Encuentra información exacta al instante usando lenguaje natural, ahorrando horas de búsqueda manual y frustración." icon="Search"/>
                     <FeatureCard title="Conocimiento Centralizado" description="Rompe los silos de información accediendo al conocimiento colectivo en un solo lugar seguro, eliminando la duplicidad de esfuerzos." icon="Library"/>
                     <FeatureCard title="Productividad Mejorada" description="Empodera a tu equipo con acceso rápido a datos relevantes, acelerando la incorporación y permitiendo decisiones más rápidas." icon="Zap"/>
@@ -2410,9 +2455,10 @@ export default function HomePage() {
          {/* --- FIN Features Section --- */}
 
 
-         {/* --- Casos de Uso Section (NUEVA) --- */}
+         {/* --- Casos de Uso Section --- */}
          <section className="w-full py-16 md:py-24 px-4">
-             <div className="container max-w-6xl">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar los casos de uso */}
+             <div className="container mx-auto max-w-6xl">
                  <h2 className="text-3xl font-bold tracking-tight text-center mb-4">Ideal Para Cada Departamento</h2>
                  <p className="text-lg text-muted-foreground text-center mb-12 max-w-2xl mx-auto">Desde RRHH hasta I+D, Atenex se adapta a las necesidades específicas de tu equipo.</p>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -2425,9 +2471,10 @@ export default function HomePage() {
          {/* --- FIN Casos de Uso --- */}
 
 
-         {/* --- Seguridad Section (NUEVA) --- */}
+         {/* --- Seguridad Section --- */}
          <section className="w-full py-16 md:py-24 px-4 bg-muted/20 dark:bg-muted/10 border-y">
-             <div className="container max-w-4xl text-center">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar la sección de seguridad */}
+             <div className="container mx-auto max-w-4xl text-center">
                  <h2 className="text-3xl font-bold tracking-tight mb-4">Seguridad y Confianza en el Núcleo</h2>
                  <p className="text-lg text-muted-foreground mb-12">Tu información es tu activo más valioso. La protegemos como si fuera nuestra.</p>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
@@ -2446,9 +2493,10 @@ export default function HomePage() {
          {/* --- FIN Seguridad --- */}
 
 
-         {/* --- CTA Final Section (NUEVA) --- */}
+         {/* --- CTA Final Section --- */}
          <section className="w-full py-16 md:py-24 px-4">
-            <div className="container max-w-3xl text-center">
+             {/* FLAG_LLM: Añadido container y mx-auto para centrar el CTA final */}
+            <div className="container mx-auto max-w-3xl text-center">
                  <h2 className="text-3xl font-bold tracking-tight mb-4">¿Listo para Potenciar tu Conocimiento Interno?</h2>
                  <p className="text-lg text-muted-foreground mb-8">Descubre cómo Atenex puede transformar el acceso a la información en tu empresa.</p>
                   {/* Repetir CTA Principal */}
@@ -2466,9 +2514,10 @@ export default function HomePage() {
       {/* --- FIN Contenido Principal --- */}
 
 
-      {/* --- Footer (Actualizado Crédito) --- */}
+      {/* --- Footer --- */}
       <footer className="bg-muted/20 border-t border-border/60 py-6 mt-auto">
-        <div className="container text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
+         {/* FLAG_LLM: Añadido container y mx-auto al div interior para centrar el footer */}
+        <div className="container mx-auto text-center text-muted-foreground text-xs sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-center">
               <span>© {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.</span>
               <span className="hidden sm:inline-block opacity-50">|</span>
@@ -2691,6 +2740,384 @@ export default function TermsPage() {
                 </CardContent>
             </Card>
         </div>
+    </div>
+  );
+}
+```
+
+## File: `components\admin\AdminManagement.tsx`
+```tsx
+// File: components/admin/AdminManagement.tsx
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from '@/components/ui/separator';
+import { Loader2, Building, UserPlus, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { listCompaniesForSelect, createCompany, createUser, CompanySelectItem, ApiError } from '@/lib/api'; // Necesitarás definir esto
+import { useAuth } from '@/lib/hooks/useAuth';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+
+// Esquemas de Validación
+const createCompanySchema = z.object({
+  companyName: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+});
+type CreateCompanyValues = z.infer<typeof createCompanySchema>;
+
+const createUserSchema = z.object({
+  userName: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  userEmail: z.string().email({ message: "Introduce un correo electrónico válido." }),
+  userPassword: z.string().min(8, { message: "La contraseña debe tener al menos 8 caracteres." }),
+  companyId: z.string().uuid({ message: "Selecciona una empresa válida." }),
+});
+type CreateUserValues = z.infer<typeof createUserSchema>;
+
+export default function AdminManagement() {
+  const { token } = useAuth();
+  const [companies, setCompanies] = useState<CompanySelectItem[]>([]);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
+  const [companyError, setCompanyError] = useState<string | null>(null);
+  const [userError, setUserError] = useState<string | null>(null);
+
+  // Formularios
+  const companyForm = useForm<CreateCompanyValues>({
+    resolver: zodResolver(createCompanySchema),
+    defaultValues: { companyName: '' },
+  });
+  const userForm = useForm<CreateUserValues>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: { userName: '', userEmail: '', userPassword: '', companyId: '' },
+  });
+
+  // Cargar lista de compañías para el selector
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      if (!token) return;
+      setIsLoadingCompanies(true);
+      try {
+        // const data = await listCompaniesForSelect(); // Llamada API real
+        // --- Datos Mock Temporales ---
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const mockCompanies: CompanySelectItem[] = [
+          { id: "comp-uuid-1", name: "Empresa Alpha" },
+          { id: "comp-uuid-2", name: "Beta Corp" },
+          { id: "comp-uuid-3", name: "Gamma Solutions" },
+          { id: "comp-uuid-4", name: "Delta Inc." },
+          { id: "comp-uuid-5", name: "Omega Ventures" },
+        ];
+        setCompanies(mockCompanies);
+        // setCompanies(data); // Usar cuando API lista
+      } catch (err: any) {
+        console.error("Error fetching companies for select:", err);
+        toast.error("Error al cargar empresas", { description: err.message });
+      } finally {
+        setIsLoadingCompanies(false);
+      }
+    };
+    fetchCompanies();
+  }, [token]);
+
+  // Handlers de envío
+  const onCompanySubmit = async (data: CreateCompanyValues) => {
+    setCompanyError(null);
+    console.log("Creando compañía:", data);
+    const toastId = toast.loading("Creando compañía...");
+    try {
+        // const newCompany = await createCompany({ name: data.companyName }); // Llamada API real
+        // --- Simulación ---
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        const newCompany = { id: `new-comp-${Date.now()}`, name: data.companyName };
+        // --- Fin Simulación ---
+
+        toast.success("Compañía Creada", { id: toastId, description: `"${newCompany.name}" creada con ID: ${newCompany.id.substring(0, 8)}...` });
+        companyForm.reset();
+        // Actualizar la lista de compañías para el selector
+        setCompanies(prev => [...prev, { id: newCompany.id, name: newCompany.name }]);
+    } catch (err: any) {
+        const message = err instanceof ApiError ? err.message : "No se pudo crear la compañía.";
+        setCompanyError(message);
+        toast.error("Error al crear compañía", { id: toastId, description: message });
+    }
+  };
+
+  const onUserSubmit = async (data: CreateUserValues) => {
+    setUserError(null);
+    console.log("Creando usuario:", data);
+    const toastId = toast.loading("Creando usuario...");
+    try {
+        // await createUser({ // Llamada API real
+        //     name: data.userName,
+        //     email: data.userEmail,
+        //     password: data.userPassword,
+        //     company_id: data.companyId,
+        // });
+        // --- Simulación ---
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        // --- Fin Simulación ---
+
+        toast.success("Usuario Creado", { id: toastId, description: `Usuario ${data.userEmail} creado para la compañía seleccionada.` });
+        userForm.reset();
+    } catch (err: any) {
+        const message = err instanceof ApiError ? err.message : "No se pudo crear el usuario.";
+        setUserError(message);
+        toast.error("Error al crear usuario", { id: toastId, description: message });
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-2xl font-bold tracking-tight">Gestión de Entidades</h1>
+
+      {/* Crear Compañía */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building className="h-5 w-5 text-primary" /> Crear Nueva Compañía
+          </CardTitle>
+          <CardDescription>Añade una nueva organización a la plataforma.</CardDescription>
+        </CardHeader>
+        <form onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
+          <CardContent className="space-y-4">
+            {companyError && (
+                <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{companyError}</AlertDescription></Alert>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="companyName">Nombre de la Compañía</Label>
+              <Input
+                id="companyName"
+                placeholder="Ej: Acme Corporation"
+                disabled={companyForm.formState.isSubmitting}
+                {...companyForm.register("companyName")}
+              />
+              {companyForm.formState.errors.companyName && (
+                <p className="text-xs text-destructive pt-1">{companyForm.formState.errors.companyName.message}</p>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter className="border-t pt-6">
+            <Button type="submit" disabled={companyForm.formState.isSubmitting}>
+              {companyForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Crear Compañía
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+
+      <Separator />
+
+      {/* Crear Usuario */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-primary" /> Crear Nuevo Usuario
+          </CardTitle>
+          <CardDescription>Añade un nuevo usuario y asígnalo a una compañía existente.</CardDescription>
+        </CardHeader>
+        <form onSubmit={userForm.handleSubmit(onUserSubmit)}>
+          <CardContent className="space-y-4">
+             {userError && (
+                <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{userError}</AlertDescription></Alert>
+             )}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="userName">Nombre Completo</Label>
+                <Input id="userName" placeholder="Ej: Juan Pérez" disabled={userForm.formState.isSubmitting} {...userForm.register("userName")} />
+                {userForm.formState.errors.userName && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userName.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="userEmail">Correo Electrónico</Label>
+                <Input id="userEmail" type="email" placeholder="ej: juan.perez@empresa.com" disabled={userForm.formState.isSubmitting} {...userForm.register("userEmail")} />
+                 {userForm.formState.errors.userEmail && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userEmail.message}</p>}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="userPassword">Contraseña</Label>
+              <Input id="userPassword" type="password" placeholder="Mínimo 8 caracteres" disabled={userForm.formState.isSubmitting} {...userForm.register("userPassword")} />
+               {userForm.formState.errors.userPassword && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userPassword.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="companyId">Asignar a Compañía</Label>
+              <Select
+                  disabled={isLoadingCompanies || userForm.formState.isSubmitting}
+                  onValueChange={(value) => userForm.setValue('companyId', value, { shouldValidate: true })}
+                  value={userForm.watch('companyId')}
+              >
+                <SelectTrigger id="companyId" className="w-full">
+                  <SelectValue placeholder={isLoadingCompanies ? "Cargando compañías..." : "Selecciona una compañía..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingCompanies ? (
+                     <SelectItem value="loading" disabled>Cargando...</SelectItem>
+                  ) : companies.length > 0 ? (
+                    companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name} ({company.id.substring(0, 6)}...)
+                      </SelectItem>
+                    ))
+                  ) : (
+                     <SelectItem value="no-companies" disabled>No hay compañías creadas</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+               {userForm.formState.errors.companyId && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.companyId.message}</p>}
+            </div>
+          </CardContent>
+          <CardFooter className="border-t pt-6">
+            <Button type="submit" disabled={userForm.formState.isSubmitting || isLoadingCompanies}>
+              {userForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Crear Usuario
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
+}
+```
+
+## File: `components\admin\AdminStats.tsx`
+```tsx
+// File: components/admin/AdminStats.tsx
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, Users, Building, Loader2 } from 'lucide-react';
+import { getAdminStats, AdminStatsResponse } from '@/lib/api'; // Necesitarás definir esto en api.ts
+import { useAuth } from '@/lib/hooks/useAuth';
+import { toast } from 'sonner';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+
+export default function AdminStats() {
+  const { token } = useAuth(); // Necesario para las llamadas API (implícito en request)
+  const [stats, setStats] = useState<AdminStatsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!token) {
+        setError("No autenticado.");
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      setError(null);
+      try {
+        // const data = await getAdminStats(); // Llamada API real (pendiente backend)
+        // --- Datos Mock Temporales ---
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simular delay
+        const mockData: AdminStatsResponse = {
+          company_count: 5,
+          users_per_company: [
+            { company_id: "comp-uuid-1", name: "Empresa Alpha", user_count: 15 },
+            { company_id: "comp-uuid-2", name: "Beta Corp", user_count: 8 },
+            { company_id: "comp-uuid-3", name: "Gamma Solutions", user_count: 25 },
+            { company_id: "comp-uuid-4", name: "Delta Inc.", user_count: 3 },
+            { company_id: "comp-uuid-5", name: "Omega Ventures", user_count: 12 },
+          ]
+        };
+        setStats(mockData);
+        // setStats(data); // Usar esto cuando la API esté lista
+      } catch (err: any) {
+        console.error("Error fetching admin stats:", err);
+        setError(err.message || "No se pudieron cargar las estadísticas.");
+        toast.error("Error al cargar estadísticas", { description: err.message });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [token]); // Depende del token para re-fetch si cambia
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold tracking-tight">Estadísticas Generales</h1>
+
+      {/* Tarjetas de Resumen */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Empresas Totales</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : error ? (
+              <span className="text-sm text-destructive">-</span>
+            ) : (
+              <div className="text-2xl font-bold">{stats?.company_count ?? '-'}</div>
+            )}
+            <p className="text-xs text-muted-foreground pt-1">
+              Número total de organizaciones registradas.
+            </p>
+          </CardContent>
+        </Card>
+         {/* Podrías añadir más tarjetas (ej. Usuarios Totales, Documentos Totales) */}
+      </div>
+
+      {/* Tabla de Usuarios por Empresa */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Usuarios por Empresa</CardTitle>
+          <CardDescription>Desglose del número de usuarios activos por cada empresa.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && !isLoading && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[60%]">Nombre Empresa</TableHead>
+                <TableHead>ID Empresa</TableHead>
+                <TableHead className="text-right">Usuarios</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <TableRow key={`skel-row-${i}`}>
+                    <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : stats?.users_per_company && stats.users_per_company.length > 0 ? (
+                stats.users_per_company.map((company) => (
+                  <TableRow key={company.company_id}>
+                    <TableCell className="font-medium">{company.name || `Empresa ${company.company_id.substring(0, 6)}`}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs font-mono">{company.company_id}</TableCell>
+                    <TableCell className="text-right font-medium">{company.user_count}</TableCell>
+                  </TableRow>
+                ))
+              ) : !error ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                    No hay datos de empresas disponibles.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -3627,12 +4054,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
 ## File: `components\chat\chat-message.tsx`
 ```tsx
-// File: components/chat/chat-message.tsx (MODIFICADO - Iteración 3.2)
+// File: components/chat/chat-message.tsx (REFACTORIZADO - Fuentes mejoradas)
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { User, BrainCircuit, AlertTriangle, FileText } from 'lucide-react';
+import { User, BrainCircuit, AlertTriangle, FileText, CircleDot } from 'lucide-react'; // Añadido CircleDot
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { RetrievedDoc } from '@/lib/api';
@@ -3642,7 +4069,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Badge } from '@/components/ui/badge'; // Importar Badge
+// import { Badge } from '@/components/ui/badge'; // Badge ya no se usa para fuentes
 
 export interface Message {
   id: string;
@@ -3662,70 +4089,85 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isError = message.isError ?? false;
 
   return (
-    // Aumentar espaciado vertical entre mensajes (controlado en page.tsx con space-y-6)
     <div className={cn(
-        'flex w-full items-start gap-3', // Usar gap en lugar de space-x
-        isUser ? 'justify-end pl-10 sm:pl-16' : 'pr-10 sm:pr-16' // Más padding en pantallas pequeñas
+        'flex w-full items-start gap-3',
+        isUser ? 'justify-end pl-10 sm:pl-16' : 'pr-10 sm:pr-16'
     )}>
-      {/* Avatar Asistente */}
       {!isUser && (
-        <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground"> {/* Fondo card */}
-           <AvatarFallback className="bg-transparent text-muted-foreground"> {/* Color icono muted */}
+        <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground">
+           <AvatarFallback className="bg-transparent text-muted-foreground">
                 {isError ? <AlertTriangle className="h-5 w-5 text-destructive" /> : <BrainCircuit className="h-5 w-5" /> }
            </AvatarFallback>
         </Avatar>
       )}
 
-      {/* Contenedor de la Burbuja */}
       <div
         className={cn(
-          'max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm', // Padding y shadow ajustados
+          'max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm',
           isUser
-            ? 'bg-primary text-primary-foreground rounded-br-lg' // Estilo usuario, esquina redondeada diferente
+            ? 'bg-primary text-primary-foreground rounded-br-lg'
             : isError
-              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30 rounded-bl-lg' // Estilo error con borde y esquina
-              // Estilo asistente, esquina redondeada diferente
+              ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30 rounded-bl-lg'
               : 'bg-muted text-foreground rounded-bl-lg'
         )}
       >
          {/* Contenido Markdown */}
+         {/* Asegurar que prose tenga los estilos correctos definidos en tailwind.config y globals.css */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
             </Markdown>
          </div>
 
-         {/* Sección de Fuentes */}
+         {/* Sección de Fuentes (REDISEÑADA) */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
-            // Separador más sutil
             <div className="mt-3 pt-2.5 border-t border-border/40">
                 <p className="text-xs font-medium text-muted-foreground mb-2">Fuentes:</p>
                 {/* Usar flex-wrap para las fuentes */}
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5"> {/* Ajuste de gap */}
                  {message.sources.map((doc, index) => (
                     <TooltipProvider key={doc.id || `source-${index}`} delayDuration={150}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                {/* Botón reemplazado por Badge para look más integrado */}
-                                <Badge
+                                {/* Botón pequeño con número y icono */}
+                                <Button
                                     variant="outline"
-                                    className="cursor-pointer border-dashed hover:border-solid hover:bg-accent/50 py-0.5 px-1.5"
+                                    size="sm" // Botón más pequeño
+                                    className="h-6 px-1.5 py-0 rounded-full border-dashed hover:border-solid hover:bg-accent/50 cursor-pointer flex items-center gap-1"
                                     onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
                                     tabIndex={0} // Make it focusable
+                                    aria-label={`Fuente ${index + 1}: ${doc.file_name || 'Detalles'}`}
                                 >
-                                    <FileText className="h-3 w-3 mr-1 flex-shrink-0 text-muted-foreground" />
-                                    <span className='truncate max-w-[120px] sm:max-w-[150px] text-xs font-normal text-foreground/80'>
-                                     {doc.file_name || doc.document_id?.substring(0, 8) || `Fuente ${index+1}`}
-                                    </span>
-                                </Badge>
+                                    {/* Número de fuente */}
+                                    <span className="text-xs font-mono text-muted-foreground">{index + 1}</span>
+                                    {/* Icono opcional */}
+                                    {/* <FileText className="h-3 w-3 flex-shrink-0 text-muted-foreground" /> */}
+                                </Button>
                             </TooltipTrigger>
-                            {/* Tooltip mejorado */}
-                            <TooltipContent side="bottom" className="max-w-xs text-xs p-2 shadow-lg" sideOffset={4}>
-                                <p className="font-medium mb-0.5">Archivo: <span className="font-normal text-muted-foreground">{doc.file_name || 'N/D'}</span></p>
-                                {doc.document_id && <p className="font-medium">ID Doc: <span className="font-normal text-muted-foreground font-mono text-[11px]">{doc.document_id}</span></p>}
-                                <p className="font-medium">ID Frag: <span className="font-normal text-muted-foreground font-mono text-[11px]">{doc.id}</span></p>
-                                {doc.score != null && <p className="font-medium">Score: <span className="font-normal text-muted-foreground">{doc.score.toFixed(4)}</span></p>}
-                                {doc.content_preview && <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium">Vista previa: <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview}</span></p>}
+                            {/* Tooltip mejorado con fondo popover */}
+                            <TooltipContent
+                                side="bottom"
+                                className="max-w-xs text-xs p-2 shadow-lg bg-popover text-popover-foreground" // Asegura fondo
+                                sideOffset={4}
+                            >
+                                <p className="font-medium mb-0.5">
+                                    <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
+                                    {doc.file_name || 'Nombre no disponible'}
+                                </p>
+                                <p className="text-muted-foreground text-[11px] mb-1.5">
+                                   ID: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
+                                </p>
+                                {doc.score != null && (
+                                    <p className="font-medium text-muted-foreground">
+                                        Score: <span className="font-normal">{doc.score.toFixed(4)}</span>
+                                    </p>
+                                )}
+                                {doc.content_preview && (
+                                    <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium">
+                                        Vista previa:
+                                        <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview}</span>
+                                    </p>
+                                )}
                             </TooltipContent>
                         </Tooltip>
                    </TooltipProvider>
@@ -3735,9 +4177,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
          )}
       </div>
 
-       {/* Avatar Usuario */}
       {isUser && (
-         <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground"> {/* Fondo card */}
+         <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground">
            <AvatarFallback className="bg-transparent text-muted-foreground"><User className="h-5 w-5" /></AvatarFallback>
          </Avatar>
       )}
@@ -3748,12 +4189,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
-// File: components/chat/retrieved-documents-panel.tsx (MODIFICADO - Iteración 3.3)
+// File: components/chat/retrieved-documents-panel.tsx (REFACTORIZADO - Mejor diseño)
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Loader2, Eye, Info } from 'lucide-react'; // Añadido Info
-import { ApiError, request, RetrievedDoc } from '@/lib/api';
+import { FileText, AlertCircle, Download, Loader2, Eye, Info, Star, ExternalLink } from 'lucide-react'; // Iconos añadidos
+import { RetrievedDoc } from '@/lib/api'; // Asegúrate que la interfaz es correcta
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -3768,7 +4209,7 @@ import {
     DialogClose
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { cn } from '@/lib/utils'; // Importar cn
+import { cn } from '@/lib/utils';
 
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
@@ -3793,73 +4234,93 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
         });
     };
 
+    // Componente para renderizar estrellas de score
+    const ScoreStars = ({ score }: { score: number | null | undefined }) => {
+      if (score == null || score < 0) return null;
+      const numStars = Math.max(0, Math.min(5, Math.round(score * 5))); // Escala 0-1 a 0-5 estrellas
+      return (
+        <div className="flex items-center gap-0.5" title={`Score: ${score.toFixed(3)}`}>
+          {[...Array(5)].map((_, i) => (
+            <Star key={i} className={cn("h-3 w-3", i < numStars ? "fill-yellow-400 text-yellow-500" : "fill-muted text-muted-foreground/50")} />
+          ))}
+        </div>
+      );
+    };
+
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* Panel principal con estilo mejorado */}
-        <div className="flex h-full flex-col border-l bg-background/50 dark:bg-muted/30">
+        <div className="flex h-full flex-col border-l bg-muted/10 dark:bg-muted/20">
             {/* Header del panel */}
             <CardHeader className="sticky top-0 z-10 border-b bg-background p-4 shadow-sm">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" /> Fuentes Recuperadas
+                    <FileText className="h-5 w-5 text-primary" /> Fuentes Relevantes
                 </CardTitle>
                 <CardDescription className="text-xs mt-1">
-                    Documentos relevantes usados para generar la respuesta.
+                    Documentos utilizados para generar la respuesta.
                 </CardDescription>
             </CardHeader>
 
-            {/* Contenedor scrollable con padding */}
+            {/* Contenedor scrollable */}
             <ScrollArea className="flex-1">
-                {/* Espaciado y padding interno */}
                 <div className="p-3 space-y-2">
                     {/* Estado de Carga con Skeleton */}
                     {isLoading && documents.length === 0 && (
                         <div className='space-y-2'>
-                            <Skeleton className="h-20 w-full rounded-lg" />
-                            <Skeleton className="h-20 w-full rounded-lg" />
-                            <Skeleton className="h-20 w-full rounded-lg" />
+                            {[...Array(3)].map((_, i) => (
+                                <Card key={`skel-${i}`} className="p-3 border border-border/50 bg-card opacity-70">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <Skeleton className="h-4 w-3/4 rounded" />
+                                        <Skeleton className="h-3 w-8 rounded-sm" />
+                                    </div>
+                                    <Skeleton className="h-3 w-full rounded" />
+                                    <Skeleton className="h-3 w-1/2 rounded mt-1" />
+                                    <div className="flex justify-between items-center mt-2">
+                                        <Skeleton className="h-2.5 w-16 rounded" />
+                                        <Skeleton className="h-3 w-3 rounded" />
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
                     )}
-                    {/* Estado Vacío mejorado */}
+                    {/* Estado Vacío */}
                     {!isLoading && documents.length === 0 && (
-                        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4">
+                        <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 min-h-[200px]">
                             <Info className="h-8 w-8 mb-3 opacity-50" />
-                            <p className="text-sm font-medium mb-1">Sin documentos relevantes</p>
+                            <p className="text-sm font-medium mb-1">Sin Fuentes</p>
                             <p className="text-xs">No se encontraron fuentes específicas para la última consulta.</p>
                         </div>
                     )}
                     {/* Lista de Documentos */}
                     {documents.map((doc, index) => (
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
-                            {/* Tarjeta de Documento */}
                             <Card
                                 className={cn(
                                     "cursor-pointer transition-all duration-150 bg-card",
-                                    "border border-border hover:border-primary/30 hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/30"
+                                    "border border-border hover:border-primary/40 hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/40"
                                 )}
                                 onClick={() => handleViewDocument(doc)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleViewDocument(doc)}
                                 tabIndex={0}
                                 title={`Ver detalles de: ${doc.file_name || 'documento'}`}
                             >
-                                <CardContent className="p-3 space-y-1.5 text-sm">
-                                    {/* Header de la tarjeta: Título y Score */}
+                                <CardContent className="p-3 space-y-1 text-sm">
+                                    {/* Header: Nombre archivo y Score */}
                                     <div className="flex justify-between items-start gap-2">
-                                        <p className="font-medium text-foreground/90 truncate flex-1">
-                                            {index + 1}. {doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}
+                                        <p className="font-medium text-foreground/95 truncate flex-1 flex items-center gap-1.5">
+                                            <span className="text-xs font-mono text-muted-foreground bg-muted px-1 py-0.5 rounded-sm">{index + 1}</span>
+                                            <span className="truncate" title={doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}>
+                                                {doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}
+                                            </span>
                                         </p>
-                                        {/* Badge de Score más refinado */}
-                                        {doc.score != null && (
-                                            <Badge variant="secondary" className="px-1.5 py-0 font-mono text-xs rounded-sm">
-                                                {doc.score.toFixed(2)}
-                                            </Badge>
-                                        )}
+                                        <ScoreStars score={doc.score} />
+                                        {/* <Badge variant="secondary" className="px-1.5 py-0 font-mono text-xs rounded-sm">{doc.score?.toFixed(2) ?? 'N/A'}</Badge> */}
                                     </div>
-                                    {/* Preview del contenido */}
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                                        {doc.content_preview || 'Vista previa no disponible.'}
+                                    {/* Preview */}
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6"> {/* Indentación */}
+                                        {doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                     </p>
-                                    {/* Footer de la tarjeta: ID y icono */}
-                                    <div className="text-[11px] text-muted-foreground/70 pt-1 flex justify-between items-center font-mono">
+                                    {/* Footer: IDs y Botón View */}
+                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6"> {/* Indentación */}
                                         <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                         <Eye className="h-3 w-3" />
                                     </div>
@@ -3870,47 +4331,47 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Dialog de Detalles (mejorado) */}
+            {/* Dialog de Detalles (con fondo y scroll) */}
             {selectedDoc && (
-                 <DialogContent className="sm:max-w-xl"> {/* Un poco más ancho */}
+                 <DialogContent className="sm:max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] bg-background/95 dark:bg-background/95 !backdrop-blur-md !shadow-2xl !border !border-border"> {/* Fondo opaco y mejor visibilidad */}
                     <DialogHeader>
-                        <DialogTitle className="truncate text-lg" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
-                            <FileText className="inline-block h-5 w-5 mr-2 align-text-bottom text-primary" />
+                        <DialogTitle className="truncate text-lg flex items-center gap-2" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
+                            <FileText className="inline-block h-5 w-5 align-text-bottom text-primary" />
                             {selectedDoc.file_name || 'Detalles del Documento'}
                         </DialogTitle>
-                        <DialogDescription>
-                            Detalles del fragmento recuperado y su contexto.
-                        </DialogDescription>
+                        {/* Metadatos resumidos bajo el título */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
+                            <span>ID Doc: <span className="font-mono text-[11px]">{selectedDoc.document_id?.substring(0,12) || 'N/D'}...</span></span>
+                            <span>ID Frag: <span className="font-mono text-[11px]">{selectedDoc.id}</span></span>
+                            <span>Score: <span className="font-medium">{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></span>
+                        </div>
                     </DialogHeader>
-                    {/* Contenido del Dialog con mejor estructura */}
-                    <div className="grid gap-3 py-4 text-sm max-h-[60vh] overflow-y-auto px-1 -mx-1">
-                        {/* Información Clave */}
-                        <div className='grid grid-cols-3 gap-x-4 gap-y-1 text-xs border-b pb-3 mb-2'>
-                            <div><span className="font-medium text-muted-foreground block">ID Documento</span><span className="font-mono text-[11px] block truncate">{selectedDoc.document_id || 'N/D'}</span></div>
-                            <div><span className="font-medium text-muted-foreground block">ID Fragmento</span><span className="font-mono text-[11px] block truncate">{selectedDoc.id}</span></div>
-                            <div><span className="font-medium text-muted-foreground block">Score</span><span>{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></div>
-                        </div>
-                        {/* Vista previa */}
-                        <div>
-                            <Label className="text-xs font-semibold text-muted-foreground">Vista Previa Contenido:</Label>
-                            <ScrollArea className="mt-1 max-h-[200px] w-full rounded-md border bg-muted/30 p-3 text-xs">
-                                <pre className="whitespace-pre-wrap break-words font-sans">{selectedDoc.content_preview || 'Vista previa no disponible.'}</pre>
-                            </ScrollArea>
-                        </div>
-                        {/* Metadatos */}
-                        {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
-                             <div>
-                                <Label className="text-xs font-semibold text-muted-foreground">Metadatos:</Label>
-                                <ScrollArea className="mt-1 max-h-[100px] w-full rounded-md border bg-muted/30 p-3 text-[11px]">
-                                    <pre className="whitespace-pre-wrap break-words font-mono">{JSON.stringify(selectedDoc.metadata, null, 2)}</pre>
-                                </ScrollArea>
+                    {/* Contenido Scrolleable */}
+                    <ScrollArea className="overflow-y-auto -mx-6 px-6 border-y py-4 my-4">
+                         <div className="space-y-4 text-sm">
+                            <div>
+                                <Label className="text-xs font-semibold text-muted-foreground">Contenido Relevante (Vista Previa):</Label>
+                                <blockquote className="mt-1 border-l-2 pl-4 italic text-muted-foreground text-xs max-h-[250px] overflow-y-auto">
+                                    {selectedDoc.content_preview || 'Vista previa no disponible.'}
+                                </blockquote>
                             </div>
-                        )}
-                    </div>
-                    <DialogFooter className="sm:justify-between">
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)}>
+                            {/* Metadatos si existen */}
+                            {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
+                                 <div>
+                                    <Label className="text-xs font-semibold text-muted-foreground">Metadatos:</Label>
+                                    <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all">
+                                        {JSON.stringify(selectedDoc.metadata, null, 2)}
+                                    </pre>
+                                </div>
+                            )}
+                         </div>
+                     </ScrollArea>
+                    <DialogFooter className="sm:justify-between flex-wrap gap-2">
+                        {/* Botón Descarga */}
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={true}> {/* Deshabilitado temporalmente */}
                             <Download className="mr-2 h-4 w-4" />Descargar Original (N/D)
                         </Button>
+                        {/* Botón Cerrar */}
                         <DialogClose asChild><Button variant="secondary" size="sm">Cerrar</Button></DialogClose>
                     </DialogFooter>
                 </DialogContent>
@@ -3920,7 +4381,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
   );
 }
 
-// Helper Label component (si no existe o para simplificar)
+// Helper Label component (si no existe globalmente)
 const Label = ({ className, children, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
     <label className={cn("block text-sm font-medium text-foreground", className)} {...props}>
         {children}
@@ -4069,10 +4530,44 @@ export function DocumentStatusList({
     // FLAG_LLM: Buscar usando document_id
     const docToDelete = documents.find(d => d.document_id === deletingDocId);
     const display = docToDelete?.file_name || deletingDocId.substring(0, 8) + '...';
-    setIsDeleting(true); const toastId = toast.loading(`Eliminando "${display}"...`);
-    try { await deleteIngestDocument(deletingDocId, authHeaders); onDeleteSuccess(deletingDocId); toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` }); closeDeleteConfirmation(); }
-    catch (e: any) { const errorMsg = e instanceof Error ? e.message : 'Error desconocido'; toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` }); }
-    finally { setIsDeleting(false); }
+    // --- LOG DETALLADO DE ORIGEN DE BORRADO ---
+    const now = new Date().toISOString();
+    let userInfo = '';
+    try {
+      // Si tienes acceso a usuario en contexto/props, inclúyelo aquí
+      if (authHeaders && (authHeaders['X-User-ID'] || authHeaders['X-Company-ID'])) {
+        userInfo = `UserID: ${authHeaders['X-User-ID'] || ''}, CompanyID: ${authHeaders['X-Company-ID'] || ''}`;
+      }
+    } catch {}
+    // Stack trace
+    const stack = (new Error('StackTrace (origen handleDeleteConfirmed)')).stack;
+    // Log en consola
+    console.error('[AUDIT][DELETE_DOCUMENT]', {
+      timestamp: now,
+      user: userInfo,
+      document_id: deletingDocId,
+      file_name: docToDelete?.file_name,
+      status: docToDelete?.status,
+      location: 'components/knowledge/document-status-list.tsx:handleDeleteConfirmed',
+      stack,
+      context: {
+        docToDelete,
+        authHeaders,
+      }
+    });
+    setIsDeleting(true);
+    const toastId = toast.loading(`Eliminando "${display}"...`);
+    try {
+      await deleteIngestDocument(deletingDocId, authHeaders);
+      onDeleteSuccess(deletingDocId);
+      toast.success('Documento Eliminado', { id: toastId, description: `"${display}" ha sido eliminado.` });
+      closeDeleteConfirmation();
+    } catch (e: any) {
+      const errorMsg = e instanceof Error ? e.message : 'Error desconocido';
+      toast.error('Error al Eliminar', { id: toastId, description: `No se pudo eliminar "${display}": ${errorMsg}` });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // --- Renderizado ---
@@ -4246,23 +4741,23 @@ export function FileUploader({
     uploadError,
     clearUploadStatus
 }: FileUploaderProps) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [dropzoneError, setDropzoneError] = useState<string | null>(null);
   const [localUploadSuccess, setLocalUploadSuccess] = useState<boolean | null>(null);
 
   // Efecto para limpiar errores/éxito visual si el archivo cambia o se deselecciona
   useEffect(() => {
-    if (!file) {
-        setDropzoneError(null);
-        setLocalUploadSuccess(null);
-        // No limpiar uploadError aquí, podría ser un error persistente del último intento
+    if (files.length === 0) {
+      setDropzoneError(null);
+      setLocalUploadSuccess(null);
+      // No limpiar uploadError aquí, podría ser un error persistente del último intento
     } else {
-        // Si se selecciona un NUEVO archivo, limpiar estados visuales y error del padre
-        setDropzoneError(null);
-        setLocalUploadSuccess(null);
-        clearUploadStatus();
+      // Si se selecciona un NUEVO archivo, limpiar estados visuales y error del padre
+      setDropzoneError(null);
+      setLocalUploadSuccess(null);
+      clearUploadStatus();
     }
-  }, [file, clearUploadStatus]);
+  }, [files, clearUploadStatus]);
 
   // Manejador del Dropzone
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
@@ -4270,7 +4765,7 @@ export function FileUploader({
     setDropzoneError(null);
     setLocalUploadSuccess(null);
     clearUploadStatus();
-    setFile(null);
+    // setFile(null); // Eliminar referencia obsoleta
 
     if (fileRejections.length > 0) {
         const rejection = fileRejections[0];
@@ -4286,7 +4781,7 @@ export function FileUploader({
     }
 
     if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
+      setFiles(acceptedFiles);
     }
   }, [clearUploadStatus]);
 
@@ -4294,28 +4789,16 @@ export function FileUploader({
     onDrop,
     accept: acceptedFileTypes,
     maxSize: MAX_FILE_SIZE_BYTES,
-    multiple: false,
+    multiple: true,
     disabled: isUploading, // Deshabilitar dropzone mientras se sube
   });
 
   // Manejador del click del botón de subida
-  const handleUploadClick = async () => {
-    if (!file || !authHeaders || isUploading) return;
-    setLocalUploadSuccess(null); // Resetear estado visual
-
-    const success = await onUploadFile(file, authHeaders); // Llama a la función del hook padre
-    setLocalUploadSuccess(success);
-    if (success) {
-        // Limpiar selección solo si la subida fue exitosa (estado 202)
-        // Si falla (ej. 409 duplicado), mantener el archivo seleccionado para info
-        setFile(null);
-    }
-    // El hook padre se encarga de los toasts
-  };
+  // El botón de subir ahora sube todos los archivos, así que esta función ya no se usa
 
   // Quitar el archivo seleccionado
   const removeFile = () => {
-    setFile(null);
+    // setFile(null); // Eliminar referencia obsoleta
   }
 
   // Determinar el error a mostrar (prioridad al error de subida si existe)
@@ -4382,41 +4865,216 @@ export function FileUploader({
       </div>
 
       {/* Preview del Archivo Seleccionado (si existe y no está subiendo/completado) */}
-      {file && !isUploading && localUploadSuccess === null && (
-        <div className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
-            <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
-                 <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
-                 <div className='flex flex-col min-w-0'>
-                    <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                        ({(file.size / 1024 / 1024).toFixed(2)} MB) -
-                        <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
-                    </span>
-                 </div>
+      {files.length > 0 && !isUploading && (
+        <div className="space-y-2">
+          {files.map(file => (
+            <div key={file.name} className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
+              <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
+                <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
+                <div className='flex flex-col min-w-0'>
+                  <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({(file.size / 1024 / 1024).toFixed(2)} MB) -
+                    <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
+                  </span>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={() => setFiles(files.filter(f => f.name !== file.name))} aria-label="Quitar archivo" disabled={isUploading}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          {/* Botón para quitar archivo, deshabilitado si está subiendo */}
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={removeFile} aria-label="Quitar archivo" disabled={isUploading}>
-            <X className="h-4 w-4" />
-          </Button>
+          ))}
         </div>
       )}
 
       {/* Botón de Subida (visible solo si hay archivo y no se completó la subida) */}
-      {file && localUploadSuccess === null && (
-          <Button
-            onClick={handleUploadClick}
-            disabled={isUploading} // Deshabilitar si está subiendo
-            className="w-full"
-          >
-            {isUploading ? (
-                <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Subiendo...
-                </>
-             ) : 'Subir y Procesar Archivo'}
-          </Button>
-       )}
+      {files.length > 0 && (
+        <Button
+          onClick={async () => {
+            for (const file of files) {
+              await onUploadFile(file, authHeaders);
+            }
+            setFiles([]);
+          }}
+          disabled={isUploading}
+          className="w-full"
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Subiendo...
+            </>
+          ) : 'Subir y Procesar Archivos'}
+        </Button>
+      )}
     </div>
+  );
+}
+```
+
+## File: `components\layout\AdminLayout.tsx`
+```tsx
+// File: components/layout/AdminLayout.tsx
+"use client";
+
+import React, { useState } from 'react';
+import { Header } from './header'; // Reutilizamos el header general
+import { AdminSidebar } from './AdminSidebar'; // Sidebar específico para admin
+import { cn } from '@/lib/utils';
+
+export function AdminLayout({ children }: { children: React.ReactNode }) {
+  // El estado de colapso podría ser útil si el AdminSidebar lo soporta
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  return (
+    <div className="flex h-screen bg-muted/30 overflow-hidden">
+      {/* Admin Sidebar */}
+      <AdminSidebar
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
+      />
+
+      {/* Contenido Principal Admin */}
+      <div className="flex h-full flex-1 flex-col">
+        <Header /> {/* Reutilizar header si es apropiado */}
+        <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
+          {children} {/* Aquí se renderizará el contenido de /admin/page.tsx */}
+        </main>
+      </div>
+    </div>
+  );
+}
+```
+
+## File: `components\layout\AdminSidebar.tsx`
+```tsx
+// File: components/layout/AdminSidebar.tsx
+"use client";
+
+import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { BarChartBig, Users, Building, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react'; // Iconos para admin
+import { APP_NAME } from '@/lib/constants';
+import AtenexLogo from '@/components/icons/atenex-logo';
+
+interface AdminSidebarProps {
+  isCollapsed: boolean;
+  setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+// Items de navegación del Admin
+const adminNavItems = [
+  { href: '/admin', label: 'Estadísticas', icon: BarChartBig, exact: true }, // Página principal del dashboard
+  { href: '/admin/management', label: 'Gestión', icon: Users },
+  // Podrías añadir links a la configuración normal si el admin también la necesita
+  // { href: '/settings', label: 'Configuración', icon: Settings },
+];
+
+export function AdminSidebar({ isCollapsed, setIsCollapsed }: AdminSidebarProps) {
+  const pathname = usePathname();
+
+  return (
+    <TooltipProvider delayDuration={0}>
+      <aside
+        className={cn(
+          "flex h-full flex-col border-r bg-card transition-all duration-300 ease-in-out",
+          isCollapsed ? "w-[60px] items-center px-2 py-4" : "w-64 p-4" // Ancho fijo cuando expandido
+        )}
+      >
+        {/* Sección Superior: Logo y Toggle */}
+        <div
+          className={cn(
+            "flex items-center mb-6 relative",
+            isCollapsed ? "h-10 justify-center" : "h-12 justify-between"
+          )}
+        >
+          <Link
+            href="/admin" // Enlaza a la página principal del admin
+            className={cn(
+              "flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm",
+              isCollapsed ? 'justify-center w-full' : ''
+            )}
+            aria-label={`${APP_NAME} - Admin Dashboard`}
+          >
+            <AtenexLogo className={cn("h-8 w-auto text-primary", isCollapsed ? "h-7" : "")} />
+            {!isCollapsed && (
+              <span className="text-xl font-bold text-foreground tracking-tight">{APP_NAME} Admin</span>
+            )}
+          </Link>
+          {/* Botón para colapsar/expandir */}
+           {!isCollapsed && (
+             <Button
+               variant="ghost"
+               size="icon"
+               className="h-8 w-8 absolute -right-10 top-2 bg-background border shadow-sm hover:bg-accent"
+               onClick={() => setIsCollapsed(true)}
+               aria-label="Colapsar sidebar"
+             >
+               <PanelLeftClose className="h-4 w-4" />
+             </Button>
+           )}
+        </div>
+
+         {isCollapsed && (
+           <Button
+             variant="ghost"
+             size="icon"
+             className="h-8 w-8 mb-4"
+             onClick={() => setIsCollapsed(false)}
+             aria-label="Expandir sidebar"
+           >
+             <PanelLeftOpen className="h-4 w-4" />
+           </Button>
+         )}
+
+        {/* Navegación Admin */}
+        <nav className={cn("flex flex-col gap-1 flex-grow", isCollapsed ? "items-center mt-4" : "mt-2")}>
+          {adminNavItems.map((item) => {
+            const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+            return (
+              <Tooltip key={item.href} disableHoverableContent={!isCollapsed}>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: isCollapsed ? "icon" : "default" }),
+                      "w-full transition-colors duration-150 ease-in-out relative group",
+                      isCollapsed ? "h-10 w-10 rounded-lg" : "justify-start pl-3 py-2 text-sm h-10",
+                      isActive
+                        ? 'font-semibold text-primary bg-primary/10 dark:bg-primary/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 dark:hover:bg-accent/30'
+                    )}
+                    aria-label={item.label}
+                  >
+                    {isActive && !isCollapsed && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 bg-primary rounded-r-md"></span>
+                    )}
+                    <item.icon
+                      className={cn(
+                        "h-5 w-5 transition-colors",
+                        isCollapsed ? "" : "mr-3",
+                        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                      )}
+                    />
+                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                  </Link>
+                </TooltipTrigger>
+                {isCollapsed && (
+                  <TooltipContent side="right" sideOffset={5}>
+                    {item.label}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            );
+          })}
+        </nav>
+        {/* Puedes añadir un footer al sidebar si es necesario */}
+      </aside>
+    </TooltipProvider>
   );
 }
 ```
@@ -4679,7 +5337,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 
 ## File: `components\theme-palette-button.tsx`
 ```tsx
-// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas B2B Final)
+// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas Reducidos)
 "use client";
 
 import * as React from "react";
@@ -4696,15 +5354,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-// Definición de temas B2B disponibles (Final)
+// Definición de temas B2B disponibles (REDUCIDOS)
 const themes = [
     { value: 'system', label: 'Automático (Sistema)' },
-    { value: 'light', label: 'Claro Profesional' },
-    { value: 'dark', label: 'Oscuro Elegante' },
-    { value: 'slate', label: 'Pizarra (Oscuro)' },
-    { value: 'indigo', label: 'Índigo (Claro)' },
-    { value: 'stone', label: 'Piedra (Claro)' },
-    { value: 'zinc', label: 'Zinc (Oscuro)' },
+    { value: 'light', label: 'Claro Profesional' }, // Tema Blanco
+    { value: 'dark', label: 'Oscuro Elegante' },   // Tema Azul Oscuro
+    { value: 'zinc', label: 'Zinc (Perla)' },     // Tema Perla/Gris Oscuro
 ];
 
 export function ThemePaletteButton() {
@@ -4725,20 +5380,25 @@ export function ThemePaletteButton() {
            <DropdownMenuSeparator />
            {themes.map((theme) => {
                // Determinar si este item es el activo (considerando 'system')
-               const isActive = activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value);
+               const isActive = activeTheme === theme.value;
+               // Si el tema activo es 'system', debemos ver si el 'resolvedTheme' coincide con 'light' o 'dark'
+               // Esto es principalmente para la lógica de la marca de verificación, pero no cambia qué se muestra como "activo" en la lista.
+               const isEffectivelyActive = activeTheme === theme.value || (activeTheme === 'system' && resolvedTheme === theme.value);
+
                return (
                  <DropdownMenuItem
                     key={theme.value}
                     onClick={() => setTheme(theme.value)}
                     className={cn(
                         "flex items-center justify-between cursor-pointer text-sm px-2 py-1.5 rounded-sm",
-                        isActive
+                        isActive // Marca el item del dropdown si es el seleccionado directamente
                           ? "font-semibold text-primary bg-accent dark:bg-accent/50"
                           : "hover:bg-accent/50 dark:hover:bg-accent/20"
                     )}
                  >
                     <span>{theme.label}</span>
-                    {isActive && ( <Check className="h-4 w-4" /> )}
+                    {/* Mostrar check si este tema es el que está efectivamente activo */}
+                    {isEffectivelyActive && ( <Check className="h-4 w-4" /> )}
                  </DropdownMenuItem>
                );
            })}
@@ -4768,6 +5428,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 
 ## File: `components\ui\alert-dialog.tsx`
 ```tsx
+// File: components/ui/alert-dialog.tsx
 "use client"
 
 import * as React from "react"
@@ -4803,7 +5464,6 @@ function AlertDialogOverlay({ className, ...props }: React.ComponentProps<typeof
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        // FLAG_LLM: z-index alto
         "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm", // Fondo más oscuro y blur
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
@@ -4820,7 +5480,7 @@ function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          // FLAG_LLM: Fondo opaco (bg-background), borde, sombra y z-index alto
+          // FLAG_LLM: Asegurar que bg-background esté presente para el fondo opaco
           "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200",
           "rounded-lg", // Asegurar redondeo
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
@@ -4924,7 +5584,6 @@ export {
   AlertDialogAction,
   AlertDialogCancel,
 }
-
 ```
 
 ## File: `components\ui\alert.tsx`
@@ -5303,6 +5962,7 @@ export { Checkbox }
 
 ## File: `components\ui\dialog.tsx`
 ```tsx
+// File: components/ui/dialog.tsx
 "use client"
 
 import * as React from "react"
@@ -5362,6 +6022,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
+          // FLAG_LLM: Asegurar que bg-background esté presente para el fondo opaco
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
           className
         )}
@@ -5438,11 +6099,11 @@ export {
   DialogTitle,
   DialogTrigger,
 }
-
 ```
 
 ## File: `components\ui\dropdown-menu.tsx`
 ```tsx
+// File: components/ui/dropdown-menu.tsx
 "use client"
 
 import * as React from "react"
@@ -5460,7 +6121,7 @@ function DropdownMenuPortal({ ...props }: React.ComponentProps<typeof DropdownMe
 }
 
 function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
-  return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" className="focus:outline-none" {...props} /> // Añadido focus:outline-none
+  return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" className="focus:outline-none" {...props} />
 }
 
 function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
@@ -5470,7 +6131,7 @@ function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.Comp
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          // FLAG_LLM: Asegurar fondo opaco, borde y sombra; z-index alto
+          // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
           "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className
@@ -5660,7 +6321,9 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
+        // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
+        "z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg", // Asegurado bg-popover
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className
       )}
       {...props}
@@ -5685,7 +6348,6 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 }
-
 ```
 
 ## File: `components\ui\input.tsx`
@@ -5915,6 +6577,7 @@ export { ScrollArea, ScrollBar }
 
 ## File: `components\ui\select.tsx`
 ```tsx
+// File: components/ui/select.tsx
 "use client"
 
 import * as React from "react"
@@ -5975,7 +6638,9 @@ function SelectContent({
         data-slot="select-content"
         position={position}
         className={cn(
-          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 min-w-[8rem] overflow-hidden rounded-md border shadow-md",
+          // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
+          "relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
@@ -6288,7 +6953,7 @@ export { Textarea }
 
 ## File: `components\ui\tooltip.tsx`
 ```tsx
-// File: components/ui/tooltip.tsx (CORREGIDO - Estilos visuales)
+// File: components/ui/tooltip.tsx
 "use client"
 
 import * as React from "react"
@@ -6315,7 +6980,7 @@ function TooltipContent({ className, sideOffset = 4, children, ...props }: React
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          // FLAG_LLM: Asegurar fondo opaco (bg-popover), borde, sombra y z-index alto
+          // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
           "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md",
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
@@ -6477,8 +7142,7 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: lib/api.ts (CORREGIDO - Mapeo ID en getDocumentStatusList, validaciones)
-// Purpose: Centralized API request function and specific API call definitions.
+// File: lib/api.ts (MODIFICADO - Añadidas interfaces y placeholders para Admin API)
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
@@ -6494,11 +7158,12 @@ export class ApiError extends Error {
     }
 }
 
-// --- Función Genérica de Request (sin cambios estructurales) ---
+// --- Función Genérica de Request (sin cambios estructurales, solo logging añadido) ---
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    // Permitir endpoints /admin
     if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
-        console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/ (or be /api/v1/docs, /openapi.json)`);
+        console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
     let apiUrl: string;
@@ -6511,10 +7176,17 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     if (apiUrl.includes("ngrok-free.app")) { headers.set('ngrok-skip-browser-warning', 'true'); }
     if (!(options.body instanceof FormData)) { if (!headers.has('Content-Type')) { headers.set('Content-Type', 'application/json'); } } else { headers.delete('Content-Type'); }
     if (token) { headers.set('Authorization', `Bearer ${token}`); }
-    else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') { console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`); }
+    else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
+         // No advertir para endpoints admin si el token no está (la API lo rechazará si es necesario)
+         if (!cleanEndpoint.startsWith('/api/v1/admin')) {
+             console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
+         }
+    }
     const config: RequestInit = { ...options, headers };
+    console.log(`API Request: ${options.method || 'GET'} ${apiUrl}`); // Log a llamada
     try {
         const response = await fetch(apiUrl, config);
+        // ... (resto del manejo de respuesta y errores sin cambios) ...
         if (!response.ok) {
             let errorData: ApiErrorData | null = null; let errorText = ''; const contentType = response.headers.get('content-type');
             try { if (contentType && contentType.includes('application/json')) { errorData = await response.json(); } else { errorText = await response.text(); } }
@@ -6551,175 +7223,193 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     }
 }
 
-// --- Tipos Específicos de Servicio ---
+// --- Tipos Específicos de Servicio (Existentes) ---
 export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
 export interface AuthHeaders { 'X-Company-ID': string; 'X-User-ID': string; }
-// FLAG_LLM: Interfaz actualizada para coincidir con los logs (usa 'id' en lugar de 'document_id')
-export interface DocumentStatusApiResponse {
-    id: string; // ID Principal del documento (UUID)
-    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // Tipos conocidos + fallback string
-    file_name?: string | null;
-    file_type?: string | null;
-    file_path?: string | null; // Añadido según logs
-    company_id?: string; // Añadido según logs
-    chunk_count?: number | null;
-    error_message?: string | null;
-    created_at?: string; // Fecha creación DB record
-    uploaded_at?: string; // Fecha subida original
-    last_updated?: string; // Fecha última actualización DB record
-    minio_exists?: boolean; // Existe en MinIO?
-    milvus_chunk_count?: number; // Conteo real en Milvus
-    message?: string; // Mensaje adicional del backend
-    // Añadir cualquier otro campo que devuelva la API si es necesario
-}
-// Interfaz Frontend (mantenemos document_id como clave principal para consistencia interna)
-export interface DocumentStatusResponse {
-    document_id: string; // Usaremos este como identificador principal en el frontend
-    status: 'uploaded' | 'processing' | 'processed' | 'error' | string;
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
-    error_message?: string | null;
-    created_at?: string;
-    last_updated?: string; // Cambiado de last_updated a string opcional
-    minio_exists?: boolean;
-    milvus_chunk_count?: number;
-}
-// Interfaz detallada (hereda de la de frontend)
-export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
-    minio_exists: boolean;
-    milvus_chunk_count: number;
-    message?: string;
-}
-// --- Resto de interfaces (sin cambios) ---
+export interface DocumentStatusApiResponse { id: string; status: string; file_name?: string | null; file_type?: string | null; file_path?: string | null; company_id?: string; chunk_count?: number | null; error_message?: string | null; created_at?: string; uploaded_at?: string; last_updated?: string; minio_exists?: boolean; milvus_chunk_count?: number; message?: string; }
+export interface DocumentStatusResponse { document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; created_at?: string; last_updated?: string | null; minio_exists?: boolean; milvus_chunk_count?: number; }
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse { minio_exists: boolean; milvus_chunk_count: number; message?: string; }
 export interface RetrievedDocApi { id: string; document_id: string; file_name: string | null; content: string; content_preview: string; metadata: Record<string, any> | null; score: number; }
 export type RetrievedDoc = RetrievedDocApi;
 export interface ChatSummary { id: string; title: string | null; created_at: string; updated_at: string; message_count: number; }
 export interface ChatMessageApi { id: string; chat_id: string; role: 'user' | 'assistant'; content: string; sources: Array<{ chunk_id: string; document_id: string; file_name: string | null; score: number; preview: string; }> | null; created_at: string; }
 export interface QueryPayload { query: string; retriever_top_k?: number; chat_id?: string | null; }
 export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id: string | null; chat_id: string; }
-export interface LoginResponse { access_token: string; token_type: string; user_id: string; email: string; full_name: string | null; role: string; company_id: string | null; }
+export interface LoginResponse { access_token: string; token_type: string; user_id: string; email: string; full_name: string | null; role: string; company_id: string | null; } // Role podría no venir
 
-// --- Funciones API Específicas ---
-
-// ** INGEST SERVICE **
-export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
-  const formData = new FormData(); formData.append('file', file);
-  return request<IngestResponse>('/api/v1/ingest/upload', { method: 'POST', headers: { ...auth } as Record<string, string>, body: formData });
+// --- NUEVO: Tipos para Admin API ---
+export interface AdminStatsResponse {
+    company_count: number;
+    users_per_company: Array<{
+        company_id: string;
+        name: string | null; // Nombre de la compañía
+        user_count: number;
+    }>;
+    // Podrían añadirse más stats aquí (total users, total docs, etc.)
+}
+export interface CompanySelectItem {
+    id: string;
+    name: string;
+}
+export interface CreateCompanyPayload {
+    name: string;
+}
+export interface CompanyResponse { // Respuesta al crear/obtener compañía
+    id: string;
+    name: string;
+    created_at?: string; // Opcional
+}
+export interface CreateUserPayload {
+    email: string;
+    password: string;
+    name: string;
+    company_id: string; // ID de la compañía a la que pertenece
+    roles?: string[]; // Roles opcionales (ej. ['user'])
+}
+export interface UserResponse { // Respuesta al crear/obtener usuario
+    id: string; // user_id
+    email: string;
+    name: string | null;
+    company_id: string | null;
+    is_active?: boolean; // Opcional
+    created_at?: string; // Opcional
 }
 
-// FLAG_LLM: Mapeo de la respuesta API a la interfaz del frontend
-const mapApiResponseToFrontend = (apiDoc: DocumentStatusApiResponse): DocumentStatusResponse => {
-    return {
-        document_id: apiDoc.id, // Mapear id a document_id
-        status: apiDoc.status,
-        file_name: apiDoc.file_name,
-        file_type: apiDoc.file_type,
-        chunk_count: apiDoc.chunk_count,
-        error_message: apiDoc.error_message,
-        created_at: apiDoc.created_at || apiDoc.uploaded_at, // Usar created_at o uploaded_at
-        last_updated: apiDoc.last_updated, // Usar el campo que venga
-        minio_exists: apiDoc.minio_exists,
-        milvus_chunk_count: apiDoc.milvus_chunk_count,
+
+// --- Funciones API Específicas (Existentes) ---
+// ** INGEST SERVICE ** (Sin cambios)
+export async function uploadDocument(/*...*/) {/*...*/}
+const mapApiResponseToFrontend = (apiDoc: DocumentStatusApiResponse): DocumentStatusResponse => {/*...*/}
+export async function getDocumentStatusList(/*...*/) {/*...*/}
+export const getDocumentStatus = async (/*...*/) {/*...*/}
+export async function retryIngestDocument(/*...*/) {/*...*/}
+export async function deleteIngestDocument(/*...*/) {/*...*/}
+// ** QUERY SERVICE ** (Sin cambios)
+export const getChats = async (/*...*/) {/*...*/}
+export const getChatMessages = async (/*...*/) {/*...*/}
+export const postQuery = async (/*...*/) {/*...*/}
+export const deleteChat = async (/*...*/) {/*...*/}
+// ** HELPERS ** (Sin cambios)
+export const mapApiSourcesToFrontend = (/*...*/) {/*...*/}
+export const mapApiMessageToFrontend = (/*...*/) {/*...*/}
+
+
+// --- NUEVO: Funciones para Admin API (Placeholders) ---
+
+/**
+ * Obtiene estadísticas generales para el dashboard de admin.
+ * Requiere token de admin.
+ */
+export async function getAdminStats(): Promise<AdminStatsResponse> {
+    console.warn("API FUNCTION STUB: getAdminStats() called");
+    // Placeholder: Simula llamada API exitosa con datos mock después de 1 seg
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const mockData: AdminStatsResponse = {
+        company_count: 5,
+        users_per_company: [
+          { company_id: "comp-uuid-1", name: "Empresa Alpha Mock", user_count: 15 },
+          { company_id: "comp-uuid-2", name: "Beta Corp Mock", user_count: 8 },
+          { company_id: "comp-uuid-3", name: "Gamma Solutions Mock", user_count: 25 },
+          { company_id: "comp-uuid-4", name: "Delta Inc. Mock", user_count: 3 },
+          { company_id: "comp-uuid-5", name: "Omega Ventures Mock", user_count: 12 },
+        ]
+      };
+    return mockData;
+    // Llamada Real (cuando exista el backend):
+    // return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
+    // Asegúrate que la llamada real incluya el token via `request`
+}
+
+/**
+ * Obtiene una lista simplificada de compañías para usar en Selects.
+ * Requiere token de admin.
+ */
+export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
+    console.warn("API FUNCTION STUB: listCompaniesForSelect() called");
+    // Placeholder: Simula llamada API exitosa con datos mock después de 0.5 seg
+    await new Promise(resolve => setTimeout(resolve, 500));
+     const mockCompanies: CompanySelectItem[] = [
+          { id: "comp-uuid-1", name: "Empresa Alpha Mock" },
+          { id: "comp-uuid-2", name: "Beta Corp Mock" },
+          { id: "comp-uuid-3", name: "Gamma Solutions Mock" },
+          { id: "comp-uuid-4", name: "Delta Inc. Mock" },
+          { id: "comp-uuid-5", name: "Omega Ventures Mock" },
+          { id: `new-comp-${Date.now()}`.substring(0,15), name: "Recién Creada Mock"}
+        ];
+    return mockCompanies;
+    // Llamada Real (cuando exista el backend):
+    // return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
+}
+
+/**
+ * Crea una nueva compañía.
+ * Requiere token de admin.
+ * @param payload - Datos de la nueva compañía.
+ */
+export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
+    console.warn("API FUNCTION STUB: createCompany() called with payload:", payload);
+     // Placeholder: Simula llamada API exitosa después de 1.2 seg
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    const newId = `comp-uuid-${Date.now()}`;
+    const mockResponse: CompanyResponse = {
+        id: newId,
+        name: payload.name,
+        created_at: new Date().toISOString(),
     };
-};
-
-export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<DocumentStatusResponse[]> {
-  const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
-  // Pedimos la respuesta como array de DocumentStatusApiResponse
-  const apiResponse = await request<DocumentStatusApiResponse[]>(endpoint, { method: 'GET', headers: { ...auth } as Record<string, string> });
-  // Mapeamos cada objeto al formato esperado por el frontend
-  return (apiResponse || []).map(mapApiResponseToFrontend);
+    return mockResponse;
+    // Llamada Real (cuando exista el backend):
+    // return request<CompanyResponse>('/api/v1/admin/companies', {
+    //     method: 'POST',
+    //     body: JSON.stringify(payload),
+    // });
 }
 
-export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
-    if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido.", 400); }
-    // La respuesta detallada también necesita mapeo si usa 'id'
-    const apiDoc = await request<DocumentStatusApiResponse>(`/api/v1/ingest/status/${documentId}`, { method: 'GET', headers: { ...auth } as Record<string, string> });
-    // Mapear y asegurar campos detallados
-    const frontendDoc = mapApiResponseToFrontend(apiDoc) as DetailedDocumentStatusResponse;
-    frontendDoc.minio_exists = apiDoc.minio_exists ?? false; // Asegurar valor booleano
-    frontendDoc.milvus_chunk_count = apiDoc.milvus_chunk_count ?? -1; // Asegurar valor numérico o -1
-    frontendDoc.message = apiDoc.message;
-    return frontendDoc;
-};
-
-export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> {
-  if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para reintentar.", 400); }
-  const endpoint = `/api/v1/ingest/retry/${documentId}`;
-  return request<IngestResponse>(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth } as Record<string, string> });
+/**
+ * Crea un nuevo usuario asociado a una compañía.
+ * Requiere token de admin.
+ * @param payload - Datos del nuevo usuario.
+ */
+export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
+     console.warn("API FUNCTION STUB: createUser() called with payload:", payload);
+     // Placeholder: Simula llamada API exitosa después de 1.5 seg
+     await new Promise(resolve => setTimeout(resolve, 1500));
+     const newId = `user-uuid-${Date.now()}`;
+     const mockResponse: UserResponse = {
+         id: newId,
+         email: payload.email,
+         name: payload.name,
+         company_id: payload.company_id,
+         is_active: true,
+         created_at: new Date().toISOString(),
+     };
+     // Simular posible error (ej. email duplicado)
+     // if (payload.email === 'error@example.com') {
+     //    throw new ApiError("El correo electrónico ya está registrado.", 409);
+     // }
+     return mockResponse;
+    // Llamada Real (cuando exista el backend):
+    // return request<UserResponse>('/api/v1/admin/users', {
+    //     method: 'POST',
+    //     body: JSON.stringify(payload),
+    // });
 }
-
-export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
-  if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para eliminar.", 400); }
-  // Usar la ruta correcta /api/v1/ingest/{document_id}
-  await request<null>(`/api/v1/ingest/${documentId}`, { method: 'DELETE', headers: { ...auth } as Record<string, string> });
-}
-
-// ** QUERY SERVICE ** (Funciones sin cambios estructurales, solo validaciones añadidas)
-export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
-     const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
-     const response = await request<ChatSummary[]>(endpoint); return response || [];
-};
-export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
-     if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido.", 400); }
-     const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
-     const response = await request<ChatMessageApi[]>(endpoint); return response || [];
-};
-export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
-     const body = { ...payload, chat_id: payload.chat_id || null };
-     return request<QueryApiResponse>('/api/v1/query/ask', { method: 'POST', body: JSON.stringify(body) });
-};
-export const deleteChat = async (chatId: string): Promise<void> => {
-    if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido para eliminar.", 400); }
-    await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
-};
-
-// --- Helpers de Mapeo (sin cambios, ya presentes y correctos) ---
-export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
-    if (!apiSources || apiSources.length === 0) return undefined;
-    return apiSources.map(source => ({
-        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name || null,
-        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
-    }));
-};
-export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
-    const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
-    return { id: apiMessage.id, role: apiMessage.role, content: apiMessage.content, sources: mappedSources, isError: false, created_at: apiMessage.created_at, };
-};
 ```
 
 ## File: `lib\auth\helpers.ts`
 ```ts
 // File: lib/auth/helpers.ts
-// Purpose: Define shared authentication types/interfaces. Remove outdated manual token helpers.
-
-// --- Manual localStorage functions (OBSOLETE for Supabase session token) ---
-// These functions should no longer be used for managing the main Supabase session token.
-// Supabase JS client handles this internally. They are removed to avoid confusion.
-/*
-export const getToken = (): string | null => { ... };
-export const setToken = (token: string): void => { ... };
-export const removeToken = (): void => { ... };
-*/
-// --- END Obsolete localStorage functions ---
-
+// Purpose: Define shared authentication types/interfaces.
 
 // --- Frontend User Interface ---
 // Defines the structure of the user object used within the frontend application.
-// This will be populated from the Supabase session data via the useAuth hook.
 export interface User {
   userId: string;    // Mapped from Supabase User ID (user.id)
   email?: string;    // Mapped from Supabase User Email (user.email)
   name?: string | null; // Mapped from Supabase User Metadata (user.user_metadata.full_name or name) - Allow null
-  companyId?: string; // Mapped from Supabase App Metadata (user.app_metadata.company_id)
+  companyId?: string | null; // Mapped from Supabase App Metadata (user.app_metadata.company_id) - Allow null
   roles?: string[];  // Mapped from Supabase App Metadata (user.app_metadata.roles)
-  // Add any other fields from the Supabase User object needed in the frontend
+  isAdmin?: boolean; // NUEVO: Flag para identificar al administrador
 }
-
-// --- getUserFromToken REMOVED ---
-// Manual token decoding is not needed; user info comes from Supabase session object.
-
 ```
 
 ## File: `lib\constants.ts`
@@ -6742,10 +7432,13 @@ import React, {
     ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { User as AppUser } from '@/lib/auth/helpers';
+import { User as AppUser } from '@/lib/auth/helpers'; // Importa la interfaz actualizada
 import { toast } from "sonner";
 import { AUTH_TOKEN_KEY } from '@/lib/constants';
-import { getApiGatewayUrl, cn } from '@/lib/utils';
+import { getApiGatewayUrl } from '@/lib/utils'; // cn no se usa aquí
+
+// Definir el email del admin globalmente o importarlo
+const ADMIN_EMAIL = "atenex@gmail.com";
 
 interface AuthContextType {
     user: AppUser | null;
@@ -6759,8 +7452,8 @@ const defaultAuthContextValue: AuthContextType = {
     user: null,
     token: null,
     isLoading: true,
-    signIn: async () => { throw new Error("AuthProvider no inicializado"); }, // Traducido
-    signOut: async () => { throw new Error("AuthProvider no inicializado"); }, // Traducido
+    signIn: async () => { throw new Error("AuthProvider no inicializado"); },
+    signOut: async () => { throw new Error("AuthProvider no inicializado"); },
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuthContextValue);
@@ -6782,7 +7475,7 @@ function decodeJwtPayload(token: string): any | null {
         );
         return JSON.parse(jsonPayload);
     } catch (error) {
-        console.error("Fallo al decodificar JWT:", error); // Traducido
+        console.error("Fallo al decodificar JWT:", error);
         return null;
     }
 }
@@ -6791,12 +7484,16 @@ function getUserFromDecodedToken(payload: any): AppUser | null {
     if (!payload || !payload.sub) {
         return null;
     }
+    // Añadir la lógica isAdmin
+    const isAdmin = payload.email === ADMIN_EMAIL;
+    console.log(`getUserFromDecodedToken: Email=${payload.email}, IsAdmin=${isAdmin}`);
     return {
         userId: payload.sub,
         email: payload.email,
         name: payload.name || null,
-        companyId: payload.company_id,
+        companyId: payload.company_id || null, // Asegurar que puede ser null
         roles: payload.roles || [],
+        isAdmin: isAdmin, // Establecer el flag isAdmin
     };
 }
 
@@ -6807,7 +7504,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const router = useRouter();
 
     useEffect(() => {
-        console.log("AuthProvider: Inicializando y buscando token en localStorage...");
+        console.log("AuthProvider: Inicializando...");
         if (typeof window !== 'undefined') {
             try {
                 const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -6818,48 +7515,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     if (currentUser) {
                         const isExpired = decodedPayload.exp && (decodedPayload.exp * 1000 < Date.now());
                         if (isExpired) {
-                            console.warn("AuthProvider: Token almacenado está expirado. Limpiando."); // Traducido
+                            console.warn("AuthProvider: Token expirado. Limpiando.");
                             localStorage.removeItem(AUTH_TOKEN_KEY);
                             setToken(null);
                             setUser(null);
                         } else {
-                            console.log("AuthProvider: Token válido encontrado en almacenamiento.", currentUser);
+                            console.log("AuthProvider: Token válido encontrado.", currentUser);
                             setToken(storedToken);
                             setUser(currentUser);
                         }
                     } else {
-                        console.warn("AuthProvider: Token inválido encontrado en almacenamiento. Limpiando."); // Traducido
+                        console.warn("AuthProvider: Token inválido encontrado. Limpiando.");
                         localStorage.removeItem(AUTH_TOKEN_KEY);
                         setToken(null);
                         setUser(null);
                     }
                 } else {
-                    console.log("AuthProvider: No se encontró token en almacenamiento."); // Traducido
+                    console.log("AuthProvider: No se encontró token.");
                     setToken(null);
                     setUser(null);
                 }
             } catch (error) {
-                console.error("AuthProvider: Error accediendo a localStorage o decodificando token:", error); // Traducido
+                console.error("AuthProvider: Error en inicialización:", error);
                 try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
                 setToken(null);
                 setUser(null);
             } finally {
                 setIsLoading(false);
-                console.log("AuthProvider: Carga inicial completa."); // Traducido
+                console.log("AuthProvider: Carga inicial completa.");
             }
         } else {
-             setIsLoading(false);
+             setIsLoading(false); // No estamos en el navegador
         }
     }, []);
 
     const signIn = useCallback(async (email: string, password: string): Promise<void> => {
-        console.log("AuthProvider: Intentando iniciar sesión..."); // Traducido
+        console.log("AuthProvider: Intentando iniciar sesión...");
         setIsLoading(true);
         let gatewayUrl = '';
         try {
             gatewayUrl = getApiGatewayUrl();
             const loginEndpoint = `${gatewayUrl}/api/v1/users/login`;
-            console.log(`AuthProvider: Llamando al endpoint de login: ${loginEndpoint}`);
+            console.log(`AuthProvider: Llamando a: ${loginEndpoint}`);
 
             const response = await fetch(loginEndpoint, {
                 method: 'POST',
@@ -6874,40 +7571,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const responseBody = await response.json();
 
             if (!response.ok) {
-                const errorMessage = responseBody?.message || responseBody?.detail || `Fallo en login (${response.status})`; // Traducido
-                console.error("AuthProvider: Llamada a API de login fallida.", { status: response.status, body: responseBody }); // Traducido
+                const errorMessage = responseBody?.message || responseBody?.detail || `Fallo en login (${response.status})`;
+                console.error("AuthProvider: Fallo API login.", { status: response.status, body: responseBody });
                 throw new Error(errorMessage);
             }
 
             const receivedToken = responseBody?.access_token || responseBody?.token;
             if (!receivedToken || typeof receivedToken !== 'string') {
-                console.error("AuthProvider: No se recibió un token válido en la respuesta de login.", responseBody); // Traducido
-                throw new Error("Login exitoso, pero no se recibió token."); // Traducido
+                console.error("AuthProvider: Token no válido en respuesta.", responseBody);
+                throw new Error("Login OK, pero no se recibió token.");
             }
 
             const decodedPayload = decodeJwtPayload(receivedToken);
             const loggedInUser = getUserFromDecodedToken(decodedPayload);
 
             if (!loggedInUser) {
-                console.error("AuthProvider: Token recibido es inválido o no se puede decodificar.", receivedToken); // Traducido
-                throw new Error("Login exitoso, pero se recibió un token inválido."); // Traducido
+                console.error("AuthProvider: Token recibido inválido.", receivedToken);
+                throw new Error("Login OK, pero token inválido.");
             }
 
             localStorage.setItem(AUTH_TOKEN_KEY, receivedToken);
             setToken(receivedToken);
             setUser(loggedInUser);
-            console.log("AuthProvider: Inicio de sesión exitoso.", loggedInUser); // Traducido
-            // Toast traducido
+            console.log("AuthProvider: Inicio de sesión exitoso.", loggedInUser);
             toast.success("Inicio de Sesión Exitoso", { description: `¡Bienvenido de nuevo, ${loggedInUser.name || loggedInUser.email}!` });
 
-            router.replace('/chat');
+            // Redirigir al dashboard si es admin, si no al chat
+            if (loggedInUser.isAdmin) {
+                router.replace('/admin'); // Redirigir a la nueva página admin
+            } else {
+                router.replace('/chat');
+            }
 
         } catch (err: any) {
-            console.error("AuthProvider: Error en inicio de sesión:", err); // Traducido
+            console.error("AuthProvider: Error en inicio de sesión:", err);
             localStorage.removeItem(AUTH_TOKEN_KEY);
             setToken(null);
             setUser(null);
-            // Toast traducido
             toast.error("Inicio de Sesión Fallido", { description: err.message || "Ocurrió un error inesperado." });
             throw err;
         } finally {
@@ -6916,25 +7616,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, [router]);
 
     const signOut = useCallback(async (): Promise<void> => {
-        console.log("AuthProvider: Cerrando sesión..."); // Traducido
+        console.log("AuthProvider: Cerrando sesión...");
         setIsLoading(true);
         try {
             localStorage.removeItem(AUTH_TOKEN_KEY);
             setToken(null);
             setUser(null);
-            console.log("AuthProvider: Token eliminado y estado limpiado."); // Traducido
-            // Toast traducido
+            console.log("AuthProvider: Estado limpiado.");
             toast.success("Sesión Cerrada", { description: "Has cerrado sesión correctamente." });
 
-            router.replace('/login');
+            router.replace('/login'); // Siempre redirigir a login al cerrar sesión
 
         } catch (error) {
-             console.error("AuthProvider: Error durante el proceso de cierre de sesión:", error); // Traducido
-             localStorage.removeItem(AUTH_TOKEN_KEY);
+             console.error("AuthProvider: Error durante cierre de sesión:", error);
+             localStorage.removeItem(AUTH_TOKEN_KEY); // Asegurar limpieza
              setToken(null);
              setUser(null);
-             // Toast traducido
-             toast.error("Problema al Cerrar Sesión", { description: "Ocurrió un error durante el cierre de sesión." });
+             toast.error("Problema al Cerrar Sesión", { description: "Ocurrió un error." });
         } finally {
              setIsLoading(false);
         }
@@ -6958,7 +7656,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
     if (context === undefined) {
-        throw new Error('useAuth debe ser usado dentro de un AuthProvider'); // Traducido
+        throw new Error('useAuth debe ser usado dentro de un AuthProvider');
     }
     return context;
 };

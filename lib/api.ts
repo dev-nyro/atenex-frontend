@@ -1,5 +1,4 @@
-// File: lib/api.ts (CORREGIDO - Mapeo ID en getDocumentStatusList, validaciones)
-// Purpose: Centralized API request function and specific API call definitions.
+// File: lib/api.ts (CORREGIDO - Restauradas funciones existentes, mantenidos placeholders Admin)
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
@@ -18,8 +17,9 @@ export class ApiError extends Error {
 // --- Función Genérica de Request (sin cambios estructurales) ---
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
-        console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/ (or be /api/v1/docs, /openapi.json)`);
+    // Permitir endpoints /admin y /docs, /openapi.json
+     if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
+        console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
     let apiUrl: string;
@@ -32,8 +32,14 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     if (apiUrl.includes("ngrok-free.app")) { headers.set('ngrok-skip-browser-warning', 'true'); }
     if (!(options.body instanceof FormData)) { if (!headers.has('Content-Type')) { headers.set('Content-Type', 'application/json'); } } else { headers.delete('Content-Type'); }
     if (token) { headers.set('Authorization', `Bearer ${token}`); }
-    else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') { console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`); }
+    else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
+         // No advertir para endpoints admin si el token no está (la API lo rechazará si es necesario)
+         if (!cleanEndpoint.startsWith('/api/v1/admin')) {
+             console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
+         }
+    }
     const config: RequestInit = { ...options, headers };
+    console.log(`API Request: ${options.method || 'GET'} ${apiUrl}`);
     try {
         const response = await fetch(apiUrl, config);
         if (!response.ok) {
@@ -72,47 +78,12 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     }
 }
 
-// --- Tipos Específicos de Servicio ---
+// --- Tipos Específicos de Servicio (Existentes) ---
 export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
 export interface AuthHeaders { 'X-Company-ID': string; 'X-User-ID': string; }
-// FLAG_LLM: Interfaz actualizada para coincidir con los logs (usa 'id' en lugar de 'document_id')
-export interface DocumentStatusApiResponse {
-    id: string; // ID Principal del documento (UUID)
-    status: 'uploaded' | 'processing' | 'processed' | 'error' | string; // Tipos conocidos + fallback string
-    file_name?: string | null;
-    file_type?: string | null;
-    file_path?: string | null; // Añadido según logs
-    company_id?: string; // Añadido según logs
-    chunk_count?: number | null;
-    error_message?: string | null;
-    created_at?: string; // Fecha creación DB record
-    uploaded_at?: string; // Fecha subida original
-    last_updated?: string; // Fecha última actualización DB record
-    minio_exists?: boolean; // Existe en MinIO?
-    milvus_chunk_count?: number; // Conteo real en Milvus
-    message?: string; // Mensaje adicional del backend
-    // Añadir cualquier otro campo que devuelva la API si es necesario
-}
-// Interfaz Frontend (mantenemos document_id como clave principal para consistencia interna)
-export interface DocumentStatusResponse {
-    document_id: string; // Usaremos este como identificador principal en el frontend
-    status: 'uploaded' | 'processing' | 'processed' | 'error' | string;
-    file_name?: string | null;
-    file_type?: string | null;
-    chunk_count?: number | null;
-    error_message?: string | null;
-    created_at?: string;
-    last_updated?: string; // Cambiado de last_updated a string opcional
-    minio_exists?: boolean;
-    milvus_chunk_count?: number;
-}
-// Interfaz detallada (hereda de la de frontend)
-export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
-    minio_exists: boolean;
-    milvus_chunk_count: number;
-    message?: string;
-}
-// --- Resto de interfaces (sin cambios) ---
+export interface DocumentStatusApiResponse { id: string; status: string; file_name?: string | null; file_type?: string | null; file_path?: string | null; company_id?: string; chunk_count?: number | null; error_message?: string | null; created_at?: string; uploaded_at?: string; last_updated?: string; minio_exists?: boolean; milvus_chunk_count?: number; message?: string; }
+export interface DocumentStatusResponse { document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; created_at?: string; last_updated?: string | null; minio_exists?: boolean; milvus_chunk_count?: number; }
+export interface DetailedDocumentStatusResponse extends DocumentStatusResponse { minio_exists: boolean; milvus_chunk_count: number; message?: string; }
 export interface RetrievedDocApi { id: string; document_id: string; file_name: string | null; content: string; content_preview: string; metadata: Record<string, any> | null; score: number; }
 export type RetrievedDoc = RetrievedDocApi;
 export interface ChatSummary { id: string; title: string | null; created_at: string; updated_at: string; message_count: number; }
@@ -121,7 +92,44 @@ export interface QueryPayload { query: string; retriever_top_k?: number; chat_id
 export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id: string | null; chat_id: string; }
 export interface LoginResponse { access_token: string; token_type: string; user_id: string; email: string; full_name: string | null; role: string; company_id: string | null; }
 
-// --- Funciones API Específicas ---
+// --- NUEVO: Tipos para Admin API ---
+export interface AdminStatsResponse {
+    company_count: number;
+    users_per_company: Array<{
+        company_id: string;
+        name: string | null; // Nombre de la compañía
+        user_count: number;
+    }>;
+}
+export interface CompanySelectItem {
+    id: string;
+    name: string;
+}
+export interface CreateCompanyPayload {
+    name: string;
+}
+export interface CompanyResponse {
+    id: string;
+    name: string;
+    created_at?: string;
+}
+export interface CreateUserPayload {
+    email: string;
+    password: string;
+    name: string;
+    company_id: string;
+    roles?: string[];
+}
+export interface UserResponse {
+    id: string;
+    email: string;
+    name: string | null;
+    company_id: string | null;
+    is_active?: boolean;
+    created_at?: string;
+}
+
+// --- Funciones API Específicas (Existentes - Cuerpo Restaurado) ---
 
 // ** INGEST SERVICE **
 export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
@@ -129,38 +137,28 @@ export async function uploadDocument(file: File, auth: AuthHeaders): Promise<Ing
   return request<IngestResponse>('/api/v1/ingest/upload', { method: 'POST', headers: { ...auth } as Record<string, string>, body: formData });
 }
 
-// FLAG_LLM: Mapeo de la respuesta API a la interfaz del frontend
 const mapApiResponseToFrontend = (apiDoc: DocumentStatusApiResponse): DocumentStatusResponse => {
     return {
-        document_id: apiDoc.id, // Mapear id a document_id
-        status: apiDoc.status,
-        file_name: apiDoc.file_name,
-        file_type: apiDoc.file_type,
-        chunk_count: apiDoc.chunk_count,
-        error_message: apiDoc.error_message,
-        created_at: apiDoc.created_at || apiDoc.uploaded_at, // Usar created_at o uploaded_at
-        last_updated: apiDoc.last_updated, // Usar el campo que venga
-        minio_exists: apiDoc.minio_exists,
+        document_id: apiDoc.id, status: apiDoc.status, file_name: apiDoc.file_name,
+        file_type: apiDoc.file_type, chunk_count: apiDoc.chunk_count,
+        error_message: apiDoc.error_message, created_at: apiDoc.created_at || apiDoc.uploaded_at,
+        last_updated: apiDoc.last_updated, minio_exists: apiDoc.minio_exists,
         milvus_chunk_count: apiDoc.milvus_chunk_count,
     };
 };
 
 export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<DocumentStatusResponse[]> {
   const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
-  // Pedimos la respuesta como array de DocumentStatusApiResponse
   const apiResponse = await request<DocumentStatusApiResponse[]>(endpoint, { method: 'GET', headers: { ...auth } as Record<string, string> });
-  // Mapeamos cada objeto al formato esperado por el frontend
   return (apiResponse || []).map(mapApiResponseToFrontend);
 }
 
 export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
     if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido.", 400); }
-    // La respuesta detallada también necesita mapeo si usa 'id'
     const apiDoc = await request<DocumentStatusApiResponse>(`/api/v1/ingest/status/${documentId}`, { method: 'GET', headers: { ...auth } as Record<string, string> });
-    // Mapear y asegurar campos detallados
     const frontendDoc = mapApiResponseToFrontend(apiDoc) as DetailedDocumentStatusResponse;
-    frontendDoc.minio_exists = apiDoc.minio_exists ?? false; // Asegurar valor booleano
-    frontendDoc.milvus_chunk_count = apiDoc.milvus_chunk_count ?? -1; // Asegurar valor numérico o -1
+    frontendDoc.minio_exists = apiDoc.minio_exists ?? false;
+    frontendDoc.milvus_chunk_count = apiDoc.milvus_chunk_count ?? -1;
     frontendDoc.message = apiDoc.message;
     return frontendDoc;
 };
@@ -173,30 +171,32 @@ export async function retryIngestDocument(documentId: string, auth: AuthHeaders)
 
 export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
   if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para eliminar.", 400); }
-  // Usar la ruta correcta /api/v1/ingest/{document_id}
   await request<null>(`/api/v1/ingest/${documentId}`, { method: 'DELETE', headers: { ...auth } as Record<string, string> });
 }
 
-// ** QUERY SERVICE ** (Funciones sin cambios estructurales, solo validaciones añadidas)
+// ** QUERY SERVICE **
 export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
      const response = await request<ChatSummary[]>(endpoint); return response || [];
 };
+
 export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
      if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido.", 400); }
      const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
      const response = await request<ChatMessageApi[]>(endpoint); return response || [];
 };
+
 export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
      const body = { ...payload, chat_id: payload.chat_id || null };
      return request<QueryApiResponse>('/api/v1/query/ask', { method: 'POST', body: JSON.stringify(body) });
 };
+
 export const deleteChat = async (chatId: string): Promise<void> => {
     if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido para eliminar.", 400); }
     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
-// --- Helpers de Mapeo (sin cambios, ya presentes y correctos) ---
+// ** HELPERS **
 export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
     if (!apiSources || apiSources.length === 0) return undefined;
     return apiSources.map(source => ({
@@ -204,7 +204,43 @@ export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): 
         content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
     }));
 };
+
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
     const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
     return { id: apiMessage.id, role: apiMessage.role, content: apiMessage.content, sources: mappedSources, isError: false, created_at: apiMessage.created_at, };
 };
+
+// --- NUEVO: Funciones para Admin API (Placeholders) ---
+export async function getAdminStats(): Promise<AdminStatsResponse> {
+    console.warn("API FUNCTION STUB: getAdminStats() called");
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const mockData: AdminStatsResponse = { 
+        company_count: 0, 
+        users_per_company: [] 
+    };
+    return mockData;
+    // return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
+}
+export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
+    console.warn("API FUNCTION STUB: listCompaniesForSelect() called");
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const mockCompanies: CompanySelectItem[] = [ /* ... mock data ... */ ];
+    return mockCompanies;
+    // return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
+}
+export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
+    console.warn("API FUNCTION STUB: createCompany() called with payload:", payload);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    const newId = `comp-uuid-${Date.now()}`;
+    const mockResponse: CompanyResponse = { id: newId, name: payload.name, created_at: new Date().toISOString() };
+    return mockResponse;
+    // return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
+}
+export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
+     console.warn("API FUNCTION STUB: createUser() called with payload:", payload);
+     await new Promise(resolve => setTimeout(resolve, 1500));
+     const newId = `user-uuid-${Date.now()}`;
+     const mockResponse: UserResponse = { id: newId, email: payload.email, name: payload.name, company_id: payload.company_id, is_active: true, created_at: new Date().toISOString() };
+     return mockResponse;
+    // return request<UserResponse>('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(payload) });
+}

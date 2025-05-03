@@ -1,4 +1,4 @@
-// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas B2B Final)
+// File: components/theme-palette-button.tsx (REFACTORIZADO - Temas Reducidos)
 "use client";
 
 import * as React from "react";
@@ -15,15 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-// Definición de temas B2B disponibles (Final)
+// Definición de temas B2B disponibles (REDUCIDOS)
 const themes = [
     { value: 'system', label: 'Automático (Sistema)' },
-    { value: 'light', label: 'Claro Profesional' },
-    { value: 'dark', label: 'Oscuro Elegante' },
-    { value: 'slate', label: 'Pizarra (Oscuro)' },
-    { value: 'indigo', label: 'Índigo (Claro)' },
-    { value: 'stone', label: 'Piedra (Claro)' },
-    { value: 'zinc', label: 'Zinc (Oscuro)' },
+    { value: 'light', label: 'Claro Profesional' }, // Tema Blanco
+    { value: 'dark', label: 'Oscuro Elegante' },   // Tema Azul Oscuro
+    { value: 'zinc', label: 'Zinc (Perla)' },     // Tema Perla/Gris Oscuro
 ];
 
 export function ThemePaletteButton() {
@@ -44,20 +41,25 @@ export function ThemePaletteButton() {
            <DropdownMenuSeparator />
            {themes.map((theme) => {
                // Determinar si este item es el activo (considerando 'system')
-               const isActive = activeTheme === theme.value || (activeTheme === 'system' && currentResolvedTheme === theme.value);
+               const isActive = activeTheme === theme.value;
+               // Si el tema activo es 'system', debemos ver si el 'resolvedTheme' coincide con 'light' o 'dark'
+               // Esto es principalmente para la lógica de la marca de verificación, pero no cambia qué se muestra como "activo" en la lista.
+               const isEffectivelyActive = activeTheme === theme.value || (activeTheme === 'system' && resolvedTheme === theme.value);
+
                return (
                  <DropdownMenuItem
                     key={theme.value}
                     onClick={() => setTheme(theme.value)}
                     className={cn(
                         "flex items-center justify-between cursor-pointer text-sm px-2 py-1.5 rounded-sm",
-                        isActive
+                        isActive // Marca el item del dropdown si es el seleccionado directamente
                           ? "font-semibold text-primary bg-accent dark:bg-accent/50"
                           : "hover:bg-accent/50 dark:hover:bg-accent/20"
                     )}
                  >
                     <span>{theme.label}</span>
-                    {isActive && ( <Check className="h-4 w-4" /> )}
+                    {/* Mostrar check si este tema es el que está efectivamente activo */}
+                    {isEffectivelyActive && ( <Check className="h-4 w-4" /> )}
                  </DropdownMenuItem>
                );
            })}
