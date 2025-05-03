@@ -212,29 +212,16 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
 
 // --- NUEVO: Funciones para Admin API (Placeholders) ---
 export async function getAdminStats(): Promise<AdminStatsResponse> {
-    console.warn("API FUNCTION STUB: getAdminStats() called");
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const mockData: AdminStatsResponse = { 
-        company_count: 0, 
-        users_per_company: [] 
-    };
-    return mockData;
-    // return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
+    // Real API call
+    return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
 }
 export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
-    console.warn("API FUNCTION STUB: listCompaniesForSelect() called");
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const mockCompanies: CompanySelectItem[] = [ /* ... mock data ... */ ];
-    return mockCompanies;
-    // return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
+    // Real API call
+    return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
 }
 export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
-    console.warn("API FUNCTION STUB: createCompany() called with payload:", payload);
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    const newId = `comp-uuid-${Date.now()}`;
-    const mockResponse: CompanyResponse = { id: newId, name: payload.name, created_at: new Date().toISOString() };
-    return mockResponse;
-    // return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
+    // Real API call
+    return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
 }
 export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
      console.warn("API FUNCTION STUB: createUser() called with payload:", payload);
