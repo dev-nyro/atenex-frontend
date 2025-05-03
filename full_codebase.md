@@ -459,18 +459,31 @@ ehthumbs_vista.db
 // File: app/(app)/admin/page.tsx
 "use client";
 
-import React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Usaremos searchParams para la navegación interna
+import React, { Suspense } from 'react'; // Import Suspense
+import { useRouter, useSearchParams } from 'next/navigation';
 import AdminStats from '@/components/admin/AdminStats';
 import AdminManagement from '@/components/admin/AdminManagement';
-import { useAuth } from '@/lib/hooks/useAuth'; // Importar useAuth para proteger si es necesario
+import { useAuth } from '@/lib/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+
+// Componente interno para leer searchParams (necesario con Suspense)
+function AdminDashboardContent() {
+  const searchParams = useSearchParams();
+  const view = searchParams.get('view') || 'stats'; // Default to stats view
+
+  // Renderizar la vista seleccionada
+  return (
+    <div className="space-y-6">
+      {view === 'stats' && <AdminStats />}
+      {view === 'management' && <AdminManagement />}
+      {/* Puedes añadir más vistas aquí si es necesario */}
+    </div>
+  );
+}
 
 export default function AdminDashboardPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const view = searchParams.get('view') || 'stats'; // Default to stats view
 
   // Opcional: Doble chequeo de admin, aunque el layout ya debería proteger
   if (isLoading) {
@@ -481,19 +494,31 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (!user?.isAdmin) {
+  // Si después de cargar no hay usuario o no es admin, redirigir
+  if (!user || !user.isAdmin) {
     // Si por alguna razón un no-admin llega aquí, redirigir
-    router.replace('/chat'); // o a donde sea apropiado
-    return null;
+    // Usar useEffect para evitar problemas de renderizado durante el renderizado
+    React.useEffect(() => {
+        console.log("AdminDashboardPage: Non-admin detected, redirecting...");
+        router.replace('/chat'); // o a donde sea apropiado
+    }, [router]);
+    return ( // Mostrar loader mientras redirige
+       <div className="flex items-center justify-center h-full">
+         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+         <p className="ml-2">Redirigiendo...</p>
+       </div>
+    );
   }
 
-  // Renderizar la vista seleccionada
+  // Usar Suspense para permitir que AdminDashboardContent use useSearchParams
   return (
-    <div className="space-y-6">
-      {view === 'stats' && <AdminStats />}
-      {view === 'management' && <AdminManagement />}
-      {/* Puedes añadir más vistas aquí si es necesario */}
-    </div>
+    <Suspense fallback={
+        <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    }>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }
 ```
@@ -612,8 +637,9 @@ export default function ChatPage() {
                     // Buscar el último mensaje con fuentes
                     let lastWithDocs: RetrievedDoc[] = [];
                     for (let i = sortedMessages.length - 1; i >= 0; i--) {
-                        if (sortedMessages[i].sources && sortedMessages[i].sources.length > 0) {
-                            lastWithDocs = mapApiSourcesToFrontend(sortedMessages[i].sources);
+                        const sources = sortedMessages[i].sources;
+                        if (Array.isArray(sources) && sources.length > 0) {
+                            lastWithDocs = mapApiSourcesToFrontend(sources) || [];
                             break;
                         }
                     }
@@ -1087,7 +1113,7 @@ export default function KnowledgePage() {
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Añadido usePathname
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { AdminLayout } from '@/components/layout/AdminLayout'; // Importar AdminLayout
@@ -1100,6 +1126,7 @@ import { toast } from 'sonner';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname(); // Obtener ruta actual
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
   const incompleteSetupWarningShown = useRef(false);
@@ -1124,33 +1151,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     // --- REDIRECCIÓN ADMIN ---
-    // Si el usuario es admin y *no* está ya en una ruta bajo /admin (o la raíz de admin)
-    // lo redirigimos a la página principal del admin.
-    // Nota: La página /admin será la que maneje las sub-vistas (stats, management).
-    if (user.isAdmin && !router.pathname?.startsWith('/admin')) {
-        console.log("AppLayout: Admin user detected, redirecting to /admin");
+    // Si es admin y NO está en una ruta /admin, redirigir
+    if (user.isAdmin && !pathname.startsWith('/admin')) {
+        console.log("AppLayout: Admin user detected outside /admin, redirecting to /admin");
         router.replace('/admin');
-        return; // Importante: detener la ejecución aquí para evitar renderizado incorrecto
+        return; // Detener ejecución para evitar renderizado incorrecto
+    }
+    // Si NO es admin y está intentando acceder a /admin, redirigir
+    if (!user.isAdmin && pathname.startsWith('/admin')) {
+        console.log("AppLayout: Non-admin user detected in /admin, redirecting to /chat");
+        router.replace('/chat'); // O a la página principal para usuarios normales
+        return; // Detener ejecución
     }
     // --- FIN REDIRECCIÓN ADMIN ---
 
-    if (user && !user.companyId && !user.isAdmin) { // Ignorar check de companyId para admin
+    // Check de Company ID (solo para no-admins)
+    if (!user.isAdmin && !user.companyId) {
        if (!incompleteSetupWarningShown.current) {
           console.error(`AppLayout: User data is incomplete (CompanyID: ${user?.companyId}). Showing warning.`);
           toast.error("Incomplete Account Setup", { /* ... */ });
           incompleteSetupWarningShown.current = true;
        }
-       // No bloquear al admin si no tiene companyId asignado
-       return;
+       // No bloquear, pero mostrar warning. La API debería manejar los errores si intenta operar.
+       // return; // Podría bloquear si se requiere companyId obligatoriamente para operar
     }
 
-    console.log("AppLayout: Auth check passed.");
+    console.log("AppLayout: Auth check passed for current route.");
     incompleteSetupWarningShown.current = false;
 
-  }, [isLoading, user, bypassAuth, router, signOut]);
+  }, [isLoading, user, bypassAuth, router, pathname, signOut]); // Añadir pathname a dependencias
 
   // --- Render Loading State ---
-  if (isLoading) { // No necesitamos bypassAuth aquí, el loader es genérico
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -1159,46 +1191,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // --- Render Auth Wall (si no es admin y falta user/company) ---
-  // El admin puede no tener companyId y aun así acceder al dashboard
-  const shouldBlockNonAdmin = !bypassAuth && !user?.isAdmin && (!user || !user.companyId);
+   // --- Bloqueador si no hay usuario (después de cargar) ---
+   if (!user && !bypassAuth) {
+       // Ya se hizo redirect en el useEffect, pero por seguridad renderizamos null o un loader
+       console.log("AppLayout: No user, rendering minimal or null.");
+        return (
+          <div className="flex h-screen items-center justify-center bg-background">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Redirigiendo...</p>
+          </div>
+        ); // O return null;
+   }
 
-  if (shouldBlockNonAdmin) {
-      console.log("AppLayout: Auth guard preventing non-admin render.");
-      return (
-        <div className="flex h-screen items-center justify-center bg-background">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-           {!isLoading && user && !user.companyId && (
-              <p className="mt-4 text-destructive">Resolviendo configuración de cuenta...</p>
-           )}
-        </div>
-      );
-  }
 
   // --- Renderizado Condicional ---
+  // Si es admin, renderiza AdminLayout (ya comprobado que está en /admin)
   if (user?.isAdmin) {
       console.log("AppLayout: Rendering Admin Layout...");
-      // Renderizar el Layout de Admin si el usuario es admin
-      // Pasamos 'children' que en este caso será el contenido de `app/(app)/admin/page.tsx`
       return <AdminLayout>{children}</AdminLayout>;
-  } else {
-      // Renderizar el Layout Normal para usuarios regulares
+  }
+  // Si no es admin, renderiza el layout normal (ya comprobado que no está en /admin)
+  else if (user) {
       console.log("AppLayout: Rendering standard user layout...");
+      // Comprobar si falta companyId para mostrar un estado bloqueado específico si es necesario
+      if (!user.companyId && !bypassAuth) {
+           console.log("AppLayout: Non-admin user without companyId, potentially blocked state.");
+           // Puedes mostrar un estado específico aquí o dejar que la lógica de las páginas maneje la falta de companyId
+           // Por ahora, se permite renderizar el layout, pero las páginas internas deberían verificar companyId
+      }
+
       return (
          <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
           <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
               <ResizablePanel
-                  collapsible
-                  collapsedSize={4}
-                  minSize={15}
-                  maxSize={25}
-                  defaultSize={18}
-                  onCollapse={() => setIsSidebarCollapsed(true)}
-                  onExpand={() => setIsSidebarCollapsed(false)}
-                  className={cn(
-                      "transition-all duration-300 ease-in-out bg-background dark:bg-card",
-                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]"
-                  )}
+                  collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={18}
+                  onCollapse={() => setIsSidebarCollapsed(true)} onExpand={() => setIsSidebarCollapsed(false)}
+                  className={cn("transition-all duration-300 ease-in-out bg-background dark:bg-card", isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]")}
                   order={1}
               >
                   <Sidebar isCollapsed={isSidebarCollapsed} />
@@ -1208,7 +1236,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div className="flex h-full flex-col">
                       <Header />
                       <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
-                          {children} {/* Aquí se renderiza el contenido de /chat, /knowledge, etc. */}
+                          {children} {/* Contenido de /chat, /knowledge, /settings */}
                       </main>
                   </div>
               </ResizablePanel>
@@ -1216,6 +1244,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       );
   }
+
+  // Fallback por si algo falla (aunque no debería llegar aquí si la lógica anterior es correcta)
+  console.error("AppLayout: Reached unexpected render state.");
+  return null;
 }
 ```
 
@@ -2803,21 +2835,11 @@ export default function AdminManagement() {
       if (!token) return;
       setIsLoadingCompanies(true);
       try {
-        // const data = await listCompaniesForSelect(); // Llamada API real
-        // --- Datos Mock Temporales ---
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const mockCompanies: CompanySelectItem[] = [
-          { id: "comp-uuid-1", name: "Empresa Alpha" },
-          { id: "comp-uuid-2", name: "Beta Corp" },
-          { id: "comp-uuid-3", name: "Gamma Solutions" },
-          { id: "comp-uuid-4", name: "Delta Inc." },
-          { id: "comp-uuid-5", name: "Omega Ventures" },
-        ];
-        setCompanies(mockCompanies);
-        // setCompanies(data); // Usar cuando API lista
+        const data = await listCompaniesForSelect(); // Llamada API (usará mock por ahora)
+        setCompanies(data);
       } catch (err: any) {
         console.error("Error fetching companies for select:", err);
-        toast.error("Error al cargar empresas", { description: err.message });
+        toast.error("Error al cargar empresas", { description: err.message || "Error desconocido" });
       } finally {
         setIsLoadingCompanies(false);
       }
@@ -2828,19 +2850,13 @@ export default function AdminManagement() {
   // Handlers de envío
   const onCompanySubmit = async (data: CreateCompanyValues) => {
     setCompanyError(null);
-    console.log("Creando compañía:", data);
     const toastId = toast.loading("Creando compañía...");
     try {
-        // const newCompany = await createCompany({ name: data.companyName }); // Llamada API real
-        // --- Simulación ---
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        const newCompany = { id: `new-comp-${Date.now()}`, name: data.companyName };
-        // --- Fin Simulación ---
-
+        const newCompany = await createCompany({ name: data.companyName }); // Llamada API (usará mock por ahora)
         toast.success("Compañía Creada", { id: toastId, description: `"${newCompany.name}" creada con ID: ${newCompany.id.substring(0, 8)}...` });
         companyForm.reset();
         // Actualizar la lista de compañías para el selector
-        setCompanies(prev => [...prev, { id: newCompany.id, name: newCompany.name }]);
+        setCompanies(prev => [...prev, { id: newCompany.id, name: newCompany.name }].sort((a, b) => a.name.localeCompare(b.name))); // Añadir y ordenar
     } catch (err: any) {
         const message = err instanceof ApiError ? err.message : "No se pudo crear la compañía.";
         setCompanyError(message);
@@ -2850,20 +2866,16 @@ export default function AdminManagement() {
 
   const onUserSubmit = async (data: CreateUserValues) => {
     setUserError(null);
-    console.log("Creando usuario:", data);
     const toastId = toast.loading("Creando usuario...");
     try {
-        // await createUser({ // Llamada API real
-        //     name: data.userName,
-        //     email: data.userEmail,
-        //     password: data.userPassword,
-        //     company_id: data.companyId,
-        // });
-        // --- Simulación ---
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        // --- Fin Simulación ---
-
-        toast.success("Usuario Creado", { id: toastId, description: `Usuario ${data.userEmail} creado para la compañía seleccionada.` });
+        await createUser({ // Llamada API (usará mock por ahora)
+            name: data.userName,
+            email: data.userEmail,
+            password: data.userPassword,
+            company_id: data.companyId,
+            roles: ['user'] // Asignar rol 'user' por defecto
+        });
+        toast.success("Usuario Creado", { id: toastId, description: `Usuario ${data.userEmail} creado y asociado.` });
         userForm.reset();
     } catch (err: any) {
         const message = err instanceof ApiError ? err.message : "No se pudo crear el usuario.";
@@ -2876,108 +2888,115 @@ export default function AdminManagement() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold tracking-tight">Gestión de Entidades</h1>
 
-      {/* Crear Compañía */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building className="h-5 w-5 text-primary" /> Crear Nueva Compañía
-          </CardTitle>
-          <CardDescription>Añade una nueva organización a la plataforma.</CardDescription>
-        </CardHeader>
-        <form onSubmit={companyForm.handleSubmit(onCompanySubmit)}>
-          <CardContent className="space-y-4">
-            {companyError && (
-                <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{companyError}</AlertDescription></Alert>
-            )}
-            <div className="space-y-1.5">
-              <Label htmlFor="companyName">Nombre de la Compañía</Label>
-              <Input
-                id="companyName"
-                placeholder="Ej: Acme Corporation"
-                disabled={companyForm.formState.isSubmitting}
-                {...companyForm.register("companyName")}
-              />
-              {companyForm.formState.errors.companyName && (
-                <p className="text-xs text-destructive pt-1">{companyForm.formState.errors.companyName.message}</p>
+      {/* Grid para formularios */}
+      <div className="grid gap-8 lg:grid-cols-2">
+
+        {/* Crear Compañía */}
+        <Card className="flex flex-col"> {/* Flex col para que footer se alinee abajo */}
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5 text-primary" /> Crear Compañía
+            </CardTitle>
+            <CardDescription>Añade una nueva organización.</CardDescription>
+          </CardHeader>
+          <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} className="flex flex-col flex-grow">
+            <CardContent className="space-y-4 flex-grow"> {/* flex-grow para empujar footer */}
+              {companyError && (
+                  <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{companyError}</AlertDescription></Alert>
               )}
-            </div>
-          </CardContent>
-          <CardFooter className="border-t pt-6">
-            <Button type="submit" disabled={companyForm.formState.isSubmitting}>
-              {companyForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Crear Compañía
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-
-      <Separator />
-
-      {/* Crear Usuario */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-primary" /> Crear Nuevo Usuario
-          </CardTitle>
-          <CardDescription>Añade un nuevo usuario y asígnalo a una compañía existente.</CardDescription>
-        </CardHeader>
-        <form onSubmit={userForm.handleSubmit(onUserSubmit)}>
-          <CardContent className="space-y-4">
-             {userError && (
-                <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{userError}</AlertDescription></Alert>
-             )}
-            <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="userName">Nombre Completo</Label>
-                <Input id="userName" placeholder="Ej: Juan Pérez" disabled={userForm.formState.isSubmitting} {...userForm.register("userName")} />
-                {userForm.formState.errors.userName && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userName.message}</p>}
+                <Label htmlFor="companyName">Nombre de la Compañía</Label>
+                <Input
+                  id="companyName"
+                  placeholder="Ej: Acme Corporation"
+                  disabled={companyForm.formState.isSubmitting}
+                  {...companyForm.register("companyName")}
+                  aria-invalid={!!companyForm.formState.errors.companyName}
+                />
+                {companyForm.formState.errors.companyName && (
+                  <p className="text-xs text-destructive pt-1">{companyForm.formState.errors.companyName.message}</p>
+                )}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="userEmail">Correo Electrónico</Label>
-                <Input id="userEmail" type="email" placeholder="ej: juan.perez@empresa.com" disabled={userForm.formState.isSubmitting} {...userForm.register("userEmail")} />
-                 {userForm.formState.errors.userEmail && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userEmail.message}</p>}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="userPassword">Contraseña</Label>
-              <Input id="userPassword" type="password" placeholder="Mínimo 8 caracteres" disabled={userForm.formState.isSubmitting} {...userForm.register("userPassword")} />
-               {userForm.formState.errors.userPassword && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userPassword.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="companyId">Asignar a Compañía</Label>
-              <Select
-                  disabled={isLoadingCompanies || userForm.formState.isSubmitting}
-                  onValueChange={(value) => userForm.setValue('companyId', value, { shouldValidate: true })}
-                  value={userForm.watch('companyId')}
-              >
-                <SelectTrigger id="companyId" className="w-full">
-                  <SelectValue placeholder={isLoadingCompanies ? "Cargando compañías..." : "Selecciona una compañía..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingCompanies ? (
-                     <SelectItem value="loading" disabled>Cargando...</SelectItem>
-                  ) : companies.length > 0 ? (
-                    companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name} ({company.id.substring(0, 6)}...)
-                      </SelectItem>
-                    ))
-                  ) : (
-                     <SelectItem value="no-companies" disabled>No hay compañías creadas</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-               {userForm.formState.errors.companyId && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.companyId.message}</p>}
-            </div>
-          </CardContent>
-          <CardFooter className="border-t pt-6">
-            <Button type="submit" disabled={userForm.formState.isSubmitting || isLoadingCompanies}>
-              {userForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Crear Usuario
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+            </CardContent>
+            <CardFooter className="border-t pt-6 mt-auto"> {/* mt-auto para empujar al fondo */}
+              <Button type="submit" disabled={companyForm.formState.isSubmitting}>
+                {companyForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Crear Compañía
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+
+        {/* Crear Usuario */}
+        <Card className="flex flex-col"> {/* Flex col */}
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" /> Crear Usuario
+            </CardTitle>
+            <CardDescription>Añade un usuario a una compañía.</CardDescription>
+          </CardHeader>
+          <form onSubmit={userForm.handleSubmit(onUserSubmit)} className="flex flex-col flex-grow">
+            <CardContent className="space-y-4 flex-grow">
+               {userError && (
+                  <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{userError}</AlertDescription></Alert>
+               )}
+               {/* Campos Nombre y Email */}
+               <div className="grid sm:grid-cols-2 gap-4">
+                 <div className="space-y-1.5">
+                   <Label htmlFor="userName">Nombre Completo</Label>
+                   <Input id="userName" placeholder="Ej: Juan Pérez" disabled={userForm.formState.isSubmitting} {...userForm.register("userName")} aria-invalid={!!userForm.formState.errors.userName}/>
+                   {userForm.formState.errors.userName && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userName.message}</p>}
+                 </div>
+                 <div className="space-y-1.5">
+                   <Label htmlFor="userEmail">Correo Electrónico</Label>
+                   <Input id="userEmail" type="email" placeholder="ej: juan.perez@empresa.com" disabled={userForm.formState.isSubmitting} {...userForm.register("userEmail")} aria-invalid={!!userForm.formState.errors.userEmail}/>
+                   {userForm.formState.errors.userEmail && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userEmail.message}</p>}
+                 </div>
+               </div>
+               {/* Campo Contraseña */}
+               <div className="space-y-1.5">
+                 <Label htmlFor="userPassword">Contraseña</Label>
+                 <Input id="userPassword" type="password" placeholder="Mínimo 8 caracteres" disabled={userForm.formState.isSubmitting} {...userForm.register("userPassword")} aria-invalid={!!userForm.formState.errors.userPassword}/>
+                 {userForm.formState.errors.userPassword && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.userPassword.message}</p>}
+               </div>
+               {/* Selector Compañía */}
+               <div className="space-y-1.5">
+                 <Label htmlFor="companyId">Asignar a Compañía</Label>
+                 <Select
+                     disabled={isLoadingCompanies || userForm.formState.isSubmitting}
+                     onValueChange={(value) => userForm.setValue('companyId', value, { shouldValidate: true })}
+                     value={userForm.watch('companyId')}
+                 >
+                   <SelectTrigger id="companyId" className="w-full" aria-invalid={!!userForm.formState.errors.companyId}>
+                     <SelectValue placeholder={isLoadingCompanies ? "Cargando compañías..." : "Selecciona una compañía..."} />
+                   </SelectTrigger>
+                   <SelectContent>
+                     {isLoadingCompanies ? (
+                        <SelectItem value="loading" disabled>Cargando...</SelectItem>
+                     ) : companies.length > 0 ? (
+                       companies.map((company) => (
+                         <SelectItem key={company.id} value={company.id}>
+                           {company.name} ({company.id.substring(0, 6)}...)
+                         </SelectItem>
+                       ))
+                     ) : (
+                        <SelectItem value="no-companies" disabled>No hay compañías creadas</SelectItem>
+                     )}
+                   </SelectContent>
+                 </Select>
+                 {userForm.formState.errors.companyId && <p className="text-xs text-destructive pt-1">{userForm.formState.errors.companyId.message}</p>}
+               </div>
+            </CardContent>
+            <CardFooter className="border-t pt-6 mt-auto">
+              <Button type="submit" disabled={userForm.formState.isSubmitting || isLoadingCompanies || !userForm.formState.isValid}>
+                {userForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Crear Usuario
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+
+      </div>
     </div>
   );
 }
@@ -3007,32 +3026,22 @@ export default function AdminStats() {
   useEffect(() => {
     const fetchStats = async () => {
       if (!token) {
-        setError("No autenticado.");
-        setIsLoading(false);
+        // No establecer error aquí, simplemente no hacer la llamada si no hay token
+        // El componente padre (layout/page) debería manejar la redirección
+        console.warn("AdminStats: No token available, skipping fetch.");
+        setIsLoading(false); // Marcar como no cargando
         return;
       }
       setIsLoading(true);
       setError(null);
       try {
-        // const data = await getAdminStats(); // Llamada API real (pendiente backend)
-        // --- Datos Mock Temporales ---
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simular delay
-        const mockData: AdminStatsResponse = {
-          company_count: 5,
-          users_per_company: [
-            { company_id: "comp-uuid-1", name: "Empresa Alpha", user_count: 15 },
-            { company_id: "comp-uuid-2", name: "Beta Corp", user_count: 8 },
-            { company_id: "comp-uuid-3", name: "Gamma Solutions", user_count: 25 },
-            { company_id: "comp-uuid-4", name: "Delta Inc.", user_count: 3 },
-            { company_id: "comp-uuid-5", name: "Omega Ventures", user_count: 12 },
-          ]
-        };
-        setStats(mockData);
-        // setStats(data); // Usar esto cuando la API esté lista
+        const data = await getAdminStats(); // Llamada API (usará mock por ahora)
+        setStats(data);
       } catch (err: any) {
         console.error("Error fetching admin stats:", err);
-        setError(err.message || "No se pudieron cargar las estadísticas.");
-        toast.error("Error al cargar estadísticas", { description: err.message });
+        const message = err.message || "No se pudieron cargar las estadísticas.";
+        setError(message);
+        toast.error("Error al cargar estadísticas", { description: message });
       } finally {
         setIsLoading(false);
       }
@@ -3041,12 +3050,18 @@ export default function AdminStats() {
     fetchStats();
   }, [token]); // Depende del token para re-fetch si cambia
 
+  // Calcula el total de usuarios sumando los user_count de cada compañía
+  const totalUsers = React.useMemo(() => {
+    return stats?.users_per_company?.reduce((sum, company) => sum + company.user_count, 0);
+  }, [stats]);
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Estadísticas Generales</h1>
 
       {/* Tarjetas de Resumen */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Tarjeta Empresas */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Empresas Totales</CardTitle>
@@ -3061,11 +3076,30 @@ export default function AdminStats() {
               <div className="text-2xl font-bold">{stats?.company_count ?? '-'}</div>
             )}
             <p className="text-xs text-muted-foreground pt-1">
-              Número total de organizaciones registradas.
+              Organizaciones registradas.
             </p>
           </CardContent>
         </Card>
-         {/* Podrías añadir más tarjetas (ej. Usuarios Totales, Documentos Totales) */}
+        {/* Tarjeta Usuarios */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Usuarios Totales</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : error ? (
+              <span className="text-sm text-destructive">-</span>
+            ) : (
+              <div className="text-2xl font-bold">{totalUsers ?? '-'}</div>
+            )}
+            <p className="text-xs text-muted-foreground pt-1">
+              Usuarios activos en todas las empresas.
+            </p>
+          </CardContent>
+        </Card>
+        {/* Puedes añadir más tarjetas aquí */}
       </div>
 
       {/* Tabla de Usuarios por Empresa */}
@@ -3085,8 +3119,8 @@ export default function AdminStats() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60%]">Nombre Empresa</TableHead>
-                <TableHead>ID Empresa</TableHead>
+                <TableHead className="w-[50%]">Nombre Empresa</TableHead>
+                <TableHead className="hidden sm:table-cell">ID Empresa</TableHead>
                 <TableHead className="text-right">Usuarios</TableHead>
               </TableRow>
             </TableHeader>
@@ -3095,7 +3129,7 @@ export default function AdminStats() {
                 [...Array(5)].map((_, i) => (
                   <TableRow key={`skel-row-${i}`}>
                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
@@ -3103,7 +3137,7 @@ export default function AdminStats() {
                 stats.users_per_company.map((company) => (
                   <TableRow key={company.company_id}>
                     <TableCell className="font-medium">{company.name || `Empresa ${company.company_id.substring(0, 6)}`}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-mono">{company.company_id}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs font-mono hidden sm:table-cell">{company.company_id}</TableCell>
                     <TableCell className="text-right font-medium">{company.user_count}</TableCell>
                   </TableRow>
                 ))
@@ -4957,7 +4991,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { BarChartBig, Users, Building, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react'; // Iconos para admin
+import { BarChartBig, Users, Building, PanelLeftClose, PanelLeftOpen, Settings, Wrench } from 'lucide-react'; // Iconos para admin, añadido Wrench
 import { APP_NAME } from '@/lib/constants';
 import AtenexLogo from '@/components/icons/atenex-logo';
 
@@ -4968,14 +5002,18 @@ interface AdminSidebarProps {
 
 // Items de navegación del Admin
 const adminNavItems = [
-  { href: '/admin', label: 'Estadísticas', icon: BarChartBig, exact: true }, // Página principal del dashboard
-  { href: '/admin/management', label: 'Gestión', icon: Users },
+  // Usar searchParams para cambiar la vista dentro de /admin
+  { href: '/admin?view=stats', label: 'Estadísticas', icon: BarChartBig, view: 'stats' },
+  { href: '/admin?view=management', label: 'Gestión', icon: Wrench, view: 'management' }, // Usar Wrench para gestión general
   // Podrías añadir links a la configuración normal si el admin también la necesita
-  // { href: '/settings', label: 'Configuración', icon: Settings },
+   { href: '/settings', label: 'Configuración', icon: Settings }, // Link a settings normal
 ];
 
 export function AdminSidebar({ isCollapsed, setIsCollapsed }: AdminSidebarProps) {
   const pathname = usePathname();
+  // Leer el parámetro 'view' para determinar la sección activa
+  const searchParams = React.useMemo(() => new URLSearchParams(window.location.search), [pathname]);
+  const currentView = searchParams.get('view') || 'stats'; // Default a 'stats'
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -5010,7 +5048,7 @@ export function AdminSidebar({ isCollapsed, setIsCollapsed }: AdminSidebarProps)
              <Button
                variant="ghost"
                size="icon"
-               className="h-8 w-8 absolute -right-10 top-2 bg-background border shadow-sm hover:bg-accent"
+               className="h-8 w-8 lg:absolute lg:-right-10 lg:top-2 bg-background border shadow-sm hover:bg-accent" // Ajuste posicional
                onClick={() => setIsCollapsed(true)}
                aria-label="Colapsar sidebar"
              >
@@ -5034,12 +5072,16 @@ export function AdminSidebar({ isCollapsed, setIsCollapsed }: AdminSidebarProps)
         {/* Navegación Admin */}
         <nav className={cn("flex flex-col gap-1 flex-grow", isCollapsed ? "items-center mt-4" : "mt-2")}>
           {adminNavItems.map((item) => {
-            const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+             // Determinar si está activo basado en el 'view' o el pathname para /settings
+             const isActive = item.href === '/settings'
+               ? pathname === item.href
+               : item.view === currentView;
+
             return (
               <Tooltip key={item.href} disableHoverableContent={!isCollapsed}>
                 <TooltipTrigger asChild>
                   <Link
-                    href={item.href}
+                    href={item.href} // Usar href para la navegación
                     className={cn(
                       buttonVariants({ variant: 'ghost', size: isCollapsed ? "icon" : "default" }),
                       "w-full transition-colors duration-150 ease-in-out relative group",
@@ -7142,7 +7184,7 @@ if __name__ == "__main__":
 
 ## File: `lib\api.ts`
 ```ts
-// File: lib/api.ts (MODIFICADO - Añadidas interfaces y placeholders para Admin API)
+// File: lib/api.ts (CORREGIDO - Restauradas funciones existentes, mantenidos placeholders Admin)
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
@@ -7158,11 +7200,11 @@ export class ApiError extends Error {
     }
 }
 
-// --- Función Genérica de Request (sin cambios estructurales, solo logging añadido) ---
+// --- Función Genérica de Request (sin cambios estructurales) ---
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    // Permitir endpoints /admin
-    if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
+    // Permitir endpoints /admin y /docs, /openapi.json
+     if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
         console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
     }
@@ -7183,10 +7225,9 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
          }
     }
     const config: RequestInit = { ...options, headers };
-    console.log(`API Request: ${options.method || 'GET'} ${apiUrl}`); // Log a llamada
+    console.log(`API Request: ${options.method || 'GET'} ${apiUrl}`);
     try {
         const response = await fetch(apiUrl, config);
-        // ... (resto del manejo de respuesta y errores sin cambios) ...
         if (!response.ok) {
             let errorData: ApiErrorData | null = null; let errorText = ''; const contentType = response.headers.get('content-type');
             try { if (contentType && contentType.includes('application/json')) { errorData = await response.json(); } else { errorText = await response.text(); } }
@@ -7235,7 +7276,7 @@ export interface ChatSummary { id: string; title: string | null; created_at: str
 export interface ChatMessageApi { id: string; chat_id: string; role: 'user' | 'assistant'; content: string; sources: Array<{ chunk_id: string; document_id: string; file_name: string | null; score: number; preview: string; }> | null; created_at: string; }
 export interface QueryPayload { query: string; retriever_top_k?: number; chat_id?: string | null; }
 export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id: string | null; chat_id: string; }
-export interface LoginResponse { access_token: string; token_type: string; user_id: string; email: string; full_name: string | null; role: string; company_id: string | null; } // Role podría no venir
+export interface LoginResponse { access_token: string; token_type: string; user_id: string; email: string; full_name: string | null; role: string; company_id: string | null; }
 
 // --- NUEVO: Tipos para Admin API ---
 export interface AdminStatsResponse {
@@ -7245,7 +7286,6 @@ export interface AdminStatsResponse {
         name: string | null; // Nombre de la compañía
         user_count: number;
     }>;
-    // Podrían añadirse más stats aquí (total users, total docs, etc.)
 }
 export interface CompanySelectItem {
     id: string;
@@ -7254,144 +7294,141 @@ export interface CompanySelectItem {
 export interface CreateCompanyPayload {
     name: string;
 }
-export interface CompanyResponse { // Respuesta al crear/obtener compañía
+export interface CompanyResponse {
     id: string;
     name: string;
-    created_at?: string; // Opcional
+    created_at?: string;
 }
 export interface CreateUserPayload {
     email: string;
     password: string;
     name: string;
-    company_id: string; // ID de la compañía a la que pertenece
-    roles?: string[]; // Roles opcionales (ej. ['user'])
+    company_id: string;
+    roles?: string[];
 }
-export interface UserResponse { // Respuesta al crear/obtener usuario
-    id: string; // user_id
+export interface UserResponse {
+    id: string;
     email: string;
     name: string | null;
     company_id: string | null;
-    is_active?: boolean; // Opcional
-    created_at?: string; // Opcional
+    is_active?: boolean;
+    created_at?: string;
 }
 
+// --- Funciones API Específicas (Existentes - Cuerpo Restaurado) ---
 
-// --- Funciones API Específicas (Existentes) ---
-// ** INGEST SERVICE ** (Sin cambios)
-export async function uploadDocument(/*...*/) {/*...*/}
-const mapApiResponseToFrontend = (apiDoc: DocumentStatusApiResponse): DocumentStatusResponse => {/*...*/}
-export async function getDocumentStatusList(/*...*/) {/*...*/}
-export const getDocumentStatus = async (/*...*/) {/*...*/}
-export async function retryIngestDocument(/*...*/) {/*...*/}
-export async function deleteIngestDocument(/*...*/) {/*...*/}
-// ** QUERY SERVICE ** (Sin cambios)
-export const getChats = async (/*...*/) {/*...*/}
-export const getChatMessages = async (/*...*/) {/*...*/}
-export const postQuery = async (/*...*/) {/*...*/}
-export const deleteChat = async (/*...*/) {/*...*/}
-// ** HELPERS ** (Sin cambios)
-export const mapApiSourcesToFrontend = (/*...*/) {/*...*/}
-export const mapApiMessageToFrontend = (/*...*/) {/*...*/}
+// ** INGEST SERVICE **
+export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
+  const formData = new FormData(); formData.append('file', file);
+  return request<IngestResponse>('/api/v1/ingest/upload', { method: 'POST', headers: { ...auth } as Record<string, string>, body: formData });
+}
 
+const mapApiResponseToFrontend = (apiDoc: DocumentStatusApiResponse): DocumentStatusResponse => {
+    return {
+        document_id: apiDoc.id, status: apiDoc.status, file_name: apiDoc.file_name,
+        file_type: apiDoc.file_type, chunk_count: apiDoc.chunk_count,
+        error_message: apiDoc.error_message, created_at: apiDoc.created_at || apiDoc.uploaded_at,
+        last_updated: apiDoc.last_updated, minio_exists: apiDoc.minio_exists,
+        milvus_chunk_count: apiDoc.milvus_chunk_count,
+    };
+};
+
+export async function getDocumentStatusList(auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<DocumentStatusResponse[]> {
+  const endpoint = `/api/v1/ingest/status?limit=${limit}&offset=${offset}`;
+  const apiResponse = await request<DocumentStatusApiResponse[]>(endpoint, { method: 'GET', headers: { ...auth } as Record<string, string> });
+  return (apiResponse || []).map(mapApiResponseToFrontend);
+}
+
+export const getDocumentStatus = async (documentId: string, auth: AuthHeaders): Promise<DetailedDocumentStatusResponse> => {
+    if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido.", 400); }
+    const apiDoc = await request<DocumentStatusApiResponse>(`/api/v1/ingest/status/${documentId}`, { method: 'GET', headers: { ...auth } as Record<string, string> });
+    const frontendDoc = mapApiResponseToFrontend(apiDoc) as DetailedDocumentStatusResponse;
+    frontendDoc.minio_exists = apiDoc.minio_exists ?? false;
+    frontendDoc.milvus_chunk_count = apiDoc.milvus_chunk_count ?? -1;
+    frontendDoc.message = apiDoc.message;
+    return frontendDoc;
+};
+
+export async function retryIngestDocument(documentId: string, auth: AuthHeaders): Promise<IngestResponse> {
+  if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para reintentar.", 400); }
+  const endpoint = `/api/v1/ingest/retry/${documentId}`;
+  return request<IngestResponse>(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth } as Record<string, string> });
+}
+
+export async function deleteIngestDocument(documentId: string, auth: AuthHeaders): Promise<void> {
+  if (!documentId || typeof documentId !== 'string') { throw new ApiError("Se requiere un ID de documento válido para eliminar.", 400); }
+  await request<null>(`/api/v1/ingest/${documentId}`, { method: 'DELETE', headers: { ...auth } as Record<string, string> });
+}
+
+// ** QUERY SERVICE **
+export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
+     const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
+     const response = await request<ChatSummary[]>(endpoint); return response || [];
+};
+
+export const getChatMessages = async (chatId: string, limit: number = 100, offset: number = 0): Promise<ChatMessageApi[]> => {
+     if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido.", 400); }
+     const endpoint = `/api/v1/query/chats/${chatId}/messages?limit=${limit}&offset=${offset}`;
+     const response = await request<ChatMessageApi[]>(endpoint); return response || [];
+};
+
+export const postQuery = async (payload: QueryPayload): Promise<QueryApiResponse> => {
+     const body = { ...payload, chat_id: payload.chat_id || null };
+     return request<QueryApiResponse>('/api/v1/query/ask', { method: 'POST', body: JSON.stringify(body) });
+};
+
+export const deleteChat = async (chatId: string): Promise<void> => {
+    if (!chatId || typeof chatId !== 'string') { throw new ApiError("Se requiere un ID de chat válido para eliminar.", 400); }
+    await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
+};
+
+// ** HELPERS **
+export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
+    if (!apiSources || apiSources.length === 0) return undefined;
+    return apiSources.map(source => ({
+        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name || null,
+        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
+    }));
+};
+
+export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
+    const mappedSources = mapApiSourcesToFrontend(apiMessage.sources);
+    return { id: apiMessage.id, role: apiMessage.role, content: apiMessage.content, sources: mappedSources, isError: false, created_at: apiMessage.created_at, };
+};
 
 // --- NUEVO: Funciones para Admin API (Placeholders) ---
-
-/**
- * Obtiene estadísticas generales para el dashboard de admin.
- * Requiere token de admin.
- */
 export async function getAdminStats(): Promise<AdminStatsResponse> {
     console.warn("API FUNCTION STUB: getAdminStats() called");
-    // Placeholder: Simula llamada API exitosa con datos mock después de 1 seg
     await new Promise(resolve => setTimeout(resolve, 1000));
-    const mockData: AdminStatsResponse = {
-        company_count: 5,
-        users_per_company: [
-          { company_id: "comp-uuid-1", name: "Empresa Alpha Mock", user_count: 15 },
-          { company_id: "comp-uuid-2", name: "Beta Corp Mock", user_count: 8 },
-          { company_id: "comp-uuid-3", name: "Gamma Solutions Mock", user_count: 25 },
-          { company_id: "comp-uuid-4", name: "Delta Inc. Mock", user_count: 3 },
-          { company_id: "comp-uuid-5", name: "Omega Ventures Mock", user_count: 12 },
-        ]
-      };
+    const mockData: AdminStatsResponse = { 
+        company_count: 0, 
+        users_per_company: [] 
+    };
     return mockData;
-    // Llamada Real (cuando exista el backend):
     // return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
-    // Asegúrate que la llamada real incluya el token via `request`
 }
-
-/**
- * Obtiene una lista simplificada de compañías para usar en Selects.
- * Requiere token de admin.
- */
 export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
     console.warn("API FUNCTION STUB: listCompaniesForSelect() called");
-    // Placeholder: Simula llamada API exitosa con datos mock después de 0.5 seg
     await new Promise(resolve => setTimeout(resolve, 500));
-     const mockCompanies: CompanySelectItem[] = [
-          { id: "comp-uuid-1", name: "Empresa Alpha Mock" },
-          { id: "comp-uuid-2", name: "Beta Corp Mock" },
-          { id: "comp-uuid-3", name: "Gamma Solutions Mock" },
-          { id: "comp-uuid-4", name: "Delta Inc. Mock" },
-          { id: "comp-uuid-5", name: "Omega Ventures Mock" },
-          { id: `new-comp-${Date.now()}`.substring(0,15), name: "Recién Creada Mock"}
-        ];
+    const mockCompanies: CompanySelectItem[] = [ /* ... mock data ... */ ];
     return mockCompanies;
-    // Llamada Real (cuando exista el backend):
     // return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
 }
-
-/**
- * Crea una nueva compañía.
- * Requiere token de admin.
- * @param payload - Datos de la nueva compañía.
- */
 export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
     console.warn("API FUNCTION STUB: createCompany() called with payload:", payload);
-     // Placeholder: Simula llamada API exitosa después de 1.2 seg
     await new Promise(resolve => setTimeout(resolve, 1200));
     const newId = `comp-uuid-${Date.now()}`;
-    const mockResponse: CompanyResponse = {
-        id: newId,
-        name: payload.name,
-        created_at: new Date().toISOString(),
-    };
+    const mockResponse: CompanyResponse = { id: newId, name: payload.name, created_at: new Date().toISOString() };
     return mockResponse;
-    // Llamada Real (cuando exista el backend):
-    // return request<CompanyResponse>('/api/v1/admin/companies', {
-    //     method: 'POST',
-    //     body: JSON.stringify(payload),
-    // });
+    // return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
 }
-
-/**
- * Crea un nuevo usuario asociado a una compañía.
- * Requiere token de admin.
- * @param payload - Datos del nuevo usuario.
- */
 export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
      console.warn("API FUNCTION STUB: createUser() called with payload:", payload);
-     // Placeholder: Simula llamada API exitosa después de 1.5 seg
      await new Promise(resolve => setTimeout(resolve, 1500));
      const newId = `user-uuid-${Date.now()}`;
-     const mockResponse: UserResponse = {
-         id: newId,
-         email: payload.email,
-         name: payload.name,
-         company_id: payload.company_id,
-         is_active: true,
-         created_at: new Date().toISOString(),
-     };
-     // Simular posible error (ej. email duplicado)
-     // if (payload.email === 'error@example.com') {
-     //    throw new ApiError("El correo electrónico ya está registrado.", 409);
-     // }
+     const mockResponse: UserResponse = { id: newId, email: payload.email, name: payload.name, company_id: payload.company_id, is_active: true, created_at: new Date().toISOString() };
      return mockResponse;
-    // Llamada Real (cuando exista el backend):
-    // return request<UserResponse>('/api/v1/admin/users', {
-    //     method: 'POST',
-    //     body: JSON.stringify(payload),
-    // });
+    // return request<UserResponse>('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(payload) });
 }
 ```
 
@@ -7431,7 +7468,7 @@ import React, {
     useCallback,
     ReactNode,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Import usePathname
 import { User as AppUser } from '@/lib/auth/helpers'; // Importa la interfaz actualizada
 import { toast } from "sonner";
 import { AUTH_TOKEN_KEY } from '@/lib/constants';
@@ -7502,6 +7539,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    const pathname = usePathname(); // Obtener pathname actual
 
     useEffect(() => {
         console.log("AuthProvider: Inicializando...");
@@ -7523,6 +7561,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                             console.log("AuthProvider: Token válido encontrado.", currentUser);
                             setToken(storedToken);
                             setUser(currentUser);
+
+                             // --- Redirección inicial si es Admin ---
+                             if (currentUser.isAdmin && !pathname?.startsWith('/admin')) {
+                                 console.log("AuthProvider: Admin detectado en inicialización, redirigiendo a /admin");
+                                 router.replace('/admin');
+                             }
+                             // --- Fin Redirección inicial ---
+
                         }
                     } else {
                         console.warn("AuthProvider: Token inválido encontrado. Limpiando.");
@@ -7547,7 +7593,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
              setIsLoading(false); // No estamos en el navegador
         }
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Ejecutar solo una vez al montar
 
     const signIn = useCallback(async (email: string, password: string): Promise<void> => {
         console.log("AuthProvider: Intentando iniciar sesión...");
