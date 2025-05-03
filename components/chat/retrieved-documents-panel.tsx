@@ -1,9 +1,9 @@
-// File: components/chat/retrieved-documents-panel.tsx (REFACTORIZADO - Mejor diseño)
+// File: components/chat/retrieved-documents-panel.tsx (REFACTORIZADO - Mejor diseño y Modal más grande)
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Loader2, Eye, Info, Star, ExternalLink } from 'lucide-react'; // Iconos añadidos
-import { RetrievedDoc } from '@/lib/api'; // Asegúrate que la interfaz es correcta
+import { FileText, Info, Star, Download, Loader2, Eye, X } from 'lucide-react'; // Iconos añadidos y X para cerrar modal
+import { RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import {
     DialogTitle,
     DialogTrigger,
     DialogFooter,
-    DialogClose
+    DialogClose // Importar DialogClose
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from '@/lib/utils';
@@ -43,10 +43,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
         });
     };
 
-    // Componente para renderizar estrellas de score
+    // Componente para renderizar estrellas de score (sin cambios)
     const ScoreStars = ({ score }: { score: number | null | undefined }) => {
       if (score == null || score < 0) return null;
-      const numStars = Math.max(0, Math.min(5, Math.round(score * 5))); // Escala 0-1 a 0-5 estrellas
+      const numStars = Math.max(0, Math.min(5, Math.round(score * 5)));
       return (
         <div className="flex items-center gap-0.5" title={`Score: ${score.toFixed(3)}`}>
           {[...Array(5)].map((_, i) => (
@@ -57,6 +57,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     };
 
   return (
+    // FLAG_LLM: Usar Dialog, no AlertDialog. Se controla con isDialogOpen state.
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/10 dark:bg-muted/20">
             {/* Header del panel */}
@@ -101,6 +102,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     )}
                     {/* Lista de Documentos */}
                     {documents.map((doc, index) => (
+                        // FLAG_LLM: El Card ahora es el DialogTrigger
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                             <Card
                                 className={cn(
@@ -122,14 +124,13 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                             </span>
                                         </p>
                                         <ScoreStars score={doc.score} />
-                                        {/* <Badge variant="secondary" className="px-1.5 py-0 font-mono text-xs rounded-sm">{doc.score?.toFixed(2) ?? 'N/A'}</Badge> */}
                                     </div>
                                     {/* Preview */}
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6"> {/* Indentación */}
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6">
                                         {doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                     </p>
                                     {/* Footer: IDs y Botón View */}
-                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6"> {/* Indentación */}
+                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6">
                                         <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                         <Eye className="h-3 w-3" />
                                     </div>
@@ -140,10 +141,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Dialog de Detalles (con fondo y scroll) */}
+            {/* FLAG_LLM: Contenido del Dialog (Modal) más grande y con más info */}
             {selectedDoc && (
-                 <DialogContent className="sm:max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] bg-background/95 dark:bg-background/95 !backdrop-blur-md !shadow-2xl !border !border-border"> {/* Fondo opaco y mejor visibilidad */}
-                    <DialogHeader>
+                 <DialogContent className="sm:max-w-2xl lg:max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] p-0"> {/* Tamaño aumentado y sin padding inicial */}
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b"> {/* Padding y borde */}
                         <DialogTitle className="truncate text-lg flex items-center gap-2" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
                             <FileText className="inline-block h-5 w-5 align-text-bottom text-primary" />
                             {selectedDoc.file_name || 'Detalles del Documento'}
@@ -156,36 +157,43 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         </div>
                     </DialogHeader>
                     {/* Contenido Scrolleable */}
-                    <ScrollArea className="overflow-y-auto -mx-6 px-6 border-y py-4 my-4">
+                    <ScrollArea className="overflow-y-auto px-6 py-4 max-h-[calc(85vh-180px)]"> {/* Altura máxima calculada */}
                          <div className="space-y-4 text-sm">
                             <div>
-                                <Label className="text-xs font-semibold text-muted-foreground">Contenido Relevante (Vista Previa):</Label>
-                                <blockquote className="mt-1 border-l-2 pl-4 italic text-muted-foreground text-xs max-h-[250px] overflow-y-auto">
-                                    {selectedDoc.content_preview || 'Vista previa no disponible.'}
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido Relevante (Vista Previa):</Label>
+                                <blockquote className="mt-1 border-l-4 pl-4 text-sm text-foreground/80 max-h-[300px] overflow-y-auto pretty-scrollbar"> {/* Blockquote estilizado */}
+                                    {selectedDoc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                 </blockquote>
                             </div>
                             {/* Metadatos si existen */}
                             {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                                  <div>
-                                    <Label className="text-xs font-semibold text-muted-foreground">Metadatos:</Label>
-                                    <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all">
+                                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Metadatos:</Label>
+                                    <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all pretty-scrollbar">
                                         {JSON.stringify(selectedDoc.metadata, null, 2)}
                                     </pre>
                                 </div>
                             )}
                          </div>
                      </ScrollArea>
-                    <DialogFooter className="sm:justify-between flex-wrap gap-2">
+                    <DialogFooter className="sm:justify-between px-6 py-4 border-t bg-muted/30"> {/* Padding y borde */}
                         {/* Botón Descarga */}
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={true}> {/* Deshabilitado temporalmente */}
-                            <Download className="mr-2 h-4 w-4" />Descargar Original (N/D)
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={!selectedDoc.file_name}> {/* Deshabilitado si no hay nombre */}
+                            <Download className="mr-2 h-4 w-4" />Descargar Original {selectedDoc.file_name ? '' : '(N/D)'}
                         </Button>
-                        {/* Botón Cerrar */}
+                        {/* Botón Cerrar explícito */}
                         <DialogClose asChild><Button variant="secondary" size="sm">Cerrar</Button></DialogClose>
                     </DialogFooter>
                 </DialogContent>
             )}
         </div>
+        {/* Estilos para scrollbar bonito (opcional, añadir a globals.css si se quiere) */}
+        <style jsx global>{`
+            .pretty-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+            .pretty-scrollbar::-webkit-scrollbar-track { background: hsl(var(--muted) / 0.3); border-radius: 3px; }
+            .pretty-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+            .pretty-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.7); }
+        `}</style>
     </Dialog>
   );
 }

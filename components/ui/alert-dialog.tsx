@@ -62,6 +62,7 @@ function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof
   )
 }
 
+// --- El resto de componentes (Header, Footer, Title, etc.) sin cambios ---
 function AlertDialogHeader({
   className,
   ...props

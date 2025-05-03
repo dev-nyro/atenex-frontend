@@ -6173,11 +6173,11 @@ function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.Comp
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
-          "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md backdrop-blur-sm",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           className
         )}
+        style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
@@ -6363,11 +6363,11 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
-        "z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg", // Asegurado bg-popover
+        "z-50 min-w-[8rem] origin-[--radix-dropdown-menu-content-transform-origin] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg backdrop-blur-sm",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className
       )}
+      style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
       {...props}
     />
   )
@@ -6680,13 +6680,13 @@ function SelectContent({
         data-slot="select-content"
         position={position}
         className={cn(
-          // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
-          "relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+          "relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md backdrop-blur-sm",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
         )}
+        style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
         {...props}
       >
         <SelectPrimitive.Viewport
@@ -7022,13 +7022,13 @@ function TooltipContent({ className, sideOffset = 4, children, ...props }: React
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          // FLAG_LLM: Asegurar que bg-popover esté presente para el fondo opaco
-          "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md",
+          "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md backdrop-blur-sm",
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           "text-balance",
           className
         )}
+        style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
         {...props}
       >
         {children}
@@ -7474,8 +7474,8 @@ import { toast } from "sonner";
 import { AUTH_TOKEN_KEY } from '@/lib/constants';
 import { getApiGatewayUrl } from '@/lib/utils'; // cn no se usa aquí
 
-// Definir el email del admin globalmente o importarlo
-const ADMIN_EMAIL = "atenex@gmail.com";
+// --- CORRECCIÓN: Usar el email correcto del admin según los logs ---
+const ADMIN_EMAIL = "admin@atenex.com"; // Antes era "atenex@gmail.com"
 
 interface AuthContextType {
     user: AppUser | null;
@@ -7521,16 +7521,16 @@ function getUserFromDecodedToken(payload: any): AppUser | null {
     if (!payload || !payload.sub) {
         return null;
     }
-    // Añadir la lógica isAdmin
+    // Añadir la lógica isAdmin comparando con la constante corregida
     const isAdmin = payload.email === ADMIN_EMAIL;
-    console.log(`getUserFromDecodedToken: Email=${payload.email}, IsAdmin=${isAdmin}`);
+    console.log(`getUserFromDecodedToken: Email=${payload.email}, IsAdmin=${isAdmin}`); // Mantener log para verificación
     return {
         userId: payload.sub,
         email: payload.email,
-        name: payload.name || null,
-        companyId: payload.company_id || null, // Asegurar que puede ser null
+        name: payload.name || payload.full_name || null, // Intentar con full_name si name no existe
+        companyId: payload.company_id || null,
         roles: payload.roles || [],
-        isAdmin: isAdmin, // Establecer el flag isAdmin
+        isAdmin: isAdmin,
     };
 }
 
@@ -7539,7 +7539,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<AppUser | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
-    const pathname = usePathname(); // Obtener pathname actual
+    const pathname = usePathname();
 
     useEffect(() => {
         console.log("AuthProvider: Inicializando...");
@@ -7562,13 +7562,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                             setToken(storedToken);
                             setUser(currentUser);
 
-                             // --- Redirección inicial si es Admin ---
-                             if (currentUser.isAdmin && !pathname?.startsWith('/admin')) {
-                                 console.log("AuthProvider: Admin detectado en inicialización, redirigiendo a /admin");
-                                 router.replace('/admin');
-                             }
-                             // --- Fin Redirección inicial ---
-
+                            // --- Redirección inicial si es Admin ---
+                            // SOLO redirige si estamos en una página NO admin
+                            if (currentUser.isAdmin && !pathname?.startsWith('/admin')) {
+                                console.log("AuthProvider: Admin detectado en inicialización fuera de /admin, redirigiendo a /admin");
+                                router.replace('/admin');
+                            }
+                            // --- Fin Redirección inicial ---
                         }
                     } else {
                         console.warn("AuthProvider: Token inválido encontrado. Limpiando.");
@@ -7591,7 +7591,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 console.log("AuthProvider: Carga inicial completa.");
             }
         } else {
-             setIsLoading(false); // No estamos en el navegador
+             setIsLoading(false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Ejecutar solo una vez al montar
@@ -7639,14 +7639,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             localStorage.setItem(AUTH_TOKEN_KEY, receivedToken);
             setToken(receivedToken);
-            setUser(loggedInUser);
+            setUser(loggedInUser); // ¡Aquí se actualiza el estado `user`!
             console.log("AuthProvider: Inicio de sesión exitoso.", loggedInUser);
             toast.success("Inicio de Sesión Exitoso", { description: `¡Bienvenido de nuevo, ${loggedInUser.name || loggedInUser.email}!` });
 
-            // Redirigir al dashboard si es admin, si no al chat
+            // La redirección ahora debería funcionar porque loggedInUser.isAdmin será true
             if (loggedInUser.isAdmin) {
-                router.replace('/admin'); // Redirigir a la nueva página admin
+                console.log("AuthProvider: Redirigiendo admin a /admin...");
+                router.replace('/admin');
             } else {
+                 console.log("AuthProvider: Redirigiendo usuario a /chat...");
                 router.replace('/chat');
             }
 

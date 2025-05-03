@@ -22,7 +22,7 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils'; // Importar helpers
@@ -50,6 +50,7 @@ export default function ChatPage() {
     const [isSending, setIsSending] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
+    // Panel de fuentes cerrado por defecto
     const [isSourcesPanelVisible, setIsSourcesPanelVisible] = useState(false);
 
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -60,7 +61,8 @@ export default function ChatPage() {
             console.log(`ChatPage: URL parameter changed. Setting chatId state to: ${chatIdParam}`);
             setChatId(chatIdParam);
             fetchedChatIdRef.current = undefined;
-            setIsSourcesPanelVisible(false);
+            // Mantenemos el panel como estaba, no lo cerramos necesariamente al cambiar de chat
+            // setIsSourcesPanelVisible(false);
         }
     }, [chatIdParam, chatId]);
 
@@ -90,7 +92,8 @@ export default function ChatPage() {
         setHistoryError(null);
         setMessages([]);
         // NO limpiar retrievedDocs aquí, así se mantienen los docs de la última consulta
-        setIsSourcesPanelVisible(false);
+        // No cerramos necesariamente el panel
+        // setIsSourcesPanelVisible(false);
         fetchedChatIdRef.current = currentFetchTarget;
 
         if (chatId) {
@@ -119,6 +122,8 @@ export default function ChatPage() {
                     setRetrievedDocs(lastWithDocs);
                     lastDocsRef.current = lastWithDocs;
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
+                    // Abrir panel si el último mensaje tenía fuentes y no estaba ya abierto
+                    if (lastWithDocs.length > 0 && !isSourcesPanelVisible) setIsSourcesPanelVisible(true);
                 })
                 .catch(error => {
                     let message = "Fallo al cargar el historial del chat.";
@@ -136,12 +141,13 @@ export default function ChatPage() {
         } else {
             // Página de nuevo chat, mostrar bienvenida
             setMessages([welcomeMessage]);
-            // NO limpiar retrievedDocs aquí
+            // Limpiar retrievedDocs y cerrar panel en nuevo chat
+            setRetrievedDocs([]);
             setIsLoadingHistory(false);
             setIsSourcesPanelVisible(false);
             fetchedChatIdRef.current = 'welcome';
         }
-    }, [chatId, user, isAuthLoading, signOut, router]);
+    }, [chatId, user, isAuthLoading, signOut, router, isSourcesPanelVisible]);
 
     useEffect(() => {
         if (scrollAreaRef.current) {
@@ -339,42 +345,44 @@ export default function ChatPage() {
     };
 
     return (
-        // Fondo ligeramente diferente para el área de chat
         <div className="flex flex-col h-full bg-background">
-             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
-                     <div className="flex h-full flex-col relative">
-                         {/* Botón toggle más discreto */}
-                         <div className="absolute top-3 right-3 z-20">
-                             <Button
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+                {/* Panel principal del Chat */}
+                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
+                    <div className="flex h-full flex-col relative">
+                        {/* Botón toggle para panel de fuentes */}
+                        <div className="absolute top-3 right-3 z-20">
+                            <Button
                                 onClick={handlePanelToggle}
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
-                                data-state={isSourcesPanelVisible ? "open" : "closed"} // Para posible estilo futuro
+                                data-state={isSourcesPanelVisible ? "open" : "closed"}
                                 aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}
-                             >
-                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                             </Button>
-                         </div>
-                         {/* Ajuste de padding en ScrollArea */}
-                         <ScrollArea className="flex-1 px-6 pt-6 pb-2" ref={scrollAreaRef}>
-                             {renderChatContent()}
-                         </ScrollArea>
-                         {/* Borde superior más sutil y padding ajustado */}
-                         <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
-                             <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
-                         </div>
-                     </div>
-                 </ResizablePanel>
-                 {/* Panel de fuentes siempre visible con los docs de la última consulta */}
-                 <>
-                     <ResizableHandle withHandle />
-                     <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-                         <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
-                     </ResizablePanel>
-                 </>
-             </ResizablePanelGroup>
+                            >
+                                {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+                            </Button>
+                        </div>
+                        {/* ScrollArea ocupa el espacio restante (flex-1) y tiene padding inferior */}
+                        <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
+                            {renderChatContent()}
+                        </ScrollArea>
+                        {/* Input fuera del ScrollArea, en la parte inferior del flex container */}
+                        <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                            <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
+                        </div>
+                    </div>
+                </ResizablePanel>
+                {/* Panel de fuentes renderizado condicionalmente */}
+                {isSourcesPanelVisible && (
+                    <>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                            <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                        </ResizablePanel>
+                    </>
+                )}
+            </ResizablePanelGroup>
         </div>
     );
 }
