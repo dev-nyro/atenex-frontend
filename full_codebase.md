@@ -7397,8 +7397,13 @@ export const deleteChat = async (chatId: string): Promise<void> => {
 export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
     if (!apiSources || apiSources.length === 0) return undefined;
     return apiSources.map(source => ({
-        id: source.chunk_id, document_id: source.document_id, file_name: source.file_name || null,
-        content: source.preview, content_preview: source.preview, metadata: null, score: source.score,
+        id: typeof source.chunk_id === 'string' ? source.chunk_id : '',
+        document_id: typeof source.document_id === 'string' ? source.document_id : '',
+        file_name: typeof source.file_name === 'string' ? source.file_name : '',
+        content: typeof source.preview === 'string' ? source.preview : '',
+        content_preview: typeof source.preview === 'string' ? source.preview : '',
+        metadata: null,
+        score: typeof source.score === 'number' ? source.score : 0,
     }));
 };
 
