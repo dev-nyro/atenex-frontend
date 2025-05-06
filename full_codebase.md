@@ -549,7 +549,7 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, BrainCircuit, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils'; // Importar helpers
@@ -577,6 +577,7 @@ export default function ChatPage() {
     const [isSending, setIsSending] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [historyError, setHistoryError] = useState<string | null>(null);
+    // Panel de fuentes cerrado por defecto
     const [isSourcesPanelVisible, setIsSourcesPanelVisible] = useState(false);
 
     const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -587,7 +588,8 @@ export default function ChatPage() {
             console.log(`ChatPage: URL parameter changed. Setting chatId state to: ${chatIdParam}`);
             setChatId(chatIdParam);
             fetchedChatIdRef.current = undefined;
-            setIsSourcesPanelVisible(false);
+            // Mantenemos el panel como estaba, no lo cerramos necesariamente al cambiar de chat
+            // setIsSourcesPanelVisible(false);
         }
     }, [chatIdParam, chatId]);
 
@@ -617,7 +619,8 @@ export default function ChatPage() {
         setHistoryError(null);
         setMessages([]);
         // NO limpiar retrievedDocs aquí, así se mantienen los docs de la última consulta
-        setIsSourcesPanelVisible(false);
+        // No cerramos necesariamente el panel
+        // setIsSourcesPanelVisible(false);
         fetchedChatIdRef.current = currentFetchTarget;
 
         if (chatId) {
@@ -646,6 +649,8 @@ export default function ChatPage() {
                     setRetrievedDocs(lastWithDocs);
                     lastDocsRef.current = lastWithDocs;
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
+                    // Abrir panel si el último mensaje tenía fuentes y no estaba ya abierto
+                    if (lastWithDocs.length > 0 && !isSourcesPanelVisible) setIsSourcesPanelVisible(true);
                 })
                 .catch(error => {
                     let message = "Fallo al cargar el historial del chat.";
@@ -663,12 +668,13 @@ export default function ChatPage() {
         } else {
             // Página de nuevo chat, mostrar bienvenida
             setMessages([welcomeMessage]);
-            // NO limpiar retrievedDocs aquí
+            // Limpiar retrievedDocs y cerrar panel en nuevo chat
+            setRetrievedDocs([]);
             setIsLoadingHistory(false);
             setIsSourcesPanelVisible(false);
             fetchedChatIdRef.current = 'welcome';
         }
-    }, [chatId, user, isAuthLoading, signOut, router]);
+    }, [chatId, user, isAuthLoading, signOut, router, isSourcesPanelVisible]);
 
     useEffect(() => {
         if (scrollAreaRef.current) {
@@ -866,42 +872,44 @@ export default function ChatPage() {
     };
 
     return (
-        // Fondo ligeramente diferente para el área de chat
         <div className="flex flex-col h-full bg-background">
-             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
-                     <div className="flex h-full flex-col relative">
-                         {/* Botón toggle más discreto */}
-                         <div className="absolute top-3 right-3 z-20">
-                             <Button
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+                {/* Panel principal del Chat */}
+                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
+                    <div className="flex h-full flex-col relative">
+                        {/* Botón toggle para panel de fuentes */}
+                        <div className="absolute top-3 right-3 z-20">
+                            <Button
                                 onClick={handlePanelToggle}
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
-                                data-state={isSourcesPanelVisible ? "open" : "closed"} // Para posible estilo futuro
+                                data-state={isSourcesPanelVisible ? "open" : "closed"}
                                 aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}
-                             >
-                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                             </Button>
-                         </div>
-                         {/* Ajuste de padding en ScrollArea */}
-                         <ScrollArea className="flex-1 px-6 pt-6 pb-2" ref={scrollAreaRef}>
-                             {renderChatContent()}
-                         </ScrollArea>
-                         {/* Borde superior más sutil y padding ajustado */}
-                         <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
-                             <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
-                         </div>
-                     </div>
-                 </ResizablePanel>
-                 {/* Panel de fuentes siempre visible con los docs de la última consulta */}
-                 <>
-                     <ResizableHandle withHandle />
-                     <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-                         <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
-                     </ResizablePanel>
-                 </>
-             </ResizablePanelGroup>
+                            >
+                                {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+                            </Button>
+                        </div>
+                        {/* ScrollArea ocupa el espacio restante (flex-1) y tiene padding inferior */}
+                        <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
+                            {renderChatContent()}
+                        </ScrollArea>
+                        {/* Input fuera del ScrollArea, en la parte inferior del flex container */}
+                        <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                            <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isLoadingHistory || isAuthLoading} />
+                        </div>
+                    </div>
+                </ResizablePanel>
+                {/* Panel de fuentes renderizado condicionalmente */}
+                {isSourcesPanelVisible && (
+                    <>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                            <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                        </ResizablePanel>
+                    </>
+                )}
+            </ResizablePanelGroup>
         </div>
     );
 }
@@ -4223,12 +4231,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
 ## File: `components\chat\retrieved-documents-panel.tsx`
 ```tsx
-// File: components/chat/retrieved-documents-panel.tsx (REFACTORIZADO - Mejor diseño)
+// File: components/chat/retrieved-documents-panel.tsx (REFACTORIZADO - Mejor diseño y Modal más grande)
 import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { FileText, AlertCircle, Download, Loader2, Eye, Info, Star, ExternalLink } from 'lucide-react'; // Iconos añadidos
-import { RetrievedDoc } from '@/lib/api'; // Asegúrate que la interfaz es correcta
+import { FileText, Info, Star, Download, Loader2, Eye, X } from 'lucide-react'; // Iconos añadidos y X para cerrar modal
+import { RetrievedDoc } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -4240,7 +4248,7 @@ import {
     DialogTitle,
     DialogTrigger,
     DialogFooter,
-    DialogClose
+    DialogClose // Importar DialogClose
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from '@/lib/utils';
@@ -4268,10 +4276,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
         });
     };
 
-    // Componente para renderizar estrellas de score
+    // Componente para renderizar estrellas de score (sin cambios)
     const ScoreStars = ({ score }: { score: number | null | undefined }) => {
       if (score == null || score < 0) return null;
-      const numStars = Math.max(0, Math.min(5, Math.round(score * 5))); // Escala 0-1 a 0-5 estrellas
+      const numStars = Math.max(0, Math.min(5, Math.round(score * 5)));
       return (
         <div className="flex items-center gap-0.5" title={`Score: ${score.toFixed(3)}`}>
           {[...Array(5)].map((_, i) => (
@@ -4282,6 +4290,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
     };
 
   return (
+    // FLAG_LLM: Usar Dialog, no AlertDialog. Se controla con isDialogOpen state.
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col border-l bg-muted/10 dark:bg-muted/20">
             {/* Header del panel */}
@@ -4326,6 +4335,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     )}
                     {/* Lista de Documentos */}
                     {documents.map((doc, index) => (
+                        // FLAG_LLM: El Card ahora es el DialogTrigger
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                             <Card
                                 className={cn(
@@ -4347,14 +4357,13 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                             </span>
                                         </p>
                                         <ScoreStars score={doc.score} />
-                                        {/* <Badge variant="secondary" className="px-1.5 py-0 font-mono text-xs rounded-sm">{doc.score?.toFixed(2) ?? 'N/A'}</Badge> */}
                                     </div>
                                     {/* Preview */}
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6"> {/* Indentación */}
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6">
                                         {doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                     </p>
                                     {/* Footer: IDs y Botón View */}
-                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6"> {/* Indentación */}
+                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6">
                                         <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                         <Eye className="h-3 w-3" />
                                     </div>
@@ -4365,10 +4374,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                 </div>
             </ScrollArea>
 
-            {/* Dialog de Detalles (con fondo y scroll) */}
+            {/* FLAG_LLM: Contenido del Dialog (Modal) más grande y con más info */}
             {selectedDoc && (
-                 <DialogContent className="sm:max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] bg-background/95 dark:bg-background/95 !backdrop-blur-md !shadow-2xl !border !border-border"> {/* Fondo opaco y mejor visibilidad */}
-                    <DialogHeader>
+                 <DialogContent className="sm:max-w-2xl lg:max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] p-0"> {/* Tamaño aumentado y sin padding inicial */}
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b"> {/* Padding y borde */}
                         <DialogTitle className="truncate text-lg flex items-center gap-2" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
                             <FileText className="inline-block h-5 w-5 align-text-bottom text-primary" />
                             {selectedDoc.file_name || 'Detalles del Documento'}
@@ -4381,36 +4390,43 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                         </div>
                     </DialogHeader>
                     {/* Contenido Scrolleable */}
-                    <ScrollArea className="overflow-y-auto -mx-6 px-6 border-y py-4 my-4">
+                    <ScrollArea className="overflow-y-auto px-6 py-4 max-h-[calc(85vh-180px)]"> {/* Altura máxima calculada */}
                          <div className="space-y-4 text-sm">
                             <div>
-                                <Label className="text-xs font-semibold text-muted-foreground">Contenido Relevante (Vista Previa):</Label>
-                                <blockquote className="mt-1 border-l-2 pl-4 italic text-muted-foreground text-xs max-h-[250px] overflow-y-auto">
-                                    {selectedDoc.content_preview || 'Vista previa no disponible.'}
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido Relevante (Vista Previa):</Label>
+                                <blockquote className="mt-1 border-l-4 pl-4 text-sm text-foreground/80 max-h-[300px] overflow-y-auto pretty-scrollbar"> {/* Blockquote estilizado */}
+                                    {selectedDoc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                 </blockquote>
                             </div>
                             {/* Metadatos si existen */}
                             {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                                  <div>
-                                    <Label className="text-xs font-semibold text-muted-foreground">Metadatos:</Label>
-                                    <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all">
+                                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Metadatos:</Label>
+                                    <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all pretty-scrollbar">
                                         {JSON.stringify(selectedDoc.metadata, null, 2)}
                                     </pre>
                                 </div>
                             )}
                          </div>
                      </ScrollArea>
-                    <DialogFooter className="sm:justify-between flex-wrap gap-2">
+                    <DialogFooter className="sm:justify-between px-6 py-4 border-t bg-muted/30"> {/* Padding y borde */}
                         {/* Botón Descarga */}
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={true}> {/* Deshabilitado temporalmente */}
-                            <Download className="mr-2 h-4 w-4" />Descargar Original (N/D)
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={!selectedDoc.file_name}> {/* Deshabilitado si no hay nombre */}
+                            <Download className="mr-2 h-4 w-4" />Descargar Original {selectedDoc.file_name ? '' : '(N/D)'}
                         </Button>
-                        {/* Botón Cerrar */}
+                        {/* Botón Cerrar explícito */}
                         <DialogClose asChild><Button variant="secondary" size="sm">Cerrar</Button></DialogClose>
                     </DialogFooter>
                 </DialogContent>
             )}
         </div>
+        {/* Estilos para scrollbar bonito (opcional, añadir a globals.css si se quiere) */}
+        <style jsx global>{`
+            .pretty-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+            .pretty-scrollbar::-webkit-scrollbar-track { background: hsl(var(--muted) / 0.3); border-radius: 3px; }
+            .pretty-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+            .pretty-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.7); }
+        `}</style>
     </Dialog>
   );
 }
@@ -5534,6 +5550,7 @@ function AlertDialogContent({ className, ...props }: React.ComponentProps<typeof
   )
 }
 
+// --- El resto de componentes (Header, Footer, Title, etc.) sin cambios ---
 function AlertDialogHeader({
   className,
   ...props
@@ -6045,7 +6062,8 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50", // Opacidad ajustada
+        "backdrop-blur-sm", // Añadir blur al fondo
         className
       )}
       {...props}
@@ -6064,8 +6082,11 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // FLAG_LLM: Asegurar que bg-background esté presente para el fondo opaco
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          // FLAG_LLM: Asegurar que bg-background esté presente y sea opaco
+          "bg-background", // Asegura fondo opaco
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200", // Mantiene padding y borde
+          // Las clases de tamaño (como max-w-lg) se aplicarán donde se use el componente
           className
         )}
         {...props}
@@ -6080,6 +6101,7 @@ function DialogContent({
   )
 }
 
+// --- El resto de componentes (DialogHeader, Footer, Title, Description) sin cambios ---
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -6154,36 +6176,16 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+// --- DropdownMenu, Portal, Trigger, Group, Label, Separator, Shortcut, Sub, RadioGroup sin cambios ---
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
 }
-
 function DropdownMenuPortal({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
   return <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
 }
-
 function DropdownMenuTrigger({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
   return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" className="focus:outline-none" {...props} />
 }
-
-function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
-  return (
-    <DropdownMenuPrimitive.Portal>
-      <DropdownMenuPrimitive.Content
-        data-slot="dropdown-menu-content"
-        sideOffset={sideOffset}
-        className={cn(
-          "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md backdrop-blur-sm",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-          className
-        )}
-        style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
-        {...props}
-      />
-    </DropdownMenuPrimitive.Portal>
-  )
-}
-
 function DropdownMenuGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
@@ -6191,7 +6193,105 @@ function DropdownMenuGroup({
     <DropdownMenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
   )
 }
+function DropdownMenuRadioGroup({
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
+  return (
+    <DropdownMenuPrimitive.RadioGroup
+      data-slot="dropdown-menu-radio-group"
+      {...props}
+    />
+  )
+}
+function DropdownMenuLabel({
+  className,
+  inset,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Label> & {
+  inset?: boolean
+}) {
+  return (
+    <DropdownMenuPrimitive.Label
+      data-slot="dropdown-menu-label"
+      data-inset={inset}
+      className={cn(
+        "px-2 py-1.5 text-sm font-medium data-[inset]:pl-8",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+function DropdownMenuSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
+  return (
+    <DropdownMenuPrimitive.Separator
+      data-slot="dropdown-menu-separator"
+      className={cn("bg-border -mx-1 my-1 h-px", className)}
+      {...props}
+    />
+  )
+}
+function DropdownMenuShortcut({
+  className,
+  ...props
+}: React.ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="dropdown-menu-shortcut"
+      className={cn(
+        "text-muted-foreground ml-auto text-xs tracking-widest",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+function DropdownMenuSub({
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
+  return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
+}
 
+// --- DropdownMenuContent y SubContent (Asegurar fondo opaco) ---
+function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        data-slot="dropdown-menu-content"
+        sideOffset={sideOffset}
+        className={cn(
+          // FLAG_LLM: Asegurar fondo opaco con bg-popover
+          "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md backdrop-blur-sm", // Añadido bg-popover
+          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          className
+        )}
+        {...props} // Mantener style override si existe
+      />
+    </DropdownMenuPrimitive.Portal>
+  )
+}
+function DropdownMenuSubContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
+  return (
+    <DropdownMenuPrimitive.SubContent
+      data-slot="dropdown-menu-sub-content"
+      className={cn(
+        // FLAG_LLM: Asegurar fondo opaco con bg-popover
+        "z-50 min-w-[8rem] origin-[--radix-dropdown-menu-content-transform-origin] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg backdrop-blur-sm", // Añadido bg-popover
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        className
+      )}
+      {...props} // Mantener style override si existe
+    />
+  )
+}
+
+// --- DropdownMenuItem, CheckboxItem, RadioItem, SubTrigger sin cambios ---
 function DropdownMenuItem({
   className,
   inset,
@@ -6214,7 +6314,6 @@ function DropdownMenuItem({
     />
   )
 }
-
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -6240,18 +6339,6 @@ function DropdownMenuCheckboxItem({
     </DropdownMenuPrimitive.CheckboxItem>
   )
 }
-
-function DropdownMenuRadioGroup({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
-  return (
-    <DropdownMenuPrimitive.RadioGroup
-      data-slot="dropdown-menu-radio-group"
-      {...props}
-    />
-  )
-}
-
 function DropdownMenuRadioItem({
   className,
   children,
@@ -6275,62 +6362,6 @@ function DropdownMenuRadioItem({
     </DropdownMenuPrimitive.RadioItem>
   )
 }
-
-function DropdownMenuLabel({
-  className,
-  inset,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Label> & {
-  inset?: boolean
-}) {
-  return (
-    <DropdownMenuPrimitive.Label
-      data-slot="dropdown-menu-label"
-      data-inset={inset}
-      className={cn(
-        "px-2 py-1.5 text-sm font-medium data-[inset]:pl-8",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
-  return (
-    <DropdownMenuPrimitive.Separator
-      data-slot="dropdown-menu-separator"
-      className={cn("bg-border -mx-1 my-1 h-px", className)}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuShortcut({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
-  return (
-    <span
-      data-slot="dropdown-menu-shortcut"
-      className={cn(
-        "text-muted-foreground ml-auto text-xs tracking-widest",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
-function DropdownMenuSub({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
-  return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
-}
-
 function DropdownMenuSubTrigger({
   className,
   inset,
@@ -6352,24 +6383,6 @@ function DropdownMenuSubTrigger({
       {children}
       <ChevronRightIcon className="ml-auto size-4" />
     </DropdownMenuPrimitive.SubTrigger>
-  )
-}
-
-function DropdownMenuSubContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
-  return (
-    <DropdownMenuPrimitive.SubContent
-      data-slot="dropdown-menu-sub-content"
-      className={cn(
-        "z-50 min-w-[8rem] origin-[--radix-dropdown-menu-content-transform-origin] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg backdrop-blur-sm",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className
-      )}
-      style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
-      {...props}
-    />
   )
 }
 
@@ -7022,18 +7035,16 @@ function TooltipContent({ className, sideOffset = 4, children, ...props }: React
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md backdrop-blur-sm",
+          // FLAG_LLM: Asegurar fondo opaco con bg-popover
+          "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-md backdrop-blur-sm", // Añadido bg-popover
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           "text-balance",
           className
         )}
-        style={{ backgroundColor: 'var(--popover, #fff)', ...props.style }}
-        {...props}
+        {...props} // Mantener el style override si existe, pero bg-popover tiene prioridad base
       >
         {children}
-        {/* TooltipArrow opcional si se desea */}
-        {/* <TooltipPrimitive.Arrow className="fill-popover" /> */}
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )
@@ -7398,29 +7409,16 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
 
 // --- NUEVO: Funciones para Admin API (Placeholders) ---
 export async function getAdminStats(): Promise<AdminStatsResponse> {
-    console.warn("API FUNCTION STUB: getAdminStats() called");
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const mockData: AdminStatsResponse = { 
-        company_count: 0, 
-        users_per_company: [] 
-    };
-    return mockData;
-    // return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
+    // Real API call
+    return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
 }
 export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
-    console.warn("API FUNCTION STUB: listCompaniesForSelect() called");
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const mockCompanies: CompanySelectItem[] = [ /* ... mock data ... */ ];
-    return mockCompanies;
-    // return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
+    // Real API call
+    return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
 }
 export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
-    console.warn("API FUNCTION STUB: createCompany() called with payload:", payload);
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    const newId = `comp-uuid-${Date.now()}`;
-    const mockResponse: CompanyResponse = { id: newId, name: payload.name, created_at: new Date().toISOString() };
-    return mockResponse;
-    // return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
+    // Real API call
+    return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
 }
 export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
      console.warn("API FUNCTION STUB: createUser() called with payload:", payload);
