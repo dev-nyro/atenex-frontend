@@ -634,16 +634,15 @@ export default function ChatPage() {
 
     // FLAG_LLM: Efecto de scroll con setTimeout para asegurar renderizado
     useEffect(() => {
-        if (scrollAreaRef.current) {
-            // Usar el elemento viewport interno para el scroll
-            const viewport = scrollAreaRef.current?.viewport as HTMLElement | null; // Acceder al viewport si es la estructura de Shadcn
+        // Solo hacer scroll si NO se está cargando historial (para evitar saltos al inicio)
+        if (scrollAreaRef.current && !isLoadingHistory) {
+            const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
             if (viewport) {
                  const timeoutId = setTimeout(() => {
                     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-                 }, 100); // Esperar 100ms
+                 }, 100);
                  return () => clearTimeout(timeoutId);
             } else {
-                // Fallback si la estructura es diferente (menos probable con Shadcn ScrollArea)
                 const scrollElement = scrollAreaRef.current as HTMLElement;
                  const timeoutId = setTimeout(() => {
                      scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
@@ -651,7 +650,7 @@ export default function ChatPage() {
                  return () => clearTimeout(timeoutId);
             }
         }
-    }, [messages, isSending]); // Depende de messages y isSending
+    }, [messages, isSending, isLoadingHistory]); // Scroll depende de messages, isSending, y isLoadingHistory
 
     // handleSendMessage (sin cambios funcionales relevantes a este fix)
     const handleSendMessage = useCallback(async (query: string) => {
@@ -691,10 +690,16 @@ export default function ChatPage() {
 
     // --- Renderizado del contenido del chat ---
     const renderChatContent = (): React.ReactNode => {
-        // Estados de Carga e Error (sin cambios significativos)
-        if (isLoadingHistory) {
-            return ( <div className="space-y-6 p-4"> {/* ... skeleton loading ... */} <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> );
+        // Estado de Carga Inicial
+        if (isLoadingHistory && messages.length === 0) {
+             return (
+                 <div className="space-y-6 p-4">
+                     <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div>
+                     <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div>
+                 </div>
+             );
         }
+        // Estado de Error
         if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> {/* ... error display ... */} <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
@@ -702,27 +707,17 @@ export default function ChatPage() {
         // Lista de mensajes + Indicador de carga
         return (
             // FLAG_LLM: Añadido padding inferior para que el último mensaje no quede pegado al input
-            <div className="space-y-6 pb-6">
+            <div className="space-y-6 pb-4"> {/* Reducido padding inferior ya que el contenedor padre lo tiene */}
                 {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
-
-                {/* --- Skeleton de "Pensando" --- */}
-                {/* Se muestra si isSending es true */}
+                {/* Skeleton de "Pensando" */}
                 {isSending && (
-                    <div className="flex items-start space-x-3 pr-10 pt-4"> {/* Estructura similar a ChatMessage */}
-                         {/* Avatar Skeleton */}
-                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-primary/10">
-                            {/* Podrías poner un icono dentro si quisieras, pero el skeleton simple es suficiente */}
-                             {/* <BrainCircuit className="h-5 w-5 text-primary m-auto"/> */}
-                        </Skeleton>
-                        {/* Text Skeleton */}
-                        <div className="flex-1 space-y-2 pt-1.5"> {/* Ajuste vertical pt-1.5 */}
-                            <Skeleton className="h-3.5 w-16 rounded" /> {/* Línea corta simulando "Pensando..." */}
-                            {/* Puedes añadir más líneas si quieres simular un párrafo */}
-                            {/* <Skeleton className="h-3.5 w-3/4 rounded" /> */}
-                            {/* <Skeleton className="h-3.5 w-1/2 rounded" /> */}
-                        </div>
+                     <div className="skeleton-thinking"> {/* Usar clases CSS */}
+                         <div className="skeleton-thinking-avatar"></div>
+                         <div className="skeleton-thinking-text">
+                             <div className="skeleton-thinking-line skeleton-thinking-line-short"></div>
+                         </div>
                     </div>
-                )}
+                 )}
             </div>
         );
     };
@@ -730,7 +725,7 @@ export default function ChatPage() {
     return (
         // FLAG_LLM: Layout principal ajustado con flex
         <div className="flex flex-col h-full bg-background">
-            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden"> {/* Permitir que el grupo crezca */}
                 {/* --- Panel Principal del Chat (Resizable) --- */}
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
                     {/* Contenedor Flex Vertical que ocupa toda la altura del panel */}
@@ -744,8 +739,8 @@ export default function ChatPage() {
 
                         {/* --- ScrollArea Flexible --- */}
                         {/* Ocupa el espacio restante (flex-1) y tiene padding */}
+                        {/* ScrollArea necesita tener un padre con altura definida para funcionar correctamente con flex-1 */}
                         <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
-                             {/* Renderiza los mensajes y el skeleton de carga */}
                              {renderChatContent()}
                         </ScrollArea>
 
@@ -4012,6 +4007,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       >
          {/* Contenido Markdown */}
          {/* Asegurar que prose tenga los estilos correctos definidos en tailwind.config y globals.css */}
+         {/* FLAG_LLM: Aplicar prose al div exterior, no al componente Markdown */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
@@ -4028,41 +4024,39 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     <TooltipProvider key={doc.id || `source-${index}`} delayDuration={150}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                {/* Botón pequeño con número y icono */}
+                                {/* Botón pequeño con número */}
                                 <Button
                                     variant="outline"
                                     size="sm" // Botón más pequeño
-                                    className="h-6 px-1.5 py-0 rounded-full border-dashed hover:border-solid hover:bg-accent/50 cursor-pointer flex items-center gap-1"
-                                    onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
+                                    className="h-6 w-6 px-1 py-0 rounded-full border-dashed hover:border-solid hover:bg-accent/50 cursor-default flex items-center justify-center focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/40"
+                                    onClick={(e) => {e.preventDefault();}} // No hacer nada en click, solo tooltip
                                     tabIndex={0} // Make it focusable
                                     aria-label={`Fuente ${index + 1}: ${doc.file_name || 'Detalles'}`}
                                 >
                                     {/* Número de fuente */}
                                     <span className="text-xs font-mono text-muted-foreground">{index + 1}</span>
-                                    {/* Icono opcional */}
-                                    {/* <FileText className="h-3 w-3 flex-shrink-0 text-muted-foreground" /> */}
                                 </Button>
                             </TooltipTrigger>
                             {/* Tooltip mejorado con fondo popover */}
                             <TooltipContent
                                 side="bottom"
-                                className="max-w-xs text-xs p-2 shadow-lg bg-popover text-popover-foreground" // Asegura fondo
+                                className="max-w-xs text-xs p-2 shadow-lg bg-popover text-popover-foreground" // Asegura fondo popover
                                 sideOffset={4}
                             >
-                                <p className="font-medium mb-0.5">
+                                <p className="font-medium mb-0.5 break-words">
                                     <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
                                     {doc.file_name || 'Nombre no disponible'}
                                 </p>
-                                <p className="text-muted-foreground text-[11px] mb-1.5">
-                                   ID: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
+                                <p className="text-muted-foreground text-[11px] mb-1.5 break-all">
+                                   ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
                                 </p>
                                 {doc.score != null && (
-                                    <p className="font-medium text-muted-foreground">
+                                    <p className="font-medium text-muted-foreground text-[11px]">
                                         Score: <span className="font-normal">{doc.score.toFixed(4)}</span>
                                     </p>
                                 )}
                                 {doc.content_preview && (
-                                    <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium">
+                                    <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
                                         Vista previa:
                                         <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview}</span>
                                     </p>
@@ -4133,7 +4127,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
         });
     };
 
-    // Componente para renderizar estrellas de score (sin cambios)
+    // Componente para renderizar estrellas de score
     const ScoreStars = ({ score }: { score: number | null | undefined }) => {
       if (score == null || score < 0) return null;
       const numStars = Math.max(0, Math.min(5, Math.round(score * 5)));
@@ -4208,7 +4202,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                     {/* Header: Nombre archivo y Score */}
                                     <div className="flex justify-between items-start gap-2">
                                         <p className="font-medium text-foreground/95 truncate flex-1 flex items-center gap-1.5">
-                                            <span className="text-xs font-mono text-muted-foreground bg-muted px-1 py-0.5 rounded-sm">{index + 1}</span>
+                                             {/* Número índice */}
+                                            <span className="flex-shrink-0 h-5 w-5 flex items-center justify-center text-xs font-mono bg-muted text-muted-foreground rounded-full border">
+                                                {index + 1}
+                                            </span>
                                             <span className="truncate" title={doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}>
                                                 {doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}
                                             </span>
@@ -4216,11 +4213,11 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                         <ScoreStars score={doc.score} />
                                     </div>
                                     {/* Preview */}
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6">
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-7"> {/* Indentado */}
                                         {doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                     </p>
                                     {/* Footer: IDs y Botón View */}
-                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6">
+                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-7"> {/* Indentado */}
                                         <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                         <Eye className="h-3 w-3" />
                                     </div>
@@ -4250,9 +4247,9 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     <ScrollArea className="overflow-y-auto px-6 py-4 max-h-[calc(85vh-180px)]"> {/* Altura máxima calculada */}
                          <div className="space-y-4 text-sm">
                             <div>
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido Relevante (Vista Previa):</Label>
-                                <blockquote className="mt-1 border-l-4 pl-4 text-sm text-foreground/80 max-h-[300px] overflow-y-auto pretty-scrollbar"> {/* Blockquote estilizado */}
-                                    {selectedDoc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido Relevante (Vista Previa Completa):</Label>
+                                <blockquote className="mt-1 border-l-4 pl-4 text-sm text-foreground/80 max-h-[300px] overflow-y-auto pretty-scrollbar whitespace-pre-wrap break-words"> {/* Blockquote estilizado y pre-wrap */}
+                                    {selectedDoc.content || <span className="italic opacity-70">Contenido no disponible.</span>}
                                 </blockquote>
                             </div>
                             {/* Metadatos si existen */}
@@ -6046,7 +6043,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50", // Opacidad ajustada
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/60", // Oscurecido un poco más
         "backdrop-blur-sm", // Añadir blur al fondo
         className
       )}
@@ -6066,8 +6063,8 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // FLAG_LLM: Asegurar que bg-background esté presente y sea opaco
-          "bg-background", // Asegura fondo opaco
+          // FLAG_LLM: Asegurar que bg-popover (o bg-background) esté presente y sea opaco
+          "bg-popover", // Usar popover como fondo estándar para modales/popups
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200", // Mantiene padding y borde
           // Las clases de tamaño (como max-w-lg) se aplicarán donde se use el componente
@@ -6076,7 +6073,7 @@ function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
           <XIcon />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
