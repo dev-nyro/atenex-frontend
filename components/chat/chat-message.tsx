@@ -57,6 +57,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       >
          {/* Contenido Markdown */}
          {/* Asegurar que prose tenga los estilos correctos definidos en tailwind.config y globals.css */}
+         {/* FLAG_LLM: Aplicar prose al div exterior, no al componente Markdown */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
@@ -73,41 +74,39 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     <TooltipProvider key={doc.id || `source-${index}`} delayDuration={150}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                {/* Botón pequeño con número y icono */}
+                                {/* Botón pequeño con número */}
                                 <Button
                                     variant="outline"
                                     size="sm" // Botón más pequeño
-                                    className="h-6 px-1.5 py-0 rounded-full border-dashed hover:border-solid hover:bg-accent/50 cursor-pointer flex items-center gap-1"
-                                    onClick={(e) => {e.preventDefault(); console.log("View source:", doc)}}
+                                    className="h-6 w-6 px-1 py-0 rounded-full border-dashed hover:border-solid hover:bg-accent/50 cursor-default flex items-center justify-center focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/40"
+                                    onClick={(e) => {e.preventDefault();}} // No hacer nada en click, solo tooltip
                                     tabIndex={0} // Make it focusable
                                     aria-label={`Fuente ${index + 1}: ${doc.file_name || 'Detalles'}`}
                                 >
                                     {/* Número de fuente */}
                                     <span className="text-xs font-mono text-muted-foreground">{index + 1}</span>
-                                    {/* Icono opcional */}
-                                    {/* <FileText className="h-3 w-3 flex-shrink-0 text-muted-foreground" /> */}
                                 </Button>
                             </TooltipTrigger>
                             {/* Tooltip mejorado con fondo popover */}
                             <TooltipContent
                                 side="bottom"
-                                className="max-w-xs text-xs p-2 shadow-lg bg-popover text-popover-foreground" // Asegura fondo
+                                className="max-w-xs text-xs p-2 shadow-lg bg-popover text-popover-foreground" // Asegura fondo popover
                                 sideOffset={4}
                             >
-                                <p className="font-medium mb-0.5">
+                                <p className="font-medium mb-0.5 break-words">
                                     <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
                                     {doc.file_name || 'Nombre no disponible'}
                                 </p>
-                                <p className="text-muted-foreground text-[11px] mb-1.5">
-                                   ID: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
+                                <p className="text-muted-foreground text-[11px] mb-1.5 break-all">
+                                   ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
                                 </p>
                                 {doc.score != null && (
-                                    <p className="font-medium text-muted-foreground">
+                                    <p className="font-medium text-muted-foreground text-[11px]">
                                         Score: <span className="font-normal">{doc.score.toFixed(4)}</span>
                                     </p>
                                 )}
                                 {doc.content_preview && (
-                                    <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium">
+                                    <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
                                         Vista previa:
                                         <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview}</span>
                                     </p>

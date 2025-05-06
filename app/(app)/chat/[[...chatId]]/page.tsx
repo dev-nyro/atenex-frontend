@@ -107,16 +107,15 @@ export default function ChatPage() {
 
     // FLAG_LLM: Efecto de scroll con setTimeout para asegurar renderizado
     useEffect(() => {
-        if (scrollAreaRef.current) {
-            // Usar el elemento viewport interno para el scroll
-            const viewport = scrollAreaRef.current?.viewport as HTMLElement | null; // Acceder al viewport si es la estructura de Shadcn
+        // Solo hacer scroll si NO se está cargando historial (para evitar saltos al inicio)
+        if (scrollAreaRef.current && !isLoadingHistory) {
+            const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
             if (viewport) {
                  const timeoutId = setTimeout(() => {
                     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-                 }, 100); // Esperar 100ms
+                 }, 100);
                  return () => clearTimeout(timeoutId);
             } else {
-                // Fallback si la estructura es diferente (menos probable con Shadcn ScrollArea)
                 const scrollElement = scrollAreaRef.current as HTMLElement;
                  const timeoutId = setTimeout(() => {
                      scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
@@ -124,7 +123,7 @@ export default function ChatPage() {
                  return () => clearTimeout(timeoutId);
             }
         }
-    }, [messages, isSending]); // Depende de messages y isSending
+    }, [messages, isSending, isLoadingHistory]); // Scroll depende de messages, isSending, y isLoadingHistory
 
     // handleSendMessage (sin cambios funcionales relevantes a este fix)
     const handleSendMessage = useCallback(async (query: string) => {
@@ -164,10 +163,16 @@ export default function ChatPage() {
 
     // --- Renderizado del contenido del chat ---
     const renderChatContent = (): React.ReactNode => {
-        // Estados de Carga e Error (sin cambios significativos)
-        if (isLoadingHistory) {
-            return ( <div className="space-y-6 p-4"> {/* ... skeleton loading ... */} <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> );
+        // Estado de Carga Inicial
+        if (isLoadingHistory && messages.length === 0) {
+             return (
+                 <div className="space-y-6 p-4">
+                     <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div>
+                     <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div>
+                 </div>
+             );
         }
+        // Estado de Error
         if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> {/* ... error display ... */} <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
@@ -175,27 +180,17 @@ export default function ChatPage() {
         // Lista de mensajes + Indicador de carga
         return (
             // FLAG_LLM: Añadido padding inferior para que el último mensaje no quede pegado al input
-            <div className="space-y-6 pb-6">
+            <div className="space-y-6 pb-4"> {/* Reducido padding inferior ya que el contenedor padre lo tiene */}
                 {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
-
-                {/* --- Skeleton de "Pensando" --- */}
-                {/* Se muestra si isSending es true */}
+                {/* Skeleton de "Pensando" */}
                 {isSending && (
-                    <div className="flex items-start space-x-3 pr-10 pt-4"> {/* Estructura similar a ChatMessage */}
-                         {/* Avatar Skeleton */}
-                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0 bg-primary/10">
-                            {/* Podrías poner un icono dentro si quisieras, pero el skeleton simple es suficiente */}
-                             {/* <BrainCircuit className="h-5 w-5 text-primary m-auto"/> */}
-                        </Skeleton>
-                        {/* Text Skeleton */}
-                        <div className="flex-1 space-y-2 pt-1.5"> {/* Ajuste vertical pt-1.5 */}
-                            <Skeleton className="h-3.5 w-16 rounded" /> {/* Línea corta simulando "Pensando..." */}
-                            {/* Puedes añadir más líneas si quieres simular un párrafo */}
-                            {/* <Skeleton className="h-3.5 w-3/4 rounded" /> */}
-                            {/* <Skeleton className="h-3.5 w-1/2 rounded" /> */}
-                        </div>
+                     <div className="skeleton-thinking"> {/* Usar clases CSS */}
+                         <div className="skeleton-thinking-avatar"></div>
+                         <div className="skeleton-thinking-text">
+                             <div className="skeleton-thinking-line skeleton-thinking-line-short"></div>
+                         </div>
                     </div>
-                )}
+                 )}
             </div>
         );
     };
@@ -203,7 +198,7 @@ export default function ChatPage() {
     return (
         // FLAG_LLM: Layout principal ajustado con flex
         <div className="flex flex-col h-full bg-background">
-            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden"> {/* Permitir que el grupo crezca */}
                 {/* --- Panel Principal del Chat (Resizable) --- */}
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
                     {/* Contenedor Flex Vertical que ocupa toda la altura del panel */}
@@ -217,8 +212,8 @@ export default function ChatPage() {
 
                         {/* --- ScrollArea Flexible --- */}
                         {/* Ocupa el espacio restante (flex-1) y tiene padding */}
+                        {/* ScrollArea necesita tener un padre con altura definida para funcionar correctamente con flex-1 */}
                         <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
-                             {/* Renderiza los mensajes y el skeleton de carga */}
                              {renderChatContent()}
                         </ScrollArea>
 

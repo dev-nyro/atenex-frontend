@@ -43,7 +43,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
         });
     };
 
-    // Componente para renderizar estrellas de score (sin cambios)
+    // Componente para renderizar estrellas de score
     const ScoreStars = ({ score }: { score: number | null | undefined }) => {
       if (score == null || score < 0) return null;
       const numStars = Math.max(0, Math.min(5, Math.round(score * 5)));
@@ -118,7 +118,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                     {/* Header: Nombre archivo y Score */}
                                     <div className="flex justify-between items-start gap-2">
                                         <p className="font-medium text-foreground/95 truncate flex-1 flex items-center gap-1.5">
-                                            <span className="text-xs font-mono text-muted-foreground bg-muted px-1 py-0.5 rounded-sm">{index + 1}</span>
+                                             {/* Número índice */}
+                                            <span className="flex-shrink-0 h-5 w-5 flex items-center justify-center text-xs font-mono bg-muted text-muted-foreground rounded-full border">
+                                                {index + 1}
+                                            </span>
                                             <span className="truncate" title={doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}>
                                                 {doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}
                                             </span>
@@ -126,11 +129,11 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                         <ScoreStars score={doc.score} />
                                     </div>
                                     {/* Preview */}
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-6">
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-7"> {/* Indentado */}
                                         {doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                     </p>
                                     {/* Footer: IDs y Botón View */}
-                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-6">
+                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-7"> {/* Indentado */}
                                         <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
                                         <Eye className="h-3 w-3" />
                                     </div>
@@ -160,9 +163,9 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                     <ScrollArea className="overflow-y-auto px-6 py-4 max-h-[calc(85vh-180px)]"> {/* Altura máxima calculada */}
                          <div className="space-y-4 text-sm">
                             <div>
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido Relevante (Vista Previa):</Label>
-                                <blockquote className="mt-1 border-l-4 pl-4 text-sm text-foreground/80 max-h-[300px] overflow-y-auto pretty-scrollbar"> {/* Blockquote estilizado */}
-                                    {selectedDoc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido Relevante (Vista Previa Completa):</Label>
+                                <blockquote className="mt-1 border-l-4 pl-4 text-sm text-foreground/80 max-h-[300px] overflow-y-auto pretty-scrollbar whitespace-pre-wrap break-words"> {/* Blockquote estilizado y pre-wrap */}
+                                    {selectedDoc.content || <span className="italic opacity-70">Contenido no disponible.</span>}
                                 </blockquote>
                             </div>
                             {/* Metadatos si existen */}
