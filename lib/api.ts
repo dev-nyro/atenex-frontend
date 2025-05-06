@@ -1,4 +1,4 @@
-// File: lib/api.ts (CORREGIDO - Restauradas funciones existentes, mantenidos placeholders Admin)
+// File: lib/api.ts (CORREGIDO - Implementada la llamada API real para createUser)
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
@@ -215,24 +215,25 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
     return { id: apiMessage.id, role: apiMessage.role, content: apiMessage.content, sources: mappedSources, isError: false, created_at: apiMessage.created_at, };
 };
 
-// --- NUEVO: Funciones para Admin API (Placeholders) ---
+// --- Admin API Functions (Existentes) ---
 export async function getAdminStats(): Promise<AdminStatsResponse> {
-    // Real API call
     return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
 }
 export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
-    // Real API call
     return request<CompanySelectItem[]>('/api/v1/admin/companies/select', { method: 'GET' });
 }
 export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
-    // Real API call
     return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
 }
+
+// --- createUser CORREGIDO ---
 export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
-     console.warn("API FUNCTION STUB: createUser() called with payload:", payload);
-     await new Promise(resolve => setTimeout(resolve, 1500));
-     const newId = `user-uuid-${Date.now()}`;
-     const mockResponse: UserResponse = { id: newId, email: payload.email, name: payload.name, company_id: payload.company_id, is_active: true, created_at: new Date().toISOString() };
-     return mockResponse;
-    // return request<UserResponse>('/api/v1/admin/users', { method: 'POST', body: JSON.stringify(payload) });
+     console.log("API Call: Attempting createUser with payload:", payload); // Log antes de la llamada real
+     // Llamada API real usando la función request genérica
+     return request<UserResponse>('/api/v1/admin/users', {
+         method: 'POST',
+         body: JSON.stringify(payload),
+         // Los headers (Content-Type, Authorization) son gestionados por la función `request`
+     });
 }
+// --- FIN CORRECCIÓN ---
