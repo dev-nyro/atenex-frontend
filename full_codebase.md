@@ -525,7 +525,7 @@ export default function AdminDashboardPage() {
 
 ## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
-// File: app/(app)/chat/[[...chatId]]/page.tsx (CORREGIDO NUEVAMENTE - Asegurando flex-1 en ScrollArea)
+// File: app/(app)/chat/[[...chatId]]/page.tsx (CORREGIDO - Revisión final scroll)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -578,88 +578,54 @@ export default function ChatPage() {
     const [historyError, setHistoryError] = useState<string | null>(null);
     const [isSourcesPanelVisible, setIsSourcesPanelVisible] = useState(false);
 
-    const scrollAreaRef = useRef<any>(null); // Mantener tipo any por simplicidad con Shadcn ref
+    const scrollAreaRef = useRef<any>(null);
     const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
-    // Efecto para manejar chatId y carga de historial
-    useEffect(() => {
-        if (chatIdParam !== chatId) {
-            setChatId(chatIdParam);
-            fetchedChatIdRef.current = undefined;
-        }
-    }, [chatIdParam, chatId]);
-
+    // useEffects de historial y scroll (sin cambios funcionales mayores)
+    useEffect(() => { if (chatIdParam !== chatId) { setChatId(chatIdParam); fetchedChatIdRef.current = undefined; } }, [chatIdParam, chatId]);
     useEffect(() => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
         const currentFetchTarget = chatId || 'welcome';
-
         if (!bypassAuth && isAuthLoading) { setIsLoadingHistory(true); setMessages([]); return; }
         if (!bypassAuth && !user) { setMessages([welcomeMessage]); setIsLoadingHistory(false); fetchedChatIdRef.current = 'welcome'; return; }
-        if (fetchedChatIdRef.current === currentFetchTarget && !isLoadingHistory) return; // Evitar recargas si ya se cargó y no está cargando
-
+        if (fetchedChatIdRef.current === currentFetchTarget && !isLoadingHistory) return;
         setIsLoadingHistory(true); setHistoryError(null); setMessages([]);
         fetchedChatIdRef.current = currentFetchTarget;
-
         if (chatId) {
             getChatMessages(chatId)
-                .then((apiMessages: ChatMessageApi[]) => {
+                .then((apiMessages: ChatMessageApi[]) => { /* ... lógica carga mensajes ... */
                     const sortedMessages = [...apiMessages].sort((a, b) => (new Date(a.created_at || 0)).getTime() - (new Date(b.created_at || 0)).getTime());
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
                     let lastWithDocs: RetrievedDoc[] = [];
                     for (let i = sortedMessages.length - 1; i >= 0; i--) { if (sortedMessages[i].sources?.length) { lastWithDocs = mapApiSourcesToFrontend(sortedMessages[i].sources) || []; break; } }
                     setRetrievedDocs(lastWithDocs); lastDocsRef.current = lastWithDocs;
                     setMessages(mappedMessages.length > 0 ? mappedMessages : [welcomeMessage]);
-                    // Abre panel si hay fuentes en el historial y el panel no está ya visible
                     if (lastWithDocs.length > 0 && !isSourcesPanelVisible) { setIsSourcesPanelVisible(true); }
                 })
                 .catch(error => { setHistoryError("Fallo al cargar el historial."); setMessages([welcomeMessage]); fetchedChatIdRef.current = undefined; })
                 .finally(() => setIsLoadingHistory(false));
-        } else {
-            setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false);
-            setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome';
-        }
-    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]); // Añadir isSourcesPanelVisible como dependencia si influye en auto-apertura
-
-    // Efecto de scroll
+        } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; }
+    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]); // Mantener isSourcesPanelVisible si es necesario para auto-apertura
     useEffect(() => {
         if (scrollAreaRef.current && !isLoadingHistory) {
             const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
-            if (viewport) {
-                 const timeoutId = setTimeout(() => {
-                    viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-                 }, 100);
-                 return () => clearTimeout(timeoutId);
-            } else {
-                // Fallback si la estructura de ref es diferente
-                const scrollElement = scrollAreaRef.current as HTMLElement;
-                if (scrollElement?.scrollTo) {
-                    const timeoutId = setTimeout(() => {
-                        scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
-                    }, 100);
-                    return () => clearTimeout(timeoutId);
-                }
-            }
+            if (viewport) { const timeoutId = setTimeout(() => { viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' }); }, 100); return () => clearTimeout(timeoutId); }
+            else { const scrollElement = scrollAreaRef.current as HTMLElement; if (scrollElement?.scrollTo) { const timeoutId = setTimeout(() => { scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' }); }, 100); return () => clearTimeout(timeoutId); } }
         }
-    }, [messages, isSending, isLoadingHistory]); // Dependencias correctas
+    }, [messages, isSending, isLoadingHistory]);
 
-    // handleSendMessage
+    // handleSendMessage (sin cambios funcionales)
     const handleSendMessage = useCallback(async (query: string) => {
         const text = query.trim();
         if (!text) { toast.warning("No se puede enviar un mensaje vacío."); return; }
         const userMessage: Message = { id: `client-user-${Date.now()}`, role: 'user', content: text, created_at: new Date().toISOString() };
-        // Reemplaza el mensaje de bienvenida si es el primer mensaje real
         setMessages(prev => prev.length === 1 && prev[0].id === 'initial-welcome' ? [userMessage] : [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
-
         if (isGreeting(text)) { setMessages(prev => [...prev, { id: `assistant-greet-${Date.now()}`, role: 'assistant', content: '¡Hola! ¿En qué puedo ayudarte hoy?', created_at: new Date().toISOString() }]); return; }
         if (isMetaQuery(text)) { setMessages(prev => [...prev, { id: `assistant-meta-${Date.now()}`, role: 'assistant', content: getMetaResponse(), created_at: new Date().toISOString() }]); return; }
-
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'; const isAuthenticated = !!user || bypassAuth;
         if (!isAuthenticated) { toast.error("No Autenticado", { description: "Por favor, inicia sesión para enviar mensajes."}); signOut(); return; }
         if (isSending) return;
-
-        setIsSending(true);
-        const currentChatIdForApi = chatId || null;
-
+        setIsSending(true); const currentChatIdForApi = chatId || null;
         try {
             const response: QueryApiResponse = await postQuery({ query: text, chat_id: currentChatIdForApi });
             const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents as any);
@@ -667,75 +633,54 @@ export default function ChatPage() {
             setMessages(prev => [...prev, assistantMessage]);
             setRetrievedDocs(mappedSources || []); lastDocsRef.current = mappedSources || [];
             if (!currentChatIdForApi && response.chat_id) { setChatId(response.chat_id); fetchedChatIdRef.current = response.chat_id; router.replace(`/chat/${response.chat_id}`, { scroll: false }); }
-            if (mappedSources && mappedSources.length > 0 && !isSourcesPanelVisible) { setIsSourcesPanelVisible(true); } // Abre panel si no estaba abierto y hay fuentes
-        } catch (error) {
-            const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: "Error al procesar tu solicitud.", isError: true, created_at: new Date().toISOString() };
-            setMessages(prev => [...prev, errorMsgObj]);
-            toast.error("Error", { description: error instanceof Error ? error.message : "Ocurrió un error inesperado." });
-        } finally {
-            setIsSending(false);
-        }
-    }, [chatId, isSending, user, router, signOut, isSourcesPanelVisible]); // Añadir isSourcesPanelVisible
+            if (mappedSources && mappedSources.length > 0 && !isSourcesPanelVisible) { setIsSourcesPanelVisible(true); }
+        } catch (error) { const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: "Error al procesar tu solicitud.", isError: true, created_at: new Date().toISOString() }; setMessages(prev => [...prev, errorMsgObj]); toast.error("Error", { description: error instanceof Error ? error.message : "Ocurrió un error inesperado." });
+        } finally { setIsSending(false); }
+    }, [chatId, isSending, user, router, signOut, isSourcesPanelVisible]);
 
-    // handlePanelToggle y handleNewChat
+    // handlePanelToggle y handleNewChat (sin cambios)
     const handlePanelToggle = () => setIsSourcesPanelVisible(!isSourcesPanelVisible);
     const handleNewChat = () => { if (pathname !== '/chat') { router.push('/chat'); } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setChatId(undefined); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; } };
 
-    // Renderizado del contenido del chat
+    // Renderizado del contenido del chat (sin cambios visuales)
     const renderChatContent = (): React.ReactNode => {
-        if (isLoadingHistory && messages.length <= 1) { // Mostrar skeleton solo si realmente está cargando el historial inicial
-             return (
-                 <div className="space-y-6 p-4">
-                     <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div>
-                     <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div>
-                 </div>
-             );
+        if (isLoadingHistory && messages.length <= 1) { /* ... skeleton ... */
+             return ( <div className="space-y-6 p-4"> <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div> </div> );
         }
-        if (historyError) {
+        if (historyError) { /* ... error message ... */
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
-        // Si no está cargando ni hay error, muestra mensajes
-        return (
-            <div className="space-y-6 pb-4"> {/* Ajusta padding inferior si es necesario */}
-                {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))}
-                {isSending && (
-                     <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div>
-                 )}
-            </div>
-        );
+        return ( <div className="space-y-6 pb-4"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
     };
 
     return (
-        // Contenedor principal de la página: debe ocupar toda la altura disponible
+         // FLAG_LLM: Asegurarse que este div ocupe toda la altura disponible de su padre (main)
         <div className="flex flex-col h-full bg-background">
-            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden"> {/* flex-1 y overflow-hidden */}
-                {/* Panel Principal del Chat */}
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
-                     {/* Contenedor Flex Vertical Interno: Crucial para el scroll */}
-                     {/* Debe ocupar toda la altura (h-full) y usar flex-col */}
+                     {/* Contenedor Flex Vertical Interno (Debe ser h-full) */}
                     <div className="flex h-full flex-col relative">
                          {/* Botón toggle panel fuentes */}
-                         <div className="absolute top-3 right-3 z-20">
+                         <div className="absolute top-3 right-3 z-20"> {/* Mover padding al ScrollArea */}
                              <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                         </div>
 
-                        {/* --- ScrollArea Flexible: Crucial para el scroll --- */}
-                        {/* Necesita 'flex-1' para ocupar el espacio restante */}
+                        {/* ScrollArea con flex-1 */}
+                        {/* FLAG_LLM: Aplicar padding aquí, no en el div contenedor del botón */}
                         <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
                              {renderChatContent()}
                         </ScrollArea>
 
-                        {/* --- Input Fijo Abajo: Crucial para el scroll --- */}
-                        {/* Necesita 'shrink-0' para no crecer */}
+                        {/* Input fijo abajo con shrink-0 */}
                         <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                         </div>
-                    </div> {/* Fin del contenedor flex vertical interno */}
+                    </div>
                 </ResizablePanel>
 
-                {/* Panel de Fuentes (Condicional) */}
+                {/* Panel de Fuentes */}
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
@@ -952,14 +897,14 @@ export default function KnowledgePage() {
 
 ## File: `app\(app)\layout.tsx`
 ```tsx
-// File: app/(app)/layout.tsx (MODIFICADO - Renderizado Condicional Admin)
+// File: app/(app)/layout.tsx (CORREGIDO - Simplificado main para pasar altura)
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { usePathname, useRouter } from 'next/navigation'; // Añadido usePathname
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { AdminLayout } from '@/components/layout/AdminLayout'; // Importar AdminLayout
+import { AdminLayout } from '@/components/layout/AdminLayout';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from '@/lib/utils';
@@ -969,60 +914,29 @@ import { toast } from 'sonner';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, signOut } = useAuth();
   const router = useRouter();
-  const pathname = usePathname(); // Obtener ruta actual
+  const pathname = usePathname();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
   const incompleteSetupWarningShown = useRef(false);
 
+  // useEffects de autenticación y redirección (sin cambios)
   useEffect(() => {
     incompleteSetupWarningShown.current = false;
   }, [user?.userId]);
 
   useEffect(() => {
-    if (bypassAuth) {
-      console.warn("AppLayout: Auth check SKIPPED (Bypass).");
-      return;
+    if (bypassAuth) return;
+    if (isLoading) return;
+    if (!user) { router.replace('/'); return; }
+    if (user.isAdmin && !pathname.startsWith('/admin')) { router.replace('/admin'); return; }
+    if (!user.isAdmin && pathname.startsWith('/admin')) { router.replace('/chat'); return; }
+    if (!user.isAdmin && !user.companyId && !incompleteSetupWarningShown.current) {
+       toast.error("Incomplete Account Setup", { description: "Falta ID de compañía. Contacta al administrador." });
+       incompleteSetupWarningShown.current = true;
+    } else if (user.companyId || user.isAdmin) {
+        incompleteSetupWarningShown.current = false;
     }
-    if (isLoading) {
-      console.log("AppLayout: Waiting for auth state...");
-      return;
-    }
-    if (!user) {
-      console.log("AppLayout: No user found after loading, redirecting to /");
-      router.replace('/');
-      return;
-    }
-
-    // --- REDIRECCIÓN ADMIN ---
-    // Si es admin y NO está en una ruta /admin, redirigir
-    if (user.isAdmin && !pathname.startsWith('/admin')) {
-        console.log("AppLayout: Admin user detected outside /admin, redirecting to /admin");
-        router.replace('/admin');
-        return; // Detener ejecución para evitar renderizado incorrecto
-    }
-    // Si NO es admin y está intentando acceder a /admin, redirigir
-    if (!user.isAdmin && pathname.startsWith('/admin')) {
-        console.log("AppLayout: Non-admin user detected in /admin, redirecting to /chat");
-        router.replace('/chat'); // O a la página principal para usuarios normales
-        return; // Detener ejecución
-    }
-    // --- FIN REDIRECCIÓN ADMIN ---
-
-    // Check de Company ID (solo para no-admins)
-    if (!user.isAdmin && !user.companyId) {
-       if (!incompleteSetupWarningShown.current) {
-          console.error(`AppLayout: User data is incomplete (CompanyID: ${user?.companyId}). Showing warning.`);
-          toast.error("Incomplete Account Setup", { /* ... */ });
-          incompleteSetupWarningShown.current = true;
-       }
-       // No bloquear, pero mostrar warning. La API debería manejar los errores si intenta operar.
-       // return; // Podría bloquear si se requiere companyId obligatoriamente para operar
-    }
-
-    console.log("AppLayout: Auth check passed for current route.");
-    incompleteSetupWarningShown.current = false;
-
-  }, [isLoading, user, bypassAuth, router, pathname, signOut]); // Añadir pathname a dependencias
+  }, [isLoading, user, bypassAuth, router, pathname, signOut]);
 
   // --- Render Loading State ---
   if (isLoading) {
@@ -1036,50 +950,47 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
    // --- Bloqueador si no hay usuario (después de cargar) ---
    if (!user && !bypassAuth) {
-       // Ya se hizo redirect en el useEffect, pero por seguridad renderizamos null o un loader
-       console.log("AppLayout: No user, rendering minimal or null.");
         return (
           <div className="flex h-screen items-center justify-center bg-background">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="mt-4 text-muted-foreground">Redirigiendo...</p>
           </div>
-        ); // O return null;
+        );
    }
 
-
   // --- Renderizado Condicional ---
-  // Si es admin, renderiza AdminLayout (ya comprobado que está en /admin)
+  // Layout Admin
   if (user?.isAdmin) {
-      console.log("AppLayout: Rendering Admin Layout...");
       return <AdminLayout>{children}</AdminLayout>;
   }
-  // Si no es admin, renderiza el layout normal (ya comprobado que no está en /admin)
+  // Layout Usuario Normal
   else if (user) {
-      console.log("AppLayout: Rendering standard user layout...");
-      // Comprobar si falta companyId para mostrar un estado bloqueado específico si es necesario
-      if (!user.companyId && !bypassAuth) {
-           console.log("AppLayout: Non-admin user without companyId, potentially blocked state.");
-           // Puedes mostrar un estado específico aquí o dejar que la lógica de las páginas maneje la falta de companyId
-           // Por ahora, se permite renderizar el layout, pero las páginas internas deberían verificar companyId
-      }
-
       return (
-         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
+         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden"> {/* overflow-hidden es importante aquí */}
           <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
               <ResizablePanel
                   collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={18}
                   onCollapse={() => setIsSidebarCollapsed(true)} onExpand={() => setIsSidebarCollapsed(false)}
-                  className={cn("transition-all duration-300 ease-in-out bg-background dark:bg-card", isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]")}
+                  className={cn(
+                      "transition-all duration-300 ease-in-out bg-background dark:bg-card",
+                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]" // Anchos ajustados
+                  )}
                   order={1}
               >
                   <Sidebar isCollapsed={isSidebarCollapsed} />
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
+                  {/* Contenedor Flexbox vertical para el panel derecho */}
                   <div className="flex h-full flex-col">
-                      <Header />
-                      <main className="flex-1 overflow-y-auto bg-background p-6 lg:p-8">
-                          {children} {/* Contenido de /chat, /knowledge, /settings */}
+                      <Header /> {/* Header fijo arriba */}
+                      {/* Main ocupa el espacio restante */}
+                      {/* FLAG_LLM: Quitamos overflow-y-auto y padding de main */}
+                      {/* El padding se aplicará dentro de la página hija (ChatPage) */}
+                      {/* El flex-1 y overflow-hidden en el padre (este div) debería ser suficiente */}
+                      <main className="flex-1 bg-background overflow-hidden">
+                          {/* El children (ChatPage) debe tener h-full para ocupar este espacio */}
+                          {children}
                       </main>
                   </div>
               </ResizablePanel>
@@ -1088,9 +999,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       );
   }
 
-  // Fallback por si algo falla (aunque no debería llegar aquí si la lógica anterior es correcta)
-  console.error("AppLayout: Reached unexpected render state.");
-  return null;
+  return null; // Fallback
 }
 ```
 

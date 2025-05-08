@@ -1,4 +1,4 @@
-// File: app/(app)/layout.tsx (CORREGIDO - Simplificado main para pasar altura)
+// File: app/(app)/layout.tsx (CORREGIDO - overflow-y-auto y padding movido a hijos)
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -67,14 +67,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Layout Usuario Normal
   else if (user) {
       return (
-         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden"> {/* overflow-hidden es importante aquí */}
+         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
           <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
               <ResizablePanel
                   collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={18}
                   onCollapse={() => setIsSidebarCollapsed(true)} onExpand={() => setIsSidebarCollapsed(false)}
                   className={cn(
                       "transition-all duration-300 ease-in-out bg-background dark:bg-card",
-                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]" // Anchos ajustados
+                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]"
                   )}
                   order={1}
               >
@@ -82,15 +82,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
-                  {/* Contenedor Flexbox vertical para el panel derecho */}
                   <div className="flex h-full flex-col">
-                      <Header /> {/* Header fijo arriba */}
-                      {/* Main ocupa el espacio restante */}
-                      {/* FLAG_LLM: Quitamos overflow-y-auto y padding de main */}
-                      {/* El padding se aplicará dentro de la página hija (ChatPage) */}
-                      {/* El flex-1 y overflow-hidden en el padre (este div) debería ser suficiente */}
-                      <main className="flex-1 bg-background overflow-hidden">
-                          {/* El children (ChatPage) debe tener h-full para ocupar este espacio */}
+                      <Header />
+                      {/* FLAG_LLM: Cambiado overflow-hidden a overflow-y-auto y quitado padding */}
+                      <main className="flex-1 bg-background overflow-y-auto">
+                          {/* El padding se aplicará en las páginas hijas */}
                           {children}
                       </main>
                   </div>
@@ -100,5 +96,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       );
   }
 
-  return null; // Fallback
+  return null;
 }
