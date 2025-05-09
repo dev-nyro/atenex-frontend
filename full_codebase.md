@@ -456,27 +456,25 @@ ehthumbs_vista.db
 
 ## File: `app\(app)\admin\page.tsx`
 ```tsx
-// File: app/(app)/admin/page.tsx
+// File: app/(app)/admin/page.tsx (CORREGIDO - Añadido padding)
 "use client";
 
-import React, { Suspense } from 'react'; // Import Suspense
+import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AdminStats from '@/components/admin/AdminStats';
 import AdminManagement from '@/components/admin/AdminManagement';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
-// Componente interno para leer searchParams (necesario con Suspense)
 function AdminDashboardContent() {
   const searchParams = useSearchParams();
-  const view = searchParams.get('view') || 'stats'; // Default to stats view
+  const view = searchParams.get('view') || 'stats';
 
-  // Renderizar la vista seleccionada
   return (
-    <div className="space-y-6">
+    // FLAG_LLM: Añadido padding aquí (p-6 lg:p-8)
+    <div className="p-6 lg:p-8 space-y-6">
       {view === 'stats' && <AdminStats />}
       {view === 'management' && <AdminManagement />}
-      {/* Puedes añadir más vistas aquí si es necesario */}
     </div>
   );
 }
@@ -485,38 +483,17 @@ export default function AdminDashboardPage() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
-  // Opcional: Doble chequeo de admin, aunque el layout ya debería proteger
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return ( <div className="flex items-center justify-center h-full"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </div> );
   }
 
-  // Si después de cargar no hay usuario o no es admin, redirigir
   if (!user || !user.isAdmin) {
-    // Si por alguna razón un no-admin llega aquí, redirigir
-    // Usar useEffect para evitar problemas de renderizado durante el renderizado
-    React.useEffect(() => {
-        console.log("AdminDashboardPage: Non-admin detected, redirecting...");
-        router.replace('/chat'); // o a donde sea apropiado
-    }, [router]);
-    return ( // Mostrar loader mientras redirige
-       <div className="flex items-center justify-center h-full">
-         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-         <p className="ml-2">Redirigiendo...</p>
-       </div>
-    );
+    React.useEffect(() => { router.replace('/chat'); }, [router]);
+    return ( <div className="flex items-center justify-center h-full"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> <p className="ml-2">Redirigiendo...</p> </div> );
   }
 
-  // Usar Suspense para permitir que AdminDashboardContent use useSearchParams
   return (
-    <Suspense fallback={
-        <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-    }>
+    <Suspense fallback={ <div className="flex items-center justify-center h-full"> <Loader2 className="h-8 w-8 animate-spin text-primary" /> </div> }>
       <AdminDashboardContent />
     </Suspense>
   );
@@ -697,13 +674,13 @@ export default function ChatPage() {
 
 ## File: `app\(app)\knowledge\page.tsx`
 ```tsx
-// File: app/(app)/knowledge/page.tsx (REFACTORIZADO - Layout de 1 Columna)
+// File: app/(app)/knowledge/page.tsx (CORREGIDO - Añadido padding y comprobación layout padre)
 'use client';
 import React, { useCallback, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, AlertTriangle, UploadCloud, FileText, List } from 'lucide-react'; // Iconos relevantes
+import { Loader2, AlertTriangle, UploadCloud, FileText, List } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses';
 import { useUploadDocument } from '@/lib/hooks/useUploadDocument';
@@ -712,12 +689,11 @@ import { FileUploader } from '@/components/knowledge/file-uploader';
 import { AuthHeaders } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator'; // Importar Separator
+import { Separator } from '@/components/ui/separator';
 
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  // Hook para manejar el estado de los documentos
   const {
     documents,
     isLoading: isLoadingDocuments,
@@ -730,32 +706,22 @@ export default function KnowledgePage() {
     deleteLocalDocument,
   } = useDocumentStatuses();
 
-  // Hook para manejar la subida de archivos
   const {
     isUploading,
     uploadError,
-    uploadResponse, // Usamos uploadResponse para el useEffect
+    uploadResponse,
     uploadFile,
     clearUploadStatus
-  } = useUploadDocument(
-    // Callback onSuccess (opcional, la lógica principal está en useEffect)
-    // () => { console.log("Upload initiated successfully via hook"); }
-  );
+  } = useUploadDocument();
 
-  // Efecto para refrescar la lista cuando una subida es exitosa (estado 202 recibido)
-  // y el backend confirma que el documento existe (se obtiene un document_id).
   useEffect(() => {
     if (uploadResponse?.document_id) {
-       const refreshDelay = 1500; // ms
-       console.log(`KnowledgePage: Upload successful for ${uploadResponse.document_id}. Refreshing list in ${refreshDelay}ms.`);
-       const timer = setTimeout(() => {
-           fetchDocuments(true); // Recarga completa para incluir el nuevo
-       }, refreshDelay);
-       return () => clearTimeout(timer); // Limpiar timeout si el componente se desmonta
+       const refreshDelay = 1500;
+       const timer = setTimeout(() => { fetchDocuments(true); }, refreshDelay);
+       return () => clearTimeout(timer);
     }
-  }, [uploadResponse, fetchDocuments]); // Depende de la respuesta de subida y la función de fetch
+  }, [uploadResponse, fetchDocuments]);
 
-  // Callbacks para acciones en la lista
   const handleRetrySuccess = useCallback((documentId: string) => {
     retryLocalUpdate(documentId);
     refreshDocument(documentId);
@@ -765,43 +731,40 @@ export default function KnowledgePage() {
     deleteLocalDocument(documentId);
   }, [deleteLocalDocument]);
 
-  // Headers de autenticación
   const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
     'X-User-ID': user.userId,
     'X-Company-ID': user.companyId,
   } : null;
 
   // --- Renderizado ---
-
-  // Skeleton de Carga Principal (mientras se verifica la autenticación)
   if (isAuthLoading) {
     return (
-        <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
-          <Skeleton className="h-10 w-1/3 mb-6" /> {/* Skeleton título */}
-          <Skeleton className="h-64 rounded-xl mb-8" /> {/* Skeleton Uploader */}
-          <Skeleton className="h-10 w-1/4 mb-4" /> {/* Skeleton título lista */}
-          <Skeleton className="h-80 rounded-xl" /> {/* Skeleton Lista */}
+         // FLAG_LLM: Añadir padding también al skeleton wrapper
+        <div className="p-6 lg:p-8 space-y-8">
+          <Skeleton className="h-10 w-1/3 mb-6" />
+          <Skeleton className="h-64 rounded-xl mb-8" />
+          <Skeleton className="h-10 w-1/4 mb-4" />
+          <Skeleton className="h-80 rounded-xl" />
         </div>
     );
   }
 
-  // Renderizado Principal - Layout de UNA SOLA COLUMNA
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+    // FLAG_LLM: Añadido padding al contenedor principal (p-6 lg:p-8)
+    <div className="p-6 lg:p-8 space-y-8">
         {/* Título de la página */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
                  <FileText className="h-7 w-7" />
                  Base de Conocimiento
             </h1>
-             {/* Botón global de refresco */}
             {authHeadersForChildren && (
                 <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => fetchDocuments(true)} // reset = true
+                    onClick={() => fetchDocuments(true)}
                     disabled={isLoadingDocuments}
-                    className="w-full sm:w-auto" // Ancho completo en móvil
+                    className="w-full sm:w-auto"
                 >
                     <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
                     Refrescar Documentos
@@ -819,7 +782,6 @@ export default function KnowledgePage() {
             </CardHeader>
             <CardContent>
             {authHeadersForChildren ? (
-                // Componente FileUploader
                 <FileUploader
                     authHeaders={authHeadersForChildren}
                     onUploadFile={uploadFile}
@@ -828,7 +790,6 @@ export default function KnowledgePage() {
                     clearUploadStatus={clearUploadStatus}
                 />
             ) : (
-                // Mensaje si no está autenticado
                 <Alert variant="default" className="bg-muted/50">
                      <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                     <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
@@ -840,7 +801,7 @@ export default function KnowledgePage() {
             </CardContent>
         </Card>
 
-        <Separator /> {/* Separador visual */}
+        <Separator />
 
         {/* Sección: Lista de Documentos Subidos */}
         <div className='space-y-4'>
@@ -848,7 +809,6 @@ export default function KnowledgePage() {
                  <List className="h-6 w-6" /> Documentos Gestionados
             </h2>
 
-             {/* Mostrar Error de Carga de la Lista */}
              {documentsError && (
                 <Alert variant="destructive">
                      <AlertTriangle className="h-4 w-4" />
@@ -860,7 +820,6 @@ export default function KnowledgePage() {
                 </Alert>
              )}
 
-             {/* Mostrar Skeleton si está cargando inicialmente y no hay error */}
              {isLoadingDocuments && documents.length === 0 && !documentsError && (
                 <div className="space-y-2 pt-2 border rounded-lg p-4">
                     <Skeleton className="h-12 w-full rounded-md" />
@@ -869,7 +828,6 @@ export default function KnowledgePage() {
                 </div>
              )}
 
-             {/* Mostrar Lista de Documentos si está autenticado y no en skeleton inicial */}
              {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
                 <DocumentStatusList
                     documents={documents}
@@ -879,11 +837,10 @@ export default function KnowledgePage() {
                     hasMore={hasMore}
                     refreshDocument={refreshDocument}
                     onDeleteSuccess={handleDeleteSuccess}
-                    isLoading={isLoadingDocuments} // Prop para indicar si se está cargando más
+                    isLoading={isLoadingDocuments}
                 />
              )}
 
-             {/* Mensaje si no está autenticado y no hubo error ni carga inicial */}
              {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
                 <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/30">
                      <p className="text-muted-foreground text-sm">Inicia sesión para ver tus documentos.</p>
@@ -897,7 +854,7 @@ export default function KnowledgePage() {
 
 ## File: `app\(app)\layout.tsx`
 ```tsx
-// File: app/(app)/layout.tsx (CORREGIDO - Simplificado main para pasar altura)
+// File: app/(app)/layout.tsx (CORREGIDO - overflow-y-auto y padding movido a hijos)
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -966,14 +923,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Layout Usuario Normal
   else if (user) {
       return (
-         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden"> {/* overflow-hidden es importante aquí */}
+         <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
           <ResizablePanelGroup direction="horizontal" className="h-full items-stretch">
               <ResizablePanel
                   collapsible collapsedSize={4} minSize={15} maxSize={25} defaultSize={18}
                   onCollapse={() => setIsSidebarCollapsed(true)} onExpand={() => setIsSidebarCollapsed(false)}
                   className={cn(
                       "transition-all duration-300 ease-in-out bg-background dark:bg-card",
-                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]" // Anchos ajustados
+                      isSidebarCollapsed ? "min-w-[60px] max-w-[60px]" : "min-w-[220px]"
                   )}
                   order={1}
               >
@@ -981,15 +938,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
-                  {/* Contenedor Flexbox vertical para el panel derecho */}
                   <div className="flex h-full flex-col">
-                      <Header /> {/* Header fijo arriba */}
-                      {/* Main ocupa el espacio restante */}
-                      {/* FLAG_LLM: Quitamos overflow-y-auto y padding de main */}
-                      {/* El padding se aplicará dentro de la página hija (ChatPage) */}
-                      {/* El flex-1 y overflow-hidden en el padre (este div) debería ser suficiente */}
-                      <main className="flex-1 bg-background overflow-hidden">
-                          {/* El children (ChatPage) debe tener h-full para ocupar este espacio */}
+                      <Header />
+                      {/* FLAG_LLM: Cambiado overflow-hidden a overflow-y-auto y quitado padding */}
+                      <main className="flex-1 bg-background overflow-y-auto">
+                          {/* El padding se aplicará en las páginas hijas */}
                           {children}
                       </main>
                   </div>
@@ -999,37 +952,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       );
   }
 
-  return null; // Fallback
+  return null;
 }
 ```
 
 ## File: `app\(app)\settings\page.tsx`
 ```tsx
-// File: app/(app)/settings/page.tsx (MODIFICADO - Iteración 4.2)
+// File: app/(app)/settings/page.tsx (CORREGIDO - Añadido padding)
 "use client";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'; // Añadido CardFooter
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Check } from 'lucide-react'; // Importar iconos
-import { Skeleton } from '@/components/ui/skeleton'; // Importar Skeleton
+import { Loader2, Check } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function SettingsPage() {
-    const { user, isLoading: isAuthLoading } = useAuth(); // Añadir isLoading
+    const { user, isLoading: isAuthLoading } = useAuth();
     const [name, setName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [hasChanged, setHasChanged] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false); // Estado para feedback visual
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     useEffect(() => {
         if (user) {
             setName(user.name || '');
             setHasChanged(false);
-            setSaveSuccess(false); // Resetear éxito al cargar datos
+            setSaveSuccess(false);
         }
     }, [user]);
 
@@ -1037,28 +990,19 @@ export default function SettingsPage() {
         const newName = event.target.value;
         setName(newName);
         setHasChanged(newName !== (user?.name || ''));
-        setSaveSuccess(false); // Resetear éxito si cambia de nuevo
+        setSaveSuccess(false);
     };
 
     const handleSave = async () => {
-        if (!hasChanged || !user) return; // Asegurar que hay usuario
+        if (!hasChanged || !user) return;
         setIsSaving(true);
         setSaveSuccess(false);
         console.log('Guardando cambios (simulado):', { name });
         try {
-          // Simular llamada API
           await new Promise(resolve => setTimeout(resolve, 1200));
-
-          // TODO: Implementar llamada API real para actualizar el nombre del usuario
-          // Ejemplo: await updateUserProfile(user.userId, { name });
-
           toast.success("Perfil Actualizado", { description: "Tu nombre ha sido guardado." });
-          setHasChanged(false);
-          setSaveSuccess(true); // Marcar éxito
-
-          // TODO: Actualizar el objeto 'user' en AuthContext para reflejar el cambio
-          // Esto podría requerir una función adicional en useAuth o recargar datos
-
+          setHasChanged(false); setSaveSuccess(true);
+          // TODO: Actualizar user en AuthContext
         } catch (error) {
           console.error("Error al guardar perfil:", error);
           toast.error("Error al Guardar", { description: "No se pudo actualizar el perfil." });
@@ -1068,20 +1012,20 @@ export default function SettingsPage() {
         }
     };
 
-    // Mostrar skeleton mientras carga la autenticación
     if (isAuthLoading) {
         return (
-            <div className="space-y-8 max-w-3xl mx-auto">
-                 <Skeleton className="h-10 w-1/4 mb-6" /> {/* Skeleton título */}
-                 <Skeleton className="h-64 w-full rounded-xl" /> {/* Skeleton Card Perfil */}
-                 <Skeleton className="h-48 w-full rounded-xl" /> {/* Skeleton Card Empresa */}
+            // FLAG_LLM: Añadir padding también al skeleton wrapper
+            <div className="p-6 lg:p-8 space-y-8 max-w-3xl mx-auto">
+                 <Skeleton className="h-10 w-1/4 mb-6" />
+                 <Skeleton className="h-64 w-full rounded-xl" />
+                 <Skeleton className="h-48 w-full rounded-xl" />
             </div>
         )
     }
 
   return (
-    // Contenedor principal con espaciado vertical y ancho máximo
-    <div className="space-y-8 max-w-3xl mx-auto">
+    // FLAG_LLM: Añadido padding al contenedor principal (p-6 lg:p-8)
+    <div className="p-6 lg:p-8 space-y-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
 
       {/* Card para Perfil */}
@@ -1090,20 +1034,11 @@ export default function SettingsPage() {
           <CardTitle>Perfil de Usuario</CardTitle>
           <CardDescription>Administra la información de tu cuenta personal.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6"> {/* Aumentado space-y */}
-            {/* Campo Nombre */}
+        <CardContent className="space-y-6">
             <div className="grid sm:grid-cols-3 items-center gap-4">
                  <Label htmlFor="name" className="sm:text-right sm:mt-2">Nombre</Label>
-                 <Input
-                    id="name"
-                    value={name}
-                    onChange={handleNameChange}
-                    disabled={isSaving}
-                    className="sm:col-span-2" // Input ocupa 2 columnas en SM+
-                    placeholder="Tu nombre completo"
-                 />
+                 <Input id="name" value={name} onChange={handleNameChange} disabled={isSaving} className="sm:col-span-2" placeholder="Tu nombre completo" />
             </div>
-             {/* Campo Email (Deshabilitado) */}
              <div className="grid sm:grid-cols-3 items-start gap-4">
                  <Label htmlFor="email" className="sm:text-right sm:mt-2">Correo electrónico</Label>
                  <div className="sm:col-span-2 space-y-1">
@@ -1112,7 +1047,6 @@ export default function SettingsPage() {
                  </div>
             </div>
         </CardContent>
-        {/* Footer para el botón Guardar */}
         <CardFooter className="border-t pt-6 justify-end">
             <Button onClick={handleSave} disabled={isSaving || !hasChanged || saveSuccess}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1129,7 +1063,6 @@ export default function SettingsPage() {
           <CardDescription>Información relacionada con tu organización.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-           {/* Información de la compañía actual (si existe) */}
             {user?.companyId ? (
                  <div className="grid sm:grid-cols-3 items-center gap-4">
                     <Label htmlFor="companyId" className="sm:text-right">ID de Empresa</Label>
@@ -1138,7 +1071,6 @@ export default function SettingsPage() {
              ) : (
                 <p className="text-sm text-muted-foreground italic">No hay información de empresa asociada a tu cuenta.</p>
              )}
-             {/* Placeholder para futuras configuraciones */}
              <p className="text-sm text-muted-foreground pt-4 border-t">
                 Otras configuraciones de la empresa aparecerán aquí en futuras versiones.
              </p>

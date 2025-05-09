@@ -1,4 +1,4 @@
-// File: app/(app)/knowledge/page.tsx (CORREGIDO - Añadido padding y comprobación layout padre)
+// File: app/(app)/knowledge/page.tsx (CONFIRMADO CON PADDING)
 'use client';
 import React, { useCallback, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,11 +60,9 @@ export default function KnowledgePage() {
     'X-Company-ID': user.companyId,
   } : null;
 
-  // --- Renderizado ---
   if (isAuthLoading) {
     return (
-         // FLAG_LLM: Añadir padding también al skeleton wrapper
-        <div className="p-6 lg:p-8 space-y-8">
+        <div className="p-6 lg:p-8 space-y-8"> {/* Padding aquí */}
           <Skeleton className="h-10 w-1/3 mb-6" />
           <Skeleton className="h-64 rounded-xl mb-8" />
           <Skeleton className="h-10 w-1/4 mb-4" />
@@ -74,9 +72,7 @@ export default function KnowledgePage() {
   }
 
   return (
-    // FLAG_LLM: Añadido padding al contenedor principal (p-6 lg:p-8)
-    <div className="p-6 lg:p-8 space-y-8">
-        {/* Título de la página */}
+    <div className="p-6 lg:p-8 space-y-8"> {/* Padding principal de la página */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
                  <FileText className="h-7 w-7" />
@@ -96,7 +92,6 @@ export default function KnowledgePage() {
             )}
         </div>
 
-        {/* Sección: Subir Documento */}
         <Card className="shadow-md border">
             <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
@@ -127,12 +122,10 @@ export default function KnowledgePage() {
 
         <Separator />
 
-        {/* Sección: Lista de Documentos Subidos */}
         <div className='space-y-4'>
              <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
                  <List className="h-6 w-6" /> Documentos Gestionados
             </h2>
-
              {documentsError && (
                 <Alert variant="destructive">
                      <AlertTriangle className="h-4 w-4" />
@@ -143,7 +136,6 @@ export default function KnowledgePage() {
                     </AlertDescription>
                 </Alert>
              )}
-
              {isLoadingDocuments && documents.length === 0 && !documentsError && (
                 <div className="space-y-2 pt-2 border rounded-lg p-4">
                     <Skeleton className="h-12 w-full rounded-md" />
@@ -151,7 +143,6 @@ export default function KnowledgePage() {
                     <Skeleton className="h-12 w-full rounded-md" />
                 </div>
              )}
-
              {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
                 <DocumentStatusList
                     documents={documents}
@@ -164,7 +155,6 @@ export default function KnowledgePage() {
                     isLoading={isLoadingDocuments}
                 />
              )}
-
              {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
                 <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/30">
                      <p className="text-muted-foreground text-sm">Inicia sesión para ver tus documentos.</p>

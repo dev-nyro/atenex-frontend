@@ -1,4 +1,4 @@
-// File: app/(app)/layout.tsx (CORREGIDO - overflow-y-auto y padding movido a hijos)
+// File: app/(app)/layout.tsx (CORREGIDO y CONFIRMADO)
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -20,26 +20,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
   const incompleteSetupWarningShown = useRef(false);
 
-  // useEffects de autenticación y redirección (sin cambios)
   useEffect(() => {
     incompleteSetupWarningShown.current = false;
   }, [user?.userId]);
 
   useEffect(() => {
-    if (bypassAuth) return;
-    if (isLoading) return;
-    if (!user) { router.replace('/'); return; }
-    if (user.isAdmin && !pathname.startsWith('/admin')) { router.replace('/admin'); return; }
-    if (!user.isAdmin && pathname.startsWith('/admin')) { router.replace('/chat'); return; }
-    if (!user.isAdmin && !user.companyId && !incompleteSetupWarningShown.current) {
-       toast.error("Incomplete Account Setup", { description: "Falta ID de compañía. Contacta al administrador." });
-       incompleteSetupWarningShown.current = true;
-    } else if (user.companyId || user.isAdmin) {
+    if (bypassAuth) {
+      console.warn("AppLayout: Auth check SKIPPED (Bypass).");
+      return;
+    }
+    if (isLoading) {
+      console.log("AppLayout: Waiting for auth state...");
+      return;
+    }
+    if (!user) {
+      console.log("AppLayout: No user found after loading, redirecting to /");
+      router.replace('/');
+      return;
+    }
+
+    if (user.isAdmin && !pathname.startsWith('/admin')) {
+        console.log("AppLayout: Admin user detected outside /admin, redirecting to /admin");
+        router.replace('/admin');
+        return; 
+    }
+    if (!user.isAdmin && pathname.startsWith('/admin')) {
+        console.log("AppLayout: Non-admin user detected in /admin, redirecting to /chat");
+        router.replace('/chat'); 
+        return; 
+    }
+
+    if (!user.isAdmin && !user.companyId) {
+       if (!incompleteSetupWarningShown.current) {
+          console.error(`AppLayout: User data is incomplete (CompanyID: ${user?.companyId}). Showing warning.`);
+          toast.error("Configuración de cuenta incompleta", { 
+            description: "Falta el ID de la compañía. Por favor, contacta al administrador.",
+            duration: 10000, // Mantener el toast más tiempo
+           });
+          incompleteSetupWarningShown.current = true;
+       }
+    } else if (user.companyId || user.isAdmin) { // Resetear si los datos son correctos
         incompleteSetupWarningShown.current = false;
     }
+
+    console.log("AppLayout: Auth check passed for current route.");
+
   }, [isLoading, user, bypassAuth, router, pathname, signOut]);
 
-  // --- Render Loading State ---
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -49,7 +76,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-   // --- Bloqueador si no hay usuario (después de cargar) ---
    if (!user && !bypassAuth) {
         return (
           <div className="flex h-screen items-center justify-center bg-background">
@@ -59,12 +85,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         );
    }
 
-  // --- Renderizado Condicional ---
-  // Layout Admin
   if (user?.isAdmin) {
       return <AdminLayout>{children}</AdminLayout>;
   }
-  // Layout Usuario Normal
   else if (user) {
       return (
          <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
@@ -82,11 +105,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
-                  <div className="flex h-full flex-col">
+                  <div className="flex h-full flex-col"> {/* Contenedor flex para Header y Main */}
                       <Header />
-                      {/* FLAG_LLM: Cambiado overflow-hidden a overflow-y-auto y quitado padding */}
+                      {/* Main debe tener overflow-y-auto y flex-1 */}
+                      {/* El padding se aplica en las páginas hijas (chat, knowledge, settings) */}
                       <main className="flex-1 bg-background overflow-y-auto">
-                          {/* El padding se aplicará en las páginas hijas */}
                           {children}
                       </main>
                   </div>

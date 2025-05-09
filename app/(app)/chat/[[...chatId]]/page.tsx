@@ -1,4 +1,4 @@
-// File: app/(app)/chat/[[...chatId]]/page.tsx (CORREGIDO - Revisión final scroll)
+// File: app/(app)/chat/[[...chatId]]/page.tsx (CONFIRMADO CON PADDING Y ESTRUCTURA FLEX)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -54,7 +54,6 @@ export default function ChatPage() {
     const scrollAreaRef = useRef<any>(null);
     const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
-    // useEffects de historial y scroll (sin cambios funcionales mayores)
     useEffect(() => { if (chatIdParam !== chatId) { setChatId(chatIdParam); fetchedChatIdRef.current = undefined; } }, [chatIdParam, chatId]);
     useEffect(() => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -66,7 +65,7 @@ export default function ChatPage() {
         fetchedChatIdRef.current = currentFetchTarget;
         if (chatId) {
             getChatMessages(chatId)
-                .then((apiMessages: ChatMessageApi[]) => { /* ... lógica carga mensajes ... */
+                .then((apiMessages: ChatMessageApi[]) => {
                     const sortedMessages = [...apiMessages].sort((a, b) => (new Date(a.created_at || 0)).getTime() - (new Date(b.created_at || 0)).getTime());
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
                     let lastWithDocs: RetrievedDoc[] = [];
@@ -78,7 +77,7 @@ export default function ChatPage() {
                 .catch(error => { setHistoryError("Fallo al cargar el historial."); setMessages([welcomeMessage]); fetchedChatIdRef.current = undefined; })
                 .finally(() => setIsLoadingHistory(false));
         } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; }
-    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]); // Mantener isSourcesPanelVisible si es necesario para auto-apertura
+    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]);
     useEffect(() => {
         if (scrollAreaRef.current && !isLoadingHistory) {
             const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
@@ -87,7 +86,6 @@ export default function ChatPage() {
         }
     }, [messages, isSending, isLoadingHistory]);
 
-    // handleSendMessage (sin cambios funcionales)
     const handleSendMessage = useCallback(async (query: string) => {
         const text = query.trim();
         if (!text) { toast.warning("No se puede enviar un mensaje vacío."); return; }
@@ -111,49 +109,38 @@ export default function ChatPage() {
         } finally { setIsSending(false); }
     }, [chatId, isSending, user, router, signOut, isSourcesPanelVisible]);
 
-    // handlePanelToggle y handleNewChat (sin cambios)
     const handlePanelToggle = () => setIsSourcesPanelVisible(!isSourcesPanelVisible);
     const handleNewChat = () => { if (pathname !== '/chat') { router.push('/chat'); } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setChatId(undefined); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; } };
 
-    // Renderizado del contenido del chat (sin cambios visuales)
     const renderChatContent = (): React.ReactNode => {
-        if (isLoadingHistory && messages.length <= 1) { /* ... skeleton ... */
+        if (isLoadingHistory && messages.length <= 1) {
              return ( <div className="space-y-6 p-4"> <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div> </div> );
         }
-        if (historyError) { /* ... error message ... */
+        if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
-        return ( <div className="space-y-6 pb-4"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
+        return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
     };
 
     return (
-         // FLAG_LLM: Asegurarse que este div ocupe toda la altura disponible de su padre (main)
-        <div className="flex flex-col h-full bg-background">
+        <div className="flex flex-col h-full bg-background p-6 lg:p-8"> {/* Padding añadido aquí */}
             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
-                     {/* Contenedor Flex Vertical Interno (Debe ser h-full) */}
                     <div className="flex h-full flex-col relative">
-                         {/* Botón toggle panel fuentes */}
-                         <div className="absolute top-3 right-3 z-20"> {/* Mover padding al ScrollArea */}
+                         <div className="absolute top-0 right-0 z-20"> {/* Botón toggle no necesita padding extra si la página ya lo tiene */}
                              <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                         </div>
-
-                        {/* ScrollArea con flex-1 */}
-                        {/* FLAG_LLM: Aplicar padding aquí, no en el div contenedor del botón */}
-                        <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
+                        {/* ScrollArea no necesita padding propio si el contenedor de la página ya lo tiene */}
+                        <ScrollArea className="flex-1" ref={scrollAreaRef}>
                              {renderChatContent()}
                         </ScrollArea>
-
-                        {/* Input fijo abajo con shrink-0 */}
-                        <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                        <div className="border-t border-border/60 pt-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                         </div>
                     </div>
                 </ResizablePanel>
-
-                {/* Panel de Fuentes */}
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
