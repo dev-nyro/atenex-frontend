@@ -106,7 +106,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
                   <div className="flex h-full flex-col"> {/* Contenedor flex para Header y Main */}
-                      <Header />
+                      {/* Solo mostrar Header si NO estamos en /chat ni subrutas */}
+                      {!(pathname.startsWith('/chat')) && <Header />}
                       {/* Main debe tener overflow:hidden y flex-1 */}
                       {/* El padding se aplica en las páginas hijas (chat, knowledge, settings) */}
                       <main className="flex-1 bg-background overflow-hidden"> {/* CONFIRMADO: overflow-hidden */}
