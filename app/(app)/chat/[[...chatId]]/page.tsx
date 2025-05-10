@@ -135,9 +135,6 @@ export default function ChatPage() {
 
     const handlePanelToggle = () => setIsSourcesPanelVisible(!isSourcesPanelVisible);
     
-    // handleNewChat no se necesita aquí si el Header lo maneja globalmente con router.push('/chat')
-    // La lógica de reseteo ya está en el useEffect que depende de `chatId`.
-
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory && messages.length <= 1) {
              return ( <div className="space-y-6 p-4"> <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div> </div> );
@@ -145,29 +142,24 @@ export default function ChatPage() {
         if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
-        // El padding se aplica al div que envuelve a renderChatContent
         return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
     };
 
     return (
-        <div className="flex flex-col h-full bg-background p-4 sm:p-6 lg:p-8"> {/* Padding ajustado */}
-            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden"> {/* overflow-hidden es importante */}
+        <div className="flex flex-col h-full bg-background p-4 sm:p-6 lg:p-8">
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100}>
-                    {/* Contenedor del panel de chat. Se añade overflow-hidden aquí. */}
                     <div className="flex h-full flex-col relative overflow-hidden">
-                         {/* Botón toggle en la esquina, ajustado para no ser afectado por padding interno de ScrollArea */}
                          <div className="absolute top-1 right-1 z-20"> 
                              <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                         </div>
-                        {/* ScrollArea para los mensajes. El padding se mueve a un div interno. */}
                         <ScrollArea className="flex-1" ref={scrollAreaRef}>
-                             <div className="px-3 py-4 sm:px-4 sm:py-5"> {/* Padding interno para mensajes */}
+                             <div className="px-3 py-4 sm:px-4 sm:py-5">
                                 {renderChatContent()}
                              </div>
                         </ScrollArea>
-                        {/* Contenedor del ChatInput con padding y estilos */}
                         <div className="border-t border-border/60 px-3 py-3 sm:px-4 sm:py-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                         </div>
@@ -176,7 +168,11 @@ export default function ChatPage() {
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
-                        <ResizablePanel defaultSize={35} minSize={20} maxSize={45}> {/* MaxSize ajustado */}
+                        {/* El ResizablePanel que contiene las fuentes ahora tiene h-full y overflow-hidden */}
+                        {/* Esto asegura que el panel tenga una altura definida por el grupo y que su contenido */}
+                        {/* (RetrievedDocumentsPanel) use su propio scroll interno si es necesario, sin */}
+                        {/* afectar las dimensiones de este panel ni del panel de chat. */}
+                        <ResizablePanel defaultSize={35} minSize={20} maxSize={45} className="h-full overflow-hidden">
                             <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
                         </ResizablePanel>
                     </>
