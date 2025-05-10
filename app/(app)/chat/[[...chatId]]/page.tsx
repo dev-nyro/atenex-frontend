@@ -22,7 +22,7 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw } from 'lucide-react'; // BrainCircuit quitado si no se usa
+import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw } from 'lucide-react'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils';
@@ -51,7 +51,7 @@ export default function ChatPage() {
     const [historyError, setHistoryError] = useState<string | null>(null);
     const [isSourcesPanelVisible, setIsSourcesPanelVisible] = useState(false);
 
-    const scrollAreaRef = useRef<any>(null); // Para ScrollArea de mensajes
+    const scrollAreaRef = useRef<any>(null); 
     const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
     useEffect(() => { if (chatIdParam !== chatId) { setChatId(chatIdParam); fetchedChatIdRef.current = undefined; } }, [chatIdParam, chatId]);
@@ -82,10 +82,10 @@ export default function ChatPage() {
                 .finally(() => setIsLoadingHistory(false));
         } else { 
             setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false); 
-            setIsSourcesPanelVisible(false); // Asegurar que el panel se oculte en un nuevo chat sin ID
+            setIsSourcesPanelVisible(false); 
             fetchedChatIdRef.current = 'welcome'; 
         }
-    }, [chatId, user, isAuthLoading, isSourcesPanelVisible]); // Añadido isSourcesPanelVisible para re-evaluar si se abre externamente
+    }, [chatId, user, isAuthLoading, isSourcesPanelVisible]); 
     
     useEffect(() => {
         if (scrollAreaRef.current && !isLoadingHistory && messages.length > 0) {
@@ -146,7 +146,8 @@ export default function ChatPage() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-background p-4 sm:p-6 lg:p-8">
+        // FLAG_LLM: Eliminado padding p-4 sm:p-6 lg:p-8 del div raíz para que el contenido ocupe toda la altura
+        <div className="flex flex-col h-full bg-background">
             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100}>
                     <div className="flex h-full flex-col relative overflow-hidden">
@@ -168,10 +169,6 @@ export default function ChatPage() {
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
-                        {/* El ResizablePanel que contiene las fuentes ahora tiene h-full y overflow-hidden */}
-                        {/* Esto asegura que el panel tenga una altura definida por el grupo y que su contenido */}
-                        {/* (RetrievedDocumentsPanel) use su propio scroll interno si es necesario, sin */}
-                        {/* afectar las dimensiones de este panel ni del panel de chat. */}
                         <ResizablePanel defaultSize={35} minSize={20} maxSize={45} className="h-full overflow-hidden">
                             <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
                         </ResizablePanel>

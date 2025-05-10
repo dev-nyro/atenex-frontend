@@ -51,12 +51,11 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
           {[...Array(5)].map((_, i) => (
             <Star
               key={i}
-              // FLAG_LLM: Clases corregidas para el color de las estrellas
               className={cn(
                 "h-3 w-3",
                 i < numStars
-                  ? "text-yellow-400 fill-yellow-400" // Estrella activa
-                  : "text-gray-300 fill-gray-300 dark:text-gray-600 dark:fill-gray-600" // Estrella inactiva
+                  ? "text-yellow-400 fill-yellow-400" 
+                  : "text-gray-300 fill-gray-300 dark:text-gray-600 dark:fill-gray-600" 
               )}
             />
           ))}
