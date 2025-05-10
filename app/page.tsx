@@ -24,7 +24,7 @@ const iconMap: { [key: string]: React.ComponentType<{ className?: string }> } = 
 
 // Empresas Placeholder para Social Proof
 const trustedLogos = [
-    { name: "Empresa Innovadora", logo: null }, // Usaremos texto como placeholder
+    { name: "Empresas Innovadoras", logo: null }, // Usaremos texto como placeholder
     { name: "Consultora Global", logo: null },
     { name: "Startup Tecnológica", logo: null },
     { name: "Sector Financiero", logo: null },
