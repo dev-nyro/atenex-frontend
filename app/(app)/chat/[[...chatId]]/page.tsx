@@ -147,23 +147,23 @@ export default function ChatPage() {
 
     return (
         // El chat y el panel de fuentes ocupan toda la pantalla, cada uno con su propio scroll
-        <div className="flex flex-col h-screen w-full bg-background">
-            <ResizablePanelGroup direction="horizontal" className="flex-1 h-full w-full overflow-hidden">
-                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100} className="h-full">
-                    <div className="flex h-full flex-col relative overflow-hidden">
+        <div className="flex flex-col h-screen w-full bg-background min-h-0">
+            <ResizablePanelGroup direction="horizontal" className="flex-1 h-full w-full overflow-hidden min-h-0">
+                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100} className="h-full min-h-0">
+                    <div className="flex h-full flex-col relative overflow-hidden min-h-0">
                         <div className="absolute top-1 right-1 z-20">
                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                             </Button>
                         </div>
                         {/* Chat window con su propio scroll */}
-                        <div className="flex flex-col flex-1 h-0">
-                            <ScrollArea className="flex-1 h-full w-full" ref={scrollAreaRef}>
+                        <div className="flex flex-col flex-1 min-h-0 h-0 relative">
+                            <ScrollArea className="flex-1 min-h-0 h-0 w-full" ref={scrollAreaRef}>
                                 <div className="px-3 py-4 sm:px-4 sm:py-5 min-h-full">{/* Padding interno para mensajes */}
                                     {renderChatContent()}
                                 </div>
                             </ScrollArea>
-                            <div className="border-t border-border/60 px-3 py-3 sm:px-4 sm:py-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                            <div className="border-t border-border/60 px-3 py-3 sm:px-4 sm:py-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0 z-10 relative">
                                 <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                             </div>
                         </div>

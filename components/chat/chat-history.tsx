@@ -149,94 +149,98 @@ export function ChatHistory() {
 
         if (chats.length === 0) {
             return (
-                <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-6">
-                    <History className="h-8 w-8 mb-3 opacity-50"/>
-                    <p className="text-sm font-medium mb-1">Sin chats anteriores</p>
-                    <p className="text-xs">Inicia una nueva conversación para verla aquí.</p>
+                <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 gap-2">
+                    <History className="h-12 w-12 mb-2 opacity-40"/>
+                    <p className="text-base font-semibold mb-1">No tienes chats previos</p>
+                    <p className="text-xs mb-2">Inicia una nueva conversación para verla aquí.</p>
+                    <Button variant="outline" size="sm" onClick={() => router.push('/chat')}>
+                        Nuevo Chat
+                    </Button>
                 </div>
             );
         }
 
-        return chats.map((chat) => {
-            const isActive = pathname === `/chat/${chat.id}`;
-            const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
-            const displayDate = new Date(chat.updated_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }); // Formato español
-
-            return (
-                <div key={chat.id} className="relative group w-full"> {/* Quitamos pr-8 */}
-                    <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
-                        <a
+        return (
+            <div className="flex flex-col gap-2">
+                {chats.map((chat) => {
+                    const isActive = pathname === `/chat/${chat.id}`;
+                    const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+                    const displayDate = new Date(chat.updated_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+                    return (
+                        <div
+                            key={chat.id}
                             className={cn(
-                                buttonVariants({ variant: "ghost", size: "default" }), // Usamos ghost
-                                "w-full justify-start h-auto py-2.5 px-3 overflow-hidden text-left rounded-md text-sm", // Padding y altura ajustados
-                                isActive
-                                ? "bg-primary/10 dark:bg-primary/20 text-primary font-medium" // Estado activo mejorado
-                                : "text-foreground/70 hover:text-foreground hover:bg-accent/50 dark:hover:bg-accent/30" // Estado inactivo
+                                'relative flex items-center group w-full bg-card border shadow-sm rounded-lg px-3 py-2 transition hover:shadow-md',
+                                isActive ? 'ring-2 ring-primary/40 border-primary/40' : 'border-border',
                             )}
-                            title={displayTitle}
                         >
-                            {/* Icono principal */}
-                            <MessageSquareText className="h-4 w-4 mr-2.5 flex-shrink-0 opacity-80" />
-                            {/* Contenedor para título y fecha */}
-                            <div className="flex flex-col flex-1 min-w-0">
-                                <span className="truncate font-medium text-foreground group-hover:text-foreground">{displayTitle}</span>
-                                <span className="text-xs text-muted-foreground/80">{displayDate}</span>
-                            </div>
-                        </a>
-                    </Link>
-                    {/* Botón Eliminar aparece en hover */}
-                    <AlertDialogTrigger asChild>
-                        <Button
-                            variant="ghost" size="icon"
-                            className={cn(
-                                "absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 p-0 rounded-md",
-                                "opacity-0 group-hover:opacity-60 focus-visible:opacity-100 hover:!opacity-100", // Control de opacidad
-                                "transition-opacity duration-150 flex-shrink-0",
-                                "hover:bg-destructive/10 hover:text-destructive", // Estilo hover
-                                isDeleting && chatToDelete?.id === chat.id ? "opacity-50 cursor-not-allowed" : ""
-                            )}
-                            onClick={(e) => openDeleteConfirmation(chat, e)}
-                            aria-label={`Eliminar chat: ${displayTitle}`}
-                            disabled={isDeleting && chatToDelete?.id === chat.id}
-                        >
-                            {isDeleting && chatToDelete?.id === chat.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            ) : (
-                                <Trash2 className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </AlertDialogTrigger>
-                </div>
-            );
-        });
+                            <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
+                                <a
+                                    className={cn(
+                                        'flex flex-1 min-w-0 items-center gap-2 text-left',
+                                        isActive ? 'text-primary font-semibold' : 'text-foreground/80 hover:text-foreground',
+                                    )}
+                                    title={displayTitle}
+                                >
+                                    <MessageSquareText className="h-4 w-4 flex-shrink-0 opacity-80" />
+                                    <div className="flex flex-col flex-1 min-w-0">
+                                        <span className="truncate font-medium">{displayTitle}</span>
+                                        <span className="text-xs text-muted-foreground/80">{displayDate}</span>
+                                    </div>
+                                </a>
+                            </Link>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="ghost" size="icon"
+                                    className={cn(
+                                        'ml-2 h-8 w-8 p-0 rounded-full border border-transparent transition',
+                                        'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
+                                        isDeleting && chatToDelete?.id === chat.id ? 'opacity-50 cursor-not-allowed' : ''
+                                    )}
+                                    onClick={(e) => openDeleteConfirmation(chat, e)}
+                                    aria-label={`Eliminar chat: ${displayTitle}`}
+                                    disabled={isDeleting && chatToDelete?.id === chat.id}
+                                >
+                                    {isDeleting && chatToDelete?.id === chat.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                    ) : (
+                                        <Trash2 className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </AlertDialogTrigger>
+                        </div>
+                    );
+                })}
+            </div>
+        );
     };
 
     return (
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
             <div className="flex flex-col h-full">
-                 {/* Header del historial */}
-                 <div className="flex justify-between items-center px-2 pt-1 pb-2 border-b shrink-0 mb-1">
-                     <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
-                         Historial
-                     </h3>
-                     <Button
-                         variant="ghost"
-                         size="icon" // Cambiado a icon
-                         className="h-7 w-7 text-muted-foreground hover:text-foreground" // Tamaño y color ajustados
-                         onClick={() => fetchChatHistory(true)}
-                         disabled={isLoading || isAuthLoading}
-                         title="Actualizar historial"
-                     >
-                         <RefreshCw className={cn("h-4 w-4", (isLoading || isAuthLoading) && "animate-spin")} />
-                         <span className="sr-only">Actualizar Historial</span>
-                     </Button>
-                 </div>
-                 {/* ScrollArea para el contenido */}
-                 <ScrollArea className="flex-1 -mx-2"> {/* Padding negativo para compensar el padding del contenedor padre */}
-                     <div className="flex flex-col gap-1 p-2"> {/* Padding interno y gap */}
-                         {renderContent()}
-                     </div>
-                 </ScrollArea>
+                {/* Header del historial */}
+                <div className="flex justify-between items-center px-2 pt-1 pb-2 border-b shrink-0 mb-1 bg-background/80 backdrop-blur-sm">
+                    <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
+                        Historial
+                    </h3>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={() => fetchChatHistory(true)}
+                        disabled={isLoading || isAuthLoading}
+                        title="Actualizar historial"
+                    >
+                        <RefreshCw className={cn("h-4 w-4", (isLoading || isAuthLoading) && "animate-spin")} />
+                        <span className="sr-only">Actualizar Historial</span>
+                    </Button>
+                </div>
+                {/* ScrollArea para el contenido */}
+                <ScrollArea className="flex-1 min-h-0 px-0 py-1">
+                    <div className="flex flex-col gap-2 p-1">
+                        {renderContent()}
+                    </div>
+                </ScrollArea>
             </div>
 
             {/* AlertDialog se mantiene igual */}
