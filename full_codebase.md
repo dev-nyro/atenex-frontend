@@ -502,7 +502,7 @@ export default function AdminDashboardPage() {
 
 ## File: `app\(app)\chat\[[...chatId]]\page.tsx`
 ```tsx
-// File: app/(app)/chat/[[...chatId]]/page.tsx (CORREGIDO - Revisión final scroll)
+// File: app/(app)/chat/[[...chatId]]/page.tsx (CONFIRMADO CON PADDING Y ESTRUCTURA FLEX)
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -558,7 +558,6 @@ export default function ChatPage() {
     const scrollAreaRef = useRef<any>(null);
     const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
-    // useEffects de historial y scroll (sin cambios funcionales mayores)
     useEffect(() => { if (chatIdParam !== chatId) { setChatId(chatIdParam); fetchedChatIdRef.current = undefined; } }, [chatIdParam, chatId]);
     useEffect(() => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
@@ -570,7 +569,7 @@ export default function ChatPage() {
         fetchedChatIdRef.current = currentFetchTarget;
         if (chatId) {
             getChatMessages(chatId)
-                .then((apiMessages: ChatMessageApi[]) => { /* ... lógica carga mensajes ... */
+                .then((apiMessages: ChatMessageApi[]) => {
                     const sortedMessages = [...apiMessages].sort((a, b) => (new Date(a.created_at || 0)).getTime() - (new Date(b.created_at || 0)).getTime());
                     const mappedMessages = sortedMessages.map(mapApiMessageToFrontend);
                     let lastWithDocs: RetrievedDoc[] = [];
@@ -582,7 +581,7 @@ export default function ChatPage() {
                 .catch(error => { setHistoryError("Fallo al cargar el historial."); setMessages([welcomeMessage]); fetchedChatIdRef.current = undefined; })
                 .finally(() => setIsLoadingHistory(false));
         } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; }
-    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]); // Mantener isSourcesPanelVisible si es necesario para auto-apertura
+    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]);
     useEffect(() => {
         if (scrollAreaRef.current && !isLoadingHistory) {
             const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
@@ -591,7 +590,6 @@ export default function ChatPage() {
         }
     }, [messages, isSending, isLoadingHistory]);
 
-    // handleSendMessage (sin cambios funcionales)
     const handleSendMessage = useCallback(async (query: string) => {
         const text = query.trim();
         if (!text) { toast.warning("No se puede enviar un mensaje vacío."); return; }
@@ -615,49 +613,38 @@ export default function ChatPage() {
         } finally { setIsSending(false); }
     }, [chatId, isSending, user, router, signOut, isSourcesPanelVisible]);
 
-    // handlePanelToggle y handleNewChat (sin cambios)
     const handlePanelToggle = () => setIsSourcesPanelVisible(!isSourcesPanelVisible);
     const handleNewChat = () => { if (pathname !== '/chat') { router.push('/chat'); } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setChatId(undefined); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; } };
 
-    // Renderizado del contenido del chat (sin cambios visuales)
     const renderChatContent = (): React.ReactNode => {
-        if (isLoadingHistory && messages.length <= 1) { /* ... skeleton ... */
+        if (isLoadingHistory && messages.length <= 1) {
              return ( <div className="space-y-6 p-4"> <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div> </div> );
         }
-        if (historyError) { /* ... error message ... */
+        if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
-        return ( <div className="space-y-6 pb-4"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
+        return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
     };
 
     return (
-         // FLAG_LLM: Asegurarse que este div ocupe toda la altura disponible de su padre (main)
-        <div className="flex flex-col h-full bg-background">
+        <div className="flex flex-col h-full bg-background p-6 lg:p-8"> {/* Padding añadido aquí */}
             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
                 <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
-                     {/* Contenedor Flex Vertical Interno (Debe ser h-full) */}
                     <div className="flex h-full flex-col relative">
-                         {/* Botón toggle panel fuentes */}
-                         <div className="absolute top-3 right-3 z-20"> {/* Mover padding al ScrollArea */}
+                         <div className="absolute top-0 right-0 z-20"> {/* Botón toggle no necesita padding extra si la página ya lo tiene */}
                              <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                         </div>
-
-                        {/* ScrollArea con flex-1 */}
-                        {/* FLAG_LLM: Aplicar padding aquí, no en el div contenedor del botón */}
-                        <ScrollArea className="flex-1 px-6 pt-6 pb-4" ref={scrollAreaRef}>
+                        {/* ScrollArea no necesita padding propio si el contenedor de la página ya lo tiene */}
+                        <ScrollArea className="flex-1" ref={scrollAreaRef}>
                              {renderChatContent()}
                         </ScrollArea>
-
-                        {/* Input fijo abajo con shrink-0 */}
-                        <div className="border-t border-border/60 p-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                        <div className="border-t border-border/60 pt-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                         </div>
                     </div>
                 </ResizablePanel>
-
-                {/* Panel de Fuentes */}
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
@@ -674,7 +661,7 @@ export default function ChatPage() {
 
 ## File: `app\(app)\knowledge\page.tsx`
 ```tsx
-// File: app/(app)/knowledge/page.tsx (CORREGIDO - Añadido padding y comprobación layout padre)
+// File: app/(app)/knowledge/page.tsx (CONFIRMADO CON PADDING)
 'use client';
 import React, { useCallback, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -736,11 +723,9 @@ export default function KnowledgePage() {
     'X-Company-ID': user.companyId,
   } : null;
 
-  // --- Renderizado ---
   if (isAuthLoading) {
     return (
-         // FLAG_LLM: Añadir padding también al skeleton wrapper
-        <div className="p-6 lg:p-8 space-y-8">
+        <div className="p-6 lg:p-8 space-y-8"> {/* Padding aquí */}
           <Skeleton className="h-10 w-1/3 mb-6" />
           <Skeleton className="h-64 rounded-xl mb-8" />
           <Skeleton className="h-10 w-1/4 mb-4" />
@@ -750,9 +735,7 @@ export default function KnowledgePage() {
   }
 
   return (
-    // FLAG_LLM: Añadido padding al contenedor principal (p-6 lg:p-8)
-    <div className="p-6 lg:p-8 space-y-8">
-        {/* Título de la página */}
+    <div className="p-6 lg:p-8 space-y-8"> {/* Padding principal de la página */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
                  <FileText className="h-7 w-7" />
@@ -772,7 +755,6 @@ export default function KnowledgePage() {
             )}
         </div>
 
-        {/* Sección: Subir Documento */}
         <Card className="shadow-md border">
             <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
@@ -803,12 +785,10 @@ export default function KnowledgePage() {
 
         <Separator />
 
-        {/* Sección: Lista de Documentos Subidos */}
         <div className='space-y-4'>
              <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
                  <List className="h-6 w-6" /> Documentos Gestionados
             </h2>
-
              {documentsError && (
                 <Alert variant="destructive">
                      <AlertTriangle className="h-4 w-4" />
@@ -819,7 +799,6 @@ export default function KnowledgePage() {
                     </AlertDescription>
                 </Alert>
              )}
-
              {isLoadingDocuments && documents.length === 0 && !documentsError && (
                 <div className="space-y-2 pt-2 border rounded-lg p-4">
                     <Skeleton className="h-12 w-full rounded-md" />
@@ -827,7 +806,6 @@ export default function KnowledgePage() {
                     <Skeleton className="h-12 w-full rounded-md" />
                 </div>
              )}
-
              {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
                 <DocumentStatusList
                     documents={documents}
@@ -840,7 +818,6 @@ export default function KnowledgePage() {
                     isLoading={isLoadingDocuments}
                 />
              )}
-
              {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
                 <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/30">
                      <p className="text-muted-foreground text-sm">Inicia sesión para ver tus documentos.</p>
@@ -854,7 +831,7 @@ export default function KnowledgePage() {
 
 ## File: `app\(app)\layout.tsx`
 ```tsx
-// File: app/(app)/layout.tsx (CORREGIDO - overflow-y-auto y padding movido a hijos)
+// File: app/(app)/layout.tsx (CORREGIDO y CONFIRMADO)
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -876,26 +853,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
   const incompleteSetupWarningShown = useRef(false);
 
-  // useEffects de autenticación y redirección (sin cambios)
   useEffect(() => {
     incompleteSetupWarningShown.current = false;
   }, [user?.userId]);
 
   useEffect(() => {
-    if (bypassAuth) return;
-    if (isLoading) return;
-    if (!user) { router.replace('/'); return; }
-    if (user.isAdmin && !pathname.startsWith('/admin')) { router.replace('/admin'); return; }
-    if (!user.isAdmin && pathname.startsWith('/admin')) { router.replace('/chat'); return; }
-    if (!user.isAdmin && !user.companyId && !incompleteSetupWarningShown.current) {
-       toast.error("Incomplete Account Setup", { description: "Falta ID de compañía. Contacta al administrador." });
-       incompleteSetupWarningShown.current = true;
-    } else if (user.companyId || user.isAdmin) {
+    if (bypassAuth) {
+      console.warn("AppLayout: Auth check SKIPPED (Bypass).");
+      return;
+    }
+    if (isLoading) {
+      console.log("AppLayout: Waiting for auth state...");
+      return;
+    }
+    if (!user) {
+      console.log("AppLayout: No user found after loading, redirecting to /");
+      router.replace('/');
+      return;
+    }
+
+    if (user.isAdmin && !pathname.startsWith('/admin')) {
+        console.log("AppLayout: Admin user detected outside /admin, redirecting to /admin");
+        router.replace('/admin');
+        return; 
+    }
+    if (!user.isAdmin && pathname.startsWith('/admin')) {
+        console.log("AppLayout: Non-admin user detected in /admin, redirecting to /chat");
+        router.replace('/chat'); 
+        return; 
+    }
+
+    if (!user.isAdmin && !user.companyId) {
+       if (!incompleteSetupWarningShown.current) {
+          console.error(`AppLayout: User data is incomplete (CompanyID: ${user?.companyId}). Showing warning.`);
+          toast.error("Configuración de cuenta incompleta", { 
+            description: "Falta el ID de la compañía. Por favor, contacta al administrador.",
+            duration: 10000, // Mantener el toast más tiempo
+           });
+          incompleteSetupWarningShown.current = true;
+       }
+    } else if (user.companyId || user.isAdmin) { // Resetear si los datos son correctos
         incompleteSetupWarningShown.current = false;
     }
+
+    console.log("AppLayout: Auth check passed for current route.");
+
   }, [isLoading, user, bypassAuth, router, pathname, signOut]);
 
-  // --- Render Loading State ---
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -905,7 +909,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-   // --- Bloqueador si no hay usuario (después de cargar) ---
    if (!user && !bypassAuth) {
         return (
           <div className="flex h-screen items-center justify-center bg-background">
@@ -915,12 +918,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         );
    }
 
-  // --- Renderizado Condicional ---
-  // Layout Admin
   if (user?.isAdmin) {
       return <AdminLayout>{children}</AdminLayout>;
   }
-  // Layout Usuario Normal
   else if (user) {
       return (
          <div className="flex h-screen bg-secondary/30 dark:bg-muted/30 overflow-hidden">
@@ -938,11 +938,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </ResizablePanel>
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
-                  <div className="flex h-full flex-col">
+                  <div className="flex h-full flex-col"> {/* Contenedor flex para Header y Main */}
                       <Header />
-                      {/* FLAG_LLM: Cambiado overflow-hidden a overflow-y-auto y quitado padding */}
+                      {/* Main debe tener overflow-y-auto y flex-1 */}
+                      {/* El padding se aplica en las páginas hijas (chat, knowledge, settings) */}
                       <main className="flex-1 bg-background overflow-y-auto">
-                          {/* El padding se aplicará en las páginas hijas */}
                           {children}
                       </main>
                   </div>
