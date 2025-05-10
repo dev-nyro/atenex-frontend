@@ -1,4 +1,4 @@
-// File: app/(app)/layout.tsx (CORREGIDO y CONFIRMADO)
+// File: app/(app)/layout.tsx
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -107,9 +107,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <ResizablePanel defaultSize={82} minSize={30} order={2}>
                   <div className="flex h-full flex-col"> {/* Contenedor flex para Header y Main */}
                       <Header />
-                      {/* Main debe tener overflow-y-auto y flex-1 */}
+                      {/* Main debe tener overflow:hidden y flex-1 */}
                       {/* El padding se aplica en las páginas hijas (chat, knowledge, settings) */}
-                      <main className="flex-1 bg-background overflow-y-auto">
+                      <main className="flex-1 bg-background overflow-hidden"> {/* MODIFICADO: overflow-y-auto a overflow-hidden */}
                           {children}
                       </main>
                   </div>
