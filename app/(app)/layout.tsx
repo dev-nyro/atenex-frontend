@@ -109,7 +109,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <Header />
                       {/* Main debe tener overflow:hidden y flex-1 */}
                       {/* El padding se aplica en las páginas hijas (chat, knowledge, settings) */}
-                      <main className="flex-1 bg-background overflow-hidden"> {/* MODIFICADO: overflow-y-auto a overflow-hidden */}
+                      <main className="flex-1 bg-background overflow-hidden"> {/* CONFIRMADO: overflow-hidden */}
                           {children}
                       </main>
                   </div>
