@@ -1818,7 +1818,7 @@ function ContactInfoItem({ Icon, label, href, text, targetBlank = false, isPlace
 /* Estilo para que ScrollArea funcione correctamente en flexbox */
 [data-radix-scroll-area-viewport] > div {
   min-width: 100%;
-  display: table;
+  display: block; /* MODIFICADO: de table a block */
 }
 
 /* Estilo para el esqueleto de mensaje de asistente */

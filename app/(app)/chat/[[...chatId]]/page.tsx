@@ -1,4 +1,4 @@
-// File: app/(app)/chat/[[...chatId]]/page.tsx (CONFIRMADO CON PADDING Y ESTRUCTURA FLEX)
+// File: app/(app)/chat/[[...chatId]]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -22,7 +22,7 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw, BrainCircuit } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw } from 'lucide-react'; // BrainCircuit quitado si no se usa
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils';
@@ -51,18 +51,22 @@ export default function ChatPage() {
     const [historyError, setHistoryError] = useState<string | null>(null);
     const [isSourcesPanelVisible, setIsSourcesPanelVisible] = useState(false);
 
-    const scrollAreaRef = useRef<any>(null);
+    const scrollAreaRef = useRef<any>(null); // Para ScrollArea de mensajes
     const fetchedChatIdRef = useRef<string | 'welcome' | undefined>(undefined);
 
     useEffect(() => { if (chatIdParam !== chatId) { setChatId(chatIdParam); fetchedChatIdRef.current = undefined; } }, [chatIdParam, chatId]);
+    
     useEffect(() => {
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true';
         const currentFetchTarget = chatId || 'welcome';
+
         if (!bypassAuth && isAuthLoading) { setIsLoadingHistory(true); setMessages([]); return; }
         if (!bypassAuth && !user) { setMessages([welcomeMessage]); setIsLoadingHistory(false); fetchedChatIdRef.current = 'welcome'; return; }
         if (fetchedChatIdRef.current === currentFetchTarget && !isLoadingHistory) return;
+        
         setIsLoadingHistory(true); setHistoryError(null); setMessages([]);
         fetchedChatIdRef.current = currentFetchTarget;
+
         if (chatId) {
             getChatMessages(chatId)
                 .then((apiMessages: ChatMessageApi[]) => {
@@ -76,13 +80,26 @@ export default function ChatPage() {
                 })
                 .catch(error => { setHistoryError("Fallo al cargar el historial."); setMessages([welcomeMessage]); fetchedChatIdRef.current = undefined; })
                 .finally(() => setIsLoadingHistory(false));
-        } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; }
-    }, [chatId, user, isAuthLoading, router, isSourcesPanelVisible]);
+        } else { 
+            setMessages([welcomeMessage]); setRetrievedDocs([]); setIsLoadingHistory(false); 
+            setIsSourcesPanelVisible(false); // Asegurar que el panel se oculte en un nuevo chat sin ID
+            fetchedChatIdRef.current = 'welcome'; 
+        }
+    }, [chatId, user, isAuthLoading, isSourcesPanelVisible]); // Añadido isSourcesPanelVisible para re-evaluar si se abre externamente
+    
     useEffect(() => {
-        if (scrollAreaRef.current && !isLoadingHistory) {
+        if (scrollAreaRef.current && !isLoadingHistory && messages.length > 0) {
             const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
-            if (viewport) { const timeoutId = setTimeout(() => { viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' }); }, 100); return () => clearTimeout(timeoutId); }
-            else { const scrollElement = scrollAreaRef.current as HTMLElement; if (scrollElement?.scrollTo) { const timeoutId = setTimeout(() => { scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' }); }, 100); return () => clearTimeout(timeoutId); } }
+            if (viewport) { 
+                const timeoutId = setTimeout(() => { viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' }); }, 100); 
+                return () => clearTimeout(timeoutId); 
+            } else { 
+                const scrollElement = scrollAreaRef.current as HTMLElement; 
+                if (scrollElement?.scrollTo) { 
+                    const timeoutId = setTimeout(() => { scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' }); }, 100); 
+                    return () => clearTimeout(timeoutId); 
+                }
+            }
         }
     }, [messages, isSending, isLoadingHistory]);
 
@@ -93,9 +110,11 @@ export default function ChatPage() {
         setMessages(prev => prev.length === 1 && prev[0].id === 'initial-welcome' ? [userMessage] : [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
         if (isGreeting(text)) { setMessages(prev => [...prev, { id: `assistant-greet-${Date.now()}`, role: 'assistant', content: '¡Hola! ¿En qué puedo ayudarte hoy?', created_at: new Date().toISOString() }]); return; }
         if (isMetaQuery(text)) { setMessages(prev => [...prev, { id: `assistant-meta-${Date.now()}`, role: 'assistant', content: getMetaResponse(), created_at: new Date().toISOString() }]); return; }
+        
         const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true'; const isAuthenticated = !!user || bypassAuth;
         if (!isAuthenticated) { toast.error("No Autenticado", { description: "Por favor, inicia sesión para enviar mensajes."}); signOut(); return; }
         if (isSending) return;
+
         setIsSending(true); const currentChatIdForApi = chatId || null;
         try {
             const response: QueryApiResponse = await postQuery({ query: text, chat_id: currentChatIdForApi });
@@ -105,12 +124,19 @@ export default function ChatPage() {
             setRetrievedDocs(mappedSources || []); lastDocsRef.current = mappedSources || [];
             if (!currentChatIdForApi && response.chat_id) { setChatId(response.chat_id); fetchedChatIdRef.current = response.chat_id; router.replace(`/chat/${response.chat_id}`, { scroll: false }); }
             if (mappedSources && mappedSources.length > 0 && !isSourcesPanelVisible) { setIsSourcesPanelVisible(true); }
-        } catch (error) { const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: "Error al procesar tu solicitud.", isError: true, created_at: new Date().toISOString() }; setMessages(prev => [...prev, errorMsgObj]); toast.error("Error", { description: error instanceof Error ? error.message : "Ocurrió un error inesperado." });
-        } finally { setIsSending(false); }
+        } catch (error) { 
+            const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: "Error al procesar tu solicitud.", isError: true, created_at: new Date().toISOString() }; 
+            setMessages(prev => [...prev, errorMsgObj]); 
+            toast.error("Error", { description: error instanceof Error ? error.message : "Ocurrió un error inesperado." });
+        } finally { 
+            setIsSending(false); 
+        }
     }, [chatId, isSending, user, router, signOut, isSourcesPanelVisible]);
 
     const handlePanelToggle = () => setIsSourcesPanelVisible(!isSourcesPanelVisible);
-    const handleNewChat = () => { if (pathname !== '/chat') { router.push('/chat'); } else { setMessages([welcomeMessage]); setRetrievedDocs([]); setChatId(undefined); setIsSourcesPanelVisible(false); fetchedChatIdRef.current = 'welcome'; } };
+    
+    // handleNewChat no se necesita aquí si el Header lo maneja globalmente con router.push('/chat')
+    // La lógica de reseteo ya está en el useEffect que depende de `chatId`.
 
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory && messages.length <= 1) {
@@ -119,24 +145,30 @@ export default function ChatPage() {
         if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
+        // El padding se aplica al div que envuelve a renderChatContent
         return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
     };
 
     return (
-        <div className="flex flex-col h-full bg-background p-6 lg:p-8"> {/* Padding añadido aquí */}
-            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={40}>
-                    <div className="flex h-full flex-col relative">
-                         <div className="absolute top-0 right-0 z-20"> {/* Botón toggle no necesita padding extra si la página ya lo tiene */}
+        <div className="flex flex-col h-full bg-background p-4 sm:p-6 lg:p-8"> {/* Padding ajustado */}
+            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden"> {/* overflow-hidden es importante */}
+                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100}>
+                    {/* Contenedor del panel de chat. Se añade overflow-hidden aquí. */}
+                    <div className="flex h-full flex-col relative overflow-hidden">
+                         {/* Botón toggle en la esquina, ajustado para no ser afectado por padding interno de ScrollArea */}
+                         <div className="absolute top-1 right-1 z-20"> 
                              <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
                              </Button>
                         </div>
-                        {/* ScrollArea no necesita padding propio si el contenedor de la página ya lo tiene */}
+                        {/* ScrollArea para los mensajes. El padding se mueve a un div interno. */}
                         <ScrollArea className="flex-1" ref={scrollAreaRef}>
-                             {renderChatContent()}
+                             <div className="px-3 py-4 sm:px-4 sm:py-5"> {/* Padding interno para mensajes */}
+                                {renderChatContent()}
+                             </div>
                         </ScrollArea>
-                        <div className="border-t border-border/60 pt-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                        {/* Contenedor del ChatInput con padding y estilos */}
+                        <div className="border-t border-border/60 px-3 py-3 sm:px-4 sm:py-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
                              <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                         </div>
                     </div>
@@ -144,7 +176,7 @@ export default function ChatPage() {
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
-                        <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+                        <ResizablePanel defaultSize={35} minSize={20} maxSize={45}> {/* MaxSize ajustado */}
                             <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
                         </ResizablePanel>
                     </>
