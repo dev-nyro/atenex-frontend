@@ -146,31 +146,39 @@ export default function ChatPage() {
     };
 
     return (
-        // FLAG_LLM: Eliminado padding p-4 sm:p-6 lg:p-8 del div raíz para que el contenido ocupe toda la altura
-        <div className="flex flex-col h-full bg-background">
-            <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100}>
+        // El chat y el panel de fuentes ocupan toda la pantalla, cada uno con su propio scroll
+        <div className="flex flex-col h-screen w-full bg-background">
+            <ResizablePanelGroup direction="horizontal" className="flex-1 h-full w-full overflow-hidden">
+                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100} className="h-full">
                     <div className="flex h-full flex-col relative overflow-hidden">
-                         <div className="absolute top-1 right-1 z-20"> 
-                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
+                        <div className="absolute top-1 right-1 z-20">
+                            <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
                                 {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                             </Button>
+                            </Button>
                         </div>
-                        <ScrollArea className="flex-1" ref={scrollAreaRef}>
-                             <div className="px-3 py-4 sm:px-4 sm:py-5">
-                                {renderChatContent()}
-                             </div>
-                        </ScrollArea>
-                        <div className="border-t border-border/60 px-3 py-3 sm:px-4 sm:py-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
-                             <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
+                        {/* Chat window con su propio scroll */}
+                        <div className="flex flex-col flex-1 h-0">
+                            <ScrollArea className="flex-1 h-full w-full" ref={scrollAreaRef}>
+                                <div className="px-3 py-4 sm:px-4 sm:py-5 min-h-full">{/* Padding interno para mensajes */}
+                                    {renderChatContent()}
+                                </div>
+                            </ScrollArea>
+                            <div className="border-t border-border/60 px-3 py-3 sm:px-4 sm:py-4 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                                <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
+                            </div>
                         </div>
                     </div>
                 </ResizablePanel>
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
+                        {/* Panel de fuentes relevante con scroll propio */}
                         <ResizablePanel defaultSize={35} minSize={20} maxSize={45} className="h-full overflow-hidden">
-                            <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                            <div className="flex flex-col h-full">
+                                <ScrollArea className="flex-1 h-full w-full">
+                                    <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                                </ScrollArea>
+                            </div>
                         </ResizablePanel>
                     </>
                 )}
