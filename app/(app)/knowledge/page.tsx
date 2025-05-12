@@ -92,34 +92,33 @@ export default function KnowledgePage() {
             )}
         </div>
 
-        <Card className="shadow-md border">
-            <CardHeader>
-                <CardTitle className="text-xl flex items-center gap-2">
-                    <UploadCloud className="h-5 w-5 text-primary" /> Subir Nuevo Documento
-                </CardTitle>
-                <CardDescription>Añade archivos a tu base de conocimiento.</CardDescription>
-            </CardHeader>
-            <CardContent>
-            {authHeadersForChildren ? (
-                <FileUploader
-                    authHeaders={authHeadersForChildren}
-                    onUploadFile={uploadFile}
-                    isUploading={isUploading}
-                    uploadError={uploadError}
-                    clearUploadStatus={clearUploadStatus}
-                />
-            ) : (
-                <Alert variant="default" className="bg-muted/50">
-                     <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                    <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
-                    <AlertDescription className="text-xs text-muted-foreground">
-                        Inicia sesión para poder subir nuevos documentos.
-                    </AlertDescription>
-                </Alert>
-            )}
-            </CardContent>
-        </Card>
 
+        {/* Uploader: Compact, collapsible */}
+        <details className="mb-2" open>
+          <summary className="cursor-pointer select-none text-base font-semibold flex items-center gap-2 px-2 py-2 rounded hover:bg-accent/30 transition-colors">
+            <UploadCloud className="h-5 w-5 text-primary" /> Subir Nuevo Documento
+            <span className="ml-2 text-xs text-muted-foreground font-normal">(Arrastra, selecciona o pega archivos)</span>
+          </summary>
+          <div className="p-2 pt-0">
+            {authHeadersForChildren ? (
+              <FileUploader
+                authHeaders={authHeadersForChildren}
+                onUploadFile={uploadFile}
+                isUploading={isUploading}
+                uploadError={uploadError}
+                clearUploadStatus={clearUploadStatus}
+              />
+            ) : (
+              <Alert variant="default" className="bg-muted/50 mt-2">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Inicia sesión para poder subir nuevos documentos.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </details>
         <Separator />
 
         <div className='space-y-4'>
