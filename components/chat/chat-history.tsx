@@ -174,43 +174,46 @@ export function ChatHistory() {
                                 isActive ? 'ring-2 ring-primary/40 border-primary/40' : 'border-border',
                             )}
                         >
-                            <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
-                                <a
-                                    className={cn(
-                                        'flex flex-1 min-w-0 items-center gap-2 text-left',
-                                        isActive ? 'text-primary font-semibold' : 'text-foreground/80 hover:text-foreground',
-                                    )}
-                                    title={displayTitle}
-                                >
-                                    <MessageSquareText className="h-4 w-4 flex-shrink-0 opacity-80" />
-                                    <div className="flex flex-col flex-1 min-w-0">
-                                        <span className="truncate font-medium">{displayTitle}</span>
-                                        <span className="text-xs text-muted-foreground/80">{displayDate}</span>
-                                    </div>
-                                </a>
-                            </Link>
-                            <div className="flex-shrink-0 flex items-center ml-2">
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                        variant="ghost" size="icon"
+                            <div className="flex flex-1 min-w-0 items-center gap-2 text-left">
+                                <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
+                                    <a
                                         className={cn(
-                                            'h-8 w-8 p-0 rounded-full border border-transparent transition',
-                                            'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
-                                            isDeleting && chatToDelete?.id === chat.id ? 'opacity-50 cursor-not-allowed' : ''
+                                            'flex flex-1 min-w-0 items-center gap-2',
+                                            isActive ? 'text-primary font-semibold' : 'text-foreground/80 hover:text-foreground',
                                         )}
-                                        onClick={(e) => openDeleteConfirmation(chat, e)}
-                                        aria-label={`Eliminar chat: ${displayTitle}`}
-                                        disabled={isDeleting && chatToDelete?.id === chat.id}
-                                        tabIndex={0}
-                                        style={{ marginLeft: 'auto' }}
+                                        title={displayTitle}
+                                        style={{ minWidth: 0 }}
                                     >
-                                        {isDeleting && chatToDelete?.id === chat.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                        ) : (
-                                            <Trash2 className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                </AlertDialogTrigger>
+                                        <MessageSquareText className="h-4 w-4 flex-shrink-0 opacity-80" />
+                                        <div className="flex flex-col flex-1 min-w-0">
+                                            <span className="truncate font-medium max-w-[12rem] sm:max-w-[16rem] md:max-w-[20rem]" title={displayTitle}>{displayTitle}</span>
+                                            <span className="text-xs text-muted-foreground/80">{displayDate}</span>
+                                        </div>
+                                    </a>
+                                </Link>
+                                <div className="flex-shrink-0 flex items-center ml-2">
+                                    <AlertDialogTrigger asChild>
+                                        <Button
+                                            variant="ghost" size="icon"
+                                            className={cn(
+                                                'h-8 w-8 p-0 rounded-full border border-transparent transition',
+                                                'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
+                                                isDeleting && chatToDelete?.id === chat.id ? 'opacity-50 cursor-not-allowed' : ''
+                                            )}
+                                            onClick={(e) => openDeleteConfirmation(chat, e)}
+                                            aria-label={`Eliminar chat: ${displayTitle}`}
+                                            disabled={isDeleting && chatToDelete?.id === chat.id}
+                                            tabIndex={0}
+                                            style={{ marginLeft: 'auto' }}
+                                        >
+                                            {isDeleting && chatToDelete?.id === chat.id ? (
+                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                            ) : (
+                                                <Trash2 className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                </div>
                             </div>
                         </div>
                     );
