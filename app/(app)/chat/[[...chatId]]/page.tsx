@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw } from 'lucide-react'; 
 import { Skeleton } from '@/components/ui/skeleton';
+import SnakeAnimation from '@/components/animations/snakeanimation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils';
 
@@ -142,7 +143,7 @@ export default function ChatPage() {
         if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
-        return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
+        return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="relative w-full min-h-[80px] h-[80px] flex items-center justify-center"><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div style={{ width: 90, height: 60 }}><SnakeAnimation /></div></div></div> )} </div> );
     };
 
     return (

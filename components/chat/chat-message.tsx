@@ -3,7 +3,8 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { User, BrainCircuit, AlertTriangle, FileText, CircleDot } from 'lucide-react'; // Añadido CircleDot
+import { User, AlertTriangle, FileText, CircleDot } from 'lucide-react';
+import AtenexLogo from '@/components/icons/atenex-logo';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { RetrievedDoc } from '@/lib/api';
@@ -40,7 +41,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       {!isUser && (
         <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground">
            <AvatarFallback className="bg-transparent text-muted-foreground">
-                {isError ? <AlertTriangle className="h-5 w-5 text-destructive" /> : <BrainCircuit className="h-5 w-5" /> }
+                {isError ? <AlertTriangle className="h-5 w-5 text-destructive" /> : <AtenexLogo className="h-5 w-5 text-primary" /> }
            </AvatarFallback>
         </Avatar>
       )}
