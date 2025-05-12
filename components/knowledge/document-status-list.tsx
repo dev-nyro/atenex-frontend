@@ -11,7 +11,7 @@ import {
     FileClock, FileCheck2, FileX2, FileQuestion, Download, AlertTriangle // Iconos
 } from 'lucide-react';
 // FLAG_LLM: Importa la interfaz correcta con document_id
-import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument, retryIngestDocument } from '@/lib/api';
+import { DocumentStatusResponse, AuthHeaders, deleteIngestDocument, retryIngestDocument, BulkDeleteResponse } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -170,6 +170,37 @@ export function DocumentStatusList({
   const canBulkRefresh = selectedDocs.length > 0;
   const canBulkDelete = selectedDocs.length > 0;
 
+  // --- Bulk Delete Handler ---
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [bulkDeleteResult, setBulkDeleteResult] = useState<BulkDeleteResponse | null>(null);
+
+  // Fix for implicit any in map
+  type BulkDeleteFail = { id: string; error: string };
+
+  const handleBulkDelete = async () => {
+    if (!authHeaders || selectedIds.length === 0 || isBulkDeleting) return;
+    setIsBulkDeleting(true);
+    setBulkDeleteResult(null);
+    const toastId = toast.loading(`Eliminando ${selectedIds.length} documentos...`);
+    try {
+      // Llama al nuevo endpoint bulk
+      const { deleteIngestDocumentsBulk } = await import('@/lib/api');
+      const result = await deleteIngestDocumentsBulk(selectedIds, authHeaders);
+      setBulkDeleteResult(result);
+      // Elimina de la UI los eliminados
+      for (const id of result.deleted) {
+        onDeleteSuccess(id);
+      }
+      toast.success('Borrado masivo completado', { id: toastId, description: `${result.deleted.length} eliminados, ${result.failed.length} fallidos.` });
+      setBulkDeleteOpen(false);
+      clearSelection();
+    } catch (e: any) {
+      toast.error('Error en borrado masivo', { id: toastId, description: e?.message || 'Error desconocido' });
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative">
@@ -223,22 +254,31 @@ export function DocumentStatusList({
                     <li key={doc.document_id} className="break-all">{doc.file_name || doc.document_id}</li>
                   ))}
                 </ul>
+                {bulkDeleteResult && (
+                  <div className="mt-3">
+                    <div className="text-green-700 dark:text-green-400 text-xs font-medium mb-1">{bulkDeleteResult.deleted.length} eliminados correctamente.</div>
+                    {bulkDeleteResult.failed.length > 0 && (
+                      <div className="text-red-700 dark:text-red-400 text-xs font-medium">
+                        {bulkDeleteResult.failed.length} fallidos:
+                        <ul className="list-disc pl-5">
+                          {bulkDeleteResult.failed.map(f => (
+                            <li key={f.id}>{f.id}: {f.error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setBulkDeleteOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setBulkDeleteOpen(false)} disabled={isBulkDeleting}>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                onClick={async () => {
-                  for (const doc of selectedDocs) {
-                    await deleteIngestDocument(doc.document_id, authHeaders);
-                    onDeleteSuccess(doc.document_id);
-                  }
-                  setBulkDeleteOpen(false);
-                  clearSelection();
-                }}
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
                 className={cn(buttonVariants({ variant: "destructive" }), "min-w-[150px]")}
               >
-                <Trash2 className="mr-2 h-4 w-4" />Eliminar Permanentemente
+                {isBulkDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Eliminar Permanentemente
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

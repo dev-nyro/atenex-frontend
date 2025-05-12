@@ -1,3 +1,25 @@
+// Bulk delete documents
+export interface BulkDeleteResponse {
+  deleted: string[];
+  failed: { id: string; error: string }[];
+}
+
+/**
+ * Borra múltiples documentos en una sola petición.
+ * @param documentIds IDs de los documentos a borrar
+ * @param auth Cabeceras de autenticación
+ */
+export async function deleteIngestDocumentsBulk(documentIds: string[], auth: AuthHeaders): Promise<BulkDeleteResponse> {
+  if (!Array.isArray(documentIds) || documentIds.length === 0) throw new ApiError("Se requiere al menos un ID de documento para borrado masivo.", 400);
+  return request<BulkDeleteResponse>(
+    '/api/v1/ingest/bulk',
+    {
+      method: 'DELETE',
+      headers: { ...auth } as Record<string, string>,
+      body: JSON.stringify({ document_ids: documentIds })
+    }
+  );
+}
 // File: lib/api.ts (CORREGIDO - Implementada la llamada API real para createUser)
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
