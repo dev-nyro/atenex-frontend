@@ -206,16 +206,22 @@ export function DocumentStatusList({
       <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative">
         {/* Bulk actions toolbar - Mejorado para no sobreponerse y ser sticky */}
         {selectedIds.length > 0 && (
-          <div className="sticky z-30 top-0 left-0 right-0 bg-accent/95 border-b border-accent px-4 py-2 flex flex-wrap items-center gap-3 animate-in fade-in shadow-lg"
-               style={{ minHeight: 48 }}>
+          <div
+            className="sticky z-[50] top-0 left-0 right-0 bg-white dark:bg-zinc-900 border-b-2 border-primary px-4 py-2 flex flex-wrap items-center gap-3 animate-in fade-in shadow-2xl"
+            style={{ minHeight: 48 }}
+          >
             <span className="font-medium text-sm">
               {selectedIds.length} seleccionado{selectedIds.length > 1 ? 's' : ''}
             </span>
-            {canBulkDelete && (
-              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)} className="min-w-[110px]">
-                <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-              </Button>
-            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+              className="min-w-[110px]"
+              style={{ display: canBulkDelete ? 'inline-flex' : 'none' }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+            </Button>
             {canBulkRetry && (
               <Button variant="outline" size="sm" onClick={async () => {
                 for (const doc of selectedDocs.filter(d => d.status === 'error')) {
