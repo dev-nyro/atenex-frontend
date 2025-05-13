@@ -191,29 +191,29 @@ export function ChatHistory() {
                                         </div>
                                     </a>
                                 </Link>
-                                <div className="flex-shrink-0 flex items-center ml-2">
-                                    <AlertDialogTrigger asChild>
-                                        <Button
-                                            variant="ghost" size="icon"
-                                            className={cn(
-                                                'h-8 w-8 p-0 rounded-full border border-transparent transition',
-                                                'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
-                                                isDeleting && chatToDelete?.id === chat.id ? 'opacity-50 cursor-not-allowed' : ''
-                                            )}
-                                            onClick={(e) => openDeleteConfirmation(chat, e)}
-                                            aria-label={`Eliminar chat: ${displayTitle}`}
-                                            disabled={isDeleting && chatToDelete?.id === chat.id}
-                                            tabIndex={0}
-                                            style={{ marginLeft: 'auto' }}
-                                        >
-                                            {isDeleting && chatToDelete?.id === chat.id ? (
-                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                            ) : (
-                                                <Trash2 className="h-4 w-4" />
-                                            )}
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                </div>
+                    <div className="flex-shrink-0 flex items-center ml-2 opacity-100">
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant="ghost" size="icon"
+                                className={cn(
+                                    'h-8 w-8 p-0 rounded-full border border-transparent transition',
+                                    'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
+                                    isDeleting && chatToDelete?.id === chat.id ? 'opacity-50 cursor-not-allowed' : ''
+                                )}
+                                onClick={(e) => openDeleteConfirmation(chat, e)}
+                                aria-label={`Eliminar chat: ${displayTitle}`}
+                                disabled={isDeleting && chatToDelete?.id === chat.id}
+                                tabIndex={0}
+                                style={{ marginLeft: 'auto', opacity: 1, pointerEvents: 'auto', visibility: 'visible' }}
+                            >
+                                {isDeleting && chatToDelete?.id === chat.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </AlertDialogTrigger>
+                    </div>
                             </div>
                         </div>
                     );
