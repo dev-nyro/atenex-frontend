@@ -203,7 +203,7 @@ export function DocumentStatusList({
 
   return (
     <TooltipProvider>
-      <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative h-full min-h-0 flex flex-col">
+      <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative h-full min-h-0 flex flex-col w-full max-w-none">
         {/* Bulk actions toolbar - Mejorado para no sobreponerse y ser sticky */}
         {selectedIds.length > 0 && (
           <div
@@ -290,7 +290,8 @@ export function DocumentStatusList({
           </AlertDialogContent>
         </AlertDialog>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto w-full max-w-none">
+          {/* Forzar tabla a ancho mínimo para evitar colapso en pantallas pequeñas */}
           <Table className='w-full text-sm'>
             <TableHeader className="sticky top-0 z-30 bg-muted/70 backdrop-blur-md">
               <TableRow className="border-b bg-muted/50 hover:bg-muted/50">

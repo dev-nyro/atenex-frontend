@@ -72,7 +72,7 @@ export default function KnowledgePage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 h-full min-h-0 flex flex-col flex-1">
+    <div className="p-6 lg:p-8 space-y-8 h-full min-h-0 flex flex-col flex-1 overflow-x-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
                  <FileText className="h-7 w-7" />
@@ -121,7 +121,7 @@ export default function KnowledgePage() {
         </details>
         <Separator />
 
-        <div className='space-y-4 flex-1 min-h-0'>
+        <div className='space-y-4 flex-1 min-h-0 w-full max-w-none'>
             <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
                 <List className="h-6 w-6" /> Documentos Gestionados
             </h2>
