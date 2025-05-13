@@ -143,7 +143,30 @@ export default function ChatPage() {
         if (historyError) {
             return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
         }
-        return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="relative w-full min-h-[80px] h-[80px] flex items-center justify-center"><div className="absolute inset-0 flex items-center justify-center pointer-events-none"><div style={{ width: 90, height: 60 }}><SnakeAnimation /></div></div></div> )} </div> );
+        return (
+          <div className="space-y-6">
+            {messages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
+            {isSending && (
+              <div className="flex w-full items-start gap-3 pr-10 sm:pr-16">
+                <div className="skeleton-thinking-avatar skeleton animate-pulse flex items-center justify-center">
+                  <span className="sr-only">Assistant typing</span>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" fill="currentColor" className="text-primary/60" /></svg>
+                </div>
+                <div className="skeleton-thinking-text flex-1 pt-1.5">
+                  <div className="skeleton-thinking-line skeleton animate-pulse w-32 mb-1" />
+                  <div className="skeleton-thinking-line skeleton animate-pulse w-24" />
+                  <div className="flex gap-1 mt-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '120ms' }} />
+                    <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '240ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
     };
 
     return (
