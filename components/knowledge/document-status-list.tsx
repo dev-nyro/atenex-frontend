@@ -207,8 +207,8 @@ export function DocumentStatusList({
         {/* Bulk actions toolbar - Mejorado para no sobreponerse y ser sticky */}
         {selectedIds.length > 0 && (
           <div
-            className="sticky z-[50] top-0 left-0 right-0 bg-white dark:bg-zinc-900 border-b-2 border-primary px-4 py-2 flex flex-wrap items-center gap-3 animate-in fade-in shadow-2xl"
-            style={{ minHeight: 48 }}
+            className="sticky z-[50] top-0 left-0 right-0 bg-white dark:bg-zinc-900 border-b-2 border-primary px-4 py-2 flex items-center gap-3 animate-in fade-in shadow-2xl"
+            style={{ minHeight: 48, maxWidth: '100vw', overflowX: 'auto' }}
           >
             <span className="font-medium text-sm">
               {selectedIds.length} seleccionado{selectedIds.length > 1 ? 's' : ''}
