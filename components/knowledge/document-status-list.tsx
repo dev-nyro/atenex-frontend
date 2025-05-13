@@ -203,7 +203,7 @@ export function DocumentStatusList({
 
   return (
     <TooltipProvider>
-      <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative max-h-[60vh] overflow-y-auto">
+      <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative h-full min-h-0 flex flex-col">
         {/* Bulk actions toolbar - Mejorado para no sobreponerse y ser sticky */}
         {selectedIds.length > 0 && (
           <div
@@ -290,27 +290,28 @@ export function DocumentStatusList({
           </AlertDialogContent>
         </AlertDialog>
 
-        <Table className='w-full text-sm'>
-          <TableHeader>
-            <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
-              <TableHead className="w-8 pl-2 pr-1 py-2">
-                <input
-                  type="checkbox"
-                  aria-label="Seleccionar todos"
-                  checked={isAllSelected}
-                  ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-                  onChange={handleSelectAll}
-                  className="accent-primary h-4 w-4 rounded border-muted-foreground/40"
-                />
-              </TableHead>
-              <TableHead className="w-[40%] pl-1 pr-2 py-2">Nombre Archivo</TableHead>
-              <TableHead className="w-[15%] px-2 py-2">Estado</TableHead>
-              <TableHead className="w-[10%] text-center px-2 py-2 hidden sm:table-cell">Chunks</TableHead>
-              <TableHead className="w-[15%] px-2 py-2 hidden md:table-cell">Actualización</TableHead>
-              <TableHead className="w-[20%] text-right pr-3 pl-2 py-2">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <Table className='w-full text-sm'>
+            <TableHeader className="sticky top-0 z-30 bg-muted/70 backdrop-blur-md">
+              <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
+                <TableHead className="w-8 pl-2 pr-1 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Seleccionar todos"
+                    checked={isAllSelected}
+                    ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                    onChange={handleSelectAll}
+                    className="accent-primary h-4 w-4 rounded border-muted-foreground/40"
+                  />
+                </TableHead>
+                <TableHead className="w-[40%] pl-1 pr-2 py-2">Nombre Archivo</TableHead>
+                <TableHead className="w-[15%] px-2 py-2">Estado</TableHead>
+                <TableHead className="w-[10%] text-center px-2 py-2 hidden sm:table-cell">Chunks</TableHead>
+                <TableHead className="w-[15%] px-2 py-2 hidden md:table-cell">Actualización</TableHead>
+                <TableHead className="w-[20%] text-right pr-3 pl-2 py-2">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
             {documents.map((doc) => {
               if (!doc || !doc.document_id) {
                 if (process.env.NODE_ENV === 'development') {
@@ -413,7 +414,7 @@ export function DocumentStatusList({
             })}
           </TableBody>
         </Table>
-      </div>
+        </div>
       {hasMore && (
         <div className="pt-6 text-center">
           <Button variant="outline" size="sm" onClick={fetchMore} disabled={isLoading || isDeleting}>
@@ -421,6 +422,7 @@ export function DocumentStatusList({
           </Button>
         </div>
       )}
+      </div>
     </TooltipProvider>
   );
 }

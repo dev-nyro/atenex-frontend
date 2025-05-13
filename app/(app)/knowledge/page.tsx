@@ -72,7 +72,7 @@ export default function KnowledgePage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-8"> {/* Padding principal de la página */}
+    <div className="p-6 lg:p-8 space-y-8 h-full min-h-0 flex flex-col flex-1">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
                  <FileText className="h-7 w-7" />
@@ -121,44 +121,49 @@ export default function KnowledgePage() {
         </details>
         <Separator />
 
-        <div className='space-y-4'>
-             <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-                 <List className="h-6 w-6" /> Documentos Gestionados
+        <div className='space-y-4 flex-1 min-h-0'>
+            <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+                <List className="h-6 w-6" /> Documentos Gestionados
             </h2>
-             {documentsError && (
+            {documentsError && (
                 <Alert variant="destructive">
-                     <AlertTriangle className="h-4 w-4" />
+                    <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Error al Cargar Documentos</AlertTitle>
                     <AlertDescription>
                         {documentsError}
                         <Button variant="link" size="sm" onClick={() => fetchDocuments(true)} className="p-0 h-auto ml-2 text-destructive underline">Reintentar</Button>
                     </AlertDescription>
                 </Alert>
-             )}
-             {isLoadingDocuments && documents.length === 0 && !documentsError && (
+            )}
+            {isLoadingDocuments && documents.length === 0 && !documentsError && (
                 <div className="space-y-2 pt-2 border rounded-lg p-4">
                     <Skeleton className="h-12 w-full rounded-md" />
                     <Skeleton className="h-12 w-full rounded-md" />
                     <Skeleton className="h-12 w-full rounded-md" />
                 </div>
-             )}
-             {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
-                <DocumentStatusList
-                    documents={documents}
-                    authHeaders={authHeadersForChildren}
-                    onRetrySuccess={handleRetrySuccess}
-                    fetchMore={fetchMore}
-                    hasMore={hasMore}
-                    refreshDocument={refreshDocument}
-                    onDeleteSuccess={handleDeleteSuccess}
-                    isLoading={isLoadingDocuments}
-                />
-             )}
-             {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
-                <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/30">
-                     <p className="text-muted-foreground text-sm">Inicia sesión para ver tus documentos.</p>
+            )}
+            {/* Scroll para la tabla de documentos, sticky header y bulk bar */}
+            {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
+                <div className="h-full min-h-0 flex-1 flex flex-col">
+                    <div className="flex-1 min-h-0">
+                        <DocumentStatusList
+                            documents={documents}
+                            authHeaders={authHeadersForChildren}
+                            onRetrySuccess={handleRetrySuccess}
+                            fetchMore={fetchMore}
+                            hasMore={hasMore}
+                            refreshDocument={refreshDocument}
+                            onDeleteSuccess={handleDeleteSuccess}
+                            isLoading={isLoadingDocuments}
+                        />
+                    </div>
                 </div>
-             )}
+            )}
+            {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
+                <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/30">
+                    <p className="text-muted-foreground text-sm">Inicia sesión para ver tus documentos.</p>
+                </div>
+            )}
         </div>
     </div>
   );

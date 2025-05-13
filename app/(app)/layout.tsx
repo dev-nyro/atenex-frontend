@@ -110,7 +110,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       {!(pathname.startsWith('/chat')) && <Header />}
                       {/* Main debe tener overflow:hidden y flex-1 */}
                       {/* El padding se aplica en las páginas hijas (chat, knowledge, settings) */}
-                      <main className="flex-1 bg-background overflow-hidden"> {/* CONFIRMADO: overflow-hidden */}
+                      <main className="flex-1 bg-background overflow-hidden min-h-0 flex flex-col"> {/* overflow-hidden y min-h-0 para scroll interno */}
                           {children}
                       </main>
                   </div>
