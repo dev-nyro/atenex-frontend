@@ -203,32 +203,23 @@ export function DocumentStatusList({
 
   return (
     <TooltipProvider>
-      <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative">
+      <div className="border rounded-lg overflow-hidden shadow-sm bg-card relative max-h-[60vh] overflow-y-auto">
         {/* Bulk actions toolbar - Mejorado para no sobreponerse y ser sticky */}
         {selectedIds.length > 0 && (
           <div
-            className="sticky z-[50] top-0 left-0 right-0 bg-white dark:bg-zinc-900 border-b-2 border-primary px-4 py-2 flex items-center gap-3 animate-in fade-in shadow-2xl"
-            style={{ minHeight: 48, maxWidth: '100vw', overflowX: 'auto' }}
+            className="sticky z-[50] top-0 left-0 right-0 bg-white dark:bg-zinc-900 border-b-2 border-primary px-2 md:px-4 py-2 flex flex-row flex-wrap items-center gap-1 md:gap-2 animate-in fade-in shadow-2xl"
+            style={{ minHeight: 44, maxWidth: '100vw', overflowX: 'auto' }}
           >
-            <span className="font-medium text-sm">
+            <span className="font-medium text-xs md:text-sm mr-2">
               {selectedIds.length} seleccionado{selectedIds.length > 1 ? 's' : ''}
             </span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setBulkDeleteOpen(true)}
-              className="min-w-[110px]"
-              style={{ display: canBulkDelete ? 'inline-flex' : 'none' }}
-            >
-              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
-            </Button>
             {canBulkRetry && (
               <Button variant="outline" size="sm" onClick={async () => {
                 for (const doc of selectedDocs.filter(d => d.status === 'error')) {
                   await handleRetry(doc.document_id, doc.file_name);
                 }
                 clearSelection();
-              }} className="min-w-[110px]">
+              }} className="min-w-[80px] md:min-w-[100px]">
                 <RefreshCw className="h-4 w-4 mr-1" /> Reintentar
               </Button>
             )}
@@ -238,11 +229,20 @@ export function DocumentStatusList({
                   await handleRefresh(doc.document_id, doc.file_name);
                 }
                 clearSelection();
-              }} className="min-w-[150px]">
-                <Loader2 className="h-4 w-4 mr-1" /> Actualizar Estado
+              }} className="min-w-[100px] md:min-w-[120px]">
+                <Loader2 className="h-4 w-4 mr-1" /> Actualizar
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={clearSelection} className="min-w-[90px]">Cancelar</Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setBulkDeleteOpen(true)}
+              className="min-w-[80px] md:min-w-[100px]"
+              style={{ display: canBulkDelete ? 'inline-flex' : 'none' }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearSelection} className="min-w-[60px] md:min-w-[80px]">Cancelar</Button>
           </div>
         )}
 
