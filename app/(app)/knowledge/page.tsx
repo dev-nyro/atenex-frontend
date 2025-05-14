@@ -81,23 +81,52 @@ export default function KnowledgePage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6 min-h-[80vh]">
-      {/* Barra de estadísticas */}
-      <div className="flex flex-wrap gap-4 items-center justify-between bg-muted/60 border rounded-lg px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap gap-4 items-center">
-          <span className="font-semibold text-lg">Documentos: <span className="text-primary">{totalDocs}</span></span>
-          <span className="text-sm text-muted-foreground">Chunks: <span className="font-semibold">{totalChunks}</span></span>
-          <span className="text-sm text-muted-foreground">Procesados: <span className="font-semibold text-green-600">{statusCounts['processed'] || 0}</span></span>
-          <span className="text-sm text-muted-foreground">En Cola: <span className="font-semibold text-blue-600">{statusCounts['uploaded'] || 0}</span></span>
-          <span className="text-sm text-muted-foreground">Procesando: <span className="font-semibold text-orange-600">{statusCounts['processing'] || 0}</span></span>
-          <span className="text-sm text-muted-foreground">Error: <span className="font-semibold text-red-600">{statusCounts['error'] || 0}</span></span>
+      {/* Grid principal: estadísticas y subida a la izquierda, resumen y uploader a la derecha */}
+      <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+        {/* Columna izquierda: estadísticas y resumen */}
+        <div className="flex flex-col gap-4 justify-between">
+          {/* Estadísticas visuales */}
+          <div className="flex flex-wrap gap-4 items-center justify-start">
+            {/* Tarjeta de total documentos */}
+            <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
+              <span className="text-2xl font-bold text-primary">{totalDocs}</span>
+              <span className="text-xs text-muted-foreground font-medium">Documentos</span>
+            </div>
+            {/* Tarjeta de chunks */}
+            <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
+              <span className="text-xl font-semibold text-foreground">{totalChunks}</span>
+              <span className="text-xs text-muted-foreground font-medium">Chunks</span>
+            </div>
+            {/* Tarjeta de procesados */}
+            <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
+              <span className="text-xl font-semibold text-green-600">{statusCounts['processed'] || 0}</span>
+              <span className="text-xs text-green-700 font-medium">Procesados</span>
+            </div>
+            {/* Tarjeta de en cola */}
+            <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
+              <span className="text-xl font-semibold text-blue-600">{statusCounts['uploaded'] || 0}</span>
+              <span className="text-xs text-blue-700 font-medium">En Cola</span>
+            </div>
+            {/* Tarjeta de procesando */}
+            <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
+              <span className="text-xl font-semibold text-orange-600">{statusCounts['processing'] || 0}</span>
+              <span className="text-xs text-orange-700 font-medium">Procesando</span>
+            </div>
+            {/* Tarjeta de error */}
+            <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
+              <span className="text-xl font-semibold text-red-600">{statusCounts['error'] || 0}</span>
+              <span className="text-xs text-red-700 font-medium">Error</span>
+            </div>
+          </div>
         </div>
-        <details className="w-full sm:w-auto group" open={false}>
-          <summary className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium px-3 py-2 rounded-md border border-dashed border-primary/40 bg-background hover:bg-muted/40 transition-all">
-            <UploadCloud className="h-5 w-5 text-primary" />
-            <span>Subir Nuevo Documento</span>
-            <span className="ml-2 text-xs text-muted-foreground font-normal hidden sm:inline">(Arrastra, selecciona o pega archivos)</span>
-          </summary>
-          <div className="p-2 pt-0">
+        {/* Columna derecha: uploader en caja flotante */}
+        <div className="flex flex-col items-center justify-center h-full">
+          <div className="w-full max-w-md bg-card border rounded-xl shadow-lg p-6 flex flex-col items-center justify-center">
+            <div className="flex items-center gap-2 mb-2">
+              <UploadCloud className="h-6 w-6 text-primary" />
+              <span className="font-semibold text-lg">Subir Nuevo Documento</span>
+            </div>
+            <span className="text-xs text-muted-foreground mb-2">(Arrastra, selecciona o pega archivos)</span>
             {authHeadersForChildren ? (
               <FileUploader
                 authHeaders={authHeadersForChildren}
@@ -107,7 +136,7 @@ export default function KnowledgePage() {
                 clearUploadStatus={clearUploadStatus}
               />
             ) : (
-              <Alert variant="default" className="bg-muted/50 mt-2">
+              <Alert variant="default" className="bg-muted/50 mt-2 w-full">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                 <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
                 <AlertDescription className="text-xs text-muted-foreground">
@@ -116,7 +145,7 @@ export default function KnowledgePage() {
               </Alert>
             )}
           </div>
-        </details>
+        </div>
       </div>
 
       <Separator />
