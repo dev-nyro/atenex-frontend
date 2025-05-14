@@ -62,42 +62,40 @@ export default function KnowledgePage() {
 
   if (isAuthLoading) {
     return (
-        <div className="p-6 lg:p-8 space-y-8"> {/* Padding aquí */}
-          <Skeleton className="h-10 w-1/3 mb-6" />
-          <Skeleton className="h-64 rounded-xl mb-8" />
-          <Skeleton className="h-10 w-1/4 mb-4" />
-          <Skeleton className="h-80 rounded-xl" />
-        </div>
+      <div className="p-6 lg:p-8 space-y-8">
+        <Skeleton className="h-10 w-1/3 mb-6" />
+        <Skeleton className="h-64 rounded-xl mb-8" />
+        <Skeleton className="h-10 w-1/4 mb-4" />
+        <Skeleton className="h-80 rounded-xl" />
+      </div>
     );
   }
 
+  // --- Estadísticas locales (solo frontend) ---
+  const totalDocs = documents.length;
+  const statusCounts = documents.reduce((acc, doc) => {
+    acc[doc.status] = (acc[doc.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const totalChunks = documents.reduce((acc, doc) => acc + (doc.milvus_chunk_count ?? doc.chunk_count ?? 0), 0);
+
   return (
-    <div className="p-6 lg:p-8 space-y-8 h-full min-h-0 flex flex-col flex-1 overflow-x-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                 <FileText className="h-7 w-7" />
-                 Base de Conocimiento
-            </h1>
-            {authHeadersForChildren && (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fetchDocuments(true)}
-                    disabled={isLoadingDocuments}
-                    className="w-full sm:w-auto"
-                >
-                    <Loader2 className={cn("mr-2 h-4 w-4", isLoadingDocuments ? "animate-spin" : "hidden")} />
-                    Refrescar Documentos
-                </Button>
-            )}
+    <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6 min-h-[80vh]">
+      {/* Barra de estadísticas */}
+      <div className="flex flex-wrap gap-4 items-center justify-between bg-muted/60 border rounded-lg px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap gap-4 items-center">
+          <span className="font-semibold text-lg">Documentos: <span className="text-primary">{totalDocs}</span></span>
+          <span className="text-sm text-muted-foreground">Chunks: <span className="font-semibold">{totalChunks}</span></span>
+          <span className="text-sm text-muted-foreground">Procesados: <span className="font-semibold text-green-600">{statusCounts['processed'] || 0}</span></span>
+          <span className="text-sm text-muted-foreground">En Cola: <span className="font-semibold text-blue-600">{statusCounts['uploaded'] || 0}</span></span>
+          <span className="text-sm text-muted-foreground">Procesando: <span className="font-semibold text-orange-600">{statusCounts['processing'] || 0}</span></span>
+          <span className="text-sm text-muted-foreground">Error: <span className="font-semibold text-red-600">{statusCounts['error'] || 0}</span></span>
         </div>
-
-
-        {/* Uploader: Compact, collapsible */}
-        <details className="mb-2" open>
-          <summary className="cursor-pointer select-none text-base font-semibold flex items-center gap-2 px-2 py-2 rounded hover:bg-accent/30 transition-colors">
-            <UploadCloud className="h-5 w-5 text-primary" /> Subir Nuevo Documento
-            <span className="ml-2 text-xs text-muted-foreground font-normal">(Arrastra, selecciona o pega archivos)</span>
+        <details className="w-full sm:w-auto group" open={false}>
+          <summary className="flex items-center gap-2 cursor-pointer select-none text-sm font-medium px-3 py-2 rounded-md border border-dashed border-primary/40 bg-background hover:bg-muted/40 transition-all">
+            <UploadCloud className="h-5 w-5 text-primary" />
+            <span>Subir Nuevo Documento</span>
+            <span className="ml-2 text-xs text-muted-foreground font-normal hidden sm:inline">(Arrastra, selecciona o pega archivos)</span>
           </summary>
           <div className="p-2 pt-0">
             {authHeadersForChildren ? (
@@ -119,52 +117,59 @@ export default function KnowledgePage() {
             )}
           </div>
         </details>
-        <Separator />
+      </div>
 
-        <div className='space-y-4 flex-1 min-h-0 w-full max-w-none'>
-            <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-                <List className="h-6 w-6" /> Documentos Gestionados
-            </h2>
-            {documentsError && (
-                <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Error al Cargar Documentos</AlertTitle>
-                    <AlertDescription>
-                        {documentsError}
-                        <Button variant="link" size="sm" onClick={() => fetchDocuments(true)} className="p-0 h-auto ml-2 text-destructive underline">Reintentar</Button>
-                    </AlertDescription>
-                </Alert>
-            )}
-            {isLoadingDocuments && documents.length === 0 && !documentsError && (
-                <div className="space-y-2 pt-2 border rounded-lg p-4">
-                    <Skeleton className="h-12 w-full rounded-md" />
-                    <Skeleton className="h-12 w-full rounded-md" />
-                    <Skeleton className="h-12 w-full rounded-md" />
-                </div>
-            )}
-            {/* Scroll para la tabla de documentos, sticky header y bulk bar */}
-            {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
-                <div className="h-full min-h-0 flex-1 flex flex-col">
-                    <div className="flex-1 min-h-0">
-                        <DocumentStatusList
-                            documents={documents}
-                            authHeaders={authHeadersForChildren}
-                            onRetrySuccess={handleRetrySuccess}
-                            fetchMore={fetchMore}
-                            hasMore={hasMore}
-                            refreshDocument={refreshDocument}
-                            onDeleteSuccess={handleDeleteSuccess}
-                            isLoading={isLoadingDocuments}
-                        />
-                    </div>
-                </div>
-            )}
-            {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
-                <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/30">
-                    <p className="text-muted-foreground text-sm">Inicia sesión para ver tus documentos.</p>
-                </div>
-            )}
-        </div>
+      <Separator />
+
+      {/* Documentos gestionados */}
+      <div className="flex-1 min-h-0 w-full max-w-none flex flex-col gap-4">
+        <h2 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+          <List className="h-6 w-6" /> Documentos Gestionados
+        </h2>
+        {documentsError && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error al Cargar Documentos</AlertTitle>
+            <AlertDescription>
+              {documentsError}
+              <Button variant="link" size="sm" onClick={() => fetchDocuments(true)} className="p-0 h-auto ml-2 text-destructive underline">Reintentar</Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        {isLoadingDocuments && documents.length === 0 && !documentsError && (
+          <div className="space-y-2 pt-2 border rounded-lg p-4">
+            <Skeleton className="h-12 w-full rounded-md" />
+            <Skeleton className="h-12 w-full rounded-md" />
+            <Skeleton className="h-12 w-full rounded-md" />
+          </div>
+        )}
+        {/* Scroll para la tabla de documentos, sticky header y bulk bar */}
+        {!isLoadingDocuments && documentsError == null && authHeadersForChildren && (
+          <div className="h-full min-h-0 flex-1 flex flex-col">
+            <div className="flex-1 min-h-0">
+              <DocumentStatusList
+                documents={documents}
+                authHeaders={authHeadersForChildren}
+                onRetrySuccess={handleRetrySuccess}
+                fetchMore={fetchMore}
+                hasMore={hasMore}
+                refreshDocument={refreshDocument}
+                onDeleteSuccess={handleDeleteSuccess}
+                isLoading={isLoadingDocuments}
+              />
+            </div>
+          </div>
+        )}
+        {!isLoadingDocuments && !authHeadersForChildren && !documentsError && (
+          <Alert variant="default" className="bg-muted/50 mt-2">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <AlertTitle className="text-sm font-medium">Autenticación Requerida</AlertTitle>
+            <AlertDescription className="text-xs text-muted-foreground">
+              Inicia sesión para ver y administrar tus documentos.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
     </div>
   );
 }
