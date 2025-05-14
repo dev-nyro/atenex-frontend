@@ -164,7 +164,11 @@ export function ChatHistory() {
             <div className="flex flex-col gap-2">
                 {chats.map((chat) => {
                     const isActive = pathname === `/chat/${chat.id}`;
-                    const displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+                    // Eliminar el prefijo "Chat: " si existe en el título
+                    let displayTitle = chat.title || `Chat ${chat.id.substring(0, 8)}...`;
+                    if (displayTitle.toLowerCase().startsWith('chat:')) {
+                        displayTitle = displayTitle.replace(/^chat:\s*/i, '');
+                    }
                     const displayDate = new Date(chat.updated_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
                     return (
                         <div
@@ -174,7 +178,7 @@ export function ChatHistory() {
                                 isActive ? 'ring-2 ring-primary/40 border-primary/40' : 'border-border',
                             )}
                         >
-                            <div className="flex flex-1 min-w-0 items-center gap-2 text-left">
+                            <div className="flex flex-1 min-w-0 items-center gap-2 text-left relative">
                                 <Link href={`/chat/${chat.id}`} passHref legacyBehavior>
                                     <a
                                         className={cn(
@@ -198,13 +202,13 @@ export function ChatHistory() {
                                 className={cn(
                                     'h-8 w-8 p-0 rounded-full border border-transparent transition',
                                     'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
+                                    'chat-history-delete-btn',
                                     isDeleting && chatToDelete?.id === chat.id ? 'opacity-50 cursor-not-allowed' : ''
                                 )}
                                 onClick={(e) => openDeleteConfirmation(chat, e)}
                                 aria-label={`Eliminar chat: ${displayTitle}`}
                                 disabled={isDeleting && chatToDelete?.id === chat.id}
                                 tabIndex={0}
-                                style={{ marginLeft: 'auto', opacity: 1, pointerEvents: 'auto', visibility: 'visible' }}
                             >
                                 {isDeleting && chatToDelete?.id === chat.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -256,7 +260,7 @@ export function ChatHistory() {
                     <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
                     <AlertDialogDescription>
                         Esta acción no se puede deshacer. Esto eliminará permanentemente el chat
-                        <span className="font-medium"> "{chatToDelete?.title || chatToDelete?.id?.substring(0, 8)}"</span> y todos sus mensajes.
+                        <span className="font-medium"> "{(chatToDelete?.title && chatToDelete?.title.toLowerCase().startsWith('chat:') ? chatToDelete?.title.replace(/^chat:\s*/i, '') : chatToDelete?.title) || chatToDelete?.id?.substring(0, 8)}"</span> y todos sus mensajes.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

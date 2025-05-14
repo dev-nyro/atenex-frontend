@@ -1,3 +1,14 @@
+/* Custom: Asegura que el botón de borrar chat siempre sea visible en historial, incluso en sidebar colapsado */
+.chat-history-delete-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+}
 /* File: atenex-frontend/app/globals.css */
 
 /* 1. Importa Tailwind v4 */
