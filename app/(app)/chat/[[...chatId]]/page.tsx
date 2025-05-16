@@ -88,18 +88,26 @@ export default function ChatPage() {
         }
     }, [chatId, user, isAuthLoading, isSourcesPanelVisible]); 
     
+    // Scroll to bottom on send and receive
     useEffect(() => {
-        if (scrollAreaRef.current && !isLoadingHistory && messages.length > 0) {
-            const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
-            if (viewport) { 
-                const timeoutId = setTimeout(() => { viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' }); }, 100); 
-                return () => clearTimeout(timeoutId); 
-            } else { 
-                const scrollElement = scrollAreaRef.current as HTMLElement; 
-                if (scrollElement?.scrollTo) { 
-                    const timeoutId = setTimeout(() => { scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' }); }, 100); 
-                    return () => clearTimeout(timeoutId); 
+        if (!isLoadingHistory && messages.length > 0) {
+            let scrollTarget = null;
+            // Try to get the Radix ScrollArea viewport
+            if (scrollAreaRef.current) {
+                // Radix exposes the viewport as a child node with data-slot="scroll-area-viewport"
+                if (scrollAreaRef.current.querySelector) {
+                    scrollTarget = scrollAreaRef.current.querySelector('[data-slot="scroll-area-viewport"]');
                 }
+                // fallback: try ref itself
+                if (!scrollTarget && scrollAreaRef.current.scrollTo) {
+                    scrollTarget = scrollAreaRef.current;
+                }
+            }
+            if (scrollTarget && scrollTarget.scrollTo) {
+                const timeoutId = setTimeout(() => {
+                    scrollTarget.scrollTo({ top: scrollTarget.scrollHeight, behavior: 'smooth' });
+                }, 100);
+                return () => clearTimeout(timeoutId);
             }
         }
     }, [messages, isSending, isLoadingHistory]);
