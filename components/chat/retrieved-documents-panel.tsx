@@ -44,40 +44,42 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
         });
     };
 
+    // Las estrellas representan la relevancia del fragmento respecto a la consulta (score de 0 a 1, 5 estrellas máximo)
     const ScoreStars = ({ score }: { score: number | null | undefined }) => {
       if (score == null || score < 0) return null;
       const numStars = Math.max(0, Math.min(5, Math.round(score * 5)));
       return (
-        <div className="flex items-center gap-0.5" title={`Score: ${score.toFixed(3)}`}>
+        <div className="flex items-center gap-0.5 group" title={`Relevancia: ${score.toFixed(3)} / 1.0`}>
           {[...Array(5)].map((_, i) => (
             <Star
               key={i}
               className={cn(
-                "h-3 w-3",
+                "h-4 w-4 transition-colors",
                 i < numStars
-                  ? "text-yellow-400 fill-yellow-400" 
-                  : "text-gray-300 fill-gray-300 dark:text-gray-600 dark:fill-gray-600" 
+                  ? "text-yellow-400 fill-yellow-400 group-hover:text-yellow-500 group-hover:fill-yellow-500" 
+                  : "text-gray-300 fill-gray-200 dark:text-gray-600 dark:fill-gray-700" 
               )}
             />
           ))}
+          <span className="ml-1 text-[10px] text-muted-foreground font-mono">{score.toFixed(2)}</span>
         </div>
       );
     };
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <div className="flex h-full flex-col border-l bg-muted/10 dark:bg-muted/20">
-            <CardHeader className="sticky top-0 z-10 border-b bg-background p-4 shadow-sm">
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" /> Fuentes Relevantes
-                </CardTitle>
-                <CardDescription className="text-xs mt-1">
-                    Documentos utilizados para generar la respuesta.
-                </CardDescription>
-            </CardHeader>
+        <div className="flex h-full flex-col bg-background">
+            {/* Header sticky mejorado, sin overlapping */}
+            <div className="sticky top-0 z-20 border-b bg-background/95 px-6 py-3 flex flex-col gap-0.5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <span className="font-semibold text-base text-foreground">Fuentes Relevantes</span>
+                </div>
+                <span className="text-xs text-muted-foreground">Documentos utilizados para generar la respuesta.</span>
+            </div>
 
-            <ScrollArea className="flex-1">
-                <div className="p-3 space-y-2">
+            <ScrollArea className="flex-1 min-h-0">
+                <div className="p-4 space-y-3">
                     {isLoading && documents.length === 0 && (
                         <div className='space-y-2'>
                             {[...Array(3)].map((_, i) => (
@@ -107,33 +109,28 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
                         <DialogTrigger asChild key={doc.id || `doc-${index}`}>
                             <Card
                                 className={cn(
-                                    "cursor-pointer transition-all duration-150 bg-card",
-                                    "border border-border hover:border-primary/40 hover:shadow-md focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/40"
+                                    "cursor-pointer transition-all duration-150 bg-card/95 hover:bg-accent/10",
+                                    "border border-border/70 hover:border-primary/60 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/40"
                                 )}
                                 onClick={() => handleViewDocument(doc)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleViewDocument(doc)}
                                 tabIndex={0}
                                 title={`Ver detalles de: ${doc.file_name || 'documento'}`}
                             >
-                                <CardContent className="p-3 space-y-1 text-sm">
-                                    <div className="flex justify-between items-start gap-2">
-                                        <p className="font-medium text-foreground/95 truncate flex-1 flex items-center gap-1.5">
-                                            <span className="flex-shrink-0 h-5 w-5 flex items-center justify-center text-xs font-mono bg-muted text-muted-foreground rounded-full border">
-                                                {index + 1}
-                                            </span>
-                                            <span className="truncate" title={doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}>
-                                                {doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}
-                                            </span>
-                                        </p>
+                                <CardContent className="p-0">
+                                    <div className="flex items-center gap-2 px-3 pt-3">
+                                        <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center text-xs font-mono bg-muted text-muted-foreground rounded-full border border-border/60">
+                                            {index + 1}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <span className="block font-medium text-foreground/95 truncate text-sm" title={doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}>{doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}</span>
+                                            <span className="block text-[11px] text-muted-foreground truncate">ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
+                                        </div>
                                         <ScoreStars score={doc.score} />
                                     </div>
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed pl-7">
+                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed px-10 pb-2 pt-1">
                                         {doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}
                                     </p>
-                                     <div className="text-[10px] text-muted-foreground/70 pt-1.5 flex justify-between items-center font-mono pl-7">
-                                        <span>ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
-                                        <Eye className="h-3 w-3" />
-                                    </div>
                                 </CardContent>
                             </Card>
                         </DialogTrigger>
