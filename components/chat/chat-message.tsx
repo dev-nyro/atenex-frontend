@@ -65,57 +65,47 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </Markdown>
          </div>
 
-         {/* Sección de Fuentes (REDISEÑADA) */}
+         {/* Sección de Fuentes (UI Mejorada) */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
-            <div className="mt-3 pt-2.5 border-t border-border/40">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Fuentes:</p>
-                {/* Usar flex-wrap para las fuentes */}
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5"> {/* Ajuste de gap */}
-                 {message.sources.map((doc, index) => (
-                    <TooltipProvider key={doc.id || `source-${index}`} delayDuration={150}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                {/* Botón pequeño con número */}
-                                <Button
-                                    variant="outline"
-                                    size="sm" // Botón más pequeño
-                                    className="h-6 w-6 px-1 py-0 rounded-full border-dashed hover:border-solid hover:bg-accent/50 cursor-default flex items-center justify-center focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-primary/40"
-                                    onClick={(e) => {e.preventDefault();}} // No hacer nada en click, solo tooltip
-                                    tabIndex={0} // Make it focusable
-                                    aria-label={`Fuente ${index + 1}: ${doc.file_name || 'Detalles'}`}
-                                >
-                                    {/* Número de fuente */}
-                                    <span className="text-xs font-mono text-muted-foreground">{index + 1}</span>
-                                </Button>
-                            </TooltipTrigger>
-                            {/* Tooltip mejorado con fondo popover */}
-                            <TooltipContent
-                                side="bottom"
-                                className="max-w-xs text-xs p-2 shadow-lg bg-popover text-popover-foreground" // Asegura fondo popover
-                                sideOffset={4}
-                            >
-                                <p className="font-medium mb-0.5 break-words">
-                                    <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
-                                    {doc.file_name || 'Nombre no disponible'}
-                                </p>
-                                <p className="text-muted-foreground text-[11px] mb-1.5 break-all">
-                                   ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
-                                </p>
-                                {doc.score != null && (
-                                    <p className="font-medium text-muted-foreground text-[11px]">
-                                        Score: <span className="font-normal">{doc.score.toFixed(4)}</span>
-                                    </p>
-                                )}
-                                {doc.content_preview && (
-                                    <p className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
-                                        Vista previa:
-                                        <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview}</span>
-                                    </p>
-                                )}
-                            </TooltipContent>
-                        </Tooltip>
-                   </TooltipProvider>
-                 ))}
+            <div className="mt-3 pt-2.5 border-t border-border/40 animate-fade-in">
+                <p className="text-xs font-semibold text-muted-foreground mb-2 tracking-wide uppercase">Fuentes utilizadas:</p>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  {message.sources.map((doc, index) => (
+                    <TooltipProvider key={doc.id || `source-${index}` } delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
+                            tabIndex={0}
+                            aria-label={`Ver fuente ${index + 1}`}
+                            onClick={e => e.preventDefault()}
+                          >
+                            {index + 1}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="center" className="max-w-xs text-xs">
+                          <div className="font-semibold mb-1 truncate flex items-center gap-1">
+                            <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
+                            {doc.file_name || `Fragmento ${doc.id?.substring(0, 8)}`}
+                          </div>
+                          <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
+                            ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
+                          </div>
+                          {doc.score != null && (
+                            <div className="font-medium text-muted-foreground text-[11px]">
+                              Score: <span className="font-normal">{doc.score.toFixed(4)}</span>
+                            </div>
+                          )}
+                          <div className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
+                            Vista previa:
+                            <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}</span>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
                 </div>
             </div>
          )}

@@ -23,9 +23,10 @@ import { cn } from '@/lib/utils';
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean;
+  showMeta?: boolean; // Permite mostrar metadatos y formato extendido
 }
 
-export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
+export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: RetrievedDocumentsPanelProps) {
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -161,7 +162,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                     {selectedDoc.content || <span className="italic opacity-70">Contenido no disponible.</span>}
                                 </blockquote>
                             </div>
-                            {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
+                            {showMeta && selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                                  <div>
                                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Metadatos:</Label>
                                     <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all pretty-scrollbar">

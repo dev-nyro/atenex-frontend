@@ -204,11 +204,19 @@ export default function ChatPage() {
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
-                        {/* Panel de fuentes relevante con scroll propio */}
-                        <ResizablePanel defaultSize={35} minSize={20} maxSize={45} className="h-full overflow-hidden">
+                        {/* Panel de fuentes relevante con scroll propio y mejor UI/UX */}
+                        <ResizablePanel defaultSize={35} minSize={20} maxSize={45} className="h-full overflow-hidden bg-muted/60 border-l border-border/60 shadow-inner">
                             <div className="flex flex-col h-full">
+                                <div className="px-4 py-3 border-b border-border/40 bg-background/80 sticky top-0 z-10 flex items-center gap-2">
+                                    <span className="font-semibold text-base text-foreground">Fuentes Relevantes</span>
+                                    <span className="ml-auto text-xs text-muted-foreground">Documentos utilizados para generar la respuesta.</span>
+                                </div>
                                 <ScrollArea className="flex-1 h-full w-full">
-                                    <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
+                                    <RetrievedDocumentsPanel 
+                                        documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} 
+                                        isLoading={isSending}
+                                        showMeta // Nueva prop para mostrar metadatos y formato mejorado
+                                    />
                                 </ScrollArea>
                             </div>
                         </ResizablePanel>
