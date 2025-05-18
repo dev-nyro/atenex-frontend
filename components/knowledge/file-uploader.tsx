@@ -166,27 +166,34 @@ export function FileUploader({
       {/* Preview del Archivo Seleccionado (scrollable, sticky button) */}
       {files.length > 0 && !isUploading && (
         <div className="relative">
-          <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+          {/* Contador de archivos y scroll */}
+          <div className="flex items-center justify-between mb-1 px-1">
+            <span className="text-xs text-muted-foreground">Archivos seleccionados: <b>{files.length}</b></span>
+            {files.length > 10 && (
+              <span className="text-[10px] text-muted-foreground">Desplaza para ver todos</span>
+            )}
+          </div>
+          <div className="max-h-80 overflow-y-auto space-y-1 pr-1 pretty-scrollbar border rounded-md bg-background/80">
             {files.map(file => (
-              <div key={file.name} className="p-3 border rounded-lg flex items-center justify-between space-x-3 bg-muted/40 shadow-sm">
-                <div className="flex items-center space-x-3 overflow-hidden flex-1 min-w-0">
-                  <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
+              <div key={file.name} className="py-1.5 px-2 border border-border/60 rounded flex items-center justify-between gap-2 bg-muted/40 shadow-sm min-h-[38px]">
+                <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                  <FileIcon className="h-4 w-4 flex-shrink-0 text-primary" />
                   <div className='flex flex-col min-w-0'>
-                    <span className="text-sm font-medium truncate" title={file.name}>{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs font-medium truncate max-w-[180px]" title={file.name}>{file.name}</span>
+                    <span className="text-[10px] text-muted-foreground">
                       ({(file.size / 1024 / 1024).toFixed(2)} MB) -
-                      <Badge variant="outline" className='ml-1.5 py-0 px-1.5 text-[10px]'>{file.type || 'desconocido'}</Badge>
+                      <Badge variant="outline" className='ml-1 py-0 px-1 text-[9px]'>{file.type || 'desconocido'}</Badge>
                     </span>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={() => setFiles(files.filter(f => f.name !== file.name))} aria-label="Quitar archivo" disabled={isUploading}>
-                  <X className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0" onClick={() => setFiles(files.filter(f => f.name !== file.name))} aria-label="Quitar archivo" disabled={isUploading}>
+                  <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
             ))}
           </div>
           {/* Botón sticky al fondo del uploader */}
-          <div className="sticky bottom-0 left-0 right-0 z-10 bg-background pt-3 pb-1 flex justify-end">
+          <div className="sticky bottom-0 left-0 right-0 z-20 bg-background pt-3 pb-1 flex justify-end border-t mt-2">
             <Button
               onClick={async () => {
                 for (const file of files) {
@@ -202,7 +209,7 @@ export function FileUploader({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Subiendo...
                 </>
-              ) : 'Subir y Procesar Archivos'}
+              ) : `Subir y Procesar Archivos (${files.length})`}
             </Button>
           </div>
         </div>

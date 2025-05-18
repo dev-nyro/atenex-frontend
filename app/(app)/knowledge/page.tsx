@@ -1,6 +1,6 @@
 // File: app/(app)/knowledge/page.tsx (CONFIRMADO CON PADDING)
 'use client';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { useDocumentStatuses } from '@/lib/hooks/useDocumentStatuses';
 import { useUploadDocument } from '@/lib/hooks/useUploadDocument';
 import { DocumentStatusList } from '@/components/knowledge/document-status-list';
 import { FileUploader } from '@/components/knowledge/file-uploader';
-import { AuthHeaders } from '@/lib/api';
+import { AuthHeaders, getDocumentStats, DocumentStatsResponse } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -38,6 +38,30 @@ export default function KnowledgePage() {
     clearUploadStatus
   } = useUploadDocument();
 
+  const [stats, setStats] = useState<DocumentStatsResponse | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
+    'X-User-ID': user.userId,
+    'X-Company-ID': user.companyId,
+  } : null;
+
+  // Fetch stats from backend
+  useEffect(() => {
+    if (!authHeadersForChildren) return;
+    setIsLoadingStats(true);
+    setStatsError(null);
+    getDocumentStats(authHeadersForChildren)
+      .then(setStats)
+      .catch((err) => {
+        setStatsError(err?.message || 'Error al obtener estadísticas');
+        setStats(null);
+      })
+      .finally(() => setIsLoadingStats(false));
+  }, [authHeadersForChildren]);
+
+  // Mantener fetchDocuments para la lista de documentos
   useEffect(() => {
     if (uploadResponse?.document_id) {
        const refreshDelay = 1500;
@@ -55,11 +79,6 @@ export default function KnowledgePage() {
     deleteLocalDocument(documentId);
   }, [deleteLocalDocument]);
 
-  const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
-    'X-User-ID': user.userId,
-    'X-Company-ID': user.companyId,
-  } : null;
-
   if (isAuthLoading) {
     return (
       <div className="p-6 lg:p-8 space-y-8">
@@ -71,13 +90,13 @@ export default function KnowledgePage() {
     );
   }
 
-  // --- Estadísticas locales (solo frontend) ---
-  const totalDocs = documents.length;
-  const statusCounts = documents.reduce((acc, doc) => {
+  // --- Estadísticas del backend o fallback local ---
+  const totalDocs = stats?.total_documents ?? documents.length;
+  const totalChunks = stats?.total_chunks ?? documents.reduce((acc, doc) => acc + (doc.milvus_chunk_count ?? doc.chunk_count ?? 0), 0);
+  const statusCounts = stats?.by_status ?? documents.reduce((acc, doc) => {
     acc[doc.status] = (acc[doc.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  const totalChunks = documents.reduce((acc, doc) => acc + (doc.milvus_chunk_count ?? doc.chunk_count ?? 0), 0);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6 min-h-[80vh]">
@@ -89,36 +108,44 @@ export default function KnowledgePage() {
           <div className="flex flex-wrap gap-4 items-center justify-start">
             {/* Tarjeta de total documentos */}
             <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
-              <span className="text-2xl font-bold text-primary">{totalDocs}</span>
+              {isLoadingStats ? <Skeleton className="h-8 w-16" /> : <span className="text-2xl font-bold text-primary">{totalDocs}</span>}
               <span className="text-xs text-muted-foreground font-medium">Documentos</span>
             </div>
             {/* Tarjeta de chunks */}
             <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
-              <span className="text-xl font-semibold text-foreground">{totalChunks}</span>
+              {isLoadingStats ? <Skeleton className="h-6 w-12" /> : <span className="text-xl font-semibold text-foreground">{totalChunks}</span>}
               <span className="text-xs text-muted-foreground font-medium">Chunks</span>
             </div>
             {/* Tarjeta de procesados */}
             <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
-              <span className="text-xl font-semibold text-green-600">{statusCounts['processed'] || 0}</span>
+              {isLoadingStats ? <Skeleton className="h-6 w-10" /> : <span className="text-xl font-semibold text-green-600">{statusCounts['processed'] || 0}</span>}
               <span className="text-xs text-green-700 font-medium">Procesados</span>
             </div>
             {/* Tarjeta de en cola */}
             <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
-              <span className="text-xl font-semibold text-blue-600">{statusCounts['uploaded'] || 0}</span>
+              {isLoadingStats ? <Skeleton className="h-6 w-10" /> : <span className="text-xl font-semibold text-blue-600">{statusCounts['uploaded'] || 0}</span>}
               <span className="text-xs text-blue-700 font-medium">En Cola</span>
             </div>
             {/* Tarjeta de procesando */}
             <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
-              <span className="text-xl font-semibold text-orange-600">{statusCounts['processing'] || 0}</span>
+              {isLoadingStats ? <Skeleton className="h-6 w-10" /> : <span className="text-xl font-semibold text-orange-600">{statusCounts['processing'] || 0}</span>}
               <span className="text-xs text-orange-700 font-medium">Procesando</span>
             </div>
             {/* Tarjeta de error */}
             <div className="flex flex-col items-center justify-center bg-card border rounded-lg shadow-sm px-4 py-3 min-w-[120px]">
-              <span className="text-xl font-semibold text-red-600">{statusCounts['error'] || 0}</span>
+              {isLoadingStats ? <Skeleton className="h-6 w-10" /> : <span className="text-xl font-semibold text-red-600">{statusCounts['error'] || 0}</span>}
               <span className="text-xs text-red-700 font-medium">Error</span>
             </div>
           </div>
         </div>
+        {/* Mostrar error de stats si ocurre */}
+        {statsError && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error al obtener estadísticas</AlertTitle>
+            <AlertDescription>{statsError}</AlertDescription>
+          </Alert>
+        )}
         {/* Columna derecha: uploader en caja flotante */}
         <div className="flex flex-col items-center justify-center h-full">
           <div className="w-full max-w-md bg-card border rounded-xl shadow-lg p-6 flex flex-col items-center justify-center">

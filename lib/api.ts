@@ -1,3 +1,37 @@
+// --- Document Stats API ---
+export interface DocumentStatsResponse {
+  total_documents: number;
+  total_chunks: number;
+  by_status: Record<string, number>;
+  by_type: Record<string, number>;
+  by_user: Array<{ user_id: string; name: string; count: number }>;
+  recent_activity: Array<{ date: string; uploaded: number; processed: number; error: number }>;
+  oldest_document_date: string | null;
+  newest_document_date: string | null;
+}
+
+/**
+ * Obtiene estadísticas agregadas de documentos desde el backend.
+ * @param authHeaders Cabeceras de autenticación (X-User-ID, X-Company-ID)
+ * @param params Parámetros opcionales: from_date, to_date, status, group_by
+ */
+export async function getDocumentStats(
+  authHeaders: AuthHeaders,
+  params?: { from_date?: string; to_date?: string; status?: string; group_by?: string }
+): Promise<DocumentStatsResponse> {
+  let query = '';
+  if (params) {
+    const q = Object.entries(params)
+      .filter(([_, v]) => v)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
+      .join('&');
+    if (q) query = `?${q}`;
+  }
+  return request<DocumentStatsResponse>(
+    `/api/v1/documents/stats${query}`,
+    { method: 'GET', headers: { ...authHeaders } as Record<string, string> }
+  );
+}
 // Bulk delete documents
 export interface BulkDeleteResponse {
   deleted: string[];

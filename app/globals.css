@@ -203,6 +203,24 @@
 }
 
 /* Estilo para que ScrollArea funcione correctamente en flexbox */
+
+/* Scrollbar bonito para listas de archivos en uploader */
+.pretty-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+}
+.pretty-scrollbar::-webkit-scrollbar {
+  width: 7px;
+  background: hsl(var(--background));
+}
+.pretty-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 6px;
+}
+.pretty-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+  border-radius: 6px;
+}
 [data-radix-scroll-area-viewport] > div {
   min-width: 100%;
   display: block; /* MODIFICADO: de table a block */
