@@ -1,6 +1,6 @@
 // File: app/(app)/knowledge/page.tsx (CONFIRMADO CON PADDING)
 'use client';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,10 +42,15 @@ export default function KnowledgePage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
 
-  const authHeadersForChildren: AuthHeaders | null = user?.userId && user?.companyId ? {
-    'X-User-ID': user.userId,
-    'X-Company-ID': user.companyId,
-  } : null;
+  const authHeadersForChildren: AuthHeaders | null = useMemo(() => {
+    if (user?.userId && user?.companyId) {
+      return {
+        'X-User-ID': user.userId,
+        'X-Company-ID': user.companyId,
+      };
+    }
+    return null;
+  }, [user?.userId, user?.companyId]);
 
   // Fetch stats from backend
   useEffect(() => {
