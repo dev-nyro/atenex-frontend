@@ -75,18 +75,18 @@ export function ChatMessage({ message }: ChatMessageProps) {
                             className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
                             tabIndex={0}
                             aria-label={`Ver fuente ${index + 1}: ${doc.cita_tag || doc.file_name || 'Detalles'}`}
-                            onClick={e => e.preventDefault()} // Prevenir cualquier acción de navegación por defecto
+                            onClick={e => e.preventDefault()}
                           >
                             {index + 1}
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="top" align="center" className="max-w-xs text-xs">
+                        <TooltipContent side="top" align="center" className="max-w-xs text-xs bg-popover text-popover-foreground">
                           <div className="font-semibold mb-1 truncate flex items-center gap-1">
                             <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
                             {doc.file_name || doc.cita_tag || `Fragmento ${doc.id?.substring(0, 8)}`}
                           </div>
                           <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
-                            ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
+                             ID Doc: {doc.document_id && doc.document_id !== doc.id ? `${doc.document_id.substring(0,8)}... / `:""}Frag: {doc.id.substring(0, 8)}...
                           </div>
                           {doc.score != null && (
                             <div className="font-medium text-muted-foreground text-[11px]">
