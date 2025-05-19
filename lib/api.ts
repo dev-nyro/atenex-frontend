@@ -1,65 +1,9 @@
-// --- Document Stats API ---
-export interface DocumentStatsResponse {
-  total_documents: number;
-  total_chunks: number;
-  by_status: Record<string, number>;
-  by_type: Record<string, number>;
-  by_user: Array<{ user_id: string; name: string; count: number }>;
-  recent_activity: Array<{ date: string; uploaded: number; processed: number; error: number }>;
-  oldest_document_date: string | null;
-  newest_document_date: string | null;
-}
-
-/**
- * Obtiene estadísticas agregadas de documentos desde el backend.
- * @param authHeaders Cabeceras de autenticación (X-User-ID, X-Company-ID)
- * @param params Parámetros opcionales: from_date, to_date, status, group_by
- */
-export async function getDocumentStats(
-  authHeaders: AuthHeaders,
-  params?: { from_date?: string; to_date?: string; status?: string; group_by?: string }
-): Promise<DocumentStatsResponse> {
-  let query = '';
-  if (params) {
-    const q = Object.entries(params)
-      .filter(([_, v]) => v)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
-      .join('&');
-    if (q) query = `?${q}`;
-  }
-  return request<DocumentStatsResponse>(
-    `/api/v1/documents/stats${query}`,
-    { method: 'GET', headers: { ...authHeaders } as Record<string, string> }
-  );
-}
-// Bulk delete documents
-export interface BulkDeleteResponse {
-  deleted: string[];
-  failed: { id: string; error: string }[];
-}
-
-/**
- * Borra múltiples documentos en una sola petición.
- * @param documentIds IDs de los documentos a borrar
- * @param auth Cabeceras de autenticación
- */
-export async function deleteIngestDocumentsBulk(documentIds: string[], auth: AuthHeaders): Promise<BulkDeleteResponse> {
-  if (!Array.isArray(documentIds) || documentIds.length === 0) throw new ApiError("Se requiere al menos un ID de documento para borrado masivo.", 400);
-  return request<BulkDeleteResponse>(
-    '/api/v1/ingest/bulk',
-    {
-      method: 'DELETE',
-      headers: { ...auth } as Record<string, string>,
-      body: JSON.stringify({ document_ids: documentIds })
-    }
-  );
-}
-// File: lib/api.ts (CORREGIDO - Implementada la llamada API real para createUser)
+// File: lib/api.ts
 import { getApiGatewayUrl } from './utils';
 import type { Message } from '@/components/chat/chat-message';
 import { AUTH_TOKEN_KEY } from './constants';
 
-// --- Tipos de Error (sin cambios) ---
+// --- Tipos de Error ---
 interface ApiErrorDataDetail { msg: string; type: string; loc?: (string | number)[]; }
 interface ApiErrorData { detail?: string | ApiErrorDataDetail[] | any; message?: string; }
 export class ApiError extends Error {
@@ -70,10 +14,9 @@ export class ApiError extends Error {
     }
 }
 
-// --- Función Genérica de Request (sin cambios estructurales) ---
+// --- Función Genérica de Request ---
 export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    // Permitir endpoints /admin y /docs, /openapi.json
      if (!cleanEndpoint.startsWith('/api/v1/') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
         console.error(`Invalid API endpoint format: ${cleanEndpoint}. Must start with /api/v1/`);
         throw new ApiError(`Invalid API endpoint format: ${cleanEndpoint}.`, 400);
@@ -89,7 +32,6 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     if (!(options.body instanceof FormData)) { if (!headers.has('Content-Type')) { headers.set('Content-Type', 'application/json'); } } else { headers.delete('Content-Type'); }
     if (token) { headers.set('Authorization', `Bearer ${token}`); }
     else if (!cleanEndpoint.includes('/api/v1/users/login') && cleanEndpoint !== '/api/v1/docs' && cleanEndpoint !== '/openapi.json') {
-         // No advertir para endpoints admin si el token no está (la API lo rechazará si es necesario)
          if (!cleanEndpoint.startsWith('/api/v1/admin')) {
              console.warn(`API Request: Making request to protected endpoint ${cleanEndpoint} without Authorization header.`);
          }
@@ -134,58 +76,70 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
     }
 }
 
-// --- Tipos Específicos de Servicio (Existentes) ---
+// --- Tipos Específicos de Servicio ---
 export interface IngestResponse { document_id: string; task_id: string; status: string; message: string; }
 export interface AuthHeaders { 'X-Company-ID': string; 'X-User-ID': string; }
 export interface DocumentStatusApiResponse { id: string; status: string; file_name?: string | null; file_type?: string | null; file_path?: string | null; company_id?: string; chunk_count?: number | null; error_message?: string | null; created_at?: string; uploaded_at?: string; last_updated?: string; minio_exists?: boolean; milvus_chunk_count?: number; message?: string; }
 export interface DocumentStatusResponse { document_id: string; status: string; file_name?: string | null; file_type?: string | null; chunk_count?: number | null; error_message?: string | null; created_at?: string; last_updated?: string | null; minio_exists?: boolean; milvus_chunk_count?: number; }
 export interface DetailedDocumentStatusResponse extends DocumentStatusResponse { minio_exists: boolean; milvus_chunk_count: number; message?: string; }
-export interface RetrievedDocApi { id: string; document_id: string; file_name: string | null; content: string; content_preview: string; metadata: Record<string, any> | null; score: number; }
-export type RetrievedDoc = RetrievedDocApi;
+
+// Estructura de un documento/fragmento recuperado por la API de /ask
+export interface RetrievedDocApi {
+  id: string; // ID del chunk/fragmento
+  document_id: string; // ID del documento padre
+  file_name: string | null;
+  content: string; // Contenido completo del chunk
+  content_preview: string; // Vista previa del chunk
+  metadata: Record<string, any> | null;
+  score: number;
+  cita_tag?: string; // Opcional, si el backend lo empieza a enviar para /ask
+}
+
+// Estructura de una fuente tal como viene en el historial de mensajes del backend
+interface ChatMessageSourceFromHistory {
+    score: number;
+    pagina?: string;
+    cita_tag: string;
+    id_documento: string; // Generalmente es el ID del chunk, a veces compuesto (docId_chunkId)
+    nombre_archivo: string; // A menudo "None"
+    // Campos que faltan en el historial y están en RetrievedDocApi: preview (content/content_preview), metadata, document_id (padre explícito si id_documento es solo chunk)
+}
+
+// Estructura de un mensaje de chat de la API (para historial)
+export interface ChatMessageApi {
+    id: string;
+    chat_id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    sources: ChatMessageSourceFromHistory[] | null; // Usa la nueva interfaz
+    created_at: string;
+}
+
+// Interfaz unificada para el frontend (usada en panel de fuentes, etc.)
+export type RetrievedDoc = {
+  id: string; // ID del chunk/fragmento
+  document_id: string; // ID del documento padre
+  file_name: string | null;
+  content?: string; // Contenido completo (puede no estar disponible para historial)
+  content_preview?: string; // Vista previa (puede no estar disponible para historial)
+  metadata: Record<string, any> | null;
+  score: number;
+  cita_tag?: string; // Para mostrar "Doc 1", etc.
+};
+
 export interface ChatSummary { id: string; title: string | null; created_at: string; updated_at: string; message_count: number; }
-export interface ChatMessageApi { id: string; chat_id: string; role: 'user' | 'assistant'; content: string; sources: Array<{ chunk_id: string; document_id: string; file_name: string | null; score: number; preview: string; }> | null; created_at: string; }
 export interface QueryPayload { query: string; retriever_top_k?: number; chat_id?: string | null; }
 export interface QueryApiResponse { answer: string; retrieved_documents: RetrievedDocApi[]; query_log_id: string | null; chat_id: string; }
 export interface LoginResponse { access_token: string; token_type: string; user_id: string; email: string; full_name: string | null; role: string; company_id: string | null; }
+export interface AdminStatsResponse { company_count: number; users_per_company: Array<{ company_id: string; name: string | null; user_count: number; }>; }
+export interface CompanySelectItem { id: string; name: string; }
+export interface CreateCompanyPayload { name: string; }
+export interface CompanyResponse { id: string; name: string; created_at?: string; }
+export interface CreateUserPayload { email: string; password: string; name: string; company_id: string; roles?: string[]; }
+export interface UserResponse { id: string; email: string; name: string | null; company_id: string | null; is_active?: boolean; created_at?: string; }
+export interface BulkDeleteResponse { deleted: string[]; failed: { id: string; error: string }[]; }
+export interface DocumentStatsResponse { total_documents: number; total_chunks: number; by_status: Record<string, number>; by_type: Record<string, number>; by_user: Array<{ user_id: string; name: string; count: number }>; recent_activity: Array<{ date: string; uploaded: number; processed: number; error: number }>; oldest_document_date: string | null; newest_document_date: string | null; }
 
-// --- NUEVO: Tipos para Admin API ---
-export interface AdminStatsResponse {
-    company_count: number;
-    users_per_company: Array<{
-        company_id: string;
-        name: string | null; // Nombre de la compañía
-        user_count: number;
-    }>;
-}
-export interface CompanySelectItem {
-    id: string;
-    name: string;
-}
-export interface CreateCompanyPayload {
-    name: string;
-}
-export interface CompanyResponse {
-    id: string;
-    name: string;
-    created_at?: string;
-}
-export interface CreateUserPayload {
-    email: string;
-    password: string;
-    name: string;
-    company_id: string;
-    roles?: string[];
-}
-export interface UserResponse {
-    id: string;
-    email: string;
-    name: string | null;
-    company_id: string | null;
-    is_active?: boolean;
-    created_at?: string;
-}
-
-// --- Funciones API Específicas (Existentes - Cuerpo Restaurado) ---
 
 // ** INGEST SERVICE **
 export async function uploadDocument(file: File, auth: AuthHeaders): Promise<IngestResponse> {
@@ -230,6 +184,11 @@ export async function deleteIngestDocument(documentId: string, auth: AuthHeaders
   await request<null>(`/api/v1/ingest/${documentId}`, { method: 'DELETE', headers: { ...auth } as Record<string, string> });
 }
 
+export async function deleteIngestDocumentsBulk(documentIds: string[], auth: AuthHeaders): Promise<BulkDeleteResponse> {
+  if (!Array.isArray(documentIds) || documentIds.length === 0) throw new ApiError("Se requiere al menos un ID de documento para borrado masivo.", 400);
+  return request<BulkDeleteResponse>( '/api/v1/ingest/bulk', { method: 'DELETE', headers: { ...auth } as Record<string, string>, body: JSON.stringify({ document_ids: documentIds }) } );
+}
+
 // ** QUERY SERVICE **
 export const getChats = async (limit: number = 100, offset: number = 0): Promise<ChatSummary[]> => {
      const endpoint = `/api/v1/query/chats?limit=${limit}&offset=${offset}`;
@@ -252,18 +211,43 @@ export const deleteChat = async (chatId: string): Promise<void> => {
     await request<null>(`/api/v1/query/chats/${chatId}`, { method: 'DELETE' });
 };
 
+
 // ** HELPERS **
-export const mapApiSourcesToFrontend = (apiSources: ChatMessageApi['sources']): RetrievedDoc[] | undefined => {
+export const mapApiSourcesToFrontend = (
+    apiSources: Array<RetrievedDocApi | ChatMessageSourceFromHistory> | null | undefined
+): RetrievedDoc[] | undefined => {
     if (!apiSources || apiSources.length === 0) return undefined;
-    return apiSources.map(source => ({
-        id: typeof source.chunk_id === 'string' ? source.chunk_id : '',
-        document_id: typeof source.document_id === 'string' ? source.document_id : '',
-        file_name: typeof source.file_name === 'string' ? source.file_name : '',
-        content: typeof source.preview === 'string' ? source.preview : '',
-        content_preview: typeof source.preview === 'string' ? source.preview : '',
-        metadata: null,
-        score: typeof source.score === 'number' ? source.score : 0,
-    }));
+
+    return apiSources.map((source: any) => {
+        if ('id_documento' in source && !('document_id' in source)) { // Es ChatMessageSourceFromHistory (del historial)
+            const historySource = source as ChatMessageSourceFromHistory;
+            const parts = historySource.id_documento.split('_');
+            const docId = parts.length > 1 ? parts.slice(0, -1).join('_') : historySource.id_documento;
+            
+            return {
+                id: historySource.id_documento, // ID completo del chunk/fragmento (e.g., "docABC_1")
+                document_id: docId, // ID del documento padre (e.g., "docABC")
+                file_name: historySource.nombre_archivo === "None" ? null : historySource.nombre_archivo,
+                content: undefined, // No disponible en historial
+                content_preview: undefined, // No disponible en historial
+                metadata: null,
+                score: historySource.score,
+                cita_tag: historySource.cita_tag
+            };
+        } else { // Es RetrievedDocApi (de /ask o un tipo ya compatible)
+            const askSource = source as RetrievedDocApi;
+            return {
+                id: askSource.id,
+                document_id: askSource.document_id,
+                file_name: askSource.file_name,
+                content: askSource.content,
+                content_preview: askSource.content_preview,
+                metadata: askSource.metadata,
+                score: askSource.score,
+                cita_tag: askSource.cita_tag // Propagar si existe
+            };
+        }
+    });
 };
 
 export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => {
@@ -271,7 +255,8 @@ export const mapApiMessageToFrontend = (apiMessage: ChatMessageApi): Message => 
     return { id: apiMessage.id, role: apiMessage.role, content: apiMessage.content, sources: mappedSources, isError: false, created_at: apiMessage.created_at, };
 };
 
-// --- Admin API Functions (Existentes) ---
+
+// --- Admin API Functions ---
 export async function getAdminStats(): Promise<AdminStatsResponse> {
     return request<AdminStatsResponse>('/api/v1/admin/stats', { method: 'GET' });
 }
@@ -281,15 +266,29 @@ export async function listCompaniesForSelect(): Promise<CompanySelectItem[]> {
 export async function createCompany(payload: CreateCompanyPayload): Promise<CompanyResponse> {
     return request<CompanyResponse>('/api/v1/admin/companies', { method: 'POST', body: JSON.stringify(payload) });
 }
-
-// --- createUser CORREGIDO ---
 export async function createUser(payload: CreateUserPayload): Promise<UserResponse> {
-     console.log("API Call: Attempting createUser with payload:", payload); // Log antes de la llamada real
-     // Llamada API real usando la función request genérica
+     console.log("API Call: Attempting createUser with payload:", payload);
      return request<UserResponse>('/api/v1/admin/users', {
          method: 'POST',
          body: JSON.stringify(payload),
-         // Los headers (Content-Type, Authorization) son gestionados por la función `request`
      });
 }
-// --- FIN CORRECCIÓN ---
+
+// --- Document Stats API ---
+export async function getDocumentStats(
+  authHeaders: AuthHeaders,
+  params?: { from_date?: string; to_date?: string; status?: string; group_by?: string }
+): Promise<DocumentStatsResponse> {
+  let query = '';
+  if (params) {
+    const q = Object.entries(params)
+      .filter(([_, v]) => v)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
+      .join('&');
+    if (q) query = `?${q}`;
+  }
+  return request<DocumentStatsResponse>(
+    `/api/v1/documents/stats${query}`,
+    { method: 'GET', headers: { ...authHeaders } as Record<string, string> }
+  );
+}

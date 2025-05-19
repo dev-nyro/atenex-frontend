@@ -1,9 +1,9 @@
-// File: components/chat/chat-message.tsx (REFACTORIZADO - Fuentes mejoradas)
+// File: components/chat/chat-message.tsx
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { User, AlertTriangle, FileText, CircleDot } from 'lucide-react';
+import { User, AlertTriangle, FileText } from 'lucide-react';
 import AtenexLogo from '@/components/icons/atenex-logo';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -14,7 +14,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
-// import { Badge } from '@/components/ui/badge'; // Badge ya no se usa para fuentes
 
 export interface Message {
   id: string;
@@ -56,16 +55,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
               : 'bg-muted text-foreground rounded-bl-lg'
         )}
       >
-         {/* Contenido Markdown */}
-         {/* Asegurar que prose tenga los estilos correctos definidos en tailwind.config y globals.css */}
-         {/* FLAG_LLM: Aplicar prose al div exterior, no al componente Markdown */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
             </Markdown>
          </div>
 
-         {/* Sección de Fuentes (UI Mejorada) */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
             <div className="mt-3 pt-2.5 border-t border-border/40 animate-fade-in">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 tracking-wide uppercase">Fuentes utilizadas:</p>
@@ -79,8 +74,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
                             size="icon"
                             className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
                             tabIndex={0}
-                            aria-label={`Ver fuente ${index + 1}`}
-                            onClick={e => e.preventDefault()}
+                            aria-label={`Ver fuente ${index + 1}: ${doc.cita_tag || doc.file_name || 'Detalles'}`}
+                            onClick={e => e.preventDefault()} // Prevenir cualquier acción de navegación por defecto
                           >
                             {index + 1}
                           </Button>
@@ -88,7 +83,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                         <TooltipContent side="top" align="center" className="max-w-xs text-xs">
                           <div className="font-semibold mb-1 truncate flex items-center gap-1">
                             <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
-                            {doc.file_name || `Fragmento ${doc.id?.substring(0, 8)}`}
+                            {doc.file_name || doc.cita_tag || `Fragmento ${doc.id?.substring(0, 8)}`}
                           </div>
                           <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
                             ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...

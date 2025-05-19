@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean;
-  showMeta?: boolean; // Permite mostrar metadatos y formato extendido
+  showMeta?: boolean; 
 }
 
 export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: RetrievedDocumentsPanelProps) {
@@ -44,7 +44,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
         });
     };
 
-    // Las estrellas representan la relevancia del fragmento respecto a la consulta (score de 0 a 1, 5 estrellas máximo)
     const ScoreStars = ({ score }: { score: number | null | undefined }) => {
       if (score == null || score < 0) return null;
       const numStars = Math.max(0, Math.min(5, Math.round(score * 5)));
@@ -69,7 +68,6 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <div className="flex h-full flex-col bg-background">
-            {/* Header sticky mejorado, sin overlapping */}
             <div className="sticky top-0 z-20 border-b bg-background/95 px-6 py-3 flex flex-col gap-0.5 shadow-sm">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
@@ -115,7 +113,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
                                 onClick={() => handleViewDocument(doc)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleViewDocument(doc)}
                                 tabIndex={0}
-                                title={`Ver detalles de: ${doc.file_name || 'documento'}`}
+                                title={`Ver detalles de: ${doc.file_name || doc.cita_tag || 'documento'}`}
                             >
                                 <CardContent className="p-0">
                                     <div className="flex items-center gap-2 px-3 pt-3">
@@ -123,8 +121,12 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
                                             {index + 1}
                                         </span>
                                         <div className="flex-1 min-w-0">
-                                            <span className="block font-medium text-foreground/95 truncate text-sm" title={doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}>{doc.file_name || `Fragmento ${doc.id.substring(0, 8)}`}</span>
-                                            <span className="block text-[11px] text-muted-foreground truncate">ID: {doc.document_id?.substring(0, 8) ?? doc.id.substring(0, 8)}...</span>
+                                            <span className="block font-medium text-foreground/95 truncate text-sm" title={doc.file_name || doc.cita_tag || `Fragmento ${doc.id.substring(0, 8)}`}>
+                                                {doc.file_name || doc.cita_tag || `Fragmento ${doc.id.substring(0, 8)}`}
+                                            </span>
+                                            <span className="block text-[11px] text-muted-foreground truncate">
+                                                ID Doc: {doc.document_id?.substring(0, 8) ?? 'N/A'} / Frag: {doc.id.substring(0, 8)}
+                                            </span>
                                         </div>
                                         <ScoreStars score={doc.score} />
                                     </div>
@@ -141,12 +143,12 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
             {selectedDoc && (
                  <DialogContent className="sm:max-w-2xl lg:max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] p-0">
                     <DialogHeader className="px-6 pt-6 pb-4 border-b">
-                        <DialogTitle className="truncate text-lg flex items-center gap-2" title={selectedDoc.file_name || selectedDoc.document_id || 'Detalles del Documento'}>
+                        <DialogTitle className="truncate text-lg flex items-center gap-2" title={selectedDoc.file_name || selectedDoc.cita_tag || selectedDoc.document_id || 'Detalles del Documento'}>
                             <FileText className="inline-block h-5 w-5 align-text-bottom text-primary" />
-                            {selectedDoc.file_name || 'Detalles del Documento'}
+                            {selectedDoc.file_name || selectedDoc.cita_tag || selectedDoc.document_id || 'Detalles del Documento'}
                         </DialogTitle>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
-                            <span>ID Doc: <span className="font-mono text-[11px]">{selectedDoc.document_id?.substring(0,12) || 'N/D'}...</span></span>
+                            <span>ID Doc: <span className="font-mono text-[11px]">{selectedDoc.document_id ? `${selectedDoc.document_id.substring(0,12)}...` : 'N/D'}</span></span>
                             <span>ID Frag: <span className="font-mono text-[11px]">{selectedDoc.id}</span></span>
                             <span>Score: <span className="font-medium">{selectedDoc.score?.toFixed(4) ?? 'N/D'}</span></span>
                         </div>
@@ -170,8 +172,8 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
                          </div>
                      </ScrollArea>
                     <DialogFooter className="sm:justify-between px-6 py-4 border-t bg-muted/30">
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={!selectedDoc.file_name}>
-                            <Download className="mr-2 h-4 w-4" />Descargar Original {selectedDoc.file_name ? '' : '(N/D)'}
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(selectedDoc)} disabled={!selectedDoc.file_name || selectedDoc.file_name === "None"}>
+                            <Download className="mr-2 h-4 w-4" />Descargar Original {(selectedDoc.file_name && selectedDoc.file_name !== "None") ? '' : '(N/D)'}
                         </Button>
                         <DialogClose asChild><Button variant="secondary" size="sm">Cerrar</Button></DialogClose>
                     </DialogFooter>
