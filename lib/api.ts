@@ -86,13 +86,13 @@ export interface DetailedDocumentStatusResponse extends DocumentStatusResponse {
 // Estructura de un documento/fragmento recuperado por la API de /ask
 export interface RetrievedDocApi {
   id: string; // ID del chunk/fragmento
-  document_id: string | null; // ID del documento padre (puede ser null desde el backend)
+  document_id: string | null; // ID del documento padre, PUEDE SER NULL
   file_name: string | null;
   content: string; // Contenido completo del chunk
   content_preview: string; // Vista previa del chunk
   metadata: Record<string, any> | null;
   score: number;
-  cita_tag?: string; 
+  cita_tag?: string; // Opcional, si el backend lo empieza a enviar para /ask
 }
 
 // Estructura de una fuente tal como viene en el historial de mensajes del backend
@@ -101,8 +101,7 @@ interface ChatMessageSourceFromHistory {
     pagina?: string;
     cita_tag: string;
     id_documento: string; 
-    nombre_archivo: string;
-    preview?: string;
+    nombre_archivo: string; 
 }
 
 // Estructura de un mensaje de chat de la API (para historial)
@@ -111,17 +110,17 @@ export interface ChatMessageApi {
     chat_id: string;
     role: 'user' | 'assistant';
     content: string;
-    sources: ChatMessageSourceFromHistory[] | null; 
+    sources: ChatMessageSourceFromHistory[] | null;
     created_at: string;
 }
 
 // Interfaz unificada para el frontend (usada en panel de fuentes, etc.)
 export type RetrievedDoc = {
-  id: string; // ID del chunk/fragmento
-  document_id: string; // ID del documento padre (asegurado, incluso si se infiere)
+  id: string; 
+  document_id: string | null; // Puede ser null
   file_name: string | null;
-  content?: string; 
-  content_preview?: string; 
+  content?: string; // Contenido completo (puede no estar disponible para historial)
+  content_preview?: string; // Vista previa (puede no estar disponible para historial)
   metadata: Record<string, any> | null;
   score: number;
   cita_tag?: string; 
@@ -219,79 +218,34 @@ export const mapApiSourcesToFrontend = (
     if (!apiSources || apiSources.length === 0) return undefined;
 
     return apiSources.map((source: any) => {
-        let chunkId: string;
-        let docId: string | null;
-        let fileName: string | null;
-        let content: string | undefined;
-        let contentPreview: string | undefined;
-        let metadata: Record<string, any> | null;
-        let score: number;
-        let citaTag: string | undefined;
-
-        if ('id' in source && ('document_id' in source || source.document_id === null)) { // Es RetrievedDocApi de /ask
-            const askSource = source as RetrievedDocApi;
-            chunkId = askSource.id;
-            docId = askSource.document_id;
-            fileName = askSource.file_name;
-            content = askSource.content;
-            contentPreview = askSource.content_preview;
-            metadata = askSource.metadata;
-            score = askSource.score;
-            citaTag = askSource.cita_tag;
-
-            // Workaround si document_id es null pero el chunkId tiene formato "docId_chunkNum"
-            if ((docId === null || docId === undefined) && chunkId.includes('_')) {
-                docId = chunkId.substring(0, chunkId.lastIndexOf('_'));
-            }
-            // Si document_id sigue siendo null, usar el chunkId como fallback para document_id
-            if (docId === null || docId === undefined) {
-                docId = chunkId;
-            }
-
-
-        } else if ('id_documento' in source) { // Es ChatMessageSourceFromHistory (del historial)
+        if ('id_documento' in source && !('document_id' in source)) { 
             const historySource = source as ChatMessageSourceFromHistory;
-            chunkId = historySource.id_documento; // Este es el ID del chunk
-            fileName = historySource.nombre_archivo === "None" ? null : historySource.nombre_archivo;
-            score = historySource.score;
-            citaTag = historySource.cita_tag;
+            const parts = historySource.id_documento.split('_');
+            const docId = parts.length > 1 ? parts.slice(0, -1).join('_') : historySource.id_documento;
             
-            // Inferir document_id del chunkId si es posible
-            if (chunkId.includes('_')) {
-                docId = chunkId.substring(0, chunkId.lastIndexOf('_'));
-            } else {
-                docId = chunkId; // Si no hay '_', asumir que el id_documento es el id del documento
-            }
-            
-            content = undefined; // No disponible en historial directo
-            contentPreview = historySource.preview || undefined; // Usar preview si está
-            metadata = null;
-
-        } else {
-            // Tipo de fuente desconocido, intentar un mapeo genérico o devolver error/valor por defecto
-            console.warn("mapApiSourcesToFrontend: Tipo de fuente desconocido", source);
-            return { // Devuelve un objeto RetrievedDoc con valores por defecto o mínimos
-                id: source.id || `unknown-${Date.now()}`,
-                document_id: `unknown-doc-${Date.now()}`,
-                file_name: 'Nombre Desconocido',
-                content: 'Contenido no disponible',
-                content_preview: 'Vista previa no disponible',
+            return {
+                id: historySource.id_documento,
+                document_id: docId, 
+                file_name: historySource.nombre_archivo === "None" ? null : historySource.nombre_archivo,
+                content: undefined, 
+                content_preview: undefined, 
                 metadata: null,
-                score: 0,
-                cita_tag: 'Error'
-            } as RetrievedDoc;
+                score: historySource.score,
+                cita_tag: historySource.cita_tag
+            };
+        } else { 
+            const askSource = source as RetrievedDocApi;
+            return {
+                id: askSource.id,
+                document_id: askSource.document_id, 
+                file_name: askSource.file_name,
+                content: askSource.content, 
+                content_preview: askSource.content_preview, 
+                metadata: askSource.metadata,
+                score: askSource.score,
+                cita_tag: askSource.cita_tag
+            };
         }
-        
-        return {
-            id: chunkId,
-            document_id: docId!, // Aseguramos que docId no sea null aquí
-            file_name: fileName,
-            content: content,
-            content_preview: contentPreview,
-            metadata: metadata,
-            score: score,
-            cita_tag: citaTag
-        };
     });
 };
 

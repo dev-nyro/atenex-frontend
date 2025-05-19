@@ -55,6 +55,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               : 'bg-muted text-foreground rounded-bl-lg'
         )}
       >
+         {/* FLAG_LLM: Aplicar clases prose al div contenedor del Markdown */}
          <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
             <Markdown remarkPlugins={[remarkGfm]}>
                 {message.content}
@@ -75,18 +76,21 @@ export function ChatMessage({ message }: ChatMessageProps) {
                             className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
                             tabIndex={0}
                             aria-label={`Ver fuente ${index + 1}: ${doc.cita_tag || doc.file_name || 'Detalles'}`}
-                            onClick={e => e.preventDefault()}
+                            // El panel de fuentes principal se encarga de abrir el modal, este solo muestra tooltip.
+                            // Si se quisiera que estos botones también abran el modal, se necesitaría pasar
+                            // la función para abrir el modal y el documento seleccionado a este componente.
+                            onClick={e => e.preventDefault()} 
                           >
                             {index + 1}
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="top" align="center" className="max-w-xs text-xs bg-popover text-popover-foreground">
+                        <TooltipContent side="top" align="center" className="max-w-xs text-xs">
                           <div className="font-semibold mb-1 truncate flex items-center gap-1">
                             <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
                             {doc.file_name || doc.cita_tag || `Fragmento ${doc.id?.substring(0, 8)}`}
                           </div>
                           <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
-                             ID Doc: {doc.document_id && doc.document_id !== doc.id ? `${doc.document_id.substring(0,8)}... / `:""}Frag: {doc.id.substring(0, 8)}...
+                            ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
                           </div>
                           {doc.score != null && (
                             <div className="font-medium text-muted-foreground text-[11px]">
