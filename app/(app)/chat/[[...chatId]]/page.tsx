@@ -89,15 +89,17 @@ export default function ChatPage() {
     
     useEffect(() => {
         if (scrollAreaRef.current && !isLoadingHistory && messages.length > 0) {
-            const viewport = scrollAreaRef.current?.viewport as HTMLElement | null;
+            // Acceder al viewport DOM element de forma más robusta
+            const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
             if (viewport) { 
                 const timeoutId = setTimeout(() => { viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' }); }, 100); 
                 return () => clearTimeout(timeoutId); 
-            } else { 
-                const scrollElement = scrollAreaRef.current as HTMLElement; 
-                if (scrollElement?.scrollTo) { 
-                    const timeoutId = setTimeout(() => { scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' }); }, 100); 
-                    return () => clearTimeout(timeoutId); 
+            } else {
+                // Fallback si querySelector falla (menos probable con la estructura de shadcn)
+                const scrollElement = scrollAreaRef.current as HTMLElement;
+                if (scrollElement?.scrollTo) {
+                    const timeoutId = setTimeout(() => { scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' }); }, 100);
+                    return () => clearTimeout(timeoutId);
                 }
             }
         }
@@ -118,20 +120,12 @@ export default function ChatPage() {
         setIsSending(true); const currentChatIdForApi = chatId || null;
         try {
             const response: QueryApiResponse = await postQuery({ query: text, chat_id: currentChatIdForApi });
-            const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents as any); // Mapeo para fuentes de panel derecho
-            const assistantMessage: Message = { 
-                id: `client-assistant-${Date.now()}`, 
-                role: 'assistant', 
-                content: response.answer, 
-                // Usar el mapeo especial para fuentes del mensaje que pueden tener estructura diferente
-                sources: mapApiSourcesToFrontend(response.retrieved_documents as any[]), // Mapeo para fuentes de mensaje
-                created_at: new Date().toISOString() 
-            };
+            const mappedSources = mapApiSourcesToFrontend(response.retrieved_documents as any);
+            const assistantMessage: Message = { id: `client-assistant-${Date.now()}`, role: 'assistant', content: response.answer, sources: mappedSources, created_at: new Date().toISOString() };
             setMessages(prev => [...prev, assistantMessage]);
-            setRetrievedDocs(response.retrieved_documents || []); // Panel usa datos directos
-            lastDocsRef.current = response.retrieved_documents || [];
+            setRetrievedDocs(mappedSources || []); lastDocsRef.current = mappedSources || [];
             if (!currentChatIdForApi && response.chat_id) { setChatId(response.chat_id); fetchedChatIdRef.current = response.chat_id; router.replace(`/chat/${response.chat_id}`, { scroll: false }); }
-            if (response.retrieved_documents && response.retrieved_documents.length > 0 && !isSourcesPanelVisible) { setIsSourcesPanelVisible(true); }
+            if (mappedSources && mappedSources.length > 0 && !isSourcesPanelVisible) { setIsSourcesPanelVisible(true); }
         } catch (error) { 
             const errorMsgObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: "Error al procesar tu solicitud.", isError: true, created_at: new Date().toISOString() }; 
             setMessages(prev => [...prev, errorMsgObj]); 
@@ -154,35 +148,37 @@ export default function ChatPage() {
     };
 
     return (
-        // FLAG_LLM: Asegurar que este div ocupe toda la altura (h-full) que le da el AppLayout
-        // y que sea un contenedor flex vertical.
+        // Contenedor raíz de la página, ocupa toda la altura y es un flex container.
+        // Se elimina el padding global de aquí, se aplicará internamente.
         <div className="flex flex-col h-full bg-background">
             <ResizablePanelGroup direction="horizontal" className="flex-1 overflow-hidden">
-                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100}>
-                    {/* Contenedor Interno del Panel de Chat: flex, h-full, flex-col, relative, overflow-hidden */}
-                    <div className="flex h-full flex-col relative overflow-hidden">
-                         <div className="absolute top-1 right-1 z-20 p-2"> {/* Padding para que el botón no pegue al borde */}
-                             <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
-                                {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
-                             </Button>
+                <ResizablePanel defaultSize={isSourcesPanelVisible ? 65 : 100} minSize={30} maxSize={100}
+                    // El panel de chat debe ser flex, ocupar altura y manejar su overflow
+                    className="flex flex-col h-full min-h-0 relative overflow-hidden" 
+                >
+                    {/* Botón para toggle del panel de fuentes */}
+                    <div className="absolute top-1 right-1 z-20 p-2">
+                        <Button onClick={handlePanelToggle} variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground" data-state={isSourcesPanelVisible ? "open" : "closed"} aria-label={isSourcesPanelVisible ? 'Cerrar Panel de Fuentes' : 'Abrir Panel de Fuentes'}>
+                            {isSourcesPanelVisible ? <PanelRightClose className="h-5 w-5" /> : <PanelRightOpen className="h-5 w-5" />}
+                        </Button>
+                    </div>
+                    {/* ScrollArea para los mensajes. flex-1 y min-h-0 son cruciales aquí. */}
+                    <ScrollArea className="flex-1 min-h-0" ref={scrollAreaRef}>
+                        {/* Div interno para aplicar padding a los mensajes */}
+                        <div className="px-4 py-6 sm:px-6">
+                            {renderChatContent()}
                         </div>
-                        {/* ScrollArea con flex-1 para que ocupe el espacio vertical */}
-                        <ScrollArea className="flex-1" ref={scrollAreaRef}>
-                             <div className="px-4 py-6 sm:px-6"> {/* Padding para contenido de mensajes */}
-                                {renderChatContent()}
-                             </div>
-                        </ScrollArea>
-                        {/* Contenedor de Input fijo abajo */}
-                        <div className="border-t border-border/60 px-4 py-3 sm:px-6 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
-                             <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
-                        </div>
+                    </ScrollArea>
+                    {/* Contenedor del ChatInput, fijo abajo y con padding. */}
+                    <div className="border-t border-border/60 px-4 py-3 sm:px-6 bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                        <ChatInput onSendMessage={handleSendMessage} isLoading={isSending || isAuthLoading || isLoadingHistory} />
                     </div>
                 </ResizablePanel>
                 {isSourcesPanelVisible && (
                     <>
                         <ResizableHandle withHandle />
+                        {/* Panel de fuentes. h-full y overflow-hidden para que maneje su propio scroll */}
                         <ResizablePanel defaultSize={35} minSize={20} maxSize={45} className="h-full overflow-hidden">
-                           {/* Asegurar que RetrievedDocumentsPanel también maneje su scroll interno */}
                             <RetrievedDocumentsPanel documents={retrievedDocs.length > 0 ? retrievedDocs : lastDocsRef.current} isLoading={isSending} />
                         </ResizablePanel>
                     </>

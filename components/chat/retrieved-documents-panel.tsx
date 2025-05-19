@@ -23,10 +23,10 @@ import { cn } from '@/lib/utils';
 interface RetrievedDocumentsPanelProps {
   documents: RetrievedDoc[];
   isLoading: boolean;
-  showMeta?: boolean; 
+  // showMeta fue eliminada, ya que el panel de fuentes ahora siempre muestra detalles completos en el modal.
 }
 
-export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: RetrievedDocumentsPanelProps) {
+export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocumentsPanelProps) {
     const [selectedDoc, setSelectedDoc] = useState<RetrievedDoc | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -67,8 +67,10 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <div className="flex h-full flex-col bg-background">
-            <div className="sticky top-0 z-20 border-b bg-background/95 px-6 py-3 flex flex-col gap-0.5 shadow-sm">
+        {/* Contenedor principal del panel de fuentes, ocupa toda la altura y es flex-col */}
+        {/* Se elimina border-l aquí, el ResizableHandle ya provee la línea visual */}
+        <div className="flex h-full flex-col bg-background"> 
+            <div className="sticky top-0 z-20 border-b bg-background/95 px-4 py-3 flex flex-col gap-0.5 shadow-sm"> {/* Ajustado padding */}
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
                   <span className="font-semibold text-base text-foreground">Fuentes Relevantes</span>
@@ -76,8 +78,9 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
                 <span className="text-xs text-muted-foreground">Documentos utilizados para generar la respuesta.</span>
             </div>
 
+            {/* ScrollArea para la lista de documentos, ocupa espacio restante y tiene su propio scroll */}
             <ScrollArea className="flex-1 min-h-0">
-                <div className="p-4 space-y-3">
+                <div className="p-3 space-y-3"> {/* Padding interno para las tarjetas */}
                     {isLoading && documents.length === 0 && (
                         <div className='space-y-2'>
                             {[...Array(3)].map((_, i) => (
@@ -161,7 +164,7 @@ export function RetrievedDocumentsPanel({ documents, isLoading, showMeta }: Retr
                                     {selectedDoc.content || <span className="italic opacity-70">Contenido no disponible.</span>}
                                 </blockquote>
                             </div>
-                            {showMeta && selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
+                            {selectedDoc.metadata && Object.keys(selectedDoc.metadata).length > 0 && (
                                  <div>
                                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Metadatos:</Label>
                                     <pre className="mt-1 max-h-[150px] w-full overflow-auto rounded-md border bg-muted/30 p-3 text-[11px] font-mono whitespace-pre-wrap break-all pretty-scrollbar">
