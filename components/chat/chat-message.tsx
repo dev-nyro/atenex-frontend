@@ -7,6 +7,7 @@ import { User, AlertTriangle, FileText } from 'lucide-react';
 import AtenexLogo from '@/components/icons/atenex-logo';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { Components } from 'react-markdown';
 import type { RetrievedDoc } from '@/lib/api';
 import {
     Tooltip,
@@ -54,10 +55,144 @@ export function ChatMessage({ message }: ChatMessageProps) {
               ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30 rounded-bl-lg'
               : 'bg-muted text-foreground rounded-bl-lg'
         )}
-      >
-         {/* FLAG_LLM: Aplicar clases prose al div contenedor del Markdown */}
-         <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-pre:my-2 prose-blockquote:my-2">
-            <Markdown remarkPlugins={[remarkGfm]}>
+      >         {/* Renderizado optimizado del contenido Markdown */}
+         <div className={cn(
+           "markdown-content prose max-w-none break-words",
+           isUser 
+             ? "user-message prose-sm prose-invert prose-p:leading-relaxed prose-headings:text-primary-foreground prose-strong:text-primary-foreground"
+             : "prose-sm dark:prose-invert prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground"
+         )}>
+            <Markdown 
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Personalizar el renderizado de elementos específicos
+                p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                ul: ({ children }) => <ul className="my-3 space-y-1 pl-6">{children}</ul>,
+                ol: ({ children }) => <ol className="my-3 space-y-1 pl-6">{children}</ol>,
+                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                blockquote: ({ children }) => (
+                  <blockquote className={cn(
+                    "border-l-4 pl-4 py-2 my-4 italic rounded-r",
+                    isUser 
+                      ? "border-primary-foreground/30 text-primary-foreground/90 bg-primary-foreground/5"
+                      : "border-border/50 text-muted-foreground bg-muted/30"
+                  )}>
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ children, className, ...props }) => {
+                  const isInlineCode = !className?.includes('language-');
+                  if (isInlineCode) {
+                    return (
+                      <code 
+                        className={cn(
+                          "px-1.5 py-0.5 text-sm font-mono rounded font-medium",
+                          isUser 
+                            ? "bg-primary-foreground/10 text-primary-foreground"
+                            : "bg-muted text-foreground"
+                        )}
+                        {...props}
+                      >
+                        {children}
+                      </code>
+                    );
+                  }
+                  return (
+                    <code 
+                      className={cn(
+                        "block p-4 text-sm font-mono rounded-lg overflow-x-auto my-4 font-normal",
+                        isUser 
+                          ? "bg-primary-foreground/10 text-primary-foreground"
+                          : "bg-muted text-foreground",
+                        className
+                      )}
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  );
+                },
+                pre: ({ children }) => (
+                  <pre className="p-0 bg-transparent overflow-visible my-0">
+                    {children}
+                  </pre>
+                ),
+                table: ({ children }) => (
+                  <div className="overflow-x-auto my-4">
+                    <table className={cn(
+                      "min-w-full border-collapse rounded-lg overflow-hidden",
+                      isUser 
+                        ? "border border-primary-foreground/30"
+                        : "border border-border"
+                    )}>
+                      {children}
+                    </table>
+                  </div>
+                ),
+                th: ({ children }) => (
+                  <th className={cn(
+                    "px-3 py-2 font-semibold text-left",
+                    isUser 
+                      ? "border border-primary-foreground/30 bg-primary-foreground/10"
+                      : "border border-border bg-muted"
+                  )}>
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className={cn(
+                    "px-3 py-2",
+                    isUser 
+                      ? "border border-primary-foreground/30"
+                      : "border border-border"
+                  )}>
+                    {children}
+                  </td>
+                ),
+                h1: ({ children }) => (
+                  <h1 className="text-xl font-bold mb-3 mt-4 first:mt-0 leading-tight">{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-lg font-semibold mb-2 mt-4 first:mt-0 leading-tight">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-base font-medium mb-2 mt-3 first:mt-0 leading-tight">{children}</h3>
+                ),
+                h4: ({ children }) => (
+                  <h4 className="text-sm font-medium mb-2 mt-3 first:mt-0 leading-tight">{children}</h4>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold">{children}</strong>
+                ),
+                em: ({ children }) => (
+                  <em className="italic">{children}</em>
+                ),
+                a: ({ children, href, ...props }) => (
+                  <a 
+                    href={href} 
+                    className={cn(
+                      "underline underline-offset-2 transition-colors",
+                      isUser 
+                        ? "text-primary-foreground hover:text-primary-foreground/80"
+                        : "text-primary hover:text-primary/80"
+                    )}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    {...props}
+                  >
+                    {children}
+                  </a>
+                ),
+                hr: () => (
+                  <hr className={cn(
+                    "my-4 border-0 h-px",
+                    isUser 
+                      ? "bg-primary-foreground/30"
+                      : "bg-border"
+                  )} />
+                ),
+              } as Components}
+            >
                 {message.content}
             </Markdown>
          </div>
