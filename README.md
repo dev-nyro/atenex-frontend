@@ -12,7 +12,7 @@ Este repositorio contiene la aplicación frontend para **Atenex**, una plataform
     *   Posibilidad de iniciar nuevos chats y eliminar chats existentes.
 *   **Visualización de Documentos Fuente:** Muestra los fragmentos de documentos relevantes recuperados por el backend y utilizados para generar respuestas, en un panel lateral redimensionable.
 *   **Gestión de la Base de Conocimiento:**
-    *   **Subida de Documentos:** Interfaz para subir nuevos documentos (PDF, DOCX, TXT, MD, HTML) al Ingest Service. Admite arrastrar y soltar, y selección múltiple.
+    *   **Subida de Documentos:** Interfaz para subir nuevos documentos (PDF, DOCX, TXT, MD, HTML, XLS, XLSX) al Ingest Service. Admite arrastrar y soltar, y selección múltiple.
     *   **Seguimiento de Estado:** Visualiza el estado de procesamiento de los documentos subidos (En Cola, Procesando, Procesado, Error).
     *   **Acciones sobre Documentos:** Reintentar procesamiento, refrescar estado, eliminar documentos (individual y masivamente).
     *   **Estadísticas de Documentos**: Visualización de métricas sobre el total de documentos, chunks y estados.

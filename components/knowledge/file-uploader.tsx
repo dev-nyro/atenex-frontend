@@ -17,6 +17,9 @@ const acceptedFileTypes = {
   'text/plain': ['.txt'],
   'text/markdown': ['.md', '.markdown'], // Añadido .markdown
   'text/html': ['.html', '.htm'],
+  // Archivos Excel - Añadido para soporte de hojas de cálculo
+  'application/vnd.ms-excel': ['.xls'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
   // Faltaban en la definición anterior pero mencionados en el video/README
   // 'application/vnd.oasis.opendocument.text': ['.odt'], // Si se soportan
   // 'application/epub+zip': ['.epub'], // Si se soportan
