@@ -205,14 +205,20 @@ export function FileUploader({
                 setFiles([]);
               }}
               disabled={isUploading}
-              className="w-full"
+              className="w-full text-lg font-semibold shadow-lg transition-all duration-150 focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 border-2 border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-[1.03] active:scale-100 active:bg-primary/80 animate-bounce-once"
+              style={{ letterSpacing: '0.01em' }}
             >
               {isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Subiendo...
                 </>
-              ) : `Subir y Procesar Archivos (${files.length})`}
+              ) : (
+                <>
+                  <span className="drop-shadow-sm tracking-wide">Subir y Procesar Archivos</span>
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-primary-foreground/20 text-primary-foreground text-xs font-bold border border-primary-foreground/30">{files.length}</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
