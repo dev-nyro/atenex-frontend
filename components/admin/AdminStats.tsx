@@ -5,17 +5,21 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Users, Building, Loader2 } from 'lucide-react';
-import { getAdminStats, AdminStatsResponse } from '@/lib/api'; // Necesitarás definir esto en api.ts
+import { AlertCircle, Users, Building, ChevronDown, ChevronRight } from 'lucide-react';
+import { getAdminStats, AdminStatsResponse } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { toast } from 'sonner';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import CompanyUsersTable from './CompanyUsersTable';
 
 export default function AdminStats() {
   const { token } = useAuth(); // Necesario para las llamadas API (implícito en request)
   const [stats, setStats] = useState<AdminStatsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -48,6 +52,17 @@ export default function AdminStats() {
   const totalUsers = React.useMemo(() => {
     return stats?.users_per_company?.reduce((sum, company) => sum + company.user_count, 0);
   }, [stats]);
+
+  // Función para toggle del estado expandido de una empresa
+  const toggleCompanyExpansion = (companyId: string) => {
+    const newExpanded = new Set(expandedCompanies);
+    if (newExpanded.has(companyId)) {
+      newExpanded.delete(companyId);
+    } else {
+      newExpanded.add(companyId);
+    }
+    setExpandedCompanies(newExpanded);
+  };
 
   return (
     <div className="space-y-6">
@@ -94,13 +109,11 @@ export default function AdminStats() {
           </CardContent>
         </Card>
         {/* Puedes añadir más tarjetas aquí */}
-      </div>
-
-      {/* Tabla de Usuarios por Empresa */}
+      </div>      {/* Tabla de Usuarios por Empresa con Expandible */}
       <Card>
         <CardHeader>
           <CardTitle>Usuarios por Empresa</CardTitle>
-          <CardDescription>Desglose del número de usuarios activos por cada empresa.</CardDescription>
+          <CardDescription>Desglose del número de usuarios activos por cada empresa. Haz clic en una empresa para ver sus usuarios.</CardDescription>
         </CardHeader>
         <CardContent>
           {error && !isLoading && (
@@ -113,9 +126,10 @@ export default function AdminStats() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50%]">Nombre Empresa</TableHead>
+                <TableHead className="w-[40%]">Nombre Empresa</TableHead>
                 <TableHead className="hidden sm:table-cell">ID Empresa</TableHead>
                 <TableHead className="text-right">Usuarios</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -125,19 +139,49 @@ export default function AdminStats() {
                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                     <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   </TableRow>
                 ))
               ) : stats?.users_per_company && stats.users_per_company.length > 0 ? (
                 stats.users_per_company.map((company) => (
-                  <TableRow key={company.company_id}>
-                    <TableCell className="font-medium">{company.name || `Empresa ${company.company_id.substring(0, 6)}`}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-mono hidden sm:table-cell">{company.company_id}</TableCell>
-                    <TableCell className="text-right font-medium">{company.user_count}</TableCell>
-                  </TableRow>
+                  <React.Fragment key={company.company_id}>
+                    <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleCompanyExpansion(company.company_id)}>
+                      <TableCell className="font-medium">
+                        {company.name || `Empresa ${company.company_id.substring(0, 6)}`}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs font-mono hidden sm:table-cell">
+                        {company.company_id}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {company.user_count}
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          {expandedCompanies.has(company.company_id) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    {expandedCompanies.has(company.company_id) && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="p-0">
+                          <div className="bg-muted/20 p-4 border-t">
+                            <h4 className="font-medium mb-3 text-sm">
+                              Usuarios de {company.name || `Empresa ${company.company_id.substring(0, 6)}`}
+                            </h4>
+                            <CompanyUsersTable companyId={company.company_id} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
                 ))
               ) : !error ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                     No hay datos de empresas disponibles.
                   </TableCell>
                 </TableRow>

@@ -136,6 +136,15 @@ export interface CreateCompanyPayload { name: string; }
 export interface CompanyResponse { id: string; name: string; created_at?: string; }
 export interface CreateUserPayload { email: string; password: string; name: string; company_id: string; roles?: string[]; }
 export interface UserResponse { id: string; email: string; name: string | null; company_id: string | null; is_active?: boolean; created_at?: string; }
+export interface UserAdminResponse { 
+  id: string; 
+  email: string; 
+  name: string | null; 
+  company_id: string | null; 
+  is_active?: boolean; 
+  created_at?: string;
+  roles?: string[];
+}
 export interface BulkDeleteResponse { deleted: string[]; failed: { id: string; error: string }[]; }
 export interface DocumentStatsResponse { total_documents: number; total_chunks: number; by_status: Record<string, number>; by_type: Record<string, number>; by_user: Array<{ user_id: string; name: string; count: number }>; recent_activity: Array<{ date: string; uploaded: number; processed: number; error: number }>; oldest_document_date: string | null; newest_document_date: string | null; }
 
@@ -290,4 +299,11 @@ export async function getDocumentStats(
     `/api/v1/documents/stats${query}`,
     { method: 'GET', headers: { ...authHeaders } as Record<string, string> }
   );
+}
+
+// --- User API Functions ---
+export async function getUsersByCompany(companyId: string, auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<UserAdminResponse[]> {
+  if (!companyId || typeof companyId !== 'string') { throw new ApiError("Se requiere un ID de empresa válido.", 400); }
+  const endpoint = `/api/v1/admin/users/by_company/${companyId}?limit=${limit}&offset=${offset}`;
+  return request<UserAdminResponse[]>(endpoint, { method: 'GET', headers: { ...auth } as Record<string, string> });
 }
