@@ -33,6 +33,21 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isError = message.isError ?? false;
 
+  // Handler para copiar el mensaje al portapapeles
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+    } catch (err) {
+      // fallback: select and copy
+      const textarea = document.createElement('textarea');
+      textarea.value = message.content;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+  };
+
   return (
     <div className={cn(
         'flex w-full items-start gap-3',
@@ -55,7 +70,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
               ? 'bg-destructive/10 text-destructive-foreground border border-destructive/30 rounded-bl-lg'
               : 'bg-muted text-foreground rounded-bl-lg'
         )}
-      >         {/* Renderizado optimizado del contenido Markdown */}
+      >
+         {/* Botón copiar tiny */}
+         <div className="flex justify-end mb-1">
+           <Button
+             variant="ghost"
+             size="icon"
+             className="h-6 w-6 p-0 text-muted-foreground hover:text-primary/90 focus:outline-none focus:ring-1 focus:ring-primary/50"
+             style={{ fontSize: 12 }}
+             title="Copiar respuesta"
+             aria-label="Copiar respuesta"
+             onClick={handleCopy}
+           >
+             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <rect x="7" y="7" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+               <rect x="4" y="4" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+             </svg>
+           </Button>
+         </div>
+         {/* Renderizado optimizado del contenido Markdown */}
          <div className={cn(
            "markdown-content prose max-w-none break-words",
            isUser 
@@ -211,9 +244,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
                             className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
                             tabIndex={0}
                             aria-label={`Ver fuente ${index + 1}: ${doc.cita_tag || doc.file_name || 'Detalles'}`}
-                            // El panel de fuentes principal se encarga de abrir el modal, este solo muestra tooltip.
-                            // Si se quisiera que estos botones también abran el modal, se necesitaría pasar
-                            // la función para abrir el modal y el documento seleccionado a este componente.
                             onClick={e => e.preventDefault()} 
                           >
                             {index + 1}
