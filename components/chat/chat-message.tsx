@@ -33,7 +33,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isError = message.isError ?? false;
 
-  // Handler para copiar el mensaje al portapapeles
+  // Handler para copiar el mensaje al portapapeles y mostrar feedback
+  const [copied, setCopied] = React.useState(false);
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(message.content);
@@ -46,6 +47,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
       document.execCommand('copy');
       document.body.removeChild(textarea);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
   };
 
   return (
@@ -71,23 +74,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
               : 'bg-muted text-foreground rounded-bl-lg'
         )}
       >
-         {/* Botón copiar tiny */}
-         <div className="flex justify-end mb-1">
-           <Button
-             variant="ghost"
-             size="icon"
-             className="h-6 w-6 p-0 text-muted-foreground hover:text-primary/90 focus:outline-none focus:ring-1 focus:ring-primary/50"
-             style={{ fontSize: 12 }}
-             title="Copiar respuesta"
-             aria-label="Copiar respuesta"
-             onClick={handleCopy}
-           >
-             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <rect x="7" y="7" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-               <rect x="4" y="4" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-             </svg>
-           </Button>
-         </div>
          {/* Renderizado optimizado del contenido Markdown */}
          <div className={cn(
            "markdown-content prose max-w-none break-words",
@@ -228,6 +214,27 @@ export function ChatMessage({ message }: ChatMessageProps) {
             >
                 {message.content}
             </Markdown>
+         </div>
+
+         {/* Botón copiar tiny debajo del mensaje */}
+         <div className="flex justify-end mt-2">
+           <Button
+             variant="ghost"
+             size="icon"
+             className="h-6 w-6 p-0 text-muted-foreground hover:text-primary/90 focus:outline-none focus:ring-1 focus:ring-primary/50"
+             style={{ fontSize: 12 }}
+             title="Copiar respuesta"
+             aria-label="Copiar respuesta"
+             onClick={handleCopy}
+           >
+             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <rect x="7" y="7" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+               <rect x="4" y="4" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+             </svg>
+           </Button>
+           {copied && (
+             <span className="ml-2 text-xs text-primary-foreground bg-primary/80 rounded px-2 py-0.5 shadow animate-fade-in">Copiado</span>
+           )}
          </div>
 
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
