@@ -23,6 +23,7 @@ export interface Message {
   sources?: RetrievedDoc[];
   isError?: boolean;
   created_at?: string;
+  user?: { name?: string | null; email?: string | null }; // Para inicial de avatar
 }
 
 interface ChatMessageProps {
@@ -259,10 +260,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
                         <TooltipContent side="top" align="center" className="max-w-xs text-xs">
                           <div className="font-semibold mb-1 truncate flex items-center gap-1">
                             <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
-                            {doc.file_name || doc.cita_tag || `Fragmento ${doc.id?.substring(0, 8)}`}
+                            {doc.file_name || doc.cita_tag || (doc.id ? `Fragmento ${typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}` : 'Fragmento')}
                           </div>
                           <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
-                            ID Doc: {doc.document_id ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id.substring(0, 8)}...
+                            ID Doc: {doc.document_id && typeof doc.document_id === 'string' ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id && typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}...
                           </div>
                           {doc.score != null && (
                             <div className="font-medium text-muted-foreground text-[11px]">
@@ -284,7 +285,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       {isUser && (
          <Avatar className="h-8 w-8 border flex-shrink-0 bg-card text-foreground">
-           <AvatarFallback className="bg-transparent text-muted-foreground"><User className="h-5 w-5" /></AvatarFallback>
+           <AvatarFallback className="bg-transparent text-muted-foreground">
+             {/* Inicial segura del usuario */}
+             {(() => {
+               const name = message.user?.name;
+               const email = message.user?.email;
+               const initial = (name ?? email ?? 'U').toString().substring(0, 1).toUpperCase();
+               return initial;
+             })()}
+           </AvatarFallback>
          </Avatar>
       )}
     </div>

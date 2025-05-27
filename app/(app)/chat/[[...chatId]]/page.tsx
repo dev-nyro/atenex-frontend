@@ -108,7 +108,13 @@ export default function ChatPage() {
     const handleSendMessage = useCallback(async (query: string) => {
         const text = query.trim();
         if (!text) { toast.warning("No se puede enviar un mensaje vacío."); return; }
-        const userMessage: Message = { id: `client-user-${Date.now()}`, role: 'user', content: text, created_at: new Date().toISOString() };
+        const userMessage: Message = {
+          id: `client-user-${Date.now()}`,
+          role: 'user',
+          content: text,
+          created_at: new Date().toISOString(),
+          user: user ? { name: user.name, email: user.email } : undefined
+        };
         setMessages(prev => prev.length === 1 && prev[0].id === 'initial-welcome' ? [userMessage] : [...prev.filter(m => m.id !== 'initial-welcome'), userMessage]);
         if (isGreeting(text)) { setMessages(prev => [...prev, { id: `assistant-greet-${Date.now()}`, role: 'assistant', content: '¡Hola! ¿En qué puedo ayudarte hoy?', created_at: new Date().toISOString() }]); return; }
         if (isMetaQuery(text)) { setMessages(prev => [...prev, { id: `assistant-meta-${Date.now()}`, role: 'assistant', content: getMetaResponse(), created_at: new Date().toISOString() }]); return; }

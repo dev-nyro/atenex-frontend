@@ -64,11 +64,16 @@ function getUserFromDecodedToken(payload: any): AppUser | null {
     }
     // Añadir la lógica isAdmin comparando con la constante corregida
     const isAdmin = payload.email === ADMIN_EMAIL;
-    console.log(`getUserFromDecodedToken: Email=${payload.email}, IsAdmin=${isAdmin}`); // Mantener log para verificación
+    let name = payload.name || payload.full_name || null;
+    // Fallback defensivo: si name es null/undefined, usar la parte antes de @ del email
+    if (!name && typeof payload.email === 'string') {
+        name = payload.email.split('@')[0];
+    }
+    console.log(`getUserFromDecodedToken: Email=${payload.email}, IsAdmin=${isAdmin}, Name=${name}`); // Mantener log para verificación
     return {
         userId: payload.sub,
         email: payload.email,
-        name: payload.name || payload.full_name || null, // Intentar con full_name si name no existe
+        name: name,
         companyId: payload.company_id || null,
         roles: payload.roles || [],
         isAdmin: isAdmin,
