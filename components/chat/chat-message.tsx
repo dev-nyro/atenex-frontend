@@ -239,45 +239,53 @@ export function ChatMessage({ message, onCitaClick }: ChatMessageProps) {
            )}
          </div>
 
-         {/* Fuentes utilizadas: mostrar cita_tag y file_name, numeradas igual que en panel derecho */}
+         {/* Fuentes utilizadas: solo número, sin 'Doc' */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
             <div className="mt-3 pt-2.5 border-t border-border/40 animate-fade-in">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 tracking-wide uppercase">Fuentes utilizadas:</p>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  {message.sources.map((doc, index) => (
-                    <TooltipProvider key={doc.id || `source-${index}` } delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
-                            tabIndex={0}
-                            aria-label={`Ver fuente ${doc.cita_tag || doc.file_name || 'Detalles'}`}
-                            onClick={() => onCitaClick && doc.cita_tag && onCitaClick(doc.cita_tag)}
-                          >
-                            {doc.cita_tag ? doc.cita_tag.replace(/\[|\]/g, '') : `${index + 1}`}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="center" className="max-w-xs text-xs">
-                          <div className="font-semibold mb-1 truncate flex items-center gap-1">
-                            <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
-                            {doc.file_name || (doc.id ? `Fragmento ${typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}` : 'Fragmento')}
-                          </div>
-                          <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
-                            Página: {doc.metadata?.page ?? '-'}
-                          </div>
-                          <div className="font-medium text-muted-foreground text-[11px]">
-                            Relevancia: <span className="font-normal">{doc.score != null ? doc.score.toFixed(2) : 'N/D'}</span>
-                          </div>
-                          <div className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
-                            Vista previa:
-                            <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}</span>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ))}
+                  {message.sources.map((doc, index) => {
+                    // Extraer solo el número de cita_tag si existe, si no usar el índice
+                    let num = `${index + 1}`;
+                    if (doc.cita_tag) {
+                      const match = doc.cita_tag.match(/\d+/);
+                      if (match) num = match[0];
+                    }
+                    return (
+                      <TooltipProvider key={doc.id || `source-${index}` } delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
+                              tabIndex={0}
+                              aria-label={`Ver fuente ${num}: ${doc.cita_tag || doc.file_name || 'Detalles'}`}
+                              onClick={() => onCitaClick && doc.cita_tag && onCitaClick(doc.cita_tag)}
+                            >
+                              {num}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="center" className="max-w-xs text-xs">
+                            <div className="font-semibold mb-1 truncate flex items-center gap-1">
+                              <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
+                              {doc.file_name || (doc.id ? `Fragmento ${typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}` : 'Fragmento')}
+                            </div>
+                            <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
+                              Página: {doc.metadata?.page ?? '-'}
+                            </div>
+                            <div className="font-medium text-muted-foreground text-[11px]">
+                              Relevancia: <span className="font-normal">{doc.score != null ? doc.score.toFixed(2) : 'N/D'}</span>
+                            </div>
+                            <div className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
+                              Vista previa:
+                              <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}</span>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  })}
                 </div>
             </div>
          )}

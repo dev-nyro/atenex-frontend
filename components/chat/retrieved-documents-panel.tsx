@@ -79,10 +79,10 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
     };
 
     // Agrupar por document_id y preparar metadatos para mejor UX
+    // Agrupar por document_id y mostrar correctamente los fragmentos y metadatos
     const groupedDocs = React.useMemo(() => {
         const groups: Record<string, {
             file_name: string|null,
-            cita_tag: string|null,
             document_id: string|null,
             fragments: RetrievedDoc[],
         }> = {};
@@ -91,7 +91,6 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
             if (!groups[docId]) {
                 groups[docId] = {
                     file_name: doc.file_name || doc.metadata?.file_name || null,
-                    cita_tag: doc.cita_tag || null,
                     document_id: doc.document_id || null,
                     fragments: [],
                 };
@@ -143,7 +142,7 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
                             <div key={docId} className="mb-4">
                                 <div className="font-semibold text-base text-foreground flex items-center gap-2 mb-1">
                                     <FileText className="h-4 w-4 text-primary" />
-                                    {group.file_name || group.cita_tag || group.document_id || 'Documento sin nombre'}
+                                    {group.file_name || group.document_id || 'Documento sin nombre'}
                                 </div>
                                 <div className="space-y-2 ml-6">
                                     {group.fragments.map((frag, fragIdx) => {
@@ -165,11 +164,11 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
                                                     <CardContent className="p-0">
                                                         <div className="flex items-center gap-2 px-3 pt-3">
                                                             <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center text-xs font-mono bg-muted text-muted-foreground rounded-full border border-border/60">
-                                                                {citaKey}
+                                                                {frag.cita_tag || citaKey}
                                                             </span>
                                                             <div className="flex-1 min-w-0">
-                                                                <span className="block font-medium text-foreground/95 truncate text-sm" title={frag.cita_tag || (frag.id && typeof frag.id === 'string' ? `Fragmento ${frag.id.substring(0, 8)}` : 'Fragmento')}>
-                                                                    {frag.cita_tag || (frag.id && typeof frag.id === 'string' ? `Fragmento ${frag.id.substring(0, 8)}` : 'Fragmento')}
+                                                                <span className="block font-medium text-foreground/95 truncate text-sm" title={frag.file_name || frag.cita_tag || (frag.id && typeof frag.id === 'string' ? `Fragmento ${frag.id.substring(0, 8)}` : 'Fragmento')}>
+                                                                    {frag.file_name || frag.cita_tag || (frag.id && typeof frag.id === 'string' ? `Fragmento ${frag.id.substring(0, 8)}` : 'Fragmento')}
                                                                 </span>
                                                                 <span className="block text-[11px] text-muted-foreground truncate">
                                                                     {frag.metadata?.title ? `Título: ${frag.metadata.title}` : frag.metadata?.page ? `Página: ${frag.metadata.page}` : ''}

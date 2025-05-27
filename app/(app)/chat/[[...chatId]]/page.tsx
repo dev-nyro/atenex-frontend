@@ -22,7 +22,7 @@ import {
     QueryApiResponse
 } from '@/lib/api';
 import { toast } from "sonner";
-import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw } from 'lucide-react'; 
+import { PanelRightClose, PanelRightOpen, AlertCircle, RefreshCw, BrainCircuit } from 'lucide-react'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn, isGreeting, isMetaQuery, getMetaResponse } from '@/lib/utils';
@@ -145,12 +145,56 @@ export default function ChatPage() {
     
     const renderChatContent = (): React.ReactNode => {
         if (isLoadingHistory && messages.length <= 1) {
-             return ( <div className="space-y-6 p-4"> <div className="flex items-start space-x-3"> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> </div> <div className="flex items-start space-x-3 justify-end"> <div className="flex-1 space-y-2 items-end flex flex-col"><Skeleton className="h-4 w-3/4 rounded" /><Skeleton className="h-4 w-1/2 rounded" /></div> <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" /> </div> </div> );
+            return (
+                <div className="space-y-6 p-4">
+                    <div className="flex items-start space-x-3">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3 justify-end">
+                        <div className="flex-1 space-y-2 items-end flex flex-col">
+                            <Skeleton className="h-4 w-3/4 rounded" />
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                        </div>
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                    </div>
+                </div>
+            );
         }
         if (historyError) {
-            return ( <div className="flex flex-col items-center justify-center h-full text-center p-6"> <AlertCircle className="h-12 w-12 text-destructive mb-4" /> <p>{historyError}</p> <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reintentar</Button> </div> );
+            return (
+                <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                    <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+                    <p>{historyError}</p>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4">
+                        <RefreshCw className="mr-2 h-4 w-4" /> Reintentar
+                    </Button>
+                </div>
+            );
         }
-        return ( <div className="space-y-6"> {messages.map((message) => ( <ChatMessage key={message.id} message={message} /> ))} {isSending && ( <div className="skeleton-thinking"> <div className="skeleton-thinking-avatar"></div> <div className="skeleton-thinking-text"> <div className="skeleton-thinking-line skeleton-thinking-line-short"></div> </div> </div> )} </div> );
+        // Animación de carga visible y moderna mientras se espera la respuesta
+        return (
+            <div className="space-y-6">
+                {messages.map((message) => (
+                    <ChatMessage key={message.id} message={message} />
+                ))}
+                {isSending && messages[messages.length - 1]?.role === 'user' && (
+                    <div className="flex items-start space-x-3 animate-pulse mt-2">
+                        <div className="h-10 w-10 rounded-full bg-primary/30 flex items-center justify-center border-2 border-primary shadow-lg">
+                            <BrainCircuit className="h-6 w-6 text-primary animate-spin-slow" />
+                        </div>
+                        <div className="space-y-2 flex-1">
+                            <div className="h-4 w-3/4 rounded bg-primary/20 mb-2" />
+                            <div className="h-4 w-1/2 rounded bg-primary/10" />
+                            <div className="text-xs text-muted-foreground mt-2">Atenex está pensando...</div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
