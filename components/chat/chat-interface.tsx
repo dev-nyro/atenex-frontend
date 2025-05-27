@@ -28,6 +28,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false); // Oculta panel por defecto
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  // Ref para interactividad entre citas y panel de fuentes
+  const sourcesPanelRef = useRef<any>(null);
+  const [pendingCitaTag, setPendingCitaTag] = useState<string | null>(null);
+  // Limpiar pendingCitaTag cuando el panel se abre y scroll se realiza
+  useEffect(() => {
+    if (isPanelOpen && pendingCitaTag && sourcesPanelRef.current && typeof sourcesPanelRef.current.scrollToCitaTag === 'function') {
+      sourcesPanelRef.current.scrollToCitaTag(pendingCitaTag);
+      setPendingCitaTag(null);
+    }
+  }, [isPanelOpen, pendingCitaTag]);
 
   // Load chat history based on chatId (placeholder)
   useEffect(() => {
@@ -119,17 +129,24 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       }
     } catch (error) {
       console.error("Query failed:", error);
-      let errorMessage = "Sorry, I encountered an error trying to answer your question.";
-       if (error instanceof ApiError && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       } else if (error instanceof Error && error.message) {
-           errorMessage = `Error: ${error.message}`;
-       }
+      // UX: Mensajes de error más amigables
+      let errorMessage = "Hubo un problema generando la respuesta. Intenta simplificar tu pregunta o inténtalo de nuevo más tarde.";
+      if (error instanceof ApiError && error.message) {
+        if (error.message.includes('application error')) {
+          errorMessage = "Ocurrió un error interno en el sistema. Por favor, intenta de nuevo más tarde.";
+        } else if (error.message.toLowerCase().includes('format') || error.message.toLowerCase().includes('pydantic')) {
+          errorMessage = "La respuesta del asistente no tuvo el formato esperado. Intenta reformular tu pregunta o contacta soporte si el problema persiste.";
+        } else {
+          errorMessage = error.message;
+        }
+      } else if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+      }
 
       const errorMessageObj: Message = { id: `error-${Date.now()}`, role: 'assistant', content: errorMessage, isError: true };
       setMessages(prev => [...prev, errorMessageObj]);
 
-      toast.error("Query Failed", {
+      toast.error("Error", {
         description: errorMessage,
       });
 
@@ -157,16 +174,28 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                     <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
                         <div className="space-y-4 pr-4"> {/* Add padding right */}
                             {messages.map(message => (
-                                <ChatMessage key={message.id} message={message} />
+                                <ChatMessage
+                                  key={message.id}
+                                  message={message}
+                                  onCitaClick={(citaTag: string) => {
+                                    if (isPanelOpen && sourcesPanelRef.current && typeof sourcesPanelRef.current.scrollToCitaTag === 'function') {
+                                      sourcesPanelRef.current.scrollToCitaTag(citaTag);
+                                    } else {
+                                      setPendingCitaTag(citaTag);
+                                      setIsPanelOpen(true);
+                                    }
+                                  }}
+                                />
                             ))}
                             {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                                <div className="flex items-start space-x-3">
-                                     <Skeleton className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                          <BrainCircuit className="h-5 w-5 text-primary"/>
-                                     </Skeleton>
+                                <div className="flex items-start space-x-3 animate-pulse">
+                                     <div className="h-10 w-10 rounded-full bg-primary/30 flex items-center justify-center border-2 border-primary shadow-lg">
+                                          <BrainCircuit className="h-6 w-6 text-primary animate-spin-slow"/>
+                                     </div>
                                     <div className="space-y-2 flex-1">
-                                        <Skeleton className="h-4 w-3/4" />
-                                        <Skeleton className="h-4 w-1/2" />
+                                        <div className="h-4 w-3/4 rounded bg-primary/20 mb-2" />
+                                        <div className="h-4 w-1/2 rounded bg-primary/10" />
+                                        <div className="text-xs text-muted-foreground mt-2">Atenex está pensando...</div>
                                     </div>
                                 </div>
                             )}
@@ -183,7 +212,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 <>
                     <ResizableHandle withHandle />
                     <ResizablePanel defaultSize={30} minSize={20} maxSize={40} className="transition-all duration-300 ease-in-out">
-                        <RetrievedDocumentsPanel documents={retrievedDocs} isLoading={isLoading && messages[messages.length - 1]?.role === 'user'} />
+                        <RetrievedDocumentsPanel
+                          ref={sourcesPanelRef}
+                          documents={retrievedDocs}
+                          isLoading={isLoading && messages[messages.length - 1]?.role === 'user'}
+                          highlightCitaTag={pendingCitaTag || undefined}
+                        />
                     </ResizablePanel>
                 </>
             )}

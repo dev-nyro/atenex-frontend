@@ -28,9 +28,10 @@ export interface Message {
 
 interface ChatMessageProps {
   message: Message;
+  onCitaClick?: (citaTag: string) => void;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onCitaClick }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isError = message.isError ?? false;
 
@@ -238,6 +239,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
            )}
          </div>
 
+         {/* Fuentes utilizadas: mostrar cita_tag y file_name, numeradas igual que en panel derecho */}
          {!isUser && !isError && message.sources && message.sources.length > 0 && (
             <div className="mt-3 pt-2.5 border-t border-border/40 animate-fade-in">
                 <p className="text-xs font-semibold text-muted-foreground mb-2 tracking-wide uppercase">Fuentes utilizadas:</p>
@@ -251,25 +253,23 @@ export function ChatMessage({ message }: ChatMessageProps) {
                             size="icon"
                             className="rounded-full px-0 py-0 text-xs font-mono font-semibold h-7 w-7 flex items-center justify-center border-primary/60 hover:border-primary"
                             tabIndex={0}
-                            aria-label={`Ver fuente ${index + 1}: ${doc.cita_tag || doc.file_name || 'Detalles'}`}
-                            onClick={e => e.preventDefault()} 
+                            aria-label={`Ver fuente ${doc.cita_tag || doc.file_name || 'Detalles'}`}
+                            onClick={() => onCitaClick && doc.cita_tag && onCitaClick(doc.cita_tag)}
                           >
-                            {index + 1}
+                            {doc.cita_tag ? doc.cita_tag.replace(/\[|\]/g, '') : `${index + 1}`}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="top" align="center" className="max-w-xs text-xs">
                           <div className="font-semibold mb-1 truncate flex items-center gap-1">
                             <FileText className="inline-block h-3 w-3 mr-1 align-text-top" />
-                            {doc.file_name || doc.cita_tag || (doc.id ? `Fragmento ${typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}` : 'Fragmento')}
+                            {doc.file_name || (doc.id ? `Fragmento ${typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}` : 'Fragmento')}
                           </div>
                           <div className="text-muted-foreground text-[11px] mb-1.5 break-all">
-                            ID Doc: {doc.document_id && typeof doc.document_id === 'string' ? `${doc.document_id.substring(0, 8)}...` : 'N/D'} / Frag: {doc.id && typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}...
+                            Página: {doc.metadata?.page ?? '-'}
                           </div>
-                          {doc.score != null && (
-                            <div className="font-medium text-muted-foreground text-[11px]">
-                              Score: <span className="font-normal">{doc.score.toFixed(4)}</span>
-                            </div>
-                          )}
+                          <div className="font-medium text-muted-foreground text-[11px]">
+                            Relevancia: <span className="font-normal">{doc.score != null ? doc.score.toFixed(2) : 'N/D'}</span>
+                          </div>
                           <div className="mt-1.5 pt-1.5 border-t border-border/50 font-medium text-[11px]">
                             Vista previa:
                             <span className="block font-normal text-muted-foreground line-clamp-3">{doc.content_preview || <span className="italic opacity-70">Vista previa no disponible.</span>}</span>
