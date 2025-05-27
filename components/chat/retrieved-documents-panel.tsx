@@ -147,6 +147,12 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
                                 <div className="space-y-2 ml-6">
                                     {group.fragments.map((frag, fragIdx) => {
                                         const citaKey = frag.cita_tag ? frag.cita_tag.replace(/\[|\]/g, '') : `${groupIdx + 1}.${fragIdx + 1}`;
+                                        // Extraer solo el número de la cita_tag para el círculo
+                                        let num = `${fragIdx + 1}`;
+                                        if (frag.cita_tag) {
+                                          const match = frag.cita_tag.match(/\d+/);
+                                          if (match) num = match[0];
+                                        }
                                         return (
                                             <DialogTrigger asChild key={frag.id || `frag-${fragIdx}`}> 
                                                 <Card
@@ -164,7 +170,7 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
                                                     <CardContent className="p-0">
                                                         <div className="flex items-center gap-2 px-3 pt-3">
                                                             <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center text-xs font-mono bg-muted text-muted-foreground rounded-full border border-border/60">
-                                                                {frag.cita_tag || citaKey}
+                                                                {num}
                                                             </span>
                                                             <div className="flex-1 min-w-0">
                                                                 <span className="block font-medium text-foreground/95 truncate text-sm" title={frag.file_name || frag.cita_tag || (frag.id && typeof frag.id === 'string' ? `Fragmento ${frag.id.substring(0, 8)}` : 'Fragmento')}>
@@ -191,7 +197,7 @@ export const RetrievedDocumentsPanel = forwardRef<any, RetrievedDocumentsPanelPr
                 </ScrollArea>
 
                 {selectedDoc && (
-                    <DialogContent className="sm:max-w-2xl lg:max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] p-0">
+                    <DialogContent className="sm:max-w-2xl lg:max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] max-h-[85vh] p-0 bg-background shadow-xl border border-border rounded-xl">
                         <DialogHeader className="px-6 pt-6 pb-4 border-b">
                             <DialogTitle className="truncate text-lg flex items-center gap-2" title={selectedDoc.file_name || selectedDoc.cita_tag || selectedDoc.document_id || 'Detalles del Documento'}>
                                 <FileText className="inline-block h-5 w-5 align-text-bottom text-primary" />
