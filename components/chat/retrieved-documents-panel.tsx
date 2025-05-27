@@ -120,11 +120,11 @@ export function RetrievedDocumentsPanel({ documents, isLoading }: RetrievedDocum
                                             {index + 1}
                                         </span>
                                         <div className="flex-1 min-w-0">
-                                            <span className="block font-medium text-foreground/95 truncate text-sm" title={doc.file_name || doc.cita_tag || `Fragmento ${doc.id.substring(0, 8)}`}>
-                                                {doc.file_name || doc.cita_tag || `Fragmento ${doc.id.substring(0, 8)}`}
+                                            <span className="block font-medium text-foreground/95 truncate text-sm" title={doc.file_name || doc.cita_tag || (doc.id && typeof doc.id === 'string' ? `Fragmento ${doc.id.substring(0, 8)}` : 'Fragmento')}>
+                                                {doc.file_name || doc.cita_tag || (doc.id && typeof doc.id === 'string' ? `Fragmento ${doc.id.substring(0, 8)}` : 'Fragmento')}
                                             </span>
                                             <span className="block text-[11px] text-muted-foreground truncate">
-                                                ID Doc: {doc.document_id?.substring(0, 8) ?? 'N/A'} / Frag: {doc.id.substring(0, 8)}
+                                                ID Doc: {doc.document_id && typeof doc.document_id === 'string' ? doc.document_id.substring(0, 8) : 'N/A'} / Frag: {doc.id && typeof doc.id === 'string' ? doc.id.substring(0, 8) : ''}
                                             </span>
                                         </div>
                                         <ScoreStars score={doc.score} />

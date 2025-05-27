@@ -290,7 +290,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
              {(() => {
                const name = message.user?.name;
                const email = message.user?.email;
-               const initial = (name ?? email ?? 'U').toString().substring(0, 1).toUpperCase();
+               let base = name ?? email ?? 'U';
+               if (base == null) base = 'U';
+               base = typeof base === 'string' ? base : String(base);
+               const initial = base.length > 0 ? base.substring(0, 1).toUpperCase() : 'U';
                return initial;
              })()}
            </AvatarFallback>
