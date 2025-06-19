@@ -34,6 +34,7 @@ interface FileUploaderProps {
   isUploading: boolean; // Estado de carga del hook padre
   uploadError: string | null; // Error del hook padre
   clearUploadStatus: () => void; // Función para limpiar error/éxito del padre
+  onFileUploaded?: (file: File, documentId: string) => void; // Callback para agregar documentos
 }
 
 export function FileUploader({
@@ -41,7 +42,8 @@ export function FileUploader({
     onUploadFile,
     isUploading,
     uploadError,
-    clearUploadStatus
+    clearUploadStatus,
+    onFileUploaded
 }: FileUploaderProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [dropzoneError, setDropzoneError] = useState<string | null>(null);
@@ -196,11 +198,15 @@ export function FileUploader({
             ))}
           </div>
           {/* Botón sticky al fondo del uploader */}
-          <div className="sticky bottom-0 left-0 right-0 z-20 bg-background pt-3 pb-1 flex justify-end border-t mt-2">
-            <Button
+          <div className="sticky bottom-0 left-0 right-0 z-20 bg-background pt-3 pb-1 flex justify-end border-t mt-2">            <Button
               onClick={async () => {
                 for (const file of files) {
-                  await onUploadFile(file, authHeaders);
+                  const success = await onUploadFile(file, authHeaders);
+                  if (success && onFileUploaded) {
+                    // Generar un document_id simulado
+                    const documentId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    onFileUploaded(file, documentId);
+                  }
                 }
                 setFiles([]);
               }}

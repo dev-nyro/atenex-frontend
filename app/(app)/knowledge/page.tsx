@@ -17,7 +17,6 @@ import { Separator } from '@/components/ui/separator';
 
 export default function KnowledgePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
-
   const {
     documents,
     isLoading: isLoadingDocuments,
@@ -28,15 +27,21 @@ export default function KnowledgePage() {
     retryLocalUpdate,
     refreshDocument,
     deleteLocalDocument,
+    addDocument, // Nueva función para agregar documentos simulados
   } = useDocumentStatuses();
-
   const {
     isUploading,
     uploadError,
     uploadResponse,
     uploadFile,
     clearUploadStatus
-  } = useUploadDocument();
+  } = useUploadDocument((response) => {
+    // Callback cuando se sube exitosamente un archivo
+    if (response.document_id) {
+      // Necesitamos guardar el archivo original para poder obtener el nombre
+      // Esto se manejará directamente en el FileUploader
+    }
+  });
 
   const [stats, setStats] = useState<DocumentStatsResponse | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -50,21 +55,39 @@ export default function KnowledgePage() {
       };
     }
     return null;
-  }, [user?.userId, user?.companyId]);
-
-  // Fetch stats from backend
+  }, [user?.userId, user?.companyId]);  // Fetch stats simuladas
   useEffect(() => {
     if (!authHeadersForChildren) return;
     setIsLoadingStats(true);
     setStatsError(null);
-    getDocumentStats(authHeadersForChildren)
-      .then(setStats)
-      .catch((err) => {
-        setStatsError(err?.message || 'Error al obtener estadísticas');
-        setStats(null);
-      })
-      .finally(() => setIsLoadingStats(false));
-  }, [authHeadersForChildren]);
+    
+    // Simular carga de estadísticas
+    setTimeout(() => {
+      const mockStats: DocumentStatsResponse = {
+        total_documents: documents.length,
+        total_chunks: documents.reduce((acc, doc) => acc + (doc.milvus_chunk_count ?? doc.chunk_count ?? 0), 0),
+        by_status: documents.reduce((acc, doc) => {
+          acc[doc.status] = (acc[doc.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),        by_type: documents.reduce((acc, doc) => {
+          const extension = (doc.file_name || 'unknown').split('.').pop()?.toLowerCase() || 'unknown';
+          acc[extension] = (acc[extension] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        by_user: [
+          { user_id: user?.userId || 'user_1', name: user?.name || 'Usuario', count: documents.length }
+        ],
+        recent_activity: [
+          { date: new Date().toISOString().split('T')[0], uploaded: 1, processed: 1, error: 0 },
+          { date: new Date(Date.now() - 86400000).toISOString().split('T')[0], uploaded: 2, processed: 2, error: 0 }
+        ],
+        oldest_document_date: documents.length > 0 ? (documents[documents.length - 1].created_at || null) : null,
+        newest_document_date: documents.length > 0 ? (documents[0].created_at || null) : null
+      };
+      setStats(mockStats);
+      setIsLoadingStats(false);
+    }, 300);
+  }, [authHeadersForChildren, documents, user]); // Agregamos documents como dependencia para actualizar las estadísticas
 
   // Mantener fetchDocuments para la lista de documentos
   useEffect(() => {
@@ -158,14 +181,14 @@ export default function KnowledgePage() {
               <UploadCloud className="h-6 w-6 text-primary" />
               <span className="font-semibold text-lg">Subir Nuevo Documento</span>
             </div>
-            <span className="text-xs text-muted-foreground mb-2">(Arrastra, selecciona o pega archivos)</span>
-            {authHeadersForChildren ? (
+            <span className="text-xs text-muted-foreground mb-2">(Arrastra, selecciona o pega archivos)</span>            {authHeadersForChildren ? (
               <FileUploader
                 authHeaders={authHeadersForChildren}
                 onUploadFile={uploadFile}
                 isUploading={isUploading}
                 uploadError={uploadError}
                 clearUploadStatus={clearUploadStatus}
+                onFileUploaded={addDocument}
               />
             ) : (
               <Alert variant="default" className="bg-muted/50 mt-2 w-full">

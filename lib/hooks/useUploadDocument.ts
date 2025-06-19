@@ -1,6 +1,6 @@
-// File: lib/hooks/useUploadDocument.ts (NUEVO)
+// File: lib/hooks/useUploadDocument.ts (SIMULADO - Solo Frontend)
 import { useState, useCallback } from 'react';
-import { uploadDocument, IngestResponse, AuthHeaders, ApiError } from '@/lib/api';
+import { IngestResponse, AuthHeaders } from '@/lib/api';
 import { toast } from 'sonner'; // Para notificaciones
 
 interface UseUploadDocumentReturn {
@@ -12,8 +12,8 @@ interface UseUploadDocumentReturn {
 }
 
 /**
- * Hook personalizado para manejar la subida de documentos.
- * Encapsula la lógica de llamada API, estado de carga, errores (incluido 409) y notificaciones.
+ * Hook personalizado SIMULADO para manejar la subida de documentos.
+ * Todo es simulado en el frontend - no hace llamadas reales al backend.
  * @param onSuccess - Callback opcional a ejecutar tras una subida exitosa.
  * @returns Objeto con el estado y la función de subida.
  */
@@ -29,45 +29,39 @@ export function useUploadDocument(onSuccess?: (response: IngestResponse) => void
     const toastId = toast.loading(`Subiendo archivo "${file.name}"...`); // Notificación de carga
 
     try {
-      const response = await uploadDocument(file, authHeaders);
-      setUploadResponse(response);
+      // Simular la subida del archivo
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular 1 segundo de subida      // Crear respuesta simulada
+      const mockResponse: IngestResponse = {
+        document_id: `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        task_id: `task_${Date.now()}`,
+        status: 'processing',
+        message: 'Documento recibido y en cola para procesamiento'
+      };
+
+      setUploadResponse(mockResponse);
       toast.success("Archivo Subido", {
         id: toastId,
-        description: `"${file.name}" ha sido puesto en cola para procesamiento. Estado: ${response.status || 'recibido'}.`,
+        description: `"${file.name}" ha sido puesto en cola para procesamiento.`,
       });
+      
       if (onSuccess) {
-        onSuccess(response);
+        onSuccess(mockResponse);
       }
+      
       setIsUploading(false);
       return true; // Indica éxito
     } catch (err: any) {
-      let errorMessage = 'Error al subir el documento.';
-      let errorTitle = "Error al Subir";
-
-      if (err instanceof ApiError) {
-        // Manejo específico del error 409 (duplicado)
-        if (err.status === 409) {
-          errorTitle = "Archivo Duplicado";
-          errorMessage = err.message || `Ya existe un documento llamado "${file.name}". No se ha subido de nuevo.`;
-        } else {
-          // Otros errores de API
-          errorMessage = err.message || `Error API (${err.status})`;
-        }
-      } else if (err.message) {
-        // Errores genéricos
-        errorMessage = err.message;
-      }
-
+      // En la simulación, esto no debería ocurrir, pero mantenemos el manejo por consistencia
+      const errorMessage = 'Error simulado al subir el documento.';
       setUploadError(errorMessage);
       setUploadResponse(null);
-      toast.error(errorTitle, {
+      toast.error("Error al Subir", {
         id: toastId,
         description: errorMessage,
       });
       setIsUploading(false);
       return false; // Indica fallo
     }
-    // No necesitamos finally porque isUploading se setea en try/catch
   }, [onSuccess]);
 
   // Función para limpiar el estado de error/respuesta (útil después de mostrar el error)
