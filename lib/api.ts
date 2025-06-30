@@ -301,7 +301,7 @@ export async function getDocumentStats(
   );
 }
 
-// --- User API Functions ---
+// --- User API Functions --- 
 export async function getUsersByCompany(companyId: string, auth: AuthHeaders, limit: number = 50, offset: number = 0): Promise<UserAdminResponse[]> {
   if (!companyId || typeof companyId !== 'string') { throw new ApiError("Se requiere un ID de empresa válido.", 400); }
   const endpoint = `/api/v1/admin/users/by_company/${companyId}?limit=${limit}&offset=${offset}`;
